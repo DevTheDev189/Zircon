@@ -1,0 +1,490 @@
+package com.mcmanager.client.auth;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.annotations.SerializedName;
+import com.sun.net.httpserver.HttpServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Microsoft Account (MSA) → Xbox Live → Xbox Security Token Service (XSTS) →
+ * Minecraft authentication flow, per plan task 3.2.
+ *
+ * <p>The flow opens the system browser against {@code login.live.com} with a
+ * local callback server on {@code http://localhost:8080/callback}. The resulting
+ * session (including the Microsoft refresh token for silent renewal) is cached in
+ * {@code ~/.mcmanager/auth_cache.json}.
+ *
+ * <p>You must register an Azure application with the redirect URI
+ * {@code http://localhost:8080/callback} and pass its client id via the
+ * {@code mcmanager.clientId} system property (or replace {@link #DEFAULT_CLIENT_ID}).
+ */
+public class MicrosoftAuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(MicrosoftAuthService.class);
+
+    public static final String DEFAULT_CLIENT_ID = "REPLACE_WITH_AZURE_CLIENT_ID";
+
+    private static final String REDIRECT_URI = "http://localhost:8080/callback";
+    private static final int CALLBACK_PORT = 8080;
+
+    private static final String AUTH_URL = "https://login.live.com/oauth20_authorize.srf";
+    private static final String TOKEN_URL = "https://login.live.com/oauth20_token.srf";
+    private static final String XBL_URL = "https://user.auth.xboxlive.com/user/authenticate";
+    private static final String XSTS_URL = "https://xsts.auth.xboxlive.com/xsts/authorize";
+    private static final String MC_LOGIN_URL = "https://api.minecraftservices.com/authentication/login_with_xbox";
+    private static final String MC_ENTITLEMENTS_URL = "https://api.minecraftservices.com/entitlements/mcstore";
+    private static final String MC_PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile";
+
+    private static final Path CACHE_FILE = Path.of(
+            System.getProperty("user.home"), ".mcmanager", "auth_cache.json");
+
+    /** Optional one-line file containing the Azure client id (no -D flag needed). */
+    private static final Path CLIENT_ID_FILE = Path.of(
+            System.getProperty("user.home"), ".mcmanager", "client_id.txt");
+
+    private final String clientId;
+    private final HttpClient http;
+    private final Gson gson = new Gson();
+
+    public MicrosoftAuthService() {
+        this(resolveClientId());
+    }
+
+    public MicrosoftAuthService(String clientId) {
+        this.clientId = clientId;
+        this.http = HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(20))
+                .executor(Executors.newVirtualThreadPerTaskExecutor())
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+    }
+
+    /**
+     * Resolution order: {@code -Dmcmanager.clientId}, the {@code --clientId=...}
+     * launcher argument (converted to a system property by {@code Main}), then the
+     * {@code ~/.mcmanager/client_id.txt} file, then the placeholder constant.
+     */
+    private static String resolveClientId() {
+        String fromProp = System.getProperty("mcmanager.clientId");
+        if (fromProp != null && !fromProp.isBlank()) {
+            return fromProp;
+        }
+        try {
+            if (Files.isRegularFile(CLIENT_ID_FILE)) {
+                String fromFile = Files.readString(CLIENT_ID_FILE).trim();
+                if (!fromFile.isBlank()) {
+                    return fromFile;
+                }
+            }
+        } catch (IOException e) {
+            // fall through to the placeholder
+        }
+        return DEFAULT_CLIENT_ID;
+    }
+
+    // ------------------------------------------------------------------
+    // Interactive login
+    // ------------------------------------------------------------------
+
+    /**
+     * Runs the full interactive browser flow and returns the authenticated session.
+     *
+     * @throws IOException if the browser/HTTP steps fail
+     */
+    public SessionData login() throws IOException, InterruptedException {
+        if (DEFAULT_CLIENT_ID.equals(clientId)) {
+            throw new IllegalStateException(
+                    "Microsoft client id not configured. Run the launcher with "
+                    + "--clientId=<AZURE_CLIENT_ID> (e.g. java -jar client-launcher-1.0.0-all.jar "
+                    + "--clientId=abc123) or create " + CLIENT_ID_FILE + " containing the id. "
+                    + "The Azure app must allow redirect uri " + REDIRECT_URI);
+        }
+
+        try (CallbackServer server = new CallbackServer()) {
+            server.start();
+
+            String authorizeUrl = AUTH_URL
+                    + "?client_id=" + urlEncode(clientId)
+                    + "&response_type=code"
+                    + "&redirect_uri=" + urlEncode(REDIRECT_URI)
+                    + "&scope=" + urlEncode("XboxLive.signin offline_access")
+                    + "&prompt=login";
+
+            log.info("Opening browser for Microsoft login (client_id={}, redirect_uri={})",
+                    clientId, REDIRECT_URI);
+            log.debug("Authorize URL: {}", authorizeUrl);
+            if (!java.awt.Desktop.isDesktopSupported()
+                    || !java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
+                throw new IOException("Desktop browser not available; open this URL manually:\n" + authorizeUrl);
+            }
+            java.awt.Desktop.getDesktop().browse(URI.create(authorizeUrl));
+
+            String code = server.awaitCode(5, TimeUnit.MINUTES);
+            if (code == null) {
+                throw new IOException("Login timed out waiting for the browser redirect");
+            }
+            return completeLogin(code);
+        }
+    }
+
+    /**
+     * Continues the flow after the browser callback: MS token → XBL → XSTS →
+     * Minecraft token → profile. Persists the session to disk.
+     */
+    public SessionData completeLogin(String authCode) throws IOException, InterruptedException {
+        MsTokenResponse ms = exchangeCodeForMsToken(authCode);
+
+        String xblToken = xblAuthenticate(ms.accessToken);
+        XstsResponse xsts = xstsAuthorize(xblToken);
+
+        String identityToken = "XBL3.0 x=" + xsts.uhs + ";" + xsts.token;
+        McLoginResponse mc = minecraftLogin(identityToken);
+
+        JsonObject profile = fetchProfile(mc.accessToken);
+
+        SessionData session = new SessionData(
+                mc.accessToken,
+                ms.refreshToken,
+                profile.get("name").getAsString(),
+                profile.get("id").getAsString(),
+                System.currentTimeMillis() + (mc.expiresIn * 1000L));
+        save(session);
+        log.info("Signed in as {}", session.getUsername());
+        return session;
+    }
+
+    // ------------------------------------------------------------------
+    // Silent renewal / cache
+    // ------------------------------------------------------------------
+
+    /** Attempts to renew an expired session using its Microsoft refresh token. */
+    public SessionData refresh(SessionData session) throws IOException, InterruptedException {
+        if (session == null || session.getRefreshToken() == null) {
+            throw new IOException("No refresh token available");
+        }
+        String body = form("client_id", clientId,
+                "redirect_uri", REDIRECT_URI,
+                "grant_type", "refresh_token",
+                "refresh_token", session.getRefreshToken(),
+                "scope", "XboxLive.signin offline_access");
+
+        JsonObject json = postJson(TOKEN_URL, body, "application/x-www-form-urlencoded");
+        MsTokenResponse ms = gson.fromJson(json, MsTokenResponse.class);
+        if (ms.accessToken == null) {
+            throw new IOException("Token refresh failed: response missing access_token");
+        }
+        return completeLoginWithMsToken(ms);
+    }
+
+    private SessionData completeLoginWithMsToken(MsTokenResponse ms)
+            throws IOException, InterruptedException {
+        String xblToken = xblAuthenticate(ms.accessToken);
+        XstsResponse xsts = xstsAuthorize(xblToken);
+        McLoginResponse mc = minecraftLogin("XBL3.0 x=" + xsts.uhs + ";" + xsts.token);
+        JsonObject profile = fetchProfile(mc.accessToken);
+        SessionData session = new SessionData(
+                mc.accessToken, ms.refreshToken,
+                profile.get("name").getAsString(), profile.get("id").getAsString(),
+                System.currentTimeMillis() + (mc.expiresIn * 1000L));
+        save(session);
+        return session;
+    }
+
+    public SessionData loadCached() {
+        if (!Files.isRegularFile(CACHE_FILE)) {
+            return null;
+        }
+        try {
+            SessionData data = gson.fromJson(Files.readString(CACHE_FILE), SessionData.class);
+            if (data == null || data.getUsername() == null) {
+                return null;
+            }
+            return data;
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not read auth cache", e);
+            return null;
+        }
+    }
+
+    public void save(SessionData session) throws IOException {
+        Files.createDirectories(CACHE_FILE.getParent());
+        Files.writeString(CACHE_FILE, gson.toJson(session));
+    }
+
+    public void clearCache() throws IOException {
+        Files.deleteIfExists(CACHE_FILE);
+    }
+
+    // ------------------------------------------------------------------
+    // Token exchange steps
+    // ------------------------------------------------------------------
+
+    private MsTokenResponse exchangeCodeForMsToken(String code) throws IOException, InterruptedException {
+        String body = form("client_id", clientId,
+                "redirect_uri", REDIRECT_URI,
+                "grant_type", "authorization_code",
+                "code", code,
+                "scope", "XboxLive.signin offline_access");
+        JsonObject json = postJson(TOKEN_URL, body, "application/x-www-form-urlencoded");
+        MsTokenResponse ms = gson.fromJson(json, MsTokenResponse.class);
+        if (ms.accessToken == null) {
+            throw new IOException("OAuth token exchange failed: response missing access_token "
+                    + "(HTTP 200; check the Azure app's public-client / redirect_uri config)");
+        }
+        return ms;
+    }
+
+    private String xblAuthenticate(String msAccessToken) throws IOException, InterruptedException {
+        JsonObject body = new JsonObject();
+        body.addProperty("RelyingParty", "http://auth.xboxlive.com");
+        body.addProperty("TokenType", "JWT");
+        JsonObject properties = new JsonObject();
+        properties.addProperty("AuthMethod", "RPS");
+        properties.addProperty("SiteName", "user.auth.xboxlive.com");
+        properties.addProperty("RpsTicket", "d=" + msAccessToken);
+        body.add("Properties", properties);
+
+        JsonObject json = postJson(XBL_URL, body.toString(), "application/json");
+        return require(json, "Token", "XBL authenticate");
+    }
+
+    private XstsResponse xstsAuthorize(String xblToken) throws IOException, InterruptedException {
+        JsonObject body = new JsonObject();
+        body.addProperty("RelyingParty", "rp://api.minecraftservices.com/");
+        body.addProperty("TokenType", "JWT");
+        JsonObject properties = new JsonObject();
+        properties.addProperty("SandboxId", "RETAIL");
+        properties.add("UserTokens", gson.toJsonTree(new String[]{xblToken}));
+        body.add("Properties", properties);
+
+        JsonObject json = postJson(XSTS_URL, body.toString(), "application/json");
+        XstsResponse xsts = new XstsResponse();
+        xsts.token = require(json, "Token", "XSTS authorize");
+        JsonObject displayClaims = json.getAsJsonObject("DisplayClaims");
+        if (displayClaims != null && displayClaims.has("xui")) {
+            var xui = displayClaims.getAsJsonArray("xui");
+            if (!xui.isEmpty()) {
+                xsts.uhs = xui.get(0).getAsJsonObject().get("uhs").getAsString();
+            }
+        }
+        if (xsts.uhs == null) {
+            throw new IOException("XSTS response missing user hash (uhs)");
+        }
+        return xsts;
+    }
+
+    private McLoginResponse minecraftLogin(String identityToken) throws IOException, InterruptedException {
+        JsonObject body = new JsonObject();
+        body.addProperty("identityToken", identityToken);
+        JsonObject json;
+        try {
+            json = postJson(MC_LOGIN_URL, body.toString(), "application/json");
+        } catch (IOException e) {
+            if (e.getMessage().contains("Invalid app registration")) {
+                throw new IOException("Minecraft rejected the login with 'Invalid app registration'. "
+                        + "Two things must be true: (1) the Microsoft account owns Minecraft Java Edition, "
+                        + "and (2) the Azure client ID is approved by Minecraft for authentication. "
+                        + "If the account is correct, submit your client ID for review at "
+                        + "https://aka.ms/mce-reviewappid — once approved (you receive an email), "
+                        + "login works with no code change.", e);
+            }
+            throw e;
+        }
+        McLoginResponse mc = new McLoginResponse();
+        mc.accessToken = require(json, "access_token", "Minecraft login");
+        mc.expiresIn = json.has("expires_in") ? json.get("expires_in").getAsLong() : 86_400;
+        return mc;
+    }
+
+    private JsonObject fetchProfile(String mcAccessToken) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(MC_PROFILE_URL))
+                .header("Authorization", "Bearer " + mcAccessToken)
+                .GET()
+                .build();
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new IOException("Minecraft profile fetch failed: HTTP " + response.statusCode()
+                    + " " + response.body());
+        }
+        return gson.fromJson(response.body(), JsonObject.class);
+    }
+
+    /** Returns true if the account owns Minecraft (best effort — never aborts login). */
+    public boolean checkEntitlements(String mcAccessToken) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(MC_ENTITLEMENTS_URL))
+                    .header("Authorization", "Bearer " + mcAccessToken)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            JsonObject json = gson.fromJson(response.body(), JsonObject.class);
+            return json != null && json.has("items") && json.getAsJsonArray("items").size() > 0;
+        } catch (Exception e) {
+            log.warn("Entitlements check failed: {}", e.getMessage());
+            return true; // don't block login on transient API issues
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // HTTP helpers
+    // ------------------------------------------------------------------
+
+    private JsonObject postJson(String url, String body, String contentType)
+            throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", contentType)
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() / 100 != 2) {
+            throw new IOException("POST " + url + " failed: HTTP " + response.statusCode()
+                    + " " + response.body());
+        }
+        return gson.fromJson(response.body(), JsonObject.class);
+    }
+
+    private String require(JsonObject json, String field, String step) throws IOException {
+        if (!json.has(field)) {
+            throw new IOException(step + " failed: response missing '" + field + "': " + json);
+        }
+        return json.get(field).getAsString();
+    }
+
+    private static String form(String... kv) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < kv.length; i += 2) {
+            if (i > 0) {
+                sb.append('&');
+            }
+            sb.append(urlEncode(kv[i])).append('=').append(urlEncode(kv[i + 1]));
+        }
+        return sb.toString();
+    }
+
+    private static String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    // ------------------------------------------------------------------
+    // Local callback server
+    // ------------------------------------------------------------------
+
+    private static final class CallbackServer implements AutoCloseable {
+        private final HttpServer server;
+        private final CompletableFuture<String> codeFuture = new CompletableFuture<>();
+
+        CallbackServer() throws IOException {
+            this.server = HttpServer.create(new InetSocketAddress("127.0.0.1", CALLBACK_PORT), 0);
+        }
+
+        void start() {
+            server.createContext("/callback", exchange -> {
+                String query = exchange.getRequestURI().getQuery();
+                String code = null;
+                String error = null;
+                String errorDescription = null;
+                if (query != null) {
+                    for (String pair : query.split("&")) {
+                        String[] kv = pair.split("=", 2);
+                        if (kv.length != 2) {
+                            continue;
+                        }
+                        String key = kv[0];
+                        String value = java.net.URLDecoder.decode(kv[1], StandardCharsets.UTF_8);
+                        switch (key) {
+                            case "code" -> code = value;
+                            case "error" -> error = value;
+                            case "error_description" -> errorDescription = value;
+                            default -> {
+                            }
+                        }
+                    }
+                }
+                String message = code != null
+                        ? "Signed in! You can close this window and return to the launcher."
+                        : "Authentication failed — close this window and return to the launcher.";
+                byte[] response = ("<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'>"
+                        + "<h2>McManager</h2><p>" + message + "</p>"
+                        + (error != null ? "<p style='color:#cf222e'>" + error
+                        + (errorDescription != null ? " — " + errorDescription : "") + "</p>" : "")
+                        + "</body></html>").getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
+                exchange.sendResponseHeaders(200, response.length);
+                try (OutputStream out = exchange.getResponseBody()) {
+                    out.write(response);
+                }
+                if (code != null) {
+                    codeFuture.complete(code);
+                } else if (error != null) {
+                    codeFuture.completeExceptionally(new IOException("Microsoft login failed: " + error
+                            + (errorDescription != null ? " — " + errorDescription : "")));
+                } else {
+                    codeFuture.completeExceptionally(new IOException("OAuth callback missing code"));
+                }
+            });
+            server.start();
+        }
+
+        /** @return the auth code, {@code null} on timeout, or throws the Azure error. */
+        String awaitCode(long timeout, TimeUnit unit) throws InterruptedException, IOException {
+            try {
+                return codeFuture.get(timeout, unit);
+            } catch (java.util.concurrent.TimeoutException e) {
+                return null;
+            } catch (java.util.concurrent.ExecutionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof IOException io) {
+                    throw io;
+                }
+                throw new IOException("OAuth callback failed", cause);
+            }
+        }
+
+        @Override
+        public void close() {
+            server.stop(0);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Token response DTOs
+    // ------------------------------------------------------------------
+
+    private static class MsTokenResponse {
+        @SerializedName("access_token")
+        String accessToken;
+        @SerializedName("refresh_token")
+        String refreshToken;
+    }
+
+    private static class XstsResponse {
+        String token;
+        String uhs;
+    }
+
+    private static class McLoginResponse {
+        String accessToken;
+        long expiresIn;
+    }
+}

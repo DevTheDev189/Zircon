@@ -1,0 +1,31 @@
+plugins {
+    id 'application'
+    id 'com.gradleup.shadow'
+    id 'org.openjfx.javafxplugin'
+}
+
+application {
+    mainClass = 'com.mcmanager.client.Main'
+}
+
+javafx {
+    version = '25.0.4'
+    modules = ['javafx.controls', 'javafx.fxml']
+}
+
+dependencies {
+    implementation project(':shared-core')
+
+    implementation 'io.github.mkpaz:atlantafx-base:2.1.0'
+    implementation 'ch.qos.logback:logback-classic:1.5.3'
+}
+
+shadowJar {
+    archiveBaseName = 'client-launcher'
+    archiveClassifier = 'all'
+    mergeServiceFiles()
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
+}

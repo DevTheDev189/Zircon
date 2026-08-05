@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>McManager — Server Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100">
+<div id="app" class="max-w-6xl mx-auto p-4">
+
+    <!-- Top bar -->
+    <header class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center font-bold text-slate-950">MC</div>
+            <div>
+                <h1 class="text-lg font-semibold leading-tight">{{ title }}</h1>
+                <p class="text-xs text-slate-400">MC {{ mcVersion }} · {{ loaderType || 'no loader' }}</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-xs px-2 py-1 rounded"
+                  :class="status.running ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'">
+                {{ status.running ? 'Server running' : 'Server stopped' }}
+            </span>
+            <span class="text-xs text-slate-400">public port {{ status.publicPort }}</span>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="flex gap-1 mb-4 border-b border-slate-800">
+        <button v-for="t in tabs" :key="t.id" @click="tab = t.id"
+                class="px-4 py-2 text-sm rounded-t"
+                :class="tab === t.id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'">
+            {{ t.label }}
+        </button>
+    </nav>
+
+    <!-- ============================ MODS TAB ============================ -->
+    <section v-show="tab === 'mods'">
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Search -->
+            <div class="bg-slate-900 rounded-lg p-4">
+                <h2 class="font-semibold mb-3">Install a mod</h2>
+                <div class="flex gap-2 mb-2">
+                    <select v-model="search.origin" class="bg-slate-800 rounded px-2 py-1 text-sm">
+                        <option value="modrinth">Modrinth</option>
+                        <option value="curseforge">CurseForge</option>
+                    </select>
+                    <input v-model="search.query" placeholder="Search mods..." class="flex-1 bg-slate-800 rounded px-3 py-1 text-sm" @keyup.enter="doSearch">
+                    <button @click="doSearch" class="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-1 text-sm font-medium">Search</button>
+                </div>
+                <p class="text-xs text-slate-500 mb-2">Facets: MC {{ mcVersion }} · {{ loaderType || 'any loader' }}</p>
+
+                <div class="max-h-72 overflow-y-auto space-y-2">
+                    <div v-for="hit in searchResults" :key="hit.projectId" class="bg-slate-800 rounded p-2 flex gap-2 items-start">
+                        <img v-if="hit.iconUrl" :src="hit.iconUrl" class="w-8 h-8 rounded object-cover" alt="">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-sm truncate">{{ hit.title }}</span>
+                                <span class="text-[10px] text-slate-400">{{ hit.author }}</span>
+                            </div>
+                            <p class="text-xs text-slate-400 line-clamp-1">{{ hit.description }}</p>
+                            <div class="flex gap-2 mt-1 items-center">
+                                <span class="text-[10px] bg-slate-700 rounded px-1">{{ (hit.downloads/1000).toFixed(1) }}k dl</span>
+                                <select v-if="versions[hit.projectId]" v-model="versions[hit.projectId]" class="text-[11px] bg-slate-700 rounded px-1 py-0.5 max-w-[180px]">
+                                    <option v-for="v in versionLists[hit.projectId]" :value="v.id">{{ v.name || v.versionNumber }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button @click="install(hit)" class="bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-1 text-xs font-medium whitespace-nowrap">Install</button>
+                    </div>
+                    <p v-if="searching" class="text-xs text-slate-500">Searching...</p>
+                    <p v-if="!searching && searchResults.length === 0 && searched" class="text-xs text-slate-500">No results.</p>
+                    <p v-if="searchNotice" class="text-xs text-yellow-400/80 mt-2">{{ searchNotice }}</p>
+                </div>
+
+                <div class="mt-3 pt-3 border-t border-slate-800">
+                    <p class="text-xs text-slate-400 mb-1">...or upload a JAR directly</p>
+                    <input type="file" ref="uploadInput" accept=".jar" class="block w-full text-xs">
+                    <button @click="upload" class="mt-2 bg-slate-700 hover:bg-slate-600 rounded px-3 py-1 text-sm">Upload to server</button>
+                </div>
+            </div>
+
+            <!-- Installed mods -->
+            <div class="bg-slate-900 rounded-lg p-4">
+                <h2 class="font-semibold mb-3">Installed mods ({{ mods.length }})</h2>
+                <div class="max-h-[420px] overflow-y-auto space-y-2">
+                    <div v-for="m in mods" :key="m.filename" class="bg-slate-800 rounded p-2 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full shrink-0"
+                              :class="m.origin === 'modrinth' ? 'bg-emerald-400' : m.origin === 'curseforge' ? 'bg-orange-400' : 'bg-sky-400'"></span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm truncate">{{ m.filename }}</p>
+                            <p class="text-[10px] text-slate-400">{{ m.origin }} · {{ formatBytes(m.fileSize) }} · {{ (m.sha1||'').slice(0,8) }}</p>
+                        </div>
+                        <button @click="removeMod(m.filename)" class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+                    </div>
+                    <p v-if="mods.length === 0" class="text-xs text-slate-500">No mods installed yet.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================ CONSOLE TAB ============================ -->
+    <section v-show="tab === 'console'">
+        <div class="bg-black rounded-lg border border-slate-800">
+            <div ref="consoleBox" class="h-96 overflow-y-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">
+                <div v-for="(line, i) in consoleLines" :key="i" :class="consoleColor(line)">{{ line }}</div>
+            </div>
+            <div class="flex items-center gap-3 p-2 border-t border-slate-800">
+                <label class="flex items-center gap-1 text-xs text-slate-400">
+                    <input type="checkbox" v-model="autoScroll"> auto-scroll
+                </label>
+                <input v-model="command" @keyup.enter="sendCommand" placeholder="Type a server command..."
+                       class="flex-1 bg-slate-900 rounded px-3 py-1.5 text-sm" :disabled="!status.running">
+                <button @click="sendCommand" class="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-1.5 text-sm" :disabled="!status.running">Send</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================ PLAYERS TAB ============================ -->
+    <section v-show="tab === 'players'">
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-slate-900 rounded-lg p-4">
+                <h2 class="font-semibold mb-3">Online ({{ online.length }})</h2>
+                <div class="flex flex-wrap gap-2">
+                    <span v-for="p in online" class="bg-slate-800 rounded px-2 py-1 text-sm">{{ p }}
+                        <button @click="kick(p)" class="text-red-400 ml-1 text-xs">kick</button>
+                    </span>
+                </div>
+
+                <h2 class="font-semibold mt-5 mb-3">Whitelist</h2>
+                <div class="flex gap-2 mb-2">
+                    <input v-model="whitelistName" placeholder="Player name" class="flex-1 bg-slate-800 rounded px-3 py-1 text-sm">
+                    <button @click="addWhitelist" class="bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-1 text-sm">Add</button>
+                </div>
+                <div class="space-y-1">
+                    <div v-for="p in whitelist" class="flex items-center justify-between bg-slate-800 rounded px-2 py-1 text-sm">
+                        <span>{{ p.name }}</span>
+                        <button @click="removeWhitelist(p.name)" class="text-red-400 text-xs">remove</button>
+                    </div>
+                </div>
+
+                <h2 class="font-semibold mt-5 mb-3">Operators</h2>
+                <div class="flex gap-2 mb-2">
+                    <input v-model="opName" placeholder="Player name" class="flex-1 bg-slate-800 rounded px-3 py-1 text-sm">
+                    <button @click="addOp" class="bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-1 text-sm">Op</button>
+                </div>
+                <div class="space-y-1">
+                    <div v-for="p in ops" class="flex items-center justify-between bg-slate-800 rounded px-2 py-1 text-sm">
+                        <span>{{ p.name }}</span>
+                        <button @click="removeOp(p.name)" class="text-red-400 text-xs">deop</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 rounded-lg p-4">
+                <h2 class="font-semibold mb-3">Bans</h2>
+                <div class="flex gap-2 mb-2">
+                    <input v-model="banName" placeholder="Player name" class="flex-1 bg-slate-800 rounded px-3 py-1 text-sm">
+                    <input v-model="banReason" placeholder="Reason (optional)" class="flex-1 bg-slate-800 rounded px-3 py-1 text-sm">
+                    <button @click="addBan" class="bg-red-600 hover:bg-red-500 rounded px-3 py-1 text-sm">Ban</button>
+                </div>
+                <div class="space-y-1">
+                    <div v-for="p in bans" class="flex items-center justify-between bg-slate-800 rounded px-2 py-1 text-sm">
+                        <span>{{ p.name }} <span v-if="p.reason" class="text-xs text-slate-400">— {{ p.reason }}</span></span>
+                        <button @click="removeBan(p.name)" class="text-emerald-400 text-xs">pardon</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================ SETTINGS TAB ============================ -->
+    <section v-show="tab === 'settings'">
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-slate-900 rounded-lg p-4">
+                <h2 class="font-semibold mb-3">Server</h2>
+                <label class="block text-xs text-slate-400 mb-1">Server title</label>
+                <input v-model="settings.serverTitle" class="w-full bg-slate-800 rounded px-3 py-1.5 text-sm mb-3">
+
+                <label class="block text-xs text-slate-400 mb-1">Minecraft version</label>
+                <input v-model="settings.minecraftVersion" class="w-full bg-slate-800 rounded px-3 py-1.5 text-sm mb-3">
+
+                <label class="block text-xs text-slate-400 mb-1">Mod loader type</label>
+                <select v-model="settings.modLoader.type" class="w-full bg-slate-800 rounded px-3 py-1.5 text-sm mb-3">
+                    <option value="fabric">Fabric</option>
+                    <option value="neoforge">NeoForge</option>
+                    <option value="forge">Forge</option>
+                    <option value="quilt">Quilt</option>
+                </select>
+
+                <label class="block text-xs text-slate-400 mb-1">Java args</label>
+                <input v-model="settings.javaArgs" class="w-full bg-slate-800 rounded px-3 py-1.5 text-sm mb-3">
+
+                <label class="flex items-center gap-2 text-sm mb-3">
+                    <input type="checkbox" v-model="settings.autoStartServer"> Auto-start server on boot
+                </label>
+
+                <div class="flex gap-2">
+                    <button @click="saveSettings" class="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-1.5 text-sm">Save settings</button>
+                    <button v-if="!status.running" @click="startServer" class="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-1.5 text-sm">Start server</button>
+                    <button v-else @click="stopServer" class="bg-red-600 hover:bg-red-500 rounded px-4 py-1.5 text-sm">Stop server</button>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">Put <code class="bg-slate-800 px-1 rounded">server.jar</code> into
+                    <code class="bg-slate-800 px-1 rounded">server-data/server/</code></p>
+            </div>
+
+            <div class="bg-slate-900 rounded-lg p-4">
+                <h2 class="font-semibold mb-3">server.properties</h2>
+                <div class="grid grid-cols-2 gap-2 max-h-[380px] overflow-y-auto">
+                    <template v-for="(value, key) in serverProps" :key="key">
+                        <label class="text-xs text-slate-400 truncate">{{ key }}</label>
+                        <input v-model="serverProps[key]" class="bg-slate-800 rounded px-2 py-1 text-sm">
+                    </template>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="mt-8 text-center text-[10px] text-slate-600">
+        McManager server manager — HTTP / BOM / downloads and Minecraft traffic share the public port via protocol detection.
+    </footer>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            tab: 'mods',
+            tabs: [
+                { id: 'mods', label: 'Mods' },
+                { id: 'console', label: 'Console' },
+                { id: 'players', label: 'Players' },
+                { id: 'settings', label: 'Settings' },
+            ],
+            title: 'My Minecraft Server',
+            mcVersion: '1.21.4',
+            loaderType: 'fabric',
+            status: { running: false, publicPort: 25565, onlinePlayers: [] },
+
+            mods: [],
+            search: { origin: 'modrinth', query: 'sodium' },
+            searchResults: [],
+            searchNotice: '',
+            searched: false,
+            searching: false,
+            versions: {},        // projectId -> selected version id
+            versionLists: {},    // projectId -> list of versions
+
+            consoleLines: [],
+            autoScroll: true,
+            command: '',
+            consoleWs: null,
+
+            online: [],
+            whitelist: [],
+            whitelistName: '',
+            bans: [],
+            banName: '',
+            banReason: '',
+            ops: [],
+            opName: '',
+
+            settings: { serverTitle: '', minecraftVersion: '', modLoader: { type: 'fabric', version: '', loaderJarUrl: '' }, javaArgs: '', autoStartServer: false },
+            serverProps: {},
+        };
+    },
+    created() {
+        this.refreshStatus();
+        this.refreshMods();
+        this.refreshPlayers();
+        this.loadConfig();
+        setInterval(() => this.refreshStatus(), 5000);
+        this.connectConsole();
+    },
+    updated() {
+        if (this.autoScroll) {
+            const box = this.$refs.consoleBox;
+            if (box) box.scrollTop = box.scrollHeight;
+        }
+    },
+    methods: {
+        async api(path, options = {}) {
+            const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
+            if (!res.ok) throw new Error(await res.text());
+            return res.status === 204 ? null : res.json();
+        },
+
+        // --- mods ---
+        async refreshMods() {
+            try {
+                const data = await this.api('/api/mods');
+                this.mods = data.mods || [];
+            } catch (e) { console.error(e); }
+        },
+        async doSearch() {
+            this.searching = true;
+            this.searched = true;
+            try {
+                const q = new URLSearchParams({
+                    query: this.search.query,
+                    origin: this.search.origin,
+                    mcVersion: this.mcVersion,
+                    loader: this.loaderType,
+                });
+                const data = await this.api('/api/mods/search?' + q);
+                this.searchResults = data.hits || [];
+                this.searchNotice = data.notice || '';
+                // Pre-fetch version/file lists for the first few results
+                for (const hit of this.searchResults.slice(0, 10)) {
+                    this.loadVersions(hit);
+                }
+            } catch (e) {
+                this.searchResults = [];
+                console.error(e);
+            } finally {
+                this.searching = false;
+            }
+        },
+        async loadVersions(hit) {
+            try {
+                if (this.search.origin === 'modrinth') {
+                    const q = new URLSearchParams({ projectId: hit.projectId, mcVersion: this.mcVersion, loader: this.loaderType });
+                    const data = await this.api('/api/mods/modrinth/versions?' + q);
+                    this.versionLists[hit.projectId] = data.versions || [];
+                    if (this.versionLists[hit.projectId].length) {
+                        this.versions[hit.projectId] = this.versionLists[hit.projectId][0].id;
+                    }
+                } else {
+                    const q = new URLSearchParams({ modId: hit.id });
+                    const data = await this.api('/api/mods/curseforge/files?' + q);
+                    this.versionLists[hit.projectId] = (data.files || []).map(f => ({
+                        id: String(f.id), name: f.displayName, fileName: f.fileName,
+                        downloadUrl: f.downloadUrl, fileFingerprint: f.fileFingerprint, length: f.length,
+                    }));
+                    if (this.versionLists[hit.projectId].length) {
+                        this.versions[hit.projectId] = this.versionLists[hit.projectId][0].id;
+                    }
+                }
+            } catch (e) { console.error(e); }
+        },
+        async install(hit) {
+            const selected = this.versionLists[hit.projectId]?.find(v => v.id === this.versions[hit.projectId]);
+            if (!selected) { alert('No matching version/file for this MC version.'); return; }
+            try {
+                if (this.search.origin === 'modrinth') {
+                    await this.api('/api/mods/install', {
+                        method: 'POST',
+                        body: JSON.stringify({ origin: 'modrinth', projectId: hit.projectId, versionId: selected.id }),
+                    });
+                } else {
+                    await this.api('/api/mods/install', {
+                        method: 'POST',
+                        body: JSON.stringify({ origin: 'curseforge', downloadUrl: selected.downloadUrl, filename: selected.fileName, fileId: selected.id }),
+                    });
+                }
+                await this.refreshMods();
+            } catch (e) { alert('Install failed: ' + e.message); }
+        },
+        async upload() {
+            const file = this.$refs.uploadInput.files[0];
+            if (!file) return;
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch('/api/mods/upload?origin=direct', { method: 'POST', body: fd });
+            if (!res.ok) { alert('Upload failed: ' + await res.text()); return; }
+            await this.refreshMods();
+        },
+        async removeMod(filename) {
+            if (!confirm('Delete ' + filename + '?')) return;
+            await this.api('/api/mods/' + encodeURIComponent(filename), { method: 'DELETE' });
+            await this.refreshMods();
+        },
+
+        // --- console ---
+        connectConsole() {
+            this.consoleWs = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/console');
+            this.consoleWs.onmessage = (ev) => {
+                this.consoleLines.push(ev.data);
+                if (this.consoleLines.length > 2000) this.consoleLines.shift();
+            };
+            this.consoleWs.onclose = () => setTimeout(() => this.connectConsole(), 3000);
+        },
+        sendCommand() {
+            if (!this.command.trim() || !this.consoleWs) return;
+            this.consoleWs.send(this.command.trim());
+            this.command = '';
+        },
+        consoleColor(line) {
+            if (line.includes('[wrapper]')) return 'text-emerald-400';
+            if (line.includes('ERROR') || line.includes('WARN')) return 'text-yellow-300';
+            return 'text-slate-300';
+        },
+
+        // --- players ---
+        async refreshPlayers() {
+            try {
+                this.online = (await this.api('/api/players/online')).players || [];
+                this.whitelist = (await this.api('/api/players/whitelist')).players || [];
+                this.bans = (await this.api('/api/players/bans')).players || [];
+                this.ops = (await this.api('/api/players/ops')).players || [];
+            } catch (e) { console.error(e); }
+        },
+        async kick(name) { await this.api('/api/players/kick', { method: 'POST', body: JSON.stringify({ name }) }); },
+        async addWhitelist() { await this.api('/api/players/whitelist', { method: 'POST', body: JSON.stringify({ name: this.whitelistName }) }); this.whitelistName = ''; this.refreshPlayers(); },
+        async removeWhitelist(name) { await this.api('/api/players/whitelist/' + encodeURIComponent(name), { method: 'DELETE' }); this.refreshPlayers(); },
+        async addBan() { await this.api('/api/players/bans', { method: 'POST', body: JSON.stringify({ name: this.banName, reason: this.banReason }) }); this.banName = ''; this.banReason = ''; this.refreshPlayers(); },
+        async removeBan(name) { await this.api('/api/players/bans/' + encodeURIComponent(name), { method: 'DELETE' }); this.refreshPlayers(); },
+        async addOp() { await this.api('/api/players/ops', { method: 'POST', body: JSON.stringify({ name: this.opName }) }); this.opName = ''; this.refreshPlayers(); },
+        async removeOp(name) { await this.api('/api/players/ops/' + encodeURIComponent(name), { method: 'DELETE' }); this.refreshPlayers(); },
+
+        // --- settings ---
+        async loadConfig() {
+            try {
+                const cfg = await this.api('/api/config');
+                this.settings.serverTitle = cfg.serverTitle;
+                this.settings.minecraftVersion = cfg.minecraftVersion;
+                this.settings.modLoader = cfg.modLoader || { type: 'fabric' };
+                this.settings.javaArgs = cfg.javaArgs;
+                this.settings.autoStartServer = cfg.autoStartServer;
+                this.serverProps = cfg.serverProperties || {};
+                this.title = cfg.serverTitle;
+                this.mcVersion = cfg.minecraftVersion;
+                this.loaderType = this.settings.modLoader.type;
+            } catch (e) { console.error(e); }
+        },
+        async saveSettings() {
+            try {
+                await this.api('/api/config', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        serverTitle: this.settings.serverTitle,
+                        minecraftVersion: this.settings.minecraftVersion,
+                        modLoader: this.settings.modLoader,
+                        javaArgs: this.settings.javaArgs,
+                        autoStartServer: this.settings.autoStartServer,
+                        serverProperties: this.serverProps,
+                    }),
+                });
+                this.title = this.settings.serverTitle;
+                this.mcVersion = this.settings.minecraftVersion;
+                this.loaderType = this.settings.modLoader.type;
+            } catch (e) { alert('Save failed: ' + e.message); }
+        },
+
+        // --- server lifecycle / status ---
+        async refreshStatus() {
+            try {
+                const s = await this.api('/api/status');
+                this.status = { ...this.status, ...s };
+            } catch (e) { /* server may be restarting */ }
+        },
+        async startServer() {
+            try {
+                await this.api('/api/server/start', { method: 'POST' });
+            } catch (e) { alert('Start failed: ' + e.message); }
+            setTimeout(() => this.refreshStatus(), 1000);
+        },
+        async stopServer() {
+            await this.api('/api/server/stop', { method: 'POST' });
+            setTimeout(() => this.refreshStatus(), 2000);
+        },
+
+        formatBytes(n) {
+            if (!n) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let i = 0;
+            while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+            return n.toFixed(1) + ' ' + units[i];
+        },
+    },
+}).mount('#app');
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+rootProject.name = 'mc-manager'
+
+include 'shared-core'
+include 'server-manager'
+include 'client-launcher'

@@ -1,0 +1,29 @@
+# ---------- Gradle ----------
+.gradle/
+build/
+**/build/
+
+# ---------- IDE / editor ----------
+.idea/
+*.iml
+.vscode/
+*.classpath
+*.project
+.settings/
+*.swp
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+
+# ---------- Runtime data (never commit wrapper state) ----------
+# server-data/ contains config.json (may hold a CurseForge API key),
+# server.properties, worlds, logs, and the server JAR.
+server-data/
+*.log
+
+# ---------- Local secrets / credentials ----------
+client_id.txt
+.env
+*.key
+*.pem
