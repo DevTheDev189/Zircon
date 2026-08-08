@@ -146,6 +146,9 @@ Provide your Azure client ID either per launch or via a local file:
 echo "<YOUR_AZURE_CLIENT_ID>" > ~/.mcmanager/client_id.txt
 ```
 
+Your Azure App ID will need to be verified with Mojang first.
+**https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=v4j5cvGGr0GRqy180BHbR-ajEQ1td1ROpz00KtS8Gd5UNVpPTkVLNFVROVQxNkdRMEtXVjNQQjdXVC4u**
+
 Sign in with Microsoft, pick a server from your saved list, and hit **PLAY** — the
 launcher syncs the exact mods the server publishes, then drops you straight in.
 
@@ -198,18 +201,6 @@ mc-manager/
 
 ---
 
-## 🔐 Security & Secrets
-
-- **No secrets in the repo.** `server-data/`, `client_id.txt`, `.env`, and `*.key`
-  are gitignored; the committed Azure client ID is a placeholder (`REPLACE_WITH_AZURE_CLIENT_ID`).
-- Your real client ID is read from `~/.mcmanager/client_id.txt` or `--clientId=` at runtime.
-- Admin API routes are JWT-protected; admin passwords are BCrypt-hashed.
-- Mod downloads are verified against Modrinth / CurseForge hashes; strict mode
-  aborts the launch if anything fails verification.
-- CurseForge API keys are read from the server config (or `-Dmcmanager.curseforgeApiKey`), never hardcoded.
-
----
-
 ## ⚖️ Legal & EULA Compliance
 
 **This project is a third-party tool and is not affiliated with Mojang Studios or
@@ -232,12 +223,6 @@ The project is designed to respect the [Minecraft EULA](https://aka.ms/Minecraft
 > doubt, review the EULA before publishing your server publicly.
 
 ---
-
-## 🗺️ Status & Roadmap
-
-**Current status:** active development — the core loop (server admin → BOM → client
-sync → launch) is working end-to-end and tested against recent Minecraft + NeoForge
-versions.
 
 ## 📄 License
 
