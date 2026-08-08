@@ -29,15 +29,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Brings the local {@code .minecraft/mods} folder in line with the server's
- * Bill of Materials, per plan task 3.3:
- *
+ * Brings the local instance mods folder in line with the server's Bill of Materials:
  * <ol>
  *   <li>Fetch {@code /bom} from the server.</li>
- *   <li>Batch-verify hashes against Modrinth / CurseForge (safety check).</li>
- *   <li>Delete local JARs that are not part of the BOM.</li>
- *   <li>Download missing / mismatched JARs from the server wrapper, reporting
- *       progress for the UI.</li>
+ *   <li>Batch-verify hashes against Modrinth / CurseForge.</li>
+ *   <li>Download missing / mismatched JARs into a staging area ({@code .mod_staging}).</li>
+ *   <li>Dynamically reconcile the active {@code mods/} directory against the staging area,
+ *       removing unlisted mods and copying the staged BOM mods.</li>
  * </ol>
  */
 public class ModSyncEngine {
@@ -71,13 +69,7 @@ public class ModSyncEngine {
     }
 
     /**
-     * Synchronizes the mods folder with the server.
-     *
-     * @param serverBaseUrl     e.g. {@code http://mc.example.com:25565}
-     * @param gameDir           the client's game directory (contains {@code mods/})
-     * @param strictVerification when {@code true}, abort if a mod cannot be verified
-     * @param trustDirectMods    whether unverifiable "direct" mods are acceptable
-     * @param listener           progress callbacks (called from worker threads)
+     * Synchronizes the mods folder with the server using a temporary staging area.
      */
     public SyncResult sync(String serverBaseUrl, Path gameDir, boolean strictVerification,
                            boolean trustDirectMods, ProgressListener listener)
@@ -89,6 +81,10 @@ public class ModSyncEngine {
         SyncResult result = new SyncResult();
         Path modsDir = gameDir.resolve("mods");
         Files.createDirectories(modsDir);
+
+        // Staging directory where downloads land before moving into active mods/
+        Path stagingDir = gameDir.resolve(".mod_staging");
+        Files.createDirectories(stagingDir);
 
         // --- Step 1: fetch the BOM ---
         listener.onStatus("Fetching mod list from " + base + "...");
@@ -105,42 +101,67 @@ public class ModSyncEngine {
             return result;
         }
 
-        // --- Step 3: reconcile the local mods folder ---
-        Set<String> wanted = new HashSet<>();
-        for (ModEntry mod : mods) {
-            wanted.add(mod.getFilename());
-        }
-
-        try (var stream = Files.list(modsDir)) {
-            for (Path file : stream.filter(p -> HashVerifier.isModJar(p.getFileName().toString())).toList()) {
-                if (!wanted.contains(file.getFileName().toString())) {
-                    Files.deleteIfExists(file);
-                    result.removed.add(file.getFileName().toString());
-                    log.info("Removed stale mod {}", file.getFileName());
-                }
-            }
-        }
-
-        // --- Step 4: download missing / mismatched mods ---
+        // --- Step 3: download missing / mismatched mods into STAGING AREA ---
         long totalBytes = mods.stream().mapToLong(ModEntry::getFileSize).sum();
         AtomicLong downloadedBytes = new AtomicLong();
 
         for (int i = 0; i < mods.size(); i++) {
             ModEntry mod = mods.get(i);
-            Path target = modsDir.resolve(mod.getFilename());
-            if (HashVerifier.matches(target, mod)) {
+            Path stagedTarget = stagingDir.resolve(mod.getFilename());
+
+            if (HashVerifier.matches(stagedTarget, mod)) {
                 result.kept.add(mod.getFilename());
                 continue;
             }
 
             String url = base + "/files/mods/" + urlEncode(mod.getFilename());
-            listener.onStatus("Downloading " + mod.getFilename() + " (" + (i + 1) + "/" + mods.size() + ")...");
-            long size = download(url, target);
+            listener.onStatus("Downloading " + mod.getFilename() + " (" + (i + 1) + "/" + mods.size() + ") to staging...");
+            long size = download(url, stagedTarget);
             downloadedBytes.addAndGet(size);
             result.downloaded.add(mod.getFilename());
 
             double fraction = totalBytes > 0 ? Math.min(1.0, downloadedBytes.get() / (double) totalBytes) : 0;
             listener.onProgress(fraction, mod.getFilename());
+        }
+
+        // --- Step 4: dynamically reconcile the active instance mods/ directory ---
+        listener.onStatus("Synchronizing active instance mods folder...");
+        Set<String> wanted = new HashSet<>();
+        for (ModEntry mod : mods) {
+            wanted.add(mod.getFilename());
+        }
+
+        // Delete local JARs in mods/ that are NOT part of the BOM
+        try (var stream = Files.list(modsDir)) {
+            for (Path file : stream.filter(p -> HashVerifier.isModJar(p.getFileName().toString())).toList()) {
+                if (!wanted.contains(file.getFileName().toString())) {
+                    Files.deleteIfExists(file);
+                    result.removed.add(file.getFileName().toString());
+                    log.info("Removed stale/unlisted mod from instance: {}", file.getFileName());
+                }
+            }
+        }
+
+        // Prune staging files that are no longer part of the BOM so the staging
+        // area mirrors the server instead of accumulating stale downloads.
+        try (var stream = Files.list(stagingDir)) {
+            for (Path file : stream.filter(p -> HashVerifier.isModJar(p.getFileName().toString())).toList()) {
+                if (!wanted.contains(file.getFileName().toString())) {
+                    Files.deleteIfExists(file);
+                    log.info("Pruned stale staged mod: {}", file.getFileName());
+                }
+            }
+        }
+
+        // Copy/move verified mods from staging into active instance mods/
+        for (ModEntry mod : mods) {
+            Path stagedFile = stagingDir.resolve(mod.getFilename());
+            Path activeTarget = modsDir.resolve(mod.getFilename());
+            if (Files.isRegularFile(stagedFile)) {
+                Files.copy(stagedFile, activeTarget, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                log.warn("Staged file missing for mod: {}", mod.getFilename());
+            }
         }
 
         listener.onProgress(1.0, "Done");

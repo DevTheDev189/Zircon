@@ -1,5 +1,6 @@
 package com.mcmanager.server.multiplexer;
 
+import com.mcmanager.server.instance.ServerInstanceManager;
 import com.mcmanager.server.service.ConfigService;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -15,19 +16,27 @@ import org.slf4j.LoggerFactory;
 /**
  * Binds the public Minecraft port (25565) and runs {@link ProtocolDetector} on
  * every accepted connection, proxying HTTP to the Javalin admin server and
- * everything else to the internal Minecraft server port.
+ * Minecraft traffic to the internal port of the instance whose name/id matches
+ * the handshake hostname (or the legacy single-server MC port when no instance
+ * manager is wired).
  */
 public class TcpMultiplexer {
 
     private static final Logger log = LoggerFactory.getLogger(TcpMultiplexer.class);
 
     private final ConfigService configService;
+    private final ServerInstanceManager instanceManager; // nullable → legacy single-server
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
 
     public TcpMultiplexer(ConfigService configService) {
+        this(configService, null);
+    }
+
+    public TcpMultiplexer(ConfigService configService, ServerInstanceManager instanceManager) {
         this.configService = configService;
+        this.instanceManager = instanceManager;
     }
 
     public void start() throws InterruptedException {
@@ -48,13 +57,17 @@ public class TcpMultiplexer {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
-                        ch.pipeline().addLast(new ProtocolDetector(webHost, webPort, mcHost, mcPort));
+                        ch.pipeline().addLast(new ProtocolDetector(webHost, webPort, mcHost, mcPort,
+                                instanceManager));
                     }
                 });
 
         serverChannel = bootstrap.bind(cfg.publicPort).sync().channel();
-        log.info("TCP multiplexer listening on 0.0.0.0:{} (HTTP -> {}:{}, MC -> {}:{})",
-                cfg.publicPort, webHost, webPort, mcHost, mcPort);
+        String mcTarget = instanceManager != null
+                ? "MC -> instance-by-hostname (default " + mcHost + ":" + mcPort + ")"
+                : "MC -> " + mcHost + ":" + mcPort;
+        log.info("TCP multiplexer listening on 0.0.0.0:{} (HTTP -> {}:{}, {})",
+                cfg.publicPort, webHost, webPort, mcTarget);
     }
 
     public void stop() {

@@ -38,6 +38,32 @@ public class ModEntry {
     @SerializedName("fileSize")
     private long fileSize;
 
+    // --- Rich metadata (admin UI / search results) ---
+
+    /** Display title, falls back to the file name when unset. */
+    @SerializedName("title")
+    private String title;
+
+    /** Short human-readable description of what the mod does. */
+    @SerializedName("description")
+    private String description;
+
+    /** Icon URL for the admin UI (Modrinth CDN, etc.). */
+    @SerializedName("iconUrl")
+    private String iconUrl;
+
+    /** Mod author name. */
+    @SerializedName("author")
+    private String author;
+
+    /** Whether the mod is verified for the instance's current MC/loader versions. */
+    @SerializedName("compatible")
+    private boolean compatible = true;
+
+    /** Human-readable warning when {@link #compatible} is {@code false}. */
+    @SerializedName("warningMessage")
+    private String warningMessage;
+
     public ModEntry() {
     }
 
@@ -108,6 +134,54 @@ public class ModEntry {
         this.fileSize = fileSize;
     }
 
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getIconUrl() {
+        return iconUrl;
+    }
+
+    public void setIconUrl(String iconUrl) {
+        this.iconUrl = iconUrl;
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public boolean isCompatible() {
+        return compatible;
+    }
+
+    public void setCompatible(boolean compatible) {
+        this.compatible = compatible;
+    }
+
+    public String getWarningMessage() {
+        return warningMessage;
+    }
+
+    public void setWarningMessage(String warningMessage) {
+        this.warningMessage = warningMessage;
+    }
+
     /** Plain map view, convenient for serializing to the admin web UI. */
     public java.util.Map<String, Object> toMap() {
         java.util.Map<String, Object> map = new java.util.HashMap<>();
@@ -118,6 +192,12 @@ public class ModEntry {
         map.put("origin", origin);
         map.put("downloadUrl", downloadUrl);
         map.put("fileSize", fileSize);
+        map.put("title", title != null ? title : filename);
+        map.put("description", description != null ? description : "");
+        map.put("iconUrl", iconUrl != null ? iconUrl : "");
+        map.put("author", author != null ? author : "");
+        map.put("compatible", compatible);
+        map.put("warningMessage", warningMessage != null ? warningMessage : "");
         return map;
     }
 

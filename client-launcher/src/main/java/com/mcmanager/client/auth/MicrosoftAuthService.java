@@ -18,6 +18,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -27,13 +30,14 @@ import java.util.concurrent.TimeUnit;
  * Minecraft authentication flow, per plan task 3.2.
  *
  * <p>The flow opens the system browser against {@code login.live.com} with a
- * local callback server on {@code http://localhost:8080/callback}. The resulting
+ * local callback server on a dynamically selected {@code http://localhost:<port>/callback}
+ * (PKCE S256; the Azure app must allow localhost redirect URIs). The resulting
  * session (including the Microsoft refresh token for silent renewal) is cached in
  * {@code ~/.mcmanager/auth_cache.json}.
  *
- * <p>You must register an Azure application with the redirect URI
- * {@code http://localhost:8080/callback} and pass its client id via the
- * {@code mcmanager.clientId} system property (or replace {@link #DEFAULT_CLIENT_ID}).
+ * <p>You must register an Azure application with a localhost redirect URI and pass
+ * its client id via the {@code mcmanager.clientId} system property (or replace
+ * {@link #DEFAULT_CLIENT_ID}).
  */
 public class MicrosoftAuthService {
 
@@ -42,7 +46,6 @@ public class MicrosoftAuthService {
     public static final String DEFAULT_CLIENT_ID = "REPLACE_WITH_AZURE_CLIENT_ID";
 
     private static final String REDIRECT_URI = "http://localhost:8080/callback";
-    private static final int CALLBACK_PORT = 8080;
 
     private static final String AUTH_URL = "https://login.live.com/oauth20_authorize.srf";
     private static final String TOKEN_URL = "https://login.live.com/oauth20_token.srf";
@@ -105,6 +108,8 @@ public class MicrosoftAuthService {
 
     /**
      * Runs the full interactive browser flow and returns the authenticated session.
+     * Uses PKCE (S256) with a dynamically selected localhost port so concurrent
+     * launchers never fight over a fixed callback port.
      *
      * @throws IOException if the browser/HTTP steps fail
      */
@@ -114,21 +119,29 @@ public class MicrosoftAuthService {
                     "Microsoft client id not configured. Run the launcher with "
                     + "--clientId=<AZURE_CLIENT_ID> (e.g. java -jar client-launcher-1.0.0-all.jar "
                     + "--clientId=abc123) or create " + CLIENT_ID_FILE + " containing the id. "
-                    + "The Azure app must allow redirect uri " + REDIRECT_URI);
+                    + "The Azure app must allow localhost redirect URIs (http://localhost:<port>/callback).");
         }
+
+        // PKCE: the code verifier is a one-time secret; only its S256 challenge
+        // is sent in the authorize URL, and the verifier is sent at token exchange.
+        String codeVerifier = generateCodeVerifier();
+        String codeChallenge = generateCodeChallenge(codeVerifier);
 
         try (CallbackServer server = new CallbackServer()) {
             server.start();
+            String redirectUri = "http://localhost:" + server.getPort() + "/callback";
 
             String authorizeUrl = AUTH_URL
                     + "?client_id=" + urlEncode(clientId)
                     + "&response_type=code"
-                    + "&redirect_uri=" + urlEncode(REDIRECT_URI)
+                    + "&redirect_uri=" + urlEncode(redirectUri)
                     + "&scope=" + urlEncode("XboxLive.signin offline_access")
+                    + "&code_challenge=" + urlEncode(codeChallenge)
+                    + "&code_challenge_method=S256"
                     + "&prompt=login";
 
             log.info("Opening browser for Microsoft login (client_id={}, redirect_uri={})",
-                    clientId, REDIRECT_URI);
+                    clientId, redirectUri);
             log.debug("Authorize URL: {}", authorizeUrl);
             if (!java.awt.Desktop.isDesktopSupported()
                     || !java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
@@ -140,7 +153,7 @@ public class MicrosoftAuthService {
             if (code == null) {
                 throw new IOException("Login timed out waiting for the browser redirect");
             }
-            return completeLogin(code);
+            return completeLogin(code, codeVerifier, redirectUri);
         }
     }
 
@@ -149,7 +162,12 @@ public class MicrosoftAuthService {
      * Minecraft token → profile. Persists the session to disk.
      */
     public SessionData completeLogin(String authCode) throws IOException, InterruptedException {
-        MsTokenResponse ms = exchangeCodeForMsToken(authCode);
+        return completeLogin(authCode, null, REDIRECT_URI);
+    }
+
+    private SessionData completeLogin(String authCode, String codeVerifier, String redirectUri)
+            throws IOException, InterruptedException {
+        MsTokenResponse ms = exchangeCodeForMsToken(authCode, codeVerifier, redirectUri);
 
         String xblToken = xblAuthenticate(ms.accessToken);
         XstsResponse xsts = xstsAuthorize(xblToken);
@@ -236,12 +254,16 @@ public class MicrosoftAuthService {
     // Token exchange steps
     // ------------------------------------------------------------------
 
-    private MsTokenResponse exchangeCodeForMsToken(String code) throws IOException, InterruptedException {
+    private MsTokenResponse exchangeCodeForMsToken(String code, String codeVerifier, String redirectUri)
+            throws IOException, InterruptedException {
         String body = form("client_id", clientId,
-                "redirect_uri", REDIRECT_URI,
+                "redirect_uri", redirectUri,
                 "grant_type", "authorization_code",
                 "code", code,
                 "scope", "XboxLive.signin offline_access");
+        if (codeVerifier != null && !codeVerifier.isBlank()) {
+            body += "&code_verifier=" + urlEncode(codeVerifier);
+        }
         JsonObject json = postJson(TOKEN_URL, body, "application/x-www-form-urlencoded");
         MsTokenResponse ms = gson.fromJson(json, MsTokenResponse.class);
         if (ms.accessToken == null) {
@@ -387,6 +409,32 @@ public class MicrosoftAuthService {
     }
 
     // ------------------------------------------------------------------
+    // PKCE helpers
+    // ------------------------------------------------------------------
+
+    /** 64 random chars from the RFC 7636 unreserved alphabet. */
+    private static String generateCodeVerifier() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(64);
+        for (int i = 0; i < 64; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
+
+    /** S256 challenge = base64url(sha256(verifier)), unpadded. */
+    private static String generateCodeChallenge(String codeVerifier) throws IOException {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(codeVerifier.getBytes(StandardCharsets.US_ASCII));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IOException("SHA-256 unavailable for PKCE", e);
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Local callback server
     // ------------------------------------------------------------------
 
@@ -395,7 +443,12 @@ public class MicrosoftAuthService {
         private final CompletableFuture<String> codeFuture = new CompletableFuture<>();
 
         CallbackServer() throws IOException {
-            this.server = HttpServer.create(new InetSocketAddress("127.0.0.1", CALLBACK_PORT), 0);
+            // Port 0 → the OS assigns a free port; no more 8080 collisions.
+            this.server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        }
+
+        int getPort() {
+            return server.getAddress().getPort();
         }
 
         void start() {

@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mcmanager.core.model.ModLoaderInfo;
+import com.mcmanager.core.model.ModLoaderType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +27,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -75,7 +76,9 @@ public class MinecraftClasspathBuilder {
             String versionName,
             Path assetsDir,
             Path nativesDir,
-            Path javaHome) {
+            Path javaHome,
+            List<String> jvmArgs,
+            List<String> gameArgs) {
     }
 
     /**
@@ -136,20 +139,28 @@ public class MinecraftClasspathBuilder {
         // --- loader ---
         String mainClass = versionJson.get("mainClass").getAsString();
         String loaderType = loader != null && loader.getType() != null ? loader.getType() : "";
+        List<String> jvmArgs = new ArrayList<>();
+        List<String> gameArgs = new ArrayList<>();
         switch (loaderType.toLowerCase(Locale.ROOT)) {
             case "fabric" -> mainClass = resolveLoaderProfile(mcVersion, loader,
                     FABRIC_META_URL + "/versions/loader/%s/%s/profile/json", classpath, librariesDir);
             case "quilt" -> mainClass = resolveLoaderProfile(mcVersion, loader,
                     QUILT_META_URL + "/versions/loader/%s/%s/profile/json", classpath, librariesDir);
             case "neoforge", "forge" -> {
-                if (loader.getLoaderJarUrl() != null && !loader.getLoaderJarUrl().isBlank()) {
-                    Path loaderJar = librariesDir.resolve("modlauncher/" + sanitize(loaderJarUrlName(loader.getLoaderJarUrl())));
-                    downloadIfMissing(loader.getLoaderJarUrl(), loaderJar);
-                    classpath.add(loaderJar);
+                if (loader.getVersion() == null || loader.getVersion().isBlank()) {
+                    throw new IOException("Loader version is required for " + loaderType
+                            + " (set 'modLoader.version' in the server BOM)");
                 }
-                mainClass = "cpw.mods.modlauncher.Launcher";
-                log.warn("{} launch uses best-effort classpath; full library resolution "
-                        + "is only implemented for Fabric/Quilt", loaderType);
+                // Install the loader headlessly, parse the generated version
+                // profile and merge its libraries/arguments into the launch.
+                Path vanillaJson = cacheDir.resolve("versions")
+                        .resolve(sanitize(mcVersion)).resolve(mcVersion + ".json");
+                ForgeLaunchResolver.ForgeLaunchData forge = new ForgeLaunchResolver().resolve(
+                        cacheDir, mcVersion, ModLoaderType.fromString(loaderType),
+                        loader.getVersion(), vanillaJson, clientJar, nativesDir, classpath);
+                mainClass = forge.mainClass();
+                jvmArgs.addAll(forge.jvmArgs());
+                gameArgs.addAll(forge.gameArgs());
             }
             default -> log.info("No loader configured — launching vanilla");
         }
@@ -174,7 +185,7 @@ public class MinecraftClasspathBuilder {
                 versionId, loaderType, classpath.size(), javaHome);
 
         return new LaunchData(mainClass, classpathStr, assetIndexId, versionId,
-                assetsDir, nativesDir, javaHome);
+                assetsDir, nativesDir, javaHome, jvmArgs, gameArgs);
     }
 
     // ------------------------------------------------------------------
@@ -211,7 +222,15 @@ public class MinecraftClasspathBuilder {
             throws IOException, InterruptedException {
         String loaderVersion = loader.getVersion();
         if (loaderVersion == null || loaderVersion.isBlank()) {
-            throw new IOException("Loader version is empty in the BOM for " + loader.getType());
+            // Be forgiving: auto-resolve the newest stable loader for this MC version
+            // when the BOM left the version empty.
+            loaderVersion = resolveLatestLoaderVersion(mcVersion, loader.getType());
+            if (loaderVersion == null) {
+                throw new IOException("Loader version is empty in the BOM for " + loader.getType()
+                        + " and could not be auto-resolved from " + ("quilt".equalsIgnoreCase(loader.getType())
+                        ? QUILT_META_URL : FABRIC_META_URL));
+            }
+            log.info("Auto-resolved {} loader version {} for MC {}", loader.getType(), loaderVersion, mcVersion);
         }
         String url = urlTemplate.formatted(mcVersion, loaderVersion);
         String profileJson = get(url);
@@ -232,6 +251,27 @@ public class MinecraftClasspathBuilder {
         log.info("{} loader profile resolved: mainClass={}, {} libraries",
                 loader.getType(), mainClass, classpath.size());
         return mainClass;
+    }
+
+    /**
+     * Queries the loader meta API for the newest stable loader version of a
+     * Minecraft version (responses are ordered newest-first).
+     *
+     * @return the loader version string, or {@code null} if none exists.
+     */
+    private String resolveLatestLoaderVersion(String mcVersion, String loaderType)
+            throws IOException, InterruptedException {
+        String base = "quilt".equalsIgnoreCase(loaderType) ? QUILT_META_URL : FABRIC_META_URL;
+        String body = get(base + "/versions/loader/" + mcVersion);
+        JsonArray versions = gson.fromJson(body, JsonArray.class);
+        if (versions == null || versions.isEmpty()) {
+            return null;
+        }
+        JsonObject first = versions.get(0).getAsJsonObject();
+        if (first.has("loader") && first.getAsJsonObject("loader").has("version")) {
+            return first.getAsJsonObject("loader").get("version").getAsString();
+        }
+        return null;
     }
 
     // ------------------------------------------------------------------
@@ -350,36 +390,81 @@ public class MinecraftClasspathBuilder {
             return;
         }
         JsonObject objects = index.getAsJsonObject("objects");
-        List<Map.Entry<String, JsonElement>> entries = new ArrayList<>(objects.entrySet());
         Path objectsDir = assetsDir.resolve("objects");
 
-        log.info("Verifying {} asset objects...", entries.size());
-        CountDownLatch latch = new CountDownLatch(entries.size());
-        AtomicReference<Throwable> firstError = new AtomicReference<>();
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (Map.Entry<String, JsonElement> entry : entries) {
-                executor.submit(() -> {
-                    try {
-                        JsonObject obj = entry.getValue().getAsJsonObject();
-                        String hash = obj.get("hash").getAsString();
-                        long size = obj.get("size").getAsLong();
-                        Path target = objectsDir.resolve(hash.substring(0, 2)).resolve(hash);
-                        if (!Files.isRegularFile(target) || Files.size(target) != size) {
-                            downloadIfMissing("https://resources.download.minecraft.net/"
-                                    + hash.substring(0, 2) + "/" + hash, target);
-                        }
-                    } catch (Exception e) {
-                        firstError.compareAndSet(null, e);
-                    } finally {
-                        latch.countDown();
-                    }
-                });
+        // Compute which assets are missing or size-mismatched on disk.
+        Set<String> missing = ConcurrentHashMap.newKeySet();
+        for (Map.Entry<String, JsonElement> entry : objects.entrySet()) {
+            JsonObject obj = entry.getValue().getAsJsonObject();
+            String hash = obj.get("hash").getAsString();
+            long size = obj.get("size").getAsLong();
+            Path target = objectsDir.resolve(hash.substring(0, 2)).resolve(hash);
+            if (!Files.isRegularFile(target) || Files.size(target) != size) {
+                missing.add(hash);
             }
-            latch.await();
         }
-        if (firstError.get() != null) {
-            log.warn("Some assets failed to download (client tolerates missing assets): {}",
-                    firstError.get().getMessage());
+        log.info("Assets: {} total, {} to download", objects.size(), missing.size());
+
+        // Download with bounded concurrency and retries until stable. The game
+        // cannot render without its resources, so we fail loudly instead of
+        // leaving gaps that cause a black screen.
+        int pass = 0;
+        while (!missing.isEmpty() && pass < 4) {
+            pass++;
+            CountDownLatch latch = new CountDownLatch(missing.size());
+            AtomicInteger failures = new AtomicInteger();
+            try (var executor = Executors.newFixedThreadPool(8)) {
+                for (String hash : List.copyOf(missing)) {
+                    executor.submit(() -> {
+                        try {
+                            downloadAsset(objectsDir, hash);
+                            missing.remove(hash);
+                        } catch (Exception e) {
+                            failures.incrementAndGet();
+                        } finally {
+                            latch.countDown();
+                        }
+                    });
+                }
+                latch.await();
+            }
+            log.info("Asset download pass {} complete ({} failed)", pass, failures.get());
+            if (failures.get() == 0) {
+                break;
+            }
+            Thread.sleep(1000L * pass); // back off before retrying
+        }
+
+        if (!missing.isEmpty()) {
+            throw new IOException("Could not download " + missing.size() + " of " + objects.size()
+                    + " asset files (e.g. " + missing.iterator().next() + "). Minecraft cannot render "
+                    + "without its resources — check the network and retry the launch.");
+        }
+    }
+
+    private void downloadAsset(Path objectsDir, String hash) throws IOException {
+        String url = "https://resources.download.minecraft.net/"
+                + hash.substring(0, 2) + "/" + hash;
+        Path target = objectsDir.resolve(hash.substring(0, 2)).resolve(hash);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(java.time.Duration.ofSeconds(60))
+                .GET()
+                .build();
+        HttpResponse<InputStream> response;
+        try {
+            response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted downloading asset " + hash, e);
+        }
+        if (response.statusCode() / 100 != 2) {
+            throw new IOException("Asset download failed: HTTP " + response.statusCode()
+                    + " for " + hash);
+        }
+        Files.createDirectories(target.getParent());
+        try (InputStream in = response.body()) {
+            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
@@ -420,11 +505,6 @@ public class MinecraftClasspathBuilder {
 
     private String loaderName(ModLoaderInfo loader) {
         return loader != null && loader.getType() != null ? loader.getType() : "vanilla";
-    }
-
-    private String loaderJarUrlName(String url) {
-        int slash = url.lastIndexOf('/');
-        return slash >= 0 ? url.substring(slash + 1) : url;
     }
 
     private String sanitize(String s) {

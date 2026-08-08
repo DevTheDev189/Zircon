@@ -16,31 +16,38 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * REST endpoints for the mod manager tab of the admin UI: file listing, uploads,
  * downloads, provider search and remote installs.
+ *
+ * <p>The mod service is resolved per request via {@link Supplier} so these
+ * endpoints transparently operate on the active instance when the wrapper runs
+ * in multi-instance mode (see {@code ModServiceResolver}); the client-facing
+ * {@code GET /files/mods/{filename}} therefore serves exactly the mods the admin
+ * UI manages.
  */
 public class ModController {
 
     private static final Logger log = LoggerFactory.getLogger(ModController.class);
 
-    private final ModManagementService mods;
+    private final Supplier<ModManagementService> mods;
 
-    public ModController(ModManagementService mods) {
+    public ModController(Supplier<ModManagementService> mods) {
         this.mods = mods;
     }
 
     /** GET /api/mods — list of installed mods from the BOM. */
     public void listMods(Context ctx) {
-        List<Map<String, Object>> result = mods.listMods().stream().map(ModEntry::toMap).toList();
+        List<Map<String, Object>> result = mods.get().listMods().stream().map(ModEntry::toMap).toList();
         ctx.json(Map.of("mods", result));
     }
 
     /** GET /files/mods/{filename} — download a hosted mod JAR. */
     public void downloadMod(Context ctx) {
         String filename = ctx.pathParam("filename");
-        Path file = mods.getModFile(filename);
+        Path file = mods.get().getModFile(filename);
         if (file == null) {
             ctx.status(404).result("Mod not found: " + filename);
             return;
@@ -66,7 +73,7 @@ public class ModController {
         String origin = ctx.queryParam("origin");
 
         try (InputStream in = uploaded.content()) {
-            ModEntry entry = mods.addMod(in, uploaded.filename(), origin);
+            ModEntry entry = mods.get().addMod(in, uploaded.filename(), origin);
             ctx.status(201).json(entry.toMap());
         } catch (IOException e) {
             log.warn("Upload failed", e);
@@ -77,7 +84,7 @@ public class ModController {
     /** DELETE /api/mods/{filename} — remove a mod. */
     public void removeMod(Context ctx) {
         try {
-            boolean removed = mods.removeMod(ctx.pathParam("filename"));
+            boolean removed = mods.get().removeMod(ctx.pathParam("filename"));
             if (!removed) {
                 ctx.status(404).result("Mod not found");
                 return;
@@ -99,8 +106,9 @@ public class ModController {
 
         Map<String, Object> result = new HashMap<>();
         try {
+            ModManagementService modService = mods.get();
             if ("curseforge".equalsIgnoreCase(origin)) {
-                if (!mods.hasCurseForgeKey()) {
+                if (!modService.hasCurseForgeKey()) {
                     result.put("origin", "curseforge");
                     result.put("hits", List.of());
                     result.put("notice", "CurseForge API key not configured on the server. "
@@ -109,13 +117,13 @@ public class ModController {
                     ctx.json(result);
                     return;
                 }
-                List<Map<String, Object>> hits = mods.curseForge()
+                List<Map<String, Object>> hits = modService.curseForge()
                         .searchMods(query, mcVersion)
                         .stream().map(CurseForgeApiClient.CurseForgeMod::toMap).toList();
                 result.put("origin", "curseforge");
                 result.put("hits", hits);
             } else {
-                List<Map<String, Object>> hits = mods.modrinth()
+                List<Map<String, Object>> hits = modService.modrinth()
                         .searchMods(query, mcVersion, loader)
                         .stream().map(ModrinthApiClient.ModrinthSearchHit::toMap).toList();
                 result.put("origin", "modrinth");
@@ -138,7 +146,7 @@ public class ModController {
             return;
         }
         try {
-            List<Map<String, Object>> versions = mods.modrinth()
+            List<Map<String, Object>> versions = mods.get().modrinth()
                     .listProjectVersions(projectId, ctx.queryParam("mcVersion"), ctx.queryParam("loader"))
                     .stream().map(ModrinthApiClient.ModrinthVersion::toMap).toList();
             ctx.json(Map.of("versions", versions));
@@ -157,12 +165,13 @@ public class ModController {
             ctx.status(400).result("modId is required");
             return;
         }
-        if (!mods.hasCurseForgeKey()) {
+        ModManagementService modService = mods.get();
+        if (!modService.hasCurseForgeKey()) {
             ctx.status(400).result("CurseForge API key not configured on the server");
             return;
         }
         try {
-            List<Map<String, Object>> files = mods.curseForge()
+            List<Map<String, Object>> files = modService.curseForge()
                     .listModFiles(Long.parseLong(modId))
                     .stream().map(CurseForgeApiClient.CurseForgeFile::toMap).toList();
             ctx.json(Map.of("files", files));
@@ -196,27 +205,14 @@ public class ModController {
         }
 
         try {
+            ModManagementService modService = mods.get();
             switch (body.origin.toLowerCase()) {
                 case "modrinth" -> {
                     if (body.projectId == null || body.versionId == null) {
                         ctx.status(400).result("projectId and versionId are required for modrinth");
                         return;
                     }
-                    List<ModrinthApiClient.ModrinthVersion> versions = mods.modrinth()
-                            .listProjectVersions(body.projectId, null, null);
-                    ModrinthApiClient.ModrinthVersion chosen = versions.stream()
-                            .filter(v -> body.versionId.equals(v.id))
-                            .findFirst()
-                            .orElse(null);
-                    if (chosen == null || chosen.primaryFile() == null) {
-                        ctx.status(404).result("Version not found or has no downloadable file");
-                        return;
-                    }
-                    ModrinthApiClient.ModrinthFile file = chosen.primaryFile();
-                    ModEntry entry = mods.installFromUrl(file.url, file.filename,
-                            ModManagementService.ORIGIN_MODRINTH);
-                    entry.setId(chosen.projectId);
-                    mods.modrinth().verifyHashes(List.of(entry.getSha1())); // sanity check (best effort)
+                    ModEntry entry = modService.installModrinthVersion(body.projectId, body.versionId, null, null);
                     ctx.status(201).json(entry.toMap());
                 }
                 case "curseforge" -> {
@@ -224,7 +220,7 @@ public class ModController {
                         ctx.status(400).result("downloadUrl and filename are required for curseforge");
                         return;
                     }
-                    ModEntry entry = mods.installFromUrl(body.downloadUrl, body.filename,
+                    ModEntry entry = modService.installFromUrl(body.downloadUrl, body.filename,
                             ModManagementService.ORIGIN_CURSEFORGE);
                     if (body.fileId != null) {
                         entry.setId(String.valueOf(body.fileId));

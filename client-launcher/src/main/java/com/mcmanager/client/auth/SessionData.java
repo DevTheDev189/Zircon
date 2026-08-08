@@ -16,6 +16,9 @@ public class SessionData {
     private String uuid;
     private long expiresAtMillis;
 
+    /** Always {@code "msa"} — sessions are only ever produced by Microsoft auth. */
+    private String userType = "msa";
+
     public SessionData() {
     }
 
@@ -25,6 +28,14 @@ public class SessionData {
         this.username = username;
         this.uuid = uuid;
         this.expiresAtMillis = expiresAtMillis;
+    }
+
+    public String getUserType() {
+        return userType;
+    }
+
+    public void setUserType(String userType) {
+        this.userType = userType;
     }
 
     public String getAccessToken() {

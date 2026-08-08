@@ -7,21 +7,17 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 /**
- * JavaFX application shell for the launcher: AtlantaFX PrimerDark theme, clean
- * 900×550 layout, and the play/sign-in state machine (plan tasks 3.1 / 3.5).
+ * JavaFX application shell for McManager client:
+ * Left Navigation Sidebar (Server List, Change Skin, Settings, Play Offline)
+ * and rich central views matching the required launcher layout.
  */
 public class MainApp extends Application {
 
@@ -29,83 +25,187 @@ public class MainApp extends Application {
     public void start(Stage stage) {
         Application.setUserAgentStylesheet(new PrimerDark().getUserAgentStylesheet());
 
-        // --- Top bar ---
+        // --- Sidebar ---
         Label logo = new Label("⚡");
-        logo.setFont(new Font(20));
-        logo.setStyle("-fx-background-color: #2da44e; -fx-text-fill: white;"
-                + "-fx-background-radius: 8; -fx-padding: 6 10;");
+        logo.setFont(new Font(22));
+        logo.setStyle("-fx-background-color: #2da44e; -fx-text-fill: white; "
+                + "-fx-background-radius: 8; -fx-padding: 4 10;");
 
         Label appName = new Label("McManager");
-        appName.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        Label appSubtitle = new Label("mod-synced Minecraft launcher");
-        appSubtitle.setStyle("-fx-font-size: 11px; -fx-text-fill: #8b949e;");
-        VBox titleBox = new VBox(0, appName, appSubtitle);
-        titleBox.setAlignment(Pos.CENTER_LEFT);
+        appName.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
+        Label appSubtitle = new Label("mod-synced launcher");
+        appSubtitle.setStyle("-fx-font-size: 10px; -fx-text-fill: #8b949e;");
+        VBox titleBox = new VBox(2, appName, appSubtitle);
 
-        HBox topBar = new HBox(10, logo, titleBox);
-        topBar.setAlignment(Pos.CENTER_LEFT);
+        HBox brandHeader = new HBox(10, logo, titleBox);
+        brandHeader.setAlignment(Pos.CENTER_LEFT);
+        brandHeader.setPadding(new Insets(16, 16, 20, 16));
 
-        // Right side: avatar + username + logout
+        // Navigation Buttons
+        Button navServerList = new Button("⚡  Server List");
+        Button navChangeSkin = new Button("👕  Change Skin");
+        Button navSettings = new Button("⚙️  Settings");
+
+        for (Button btn : new Button[]{navServerList, navChangeSkin, navSettings}) {
+            btn.setMaxWidth(Double.MAX_VALUE);
+            btn.setAlignment(Pos.CENTER_LEFT);
+            btn.setStyle("-fx-font-size: 14px; -fx-padding: 10 14; -fx-background-radius: 8; "
+                    + "-fx-background-color: transparent; -fx-text-fill: #c9d1d9;");
+        }
+
+        VBox navBox = new VBox(6, navServerList, navChangeSkin, navSettings);
+        navBox.setPadding(new Insets(0, 12, 0, 12));
+
+        Region sidebarSpacer = new Region();
+        VBox.setVgrow(sidebarSpacer, Priority.ALWAYS);
+
+        // Sidebar Footer User Card
         Circle avatar = new Circle(14, javafx.scene.paint.Color.web("#2da44e"));
         Label userLabel = new Label("Not signed in");
-        userLabel.setStyle("-fx-font-size: 13px;");
+        userLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: white; -fx-font-weight: bold;");
         Button logoutButton = new Button("Logout");
+        logoutButton.setStyle("-fx-font-size: 10px; -fx-padding: 2 8;");
         logoutButton.setVisible(false);
 
-        HBox userBox = new HBox(8, avatar, userLabel, logoutButton);
-        userBox.setAlignment(Pos.CENTER_RIGHT);
+        HBox userHeader = new HBox(8, avatar, userLabel, logoutButton);
+        userHeader.setAlignment(Pos.CENTER_LEFT);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox header = new HBox(topBar, spacer, userBox);
-        header.setAlignment(Pos.CENTER);
-        header.setPadding(new Insets(14, 20, 10, 20));
+        VBox userCard = new VBox(10, userHeader);
+        userCard.setStyle("-fx-background-color: #161b22; -fx-background-radius: 10; -fx-padding: 12;");
 
-        // --- Center panel ---
-        Label serverLabel = new Label("Server address");
-        serverLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8b949e;");
-        TextField serverField = new TextField("localhost:25565");
-        serverField.setPromptText("mc.example.com:25565");
-        serverField.setStyle("-fx-font-size: 20px; -fx-padding: 10 12;");
-        VBox serverBox = new VBox(6, serverLabel, serverField);
+        VBox sidebar = new VBox(brandHeader, navBox, sidebarSpacer, userCard);
+        sidebar.setPrefWidth(220);
+        sidebar.setMinWidth(220);
+        sidebar.setPadding(new Insets(0, 0, 16, 0));
+        sidebar.setStyle("-fx-background-color: #0d1117; -fx-border-color: #21262d; -fx-border-width: 0 1 0 0;");
 
-        Label statusLabel = new Label("Ready.");
-        statusLabel.setWrapText(true);
-        statusLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #c9d1d9;");
+        // --- View 1: Server List ---
+        Label sectionYourServers = new Label("Your Servers");
+        sectionYourServers.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
+
+        Button addServerBtn = new Button("+ Add Server");
+        addServerBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 12px; -fx-font-weight: bold;");
+
+        Region yourSpacer = new Region();
+        HBox.setHgrow(yourSpacer, Priority.ALWAYS);
+        HBox yourHeader = new HBox(sectionYourServers, yourSpacer, addServerBtn);
+        yourHeader.setAlignment(Pos.CENTER_LEFT);
+
+        VBox savedServersContainer = new VBox(10);
+        ScrollPane savedScroll = new ScrollPane(savedServersContainer);
+        savedScroll.setFitToWidth(true);
+        savedScroll.setPrefHeight(200);
+        savedScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+
+        Label sectionRecommended = new Label("Recommended Servers");
+        sectionRecommended.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 10 0 0 0;");
+
+        VBox recommendedContainer = new VBox(10);
+
+        VBox serverListView = new VBox(14, yourHeader, savedScroll, sectionRecommended, recommendedContainer);
+        serverListView.setPadding(new Insets(20));
+
+        // --- View 2: Change Skin ---
+        Label skinTitle = new Label("Skin Customizer");
+        skinTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
+        Label skinSubtitle = new Label("Upload a custom 64x64 PNG skin for your Minecraft player");
+        skinSubtitle.setStyle("-fx-font-size: 12px; -fx-text-fill: #8b949e;");
+
+        ImageView skinPreview = new ImageView();
+        skinPreview.setFitWidth(128);
+        skinPreview.setFitHeight(128);
+        skinPreview.setPreserveRatio(true);
+        skinPreview.setSmooth(false); // Sharp pixel scaling
+
+        StackPane skinBox = new StackPane(skinPreview);
+        skinBox.setPrefSize(160, 160);
+        skinBox.setMaxSize(160, 160);
+        skinBox.setStyle("-fx-background-color: #161b22; -fx-border-color: #30363d; -fx-border-radius: 12; -fx-background-radius: 12;");
+
+        Button uploadSkinBtn = new Button("Upload .PNG Skin");
+        uploadSkinBtn.setStyle("-fx-background-color: #2da44e; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16;");
+
+        Button resetSkinBtn = new Button("Reset to Default");
+        resetSkinBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #c9d1d9; -fx-padding: 8 16;");
+
+        HBox skinActionBox = new HBox(12, uploadSkinBtn, resetSkinBtn);
+        skinActionBox.setAlignment(Pos.CENTER);
+
+        Label skinStatus = new Label("Default Steve / Alex");
+        skinStatus.setStyle("-fx-font-size: 12px; -fx-text-fill: #8b949e;");
+
+        VBox changeSkinView = new VBox(16, skinTitle, skinSubtitle, skinBox, skinActionBox, skinStatus);
+        changeSkinView.setAlignment(Pos.TOP_CENTER);
+        changeSkinView.setPadding(new Insets(30));
+
+        // --- View 3: Settings ---
+        Label settingsTitle = new Label("Launcher Settings");
+        settingsTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
+
+        Label ramLabel = new Label("Max Memory Allocation (RAM): 4 GB");
+        ramLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #c9d1d9;");
+        Slider ramSlider = new Slider(2, 16, 4);
+        ramSlider.setMajorTickUnit(2);
+        ramSlider.setMinorTickCount(1);
+        ramSlider.setSnapToTicks(true);
+        ramSlider.setShowTickLabels(true);
+
+        CheckBox strictVerifyCheck = new CheckBox("Strict Hash Verification (Abort on unverified mods)");
+        strictVerifyCheck.setSelected(true);
+
+        CheckBox trustDirectCheck = new CheckBox("Trust Direct Custom Mods");
+        trustDirectCheck.setSelected(false);
+
+        Label clientIdLabel = new Label("Azure App Client ID");
+        clientIdLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #8b949e;");
+        TextField clientIdField = new TextField();
+        clientIdField.setPromptText("Microsoft App Client ID");
+
+        VBox settingsView = new VBox(18, settingsTitle, ramLabel, ramSlider, strictVerifyCheck, trustDirectCheck, clientIdLabel, clientIdField);
+        settingsView.setPadding(new Insets(24));
+        settingsView.setMaxWidth(500);
+
+        // --- Central View Switcher ---
+        StackPane centerContainer = new StackPane(serverListView, changeSkinView, settingsView);
+        changeSkinView.setVisible(false);
+        settingsView.setVisible(false);
+
+        // --- Bottom Notification / Launch Bar ---
+        Label statusLabel = new Label("Ready to play.");
+        statusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #8b949e;");
 
         ProgressBar progressBar = new ProgressBar(0);
         progressBar.setMaxWidth(Double.MAX_VALUE);
         progressBar.setPrefHeight(6);
         progressBar.setVisible(false);
 
-        VBox center = new VBox(24, serverBox, statusLabel, progressBar);
-        center.setAlignment(Pos.CENTER);
-        center.setPadding(new Insets(40, 60, 30, 60));
-        VBox.setVgrow(center, Priority.ALWAYS);
+        VBox bottomStatusBox = new VBox(6, statusLabel, progressBar);
+        bottomStatusBox.setPadding(new Insets(10, 20, 14, 20));
+        bottomStatusBox.setStyle("-fx-background-color: #0d1117; -fx-border-color: #21262d; -fx-border-width: 1 0 0 0;");
 
-        // --- Bottom action area ---
-        Button actionButton = new Button("PLAY");
-        actionButton.setMaxWidth(Double.MAX_VALUE);
-        actionButton.setPrefHeight(52);
-        actionButton.setStyle(
-                "-fx-background-color: #2da44e; -fx-text-fill: white; -fx-font-size: 18px;"
-                + "-fx-font-weight: bold; -fx-background-radius: 10;");
-        HBox actionBox = new HBox(actionButton);
-        actionBox.setPadding(new Insets(0, 60, 24, 60));
-        actionBox.setAlignment(Pos.CENTER);
+        BorderPane mainContentLayout = new BorderPane();
+        mainContentLayout.setCenter(centerContainer);
+        mainContentLayout.setBottom(bottomStatusBox);
+        mainContentLayout.setStyle("-fx-background-color: #161b22;");
 
-        VBox root = new VBox(header, center, actionBox);
-        root.setStyle("-fx-background-color: #0d1117;");
+        HBox root = new HBox(sidebar, mainContentLayout);
+        HBox.setHgrow(mainContentLayout, Priority.ALWAYS);
 
         MainController controller = new MainController(
-                serverField, statusLabel, progressBar, actionButton, userLabel, logoutButton);
+                navServerList, navChangeSkin, navSettings,
+                serverListView, changeSkinView, settingsView,
+                savedServersContainer, recommendedContainer, addServerBtn,
+                skinPreview, uploadSkinBtn, resetSkinBtn, skinStatus,
+                ramSlider, ramLabel, strictVerifyCheck, trustDirectCheck, clientIdField,
+                statusLabel, progressBar, userLabel, logoutButton, stage
+        );
         controller.init();
 
-        Scene scene = new Scene(root, 900, 550);
+        Scene scene = new Scene(root, 960, 600);
         stage.setTitle("McManager Launcher");
         stage.setScene(scene);
-        stage.setMinWidth(720);
-        stage.setMinHeight(480);
+        stage.setMinWidth(800);
+        stage.setMinHeight(520);
         stage.show();
 
         stage.setOnCloseRequest(e -> {

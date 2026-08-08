@@ -1,5 +1,8 @@
 package com.mcmanager.server;
 
+import com.mcmanager.server.auth.AuthService;
+import com.mcmanager.server.auth.JwtUtil;
+import com.mcmanager.server.instance.ServerInstanceManager;
 import com.mcmanager.server.multiplexer.TcpMultiplexer;
 import com.mcmanager.server.process.ConsoleStreamHandler;
 import com.mcmanager.server.process.MinecraftProcessManager;
@@ -13,9 +16,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Entry point of the server manager: wires up configuration, the mod/BOM
- * services, the Minecraft subprocess manager, the Javalin admin API and the
- * Netty protocol multiplexer on the public port.
+ * Entry point of the server manager: wires up configuration, admin auth, the
+ * multi-instance engine, the mod/BOM services, the Minecraft subprocess
+ * manager, the Javalin admin API and the Netty protocol multiplexer on the
+ * public port.
  */
 public class Main {
 
@@ -23,20 +27,32 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         ConfigService configService = new ConfigService();
+
+        // Admin auth: creates users.json + a random initial admin password on
+        // first run (printed to stdout) and the JWT signing secret.
+        AuthService.initializeAuth(configService.getDataDir());
+        JwtUtil.initialize(configService.getDataDir());
+
         BomService bomService = new BomService(configService);
         ModManagementService modService = new ModManagementService(bomService, configService);
         ConsoleStreamHandler console = new ConsoleStreamHandler();
         MinecraftProcessManager processManager = new MinecraftProcessManager(configService, console);
 
-        JavalinApp webApp = new JavalinApp(configService, bomService, modService, processManager, console);
+        // Multi-instance engine (isolated <data>/instances/<id>/ dirs).
+        ServerInstanceManager instanceManager = new ServerInstanceManager(configService.getDataDir(), console);
+
+        JavalinApp webApp = new JavalinApp(configService, bomService, modService, processManager, console,
+                instanceManager);
         webApp.start();
 
-        TcpMultiplexer multiplexer = new TcpMultiplexer(configService);
+        TcpMultiplexer multiplexer = new TcpMultiplexer(configService, instanceManager);
         multiplexer.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             log.info("Shutting down...");
             processManager.stop();
+            instanceManager.listInstances().forEach(inst ->
+                    instanceManager.stopInstance(inst.getId()));
             multiplexer.stop();
             webApp.stop();
         }));

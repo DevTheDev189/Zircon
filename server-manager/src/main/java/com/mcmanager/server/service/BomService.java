@@ -20,12 +20,21 @@ public class BomService {
     private static final Logger log = LoggerFactory.getLogger(BomService.class);
 
     private final Path bomFile;
-    private final ConfigService configService;
+    private final ConfigService configService; // nullable for instance-scoped BOMs
+    private final BillOfMaterials defaultBom;  // used instead of config when non-null
     private BillOfMaterials bom;
 
     public BomService(ConfigService configService) {
         this.configService = configService;
         this.bomFile = configService.getBomFile();
+        this.defaultBom = null;
+    }
+
+    /** Instance-scoped BOM stored at {@code <instance>/bom.json}. */
+    public BomService(Path bomFile, BillOfMaterials defaultBom) {
+        this.configService = null;
+        this.bomFile = bomFile;
+        this.defaultBom = defaultBom;
     }
 
     /** Returns the current BOM, loading it (or creating a default) on first access. */
@@ -62,6 +71,14 @@ public class BomService {
     }
 
     private BillOfMaterials createDefault() {
+        if (defaultBom != null) {
+            try {
+                save(defaultBom);
+            } catch (IOException e) {
+                log.warn("Could not write default BOM", e);
+            }
+            return defaultBom;
+        }
         ConfigService.ServerConfig cfg = configService.getConfig();
         BillOfMaterials fresh = new BillOfMaterials(
                 cfg.minecraftVersion,

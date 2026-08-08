@@ -1,5 +1,9 @@
 package com.mcmanager.server.process;
 
+import com.mcmanager.core.model.InstanceConfig;
+import com.mcmanager.core.model.ModLoaderInfo;
+import com.mcmanager.core.model.ModLoaderType;
+import com.mcmanager.server.install.ServerInstaller;
 import com.mcmanager.server.service.ConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +21,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Launches and supervises the Minecraft server subprocess.
+ * Launches and supervises a Minecraft server subprocess.
+ *
+ * <p>Supports two wiring styles:
+ * <ul>
+ *   <li>the legacy single-server layout, derived from {@link ConfigService}
+ *       ({@code <data>/server}, global {@code mcPort});</li>
+ *   <li>isolated Zircon instances, derived from an {@link InstanceConfig} whose
+ *       server lives in {@code <data>/instances/<id>/server} and binds its own
+ *       internal port.</li>
+ * </ul>
  *
  * <p>The server is told to bind the internal port ({@code --port <mcPort>}) so
  * the Netty multiplexer on the public port can proxy to it. stdout/stderr are
@@ -28,7 +41,35 @@ public class MinecraftProcessManager {
 
     private static final Logger log = LoggerFactory.getLogger(MinecraftProcessManager.class);
 
-    private final ConfigService configService;
+    /** Immutable launch description captured at construction time. */
+    private static final class LaunchContext {
+        final Path serverDir;
+        final Path serverJar;
+        final Path installerCacheDir;
+        final String minecraftVersion;
+        final ModLoaderInfo loaderInfo;
+        final String javaArgs;
+        final int mcPort;
+        final int publicPort;
+        final ModLoaderType loader;
+        final String loaderVersion;
+
+        LaunchContext(Path serverDir, Path serverJar, Path installerCacheDir, String minecraftVersion,
+                      ModLoaderInfo loaderInfo, String javaArgs, int mcPort, int publicPort) {
+            this.serverDir = serverDir;
+            this.serverJar = serverJar;
+            this.installerCacheDir = installerCacheDir;
+            this.minecraftVersion = minecraftVersion;
+            this.loaderInfo = loaderInfo;
+            this.javaArgs = javaArgs;
+            this.mcPort = mcPort;
+            this.publicPort = publicPort;
+            this.loader = ModLoaderType.fromString(loaderInfo.getType(), null);
+            this.loaderVersion = loaderInfo.getVersion();
+        }
+    }
+
+    private final LaunchContext context;
     private final ConsoleStreamHandler console;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -38,8 +79,33 @@ public class MinecraftProcessManager {
     private Process process;
     private volatile boolean stopRequested = false;
 
+    /** Legacy single-server wiring (existing tests and controllers keep working). */
     public MinecraftProcessManager(ConfigService configService, ConsoleStreamHandler console) {
-        this.configService = configService;
+        ConfigService.ServerConfig cfg = configService.getConfig();
+        this.context = new LaunchContext(
+                configService.getServerDir(),
+                configService.getServerJar(),
+                configService.getDataDir().resolve(".cache").resolve("installers"),
+                cfg.minecraftVersion,
+                cfg.modLoader,
+                cfg.javaArgs,
+                cfg.mcPort,
+                cfg.publicPort);
+        this.console = console;
+    }
+
+    /** Multi-instance wiring: the process manager is bound to one isolated instance. */
+    public MinecraftProcessManager(InstanceConfig config, Path serverDir, Path installerCacheDir,
+                                   ConsoleStreamHandler console) {
+        this.context = new LaunchContext(
+                serverDir,
+                serverDir.resolve("server.jar"),
+                installerCacheDir,
+                config.getMinecraftVersion(),
+                config.getModLoader(),
+                config.getJavaArgs(),
+                config.getInternalMcPort(),
+                -1); // no dedicated public port per instance; the multiplexer routes by hostname
         this.console = console;
     }
 
@@ -55,34 +121,50 @@ public class MinecraftProcessManager {
     /**
      * Starts the server. Returns immediately; the process is supervised in the
      * background and its console output is streamed to {@link ConsoleStreamHandler}.
+     * The server matching the configured mod loader is installed on demand.
      *
-     * @throws IllegalStateException if the server JAR is missing or already running.
+     * @throws IllegalStateException if the server is already running
+     * @throws IOException           if the server cannot be installed or launched
      */
     public void start() throws IOException {
         synchronized (lock) {
             if (isRunning()) {
                 throw new IllegalStateException("Server is already running");
             }
-            Path serverJar = configService.getServerJar();
-            if (!Files.isRegularFile(serverJar)) {
-                throw new IllegalStateException("No server.jar found at " + serverJar
-                        + ". Drop the vanilla/fabric/neoforge server JAR into "
-                        + configService.getServerDir());
-            }
 
-            ConfigService.ServerConfig cfg = configService.getConfig();
+            // Install the server matching the configured mod loader (vanilla /
+            // fabric / quilt / forge / neoforge) before launching it.
+            ServerInstaller.ensureServerInstalled(context.serverDir, context.serverJar,
+                    context.installerCacheDir, context.minecraftVersion, context.loaderInfo);
+
             List<String> command = new ArrayList<>();
             command.add(javaBin());
-            command.addAll(List.of(cfg.javaArgs.split("\\s+")));
-            command.add("-jar");
-            command.add(serverJar.toString());
+            command.addAll(List.of(context.javaArgs.split("\\s+")));
+
+            if (context.loader != null && context.loader.isForgeLike()) {
+                // Forge/NeoForge servers launch through the installer-generated
+                // @args file (module path + JVM args + main class). Paths inside
+                // the file are relative to the server dir, which is the CWD.
+                Path argsFile = ServerInstaller.findServerArgsFile(context.serverDir, context.loaderVersion);
+                if (argsFile == null) {
+                    throw new IOException("Forge/NeoForge server args file not found after installation");
+                }
+                command.add("@" + context.serverDir.relativize(argsFile));
+            } else {
+                if (!Files.isRegularFile(context.serverJar)) {
+                    throw new IllegalStateException("No server.jar found at " + context.serverJar
+                            + ". Drop the vanilla/fabric server JAR into " + context.serverDir);
+                }
+                command.add("-jar");
+                command.add(context.serverJar.toString());
+            }
             command.add("nogui");
             command.add("--port");
-            command.add(String.valueOf(cfg.mcPort));
+            command.add(String.valueOf(context.mcPort));
 
             log.info("Launching: {}", String.join(" ", command));
             ProcessBuilder pb = new ProcessBuilder(command);
-            pb.directory(configService.getServerDir().toFile());
+            pb.directory(context.serverDir.toFile());
             pb.redirectErrorStream(true);
 
             stopRequested = false;
@@ -91,8 +173,10 @@ public class MinecraftProcessManager {
             running.set(true);
             exitCode.set(-1);
 
-            console.accept("[wrapper] Starting Minecraft server on internal port " + cfg.mcPort
-                    + " (public port " + cfg.publicPort + ")");
+            String publicPortText = context.publicPort > 0
+                    ? " (public port " + context.publicPort + ")" : "";
+            console.accept("[wrapper] Starting Minecraft server on internal port " + context.mcPort
+                    + publicPortText);
 
             Thread.ofVirtual().name("mc-stdout").start(() -> pumpOutput(launched));
             Thread.ofVirtual().name("mc-monitor").start(() -> monitor(launched));

@@ -1,4 +1,8 @@
 dependencies {
     api 'com.google.code.gson:gson:2.10.1'
     api 'org.slf4j:slf4j-api:2.0.12'
+
+    // TOML parsing for Forge (META-INF/mods.toml) and NeoForge
+    // (META-INF/neoforge.mods.toml) mod metadata files.
+    implementation 'org.tomlj:tomlj:1.1.1'
 }

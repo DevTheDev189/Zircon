@@ -170,9 +170,47 @@ public class ModrinthApiClient {
         return versions;
     }
 
+    /**
+     * Fetches the public metadata of a Modrinth project (title, description, icon,
+     * author). Used to enrich installed mod entries for the admin UI.
+     */
+    public ModrinthProject getProject(String projectId) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/project/" + urlEncode(projectId)))
+                .header("User-Agent", userAgent)
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() / 100 != 2) {
+            throw new IOException("Modrinth getProject failed: HTTP " + response.statusCode()
+                    + " " + response.body());
+        }
+        return gson.fromJson(response.body(), ModrinthProject.class);
+    }
+
     // ------------------------------------------------------------------
     // Response DTOs
     // ------------------------------------------------------------------
+
+    /** Public project metadata from {@code GET /project/{id}}. */
+    public static class ModrinthProject {
+        @SerializedName("id")
+        public String id;
+        @SerializedName("slug")
+        public String slug;
+        @SerializedName("title")
+        public String title;
+        @SerializedName("description")
+        public String description;
+        @SerializedName("icon_url")
+        public String iconUrl;
+        @SerializedName("author")
+        public String author;
+        @SerializedName("downloads")
+        public long downloads;
+    }
 
     /** A specific version/file of a Modrinth project. */
     public static class ModrinthVersion {

@@ -2,42 +2,79 @@ package com.mcmanager.client.ui.controller;
 
 import com.mcmanager.client.auth.MicrosoftAuthService;
 import com.mcmanager.client.auth.SessionData;
+import com.mcmanager.client.launch.JavaRuntimeSelector;
 import com.mcmanager.client.launch.MinecraftClasspathBuilder;
 import com.mcmanager.client.launch.MinecraftRunner;
+import com.mcmanager.client.model.SavedServer;
+import com.mcmanager.client.skin.SkinManager;
 import com.mcmanager.client.sync.ModSyncEngine;
 import com.mcmanager.core.model.BillOfMaterials;
 import com.mcmanager.core.model.ModLoaderInfo;
 import javafx.application.Platform;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.control.TextField;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * MVC controller behind {@code MainApp}: drives the sign-in → sync → launch
- * state machine and reports progress to the UI on the JavaFX thread.
+ * Controller driving navigation views, server list management,
+ * custom skin uploads, settings, dynamic mod staging sync, and game launches.
  */
 public class MainController {
 
     private static final Logger log = LoggerFactory.getLogger(MainController.class);
-
-    private static final Path GAME_DIR = Path.of(
-            System.getProperty("user.home"), ".mcmanager", "game");
     private static final String DEFAULT_SERVER_PORT = "25565";
 
-    private final TextField serverField;
+    private static final Path INSTANCES_ROOT = Path.of(
+            System.getProperty("user.home"), ".zircon", "instances");
+
+    // Sidebar & View Controls
+    private final Button navServerList;
+    private final Button navChangeSkin;
+    private final Button navSettings;
+    private final Node serverListView;
+    private final Node changeSkinView;
+    private final Node settingsView;
+
+    // Server List View Controls
+    private final VBox savedServersContainer;
+    private final VBox recommendedContainer;
+    private final Button addServerBtn;
+
+    // Skin View Controls
+    private final ImageView skinPreview;
+    private final Button uploadSkinBtn;
+    private final Button resetSkinBtn;
+    private final Label skinStatus;
+
+    // Settings Controls
+    private final Slider ramSlider;
+    private final Label ramLabel;
+    private final CheckBox strictVerifyCheck;
+    private final CheckBox trustDirectCheck;
+    private final TextField clientIdField;
+
+    // Global Status & Auth Controls
     private final Label statusLabel;
     private final ProgressBar progressBar;
-    private final Button actionButton;
     private final Label userLabel;
     private final Button logoutButton;
+    private final Stage stage;
 
     private final MicrosoftAuthService auth = new MicrosoftAuthService();
     private final ModSyncEngine syncEngine = new ModSyncEngine();
@@ -48,29 +85,94 @@ public class MainController {
     private volatile SessionData session;
     private volatile Process gameProcess;
 
-    public MainController(TextField serverField, Label statusLabel, ProgressBar progressBar,
-                          Button actionButton, Label userLabel, Button logoutButton) {
-        this.serverField = serverField;
+    public MainController(Button navServerList, Button navChangeSkin, Button navSettings,
+                          Node serverListView, Node changeSkinView, Node settingsView,
+                          VBox savedServersContainer, VBox recommendedContainer, Button addServerBtn,
+                          ImageView skinPreview, Button uploadSkinBtn, Button resetSkinBtn, Label skinStatus,
+                          Slider ramSlider, Label ramLabel, CheckBox strictVerifyCheck, CheckBox trustDirectCheck,
+                          TextField clientIdField, Label statusLabel, ProgressBar progressBar,
+                          Label userLabel, Button logoutButton, Stage stage) {
+        this.navServerList = navServerList;
+        this.navChangeSkin = navChangeSkin;
+        this.navSettings = navSettings;
+        this.serverListView = serverListView;
+        this.changeSkinView = changeSkinView;
+        this.settingsView = settingsView;
+        this.savedServersContainer = savedServersContainer;
+        this.recommendedContainer = recommendedContainer;
+        this.addServerBtn = addServerBtn;
+        this.skinPreview = skinPreview;
+        this.uploadSkinBtn = uploadSkinBtn;
+        this.resetSkinBtn = resetSkinBtn;
+        this.skinStatus = skinStatus;
+        this.ramSlider = ramSlider;
+        this.ramLabel = ramLabel;
+        this.strictVerifyCheck = strictVerifyCheck;
+        this.trustDirectCheck = trustDirectCheck;
+        this.clientIdField = clientIdField;
         this.statusLabel = statusLabel;
         this.progressBar = progressBar;
-        this.actionButton = actionButton;
         this.userLabel = userLabel;
         this.logoutButton = logoutButton;
+        this.stage = stage;
     }
 
     public void init() {
+        // Setup Navigation Tabs
+        navServerList.setOnAction(e -> switchTab(serverListView, navServerList));
+        navChangeSkin.setOnAction(e -> switchTab(changeSkinView, navChangeSkin));
+        navSettings.setOnAction(e -> switchTab(settingsView, navSettings));
+        switchTab(serverListView, navServerList);
+
+        // Auth initialization — Microsoft sign-in is mandatory; the cached session
+        // (or a fresh browser login) is loaded on startup and during launches.
+        initSession();
+
+        // Server List Setup
+        addServerBtn.setOnAction(e -> promptAddServer());
+        populateServerList();
+        populateRecommendedServers();
+
+        // Skin Customizer Setup
+        refreshSkinPreview();
+        uploadSkinBtn.setOnAction(e -> handleUploadSkin());
+        resetSkinBtn.setOnAction(e -> handleResetSkin());
+
+        // Settings Setup
+        ramSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            ramLabel.setText("Max Memory Allocation (RAM): " + newVal.intValue() + " GB");
+        });
+
+        logoutButton.setOnAction(e -> onLogout());
+    }
+
+    private void switchTab(Node targetView, Button activeBtn) {
+        serverListView.setVisible(targetView == serverListView);
+        changeSkinView.setVisible(targetView == changeSkinView);
+        settingsView.setVisible(targetView == settingsView);
+
+        for (Button btn : new Button[]{navServerList, navChangeSkin, navSettings}) {
+            if (btn == activeBtn) {
+                btn.setStyle("-fx-font-size: 14px; -fx-padding: 10 14; -fx-background-radius: 8; "
+                        + "-fx-background-color: #21262d; -fx-text-fill: white; -fx-font-weight: bold;");
+            } else {
+                btn.setStyle("-fx-font-size: 14px; -fx-padding: 10 14; -fx-background-radius: 8; "
+                        + "-fx-background-color: transparent; -fx-text-fill: #c9d1d9;");
+            }
+        }
+    }
+
+    private void initSession() {
         session = auth.loadCached();
         if (session != null) {
             userLabel.setText(session.getUsername());
             logoutButton.setVisible(true);
+            status("Signed in as " + session.getUsername());
+        } else {
+            userLabel.setText("Not signed in");
+            logoutButton.setVisible(false);
+            status("Ready to sign in.");
         }
-        String prefill = System.getProperty("mcmanager.serverAddress");
-        if (prefill != null && !prefill.isBlank()) {
-            serverField.setText(prefill);
-        }
-        actionButton.setOnAction(e -> onAction());
-        logoutButton.setOnAction(e -> onLogout());
-        refreshButtonState();
     }
 
     public void shutdown() {
@@ -80,21 +182,152 @@ public class MainController {
     }
 
     // ------------------------------------------------------------------
-    // Main state machine
+    // Server List Management
     // ------------------------------------------------------------------
 
-    private void onAction() {
+    private void populateServerList() {
+        savedServersContainer.getChildren().clear();
+        List<SavedServer> saved = SavedServer.load();
+        if (saved.isEmpty()) {
+            // Seed a local default server on first run
+            SavedServer.recordPlayed("Localhost Server", "localhost:25565");
+            saved = SavedServer.load();
+        }
+
+        for (SavedServer s : saved) {
+            savedServersContainer.getChildren().add(createSavedServerCard(s));
+        }
+    }
+
+    private HBox createSavedServerCard(SavedServer server) {
+        Label nameLbl = new Label(server.getName());
+        nameLbl.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: white;");
+
+        Label addrLbl = new Label(server.getAddress());
+        addrLbl.setStyle("-fx-font-size: 11px; -fx-text-fill: #8b949e;");
+
+        VBox text = new VBox(2, nameLbl, addrLbl);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button playBtn = new Button("PLAY");
+        playBtn.setStyle("-fx-background-color: #2da44e; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 6 16;");
+        playBtn.setOnAction(e -> launchServer(server.getName(), server.getAddress()));
+
+        HBox card = new HBox(12, text, spacer, playBtn);
+        card.setAlignment(Pos.CENTER_LEFT);
+        card.setPadding(new Insets(12));
+        card.setStyle("-fx-background-color: #161b22; -fx-border-color: #30363d; -fx-border-radius: 8; -fx-background-radius: 8;");
+        return card;
+    }
+
+    private void populateRecommendedServers() {
+        recommendedContainer.getChildren().clear();
+        List<String[]> dummy = List.of(
+                new String[]{"Hypixel Network", "mc.hypixel.net", "Popular Minigames & SkyBlock"},
+                new String[]{"Wynncraft", "play.wynncraft.net", "The Minecraft MMORPG"},
+                new String[]{"Zircon Official", "mc.zircon.example.com:25565", "Official Mod-Synced Server"}
+        );
+
+        for (String[] rec : dummy) {
+            Label nameLbl = new Label(rec[0]);
+            nameLbl.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: white;");
+
+            Label descLbl = new Label(rec[2] + " (" + rec[1] + ")");
+            descLbl.setStyle("-fx-font-size: 11px; -fx-text-fill: #8b949e;");
+
+            VBox text = new VBox(2, nameLbl, descLbl);
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            Button joinBtn = new Button("Add & Play");
+            joinBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-padding: 4 12; -fx-font-size: 11px;");
+            joinBtn.setOnAction(e -> {
+                SavedServer.recordPlayed(rec[0], rec[1]);
+                populateServerList();
+                launchServer(rec[0], rec[1]);
+            });
+
+            HBox card = new HBox(12, text, spacer, joinBtn);
+            card.setAlignment(Pos.CENTER_LEFT);
+            card.setPadding(new Insets(10, 12, 10, 12));
+            card.setStyle("-fx-background-color: #0d1117; -fx-border-color: #21262d; -fx-border-radius: 8; -fx-background-radius: 8;");
+            recommendedContainer.getChildren().add(card);
+        }
+    }
+
+    private void promptAddServer() {
+        TextInputDialog dialog = new TextInputDialog("localhost:25565");
+        dialog.setTitle("Add Minecraft Server");
+        dialog.setHeaderText("Connect to a Mod-Synced Minecraft Server");
+        dialog.setContentText("Server Address (host:port):");
+
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(addr -> {
+            if (!addr.isBlank()) {
+                SavedServer.recordPlayed("Custom Server", addr.trim());
+                populateServerList();
+                launchServer("Custom Server", addr.trim());
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Skin Customizer
+    // ------------------------------------------------------------------
+
+    private void refreshSkinPreview() {
+        Image customSkin = SkinManager.loadActiveSkinImage();
+        if (customSkin != null) {
+            skinPreview.setImage(customSkin);
+            skinStatus.setText("Active Skin: Custom Upload (.PNG)");
+        } else {
+            skinPreview.setImage(null);
+            skinStatus.setText("Active Skin: Default Steve / Alex");
+        }
+    }
+
+    private void handleUploadSkin() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Select Minecraft Skin PNG");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG Images", "*.png"));
+        File selected = chooser.showOpenDialog(stage);
+        if (selected != null) {
+            try {
+                SkinManager.saveSkin(selected);
+                refreshSkinPreview();
+                status("Uploaded new skin: " + selected.getName());
+            } catch (IOException e) {
+                log.warn("Failed to save custom skin", e);
+                status("Failed to save skin: " + e.getMessage());
+            }
+        }
+    }
+
+    private void handleResetSkin() {
+        SkinManager.resetSkin();
+        refreshSkinPreview();
+        status("Reset skin to default.");
+    }
+
+    // ------------------------------------------------------------------
+    // Launch Pipeline
+    // ------------------------------------------------------------------
+
+    private void launchServer(String name, String serverAddress) {
         if (gameProcess != null && gameProcess.isAlive()) {
             gameProcess.destroy();
             status("Game process stopped.");
             gameProcess = null;
-            refreshButtonState();
             return;
         }
         if (busy.compareAndSet(false, true)) {
-            String address = serverField.getText(); // captured on the FX thread
+            SavedServer.recordPlayed(name, serverAddress);
+            populateServerList();
             setBusyUi(true);
-            Thread.ofVirtual().name("launcher-flow").start(() -> runFlow(address));
+            Thread.ofVirtual().name("launcher-flow").start(() -> runFlow(serverAddress));
         }
     }
 
@@ -121,22 +354,26 @@ public class MainController {
             String baseUrl = "http://" + host + ":" + port;
             status("Server: " + baseUrl);
 
-            // 3. Fetch the BOM so we know the MC version + loader before resolving
+            Path gameDir = instanceGameDir(host, String.valueOf(port));
+            Files.createDirectories(gameDir);
+
+            // 3. Fetch BOM
             BillOfMaterials bom = fetchBom(baseUrl);
             ModLoaderInfo loader = bom.getModLoader();
 
-            // 4. Resolve the launch environment (downloads client, libs, assets)
+            // 4. Resolve Launch Environment
             status("Resolving Minecraft " + bom.getMinecraftVersion() + " runtime...");
+            int requiredJava = JavaRuntimeSelector.getRequiredJavaMajorVersion(bom.getMinecraftVersion());
             MinecraftClasspathBuilder.LaunchData launchData =
-                    classpathBuilder.resolve(bom.getMinecraftVersion(), loader, 21);
+                    classpathBuilder.resolve(bom.getMinecraftVersion(), loader, requiredJava);
 
-            // 5. Sync mods
-            Files.createDirectories(GAME_DIR);
-            status("Checking mod hashes...");
+            // 5. Sync Mods using Staging Area & Reconciler
+            status("Checking mod hashes & synchronizing staging area...");
             Platform.runLater(() -> progressBar.setVisible(true));
-            boolean strict = Boolean.parseBoolean(System.getProperty("mcmanager.strictVerification", "true"));
-            boolean trustDirect = Boolean.parseBoolean(System.getProperty("mcmanager.trustDirectMods", "false"));
-            ModSyncEngine.SyncResult syncResult = syncEngine.sync(baseUrl, GAME_DIR, strict, trustDirect,
+            boolean strict = strictVerifyCheck.isSelected();
+            boolean trustDirect = trustDirectCheck.isSelected();
+
+            ModSyncEngine.SyncResult syncResult = syncEngine.sync(baseUrl, gameDir, strict, trustDirect,
                     new ModSyncEngine.ProgressListener() {
                         @Override
                         public void onStatus(String message) {
@@ -153,10 +390,10 @@ public class MainController {
                 return;
             }
 
-            // 6. Launch the game, auto-connecting to the server
-            status("Starting the game...");
-            gameProcess = runner.launch(launchData, session, GAME_DIR, host, port, null);
-            status("Game running — connecting to " + host + ":" + port);
+            // 6. Launch Game
+            status("Starting Minecraft process...");
+            gameProcess = runner.launch(launchData, session, gameDir, host, port, null);
+            status("Game running — connected to " + host + ":" + port);
             Thread.ofVirtual().name("game-wait").start(() -> {
                 try {
                     int code = gameProcess.waitFor();
@@ -164,8 +401,6 @@ public class MainController {
                     Platform.runLater(() -> status("Game exited (code " + code + ")."));
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                } finally {
-                    Platform.runLater(this::refreshButtonState);
                 }
             });
         } catch (Exception e) {
@@ -175,14 +410,9 @@ public class MainController {
             Platform.runLater(() -> {
                 busy.set(false);
                 setBusyUi(false);
-                refreshButtonState();
             });
         }
     }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
 
     private BillOfMaterials fetchBom(String baseUrl) throws IOException, InterruptedException {
         java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
@@ -201,16 +431,19 @@ public class MainController {
         return com.mcmanager.core.model.BomJson.fromJson(response.body());
     }
 
+    private static Path instanceGameDir(String host, String portOrName) {
+        String safeHost = host.replaceAll("[^A-Za-z0-9._-]", "_");
+        return INSTANCES_ROOT.resolve(safeHost + "_" + portOrName);
+    }
+
     private String[] parseServerAddress(String input) {
         String address = input == null ? "" : input.trim();
         if (address.isEmpty()) {
             return new String[]{"localhost", DEFAULT_SERVER_PORT};
         }
-        // handle "host:port" and "host"
         String host = address;
         String port = DEFAULT_SERVER_PORT;
         if (address.startsWith("[")) {
-            // IPv6 literal [::1]:25565
             int end = address.indexOf(']');
             if (end > 0) {
                 host = address.substring(1, end);
@@ -238,12 +471,7 @@ public class MainController {
         userLabel.setText("Not signed in");
         logoutButton.setVisible(false);
         status("Signed out.");
-        refreshButtonState();
     }
-
-    // ------------------------------------------------------------------
-    // UI updates (must run on the JavaFX thread)
-    // ------------------------------------------------------------------
 
     private void status(String text) {
         Platform.runLater(() -> statusLabel.setText(text));
@@ -261,25 +489,5 @@ public class MainController {
             progressBar.setProgress(busy ? ProgressBar.INDETERMINATE_PROGRESS : 0);
             progressBar.setVisible(busy);
         });
-    }
-
-    private void refreshButtonState() {
-        boolean gameAlive = gameProcess != null && gameProcess.isAlive();
-        String greenStyle = "-fx-background-color: #2da44e; -fx-text-fill: white;"
-                + "-fx-font-size: 18px; -fx-font-weight: bold; -fx-background-radius: 10;";
-        if (gameAlive) {
-            actionButton.setText("STOP GAME");
-            actionButton.setStyle("-fx-background-color: #cf222e; -fx-text-fill: white;"
-                    + "-fx-font-size: 18px; -fx-font-weight: bold; -fx-background-radius: 10;");
-        } else if (busy.get()) {
-            actionButton.setText("WORKING...");
-            actionButton.setDisable(true);
-        } else if (session == null) {
-            actionButton.setText("SIGN IN WITH MICROSOFT");
-            actionButton.setStyle(greenStyle);
-        } else {
-            actionButton.setText("PLAY");
-            actionButton.setStyle(greenStyle);
-        }
     }
 }

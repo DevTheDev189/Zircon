@@ -13,6 +13,12 @@ dependencies {
     implementation 'io.javalin:javalin:6.1.3'
     implementation 'io.netty:netty-all:4.1.108.Final'
     implementation 'ch.qos.logback:logback-classic:1.5.3'
+
+    // Admin auth: BCrypt password hashing + JWT tokens
+    implementation 'org.mindrot:jbcrypt:0.4'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 }
 
 shadowJar {
