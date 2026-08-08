@@ -3,10 +3,10 @@
 ![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white)
 ![Gradle](https://img.shields.io/badge/Gradle-9.6-green?logo=gradle&logoColor=white)
 ![JavaFX](https://img.shields.io/badge/JavaFX-25-blue?logo=openjfx&logoColor=white)
-![Javalin](https://img.shields.io/badge/API-Javalin-6-blueviolet)
 ![Netty](https://img.shields.io/badge/Netty-4.1-teal)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
 ![Status](https://img.shields.io/badge/status-active_development-yellow)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 > **Run your own modded Minecraft server with a full admin dashboard, and let your
 > players join with a one-click launcher that installs the *exact* mods your server
@@ -239,21 +239,12 @@ The project is designed to respect the [Minecraft EULA](https://aka.ms/Minecraft
 sync → launch) is working end-to-end and tested against recent Minecraft + NeoForge
 versions.
 
-**On the horizon:**
-
-- [ ] Server-provided CurseForge key for launcher-side hash verification
-- [ ] Auto-update channel for the launcher
-- [ ] Per-player permissions for the admin dashboard
-- [ ] Pack exports / shareable server packs
-- [ ] Bundled distribution (installers) for server + launcher
-
----
-
 ## 📄 License
 
-The code in this repository is provided under a permissive license — see
-[`LICENSE`](LICENSE) (coming soon). Note that Minecraft itself, its assets, and
-its trademarks remain the property of Mojang Studios / Microsoft.
+The code in this repository is licensed under the [MIT License](LICENSE).
+Minecraft itself, its assets, and its trademarks remain the property of Mojang
+Studios / Microsoft — see the [Legal & EULA Compliance](#-legal--eula-compliance)
+section above.
 
 ---
 
