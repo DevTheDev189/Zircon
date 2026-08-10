@@ -14,6 +14,9 @@ import java.util.List;
  * <ul>
  *   <li>{@code --clientId=<AZURE_CLIENT_ID>} — Microsoft app registration id</li>
  *   <li>{@code --server=<host:port>} — prefill the server address field</li>
+ *   <li>{@code --offline} — DEV-ONLY (temporary testing aid): skip Microsoft auth,
+ *       use a fake legacy session. REMOVE BEFORE RELEASE.</li>
+ *   <li>{@code --username=<name>} — offline player name (with --offline)</li>
  * </ul>
  */
 public final class Main {
@@ -28,6 +31,10 @@ public final class Main {
                 System.setProperty("mcmanager.clientId", arg.substring("--clientId=".length()));
             } else if (arg.startsWith("--server=")) {
                 System.setProperty("mcmanager.serverAddress", arg.substring("--server=".length()));
+            } else if (arg.startsWith("--username=")) {
+                System.setProperty("mcmanager.offlineUsername", arg.substring("--username=".length()));
+            } else if ("--offline".equals(arg)) {
+                System.setProperty("mcmanager.offline", "true");
             } else {
                 passthrough.add(arg);
             }

@@ -74,6 +74,7 @@ public class MainController {
     private final ProgressBar progressBar;
     private final Label userLabel;
     private final Button logoutButton;
+    private final ToggleButton offlineToggle; // DEV-ONLY: temporary testing aid
     private final Stage stage;
 
     private final MicrosoftAuthService auth = new MicrosoftAuthService();
@@ -84,6 +85,8 @@ public class MainController {
     private final AtomicBoolean busy = new AtomicBoolean(false);
     private volatile SessionData session;
     private volatile Process gameProcess;
+    /** DEV-ONLY (temporary testing aid): enabled via --offline / mcmanager.offline. REMOVE BEFORE RELEASE. */
+    private boolean offlineMode = Boolean.parseBoolean(System.getProperty("mcmanager.offline", "false"));
 
     public MainController(Button navServerList, Button navChangeSkin, Button navSettings,
                           Node serverListView, Node changeSkinView, Node settingsView,
@@ -91,7 +94,7 @@ public class MainController {
                           ImageView skinPreview, Button uploadSkinBtn, Button resetSkinBtn, Label skinStatus,
                           Slider ramSlider, Label ramLabel, CheckBox strictVerifyCheck, CheckBox trustDirectCheck,
                           TextField clientIdField, Label statusLabel, ProgressBar progressBar,
-                          Label userLabel, Button logoutButton, Stage stage) {
+                          Label userLabel, Button logoutButton, ToggleButton offlineToggle, Stage stage) {
         this.navServerList = navServerList;
         this.navChangeSkin = navChangeSkin;
         this.navSettings = navSettings;
@@ -114,6 +117,7 @@ public class MainController {
         this.progressBar = progressBar;
         this.userLabel = userLabel;
         this.logoutButton = logoutButton;
+        this.offlineToggle = offlineToggle;
         this.stage = stage;
     }
 
@@ -124,8 +128,13 @@ public class MainController {
         navSettings.setOnAction(e -> switchTab(settingsView, navSettings));
         switchTab(serverListView, navServerList);
 
-        // Auth initialization — Microsoft sign-in is mandatory; the cached session
-        // (or a fresh browser login) is loaded on startup and during launches.
+        // Auth initialization
+        offlineToggle.setSelected(offlineMode);
+        offlineToggle.setOnAction(e -> {
+            offlineMode = offlineToggle.isSelected();
+            initSession();
+        });
+
         initSession();
 
         // Server List Setup
@@ -163,15 +172,23 @@ public class MainController {
     }
 
     private void initSession() {
-        session = auth.loadCached();
-        if (session != null) {
-            userLabel.setText(session.getUsername());
-            logoutButton.setVisible(true);
-            status("Signed in as " + session.getUsername());
-        } else {
-            userLabel.setText("Not signed in");
+        if (offlineMode) {
+            String name = System.getProperty("mcmanager.offlineUsername", "DevPlayer");
+            session = SessionData.offline(name);
+            userLabel.setText(session.getUsername() + " (offline)");
             logoutButton.setVisible(false);
-            status("Ready to sign in.");
+            status("Offline mode enabled");
+        } else {
+            session = auth.loadCached();
+            if (session != null) {
+                userLabel.setText(session.getUsername());
+                logoutButton.setVisible(true);
+                status("Signed in as " + session.getUsername());
+            } else {
+                userLabel.setText("Not signed in");
+                logoutButton.setVisible(false);
+                status("Ready to sign in.");
+            }
         }
     }
 
@@ -337,7 +354,7 @@ public class MainController {
             if (session == null) {
                 status("Opening browser for Microsoft login...");
                 session = auth.login();
-            } else if (session.isExpired()) {
+            } else if (!offlineMode && session.isExpired()) {
                 status("Renewing session...");
                 try {
                     session = auth.refresh(session);
@@ -352,7 +369,7 @@ public class MainController {
             String host = hostPort[0];
             int port = Integer.parseInt(hostPort[1]);
             String baseUrl = "http://" + host + ":" + port;
-            status("Server: " + baseUrl);
+            status((offlineMode ? "[OFFLINE MODE] " : "") + "Server: " + baseUrl);
 
             Path gameDir = instanceGameDir(host, String.valueOf(port));
             Files.createDirectories(gameDir);
@@ -462,10 +479,12 @@ public class MainController {
     }
 
     private void onLogout() {
-        try {
-            auth.clearCache();
-        } catch (IOException e) {
-            log.warn("Could not clear auth cache", e);
+        if (!offlineMode) {
+            try {
+                auth.clearCache();
+            } catch (IOException e) {
+                log.warn("Could not clear auth cache", e);
+            }
         }
         session = null;
         userLabel.setText("Not signed in");

@@ -1,5 +1,8 @@
 package com.mcmanager.client.auth;
 
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+
 /**
  * Plain Gson-serializable POJO holding a Minecraft/Microsoft authentication
  * session: the Minecraft access token, the Microsoft refresh token (for silent
@@ -16,7 +19,7 @@ public class SessionData {
     private String uuid;
     private long expiresAtMillis;
 
-    /** Always {@code "msa"} — sessions are only ever produced by Microsoft auth. */
+    /** Always {@code "msa"} in release builds; {@code "legacy"} only for DEV-ONLY offline sessions. */
     private String userType = "msa";
 
     public SessionData() {
@@ -28,6 +31,19 @@ public class SessionData {
         this.username = username;
         this.uuid = uuid;
         this.expiresAtMillis = expiresAtMillis;
+    }
+
+    /**
+     * DEV-ONLY (temporary testing aid): creates a fake session with a dummy token
+     * and {@code userType=legacy}, so the client runs without Microsoft auth.
+     * REMOVE BEFORE RELEASE.
+     */
+    public static SessionData offline(String username) {
+        String name = username == null || username.isBlank() ? "DevPlayer" : username.trim();
+        UUID offlineUuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8));
+        SessionData session = new SessionData("0", null, name, offlineUuid.toString(), Long.MAX_VALUE);
+        session.setUserType("legacy");
+        return session;
     }
 
     public String getUserType() {
