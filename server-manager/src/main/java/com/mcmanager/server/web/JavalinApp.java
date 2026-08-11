@@ -5,11 +5,13 @@ import com.mcmanager.server.auth.JwtUtil;
 import com.mcmanager.server.instance.ServerInstanceManager;
 import com.mcmanager.server.process.ConsoleStreamHandler;
 import com.mcmanager.server.process.MinecraftProcessManager;
+import com.mcmanager.server.service.BackupService;
 import com.mcmanager.server.service.BomService;
 import com.mcmanager.server.service.ConfigService;
 import com.mcmanager.server.service.ModManagementService;
 import com.mcmanager.server.service.ModServiceResolver;
 import com.mcmanager.server.stats.SystemMetricsService;
+import com.mcmanager.server.web.controller.BackupController;
 import com.mcmanager.server.web.controller.BomController;
 import com.mcmanager.server.web.controller.ConfigController;
 import com.mcmanager.server.web.controller.ConsoleController;
@@ -44,18 +46,21 @@ public class JavalinApp {
     private final MinecraftProcessManager processManager;
     private final ConsoleStreamHandler console;
     private final ServerInstanceManager instanceManager;
+    private final BackupService backupService;
 
     private Javalin app;
 
     public JavalinApp(ConfigService configService, BomService bomService,
                       ModManagementService modService, MinecraftProcessManager processManager,
-                      ConsoleStreamHandler console, ServerInstanceManager instanceManager) {
+                      ConsoleStreamHandler console, ServerInstanceManager instanceManager,
+                      BackupService backupService) {
         this.configService = configService;
         this.bomService = bomService;
         this.modService = modService;
         this.processManager = processManager;
         this.console = console;
         this.instanceManager = instanceManager;
+        this.backupService = backupService;
     }
 
     public void start() {
@@ -72,6 +77,7 @@ public class JavalinApp {
         ConsoleController consoleController = new ConsoleController(console, processManager);
         InstanceController instanceController = new InstanceController(instanceManager,
                 configService.getConfig().curseforgeApiKey);
+        BackupController backupController = new BackupController(backupService);
         console.addListener(consoleController::broadcast);
 
         app = Javalin.create(javalinConfig -> {
@@ -236,6 +242,11 @@ public class JavalinApp {
         app.get("/api/instances/{id}/mods/modrinth/versions", instanceController::modrinthVersions);
         app.get("/api/instances/{id}/mods/curseforge/files", instanceController::curseForgeFiles);
         app.post("/api/instances/{id}/mods/install", instanceController::installMod);
+
+        // Backups REST endpoints
+        app.get("/api/instances/{id}/backups", backupController::listBackups);
+        app.post("/api/instances/{id}/backups", backupController::createBackup);
+        app.post("/api/instances/{id}/backups/{backupId}/restore", backupController::restoreBackup);
 
         // Static fallback: serve index.html for unknown GETs (SPA deep links).
         app.get("/", ctx -> ctx.redirect("/index.html"));

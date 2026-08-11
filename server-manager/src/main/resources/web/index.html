@@ -86,7 +86,7 @@
             <!-- Top Navbar (hidden on the Stats tab — it's a global view, not an instance page) -->
             <header v-if="activeTab !== 'stats'" class="h-16 border-b border-slate-800 px-6 flex items-center justify-between">
                 <nav class="flex gap-2">
-                    <button v-for="t in ['mods', 'console', 'players', 'settings']" :key="t" @click="activeTab = t"
+                    <button v-for="t in ['mods', 'console', 'players', 'backups', 'settings']" :key="t" @click="activeTab = t"
                             class="px-4 py-2 text-sm rounded-lg capitalize transition"
                             :class="activeTab === t ? 'bg-slate-800 text-white font-medium' : 'text-slate-400 hover:text-slate-200'">
                         {{ t }}
@@ -405,6 +405,55 @@
                     <p v-else class="text-xs text-slate-500">Select a server instance first.</p>
                 </div>
 
+                <!-- BACKUPS VIEW -->
+                <div v-if="activeTab === 'backups'" class="space-y-6">
+                    <div class="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-sm text-slate-200">Server Backups</h3>
+                            <p class="text-xs text-slate-400">LZ4-compressed system snapshots with automatic restoration points</p>
+                        </div>
+                        <button @click="triggerBackup" :disabled="creatingBackup || !selectedInstance"
+                                class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 font-semibold px-4 py-2 rounded-lg text-sm transition flex items-center gap-2">
+                            <svg v-if="creatingBackup" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>{{ creatingBackup ? 'Creating Backup...' : 'Backup Now' }}</span>
+                        </button>
+                    </div>
+
+                    <!-- Backup History -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                        <h4 class="font-bold text-sm mb-3">Backup History</h4>
+                        <p v-if="!selectedInstance" class="text-xs text-slate-500 text-center py-6">Select a server instance first.</p>
+                        <div v-else class="space-y-2 max-h-[500px] overflow-y-auto">
+                            <div v-for="b in backupsList" :key="b.id" class="bg-slate-800/60 border border-slate-700/40 p-3 rounded-lg flex items-center justify-between gap-4">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <p class="font-semibold text-sm text-slate-200">{{ formatDate(b.timestamp) }}</p>
+                                        <span class="text-[10px] px-2 py-0.5 rounded font-mono uppercase font-bold"
+                                              :class="b.triggerType === 'scheduled' ? 'bg-blue-500/20 text-blue-300' : 'bg-emerald-500/20 text-emerald-300'">
+                                            {{ b.triggerType }}
+                                        </span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded font-mono uppercase font-bold"
+                                              :class="b.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'">
+                                            {{ b.status }}
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-slate-400 font-mono mt-1">{{ formatBytes(b.sizeBytes) }} • {{ b.filename }}</p>
+                                </div>
+
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <button @click="showLogsModal(b)" class="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 px-2.5 py-1 rounded">Logs</button>
+                                    <button @click="confirmRestore(b)" :disabled="b.status !== 'completed'"
+                                            class="bg-amber-600/80 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-xs px-3 py-1 rounded transition">Restore</button>
+                                </div>
+                            </div>
+                            <p v-if="!backupsList.length" class="text-xs text-slate-500 text-center py-6">No backups found for this instance.</p>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </main>
     </div>
@@ -502,6 +551,21 @@
         </div>
     </div>
 
+    <!-- BACKUP LOGS MODAL -->
+    <div v-if="selectedLogBackup" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-xl w-[36rem] max-h-[70vh] shadow-2xl flex flex-col">
+            <h3 class="text-lg font-bold mb-1">Backup Audit Log</h3>
+            <p class="text-xs text-slate-400 font-mono mb-4">{{ selectedLogBackup.filename }}</p>
+            <div class="flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-1">
+                <p v-for="(line, i) in selectedLogBackup.logs" :key="i" class="text-slate-300">{{ line }}</p>
+                <p v-if="!selectedLogBackup.logs || !selectedLogBackup.logs.length" class="text-slate-500">No log entries recorded.</p>
+            </div>
+            <div class="flex justify-end mt-4">
+                <button @click="selectedLogBackup = null" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-semibold">Close</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -552,6 +616,9 @@ createApp({
             banForm: { name: '', reason: '' },
             settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '' },
             serverProps: {},
+            backupsList: [],
+            creatingBackup: false,
+            selectedLogBackup: null,
             showEulaModal: false,
             eulaInstance: null,
             showDeleteModal: false,
@@ -642,6 +709,7 @@ createApp({
             this.loadMods();
             this.loadServerProperties();
             this.loadPlayers();
+            this.loadBackups();
             // The Stats view hides the top bar, so picking a server there must
             // also navigate back into the instance pages (mods is the landing tab).
             if (this.activeTab === 'stats') this.activeTab = 'mods';
@@ -780,6 +848,7 @@ createApp({
                 this.loadInstances();
                 if (this.activeTab === 'stats') this.loadStats();
                 if (this.activeTab === 'players') this.loadPlayers();
+                if (this.activeTab === 'backups') this.loadBackups();
             }, 5000);
         },
         formatBytes(bytes) {
@@ -787,6 +856,48 @@ createApp({
             const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        },
+        // ---- Backups ----
+        async loadBackups() {
+            if (!this.selectedInstance) return;
+            try {
+                const data = await this.api(`/api/instances/${this.selectedInstance.id}/backups`);
+                this.backupsList = data.backups || [];
+            } catch (e) {
+                this.backupsList = [];
+            }
+        },
+        async triggerBackup() {
+            if (!this.selectedInstance) return;
+            this.creatingBackup = true;
+            try {
+                await this.api(`/api/instances/${this.selectedInstance.id}/backups`, { method: 'POST' });
+                await this.loadBackups();
+                alert('Backup created successfully!');
+            } catch (e) {
+                alert('Backup failed: ' + e.message);
+            } finally {
+                this.creatingBackup = false;
+            }
+        },
+        showLogsModal(backup) {
+            this.selectedLogBackup = backup;
+        },
+        async confirmRestore(backup) {
+            if (!this.selectedInstance) return;
+            if (!confirm(`Are you sure you want to restore the backup from ${this.formatDate(backup.timestamp)}? The current server state will be overwritten!`)) return;
+            try {
+                await this.api(`/api/instances/${this.selectedInstance.id}/backups/${backup.id}/restore`, { method: 'POST' });
+                alert('Backup restored successfully!');
+                await this.loadInstances();
+                await this.loadBackups();
+            } catch (e) {
+                alert('Restore failed: ' + e.message);
+            }
+        },
+        formatDate(ts) {
+            if (!ts) return '—';
+            return new Date(ts).toLocaleString();
         },
         async searchMods() {
             if (!this.selectedInstance || !this.searchQuery.trim()) return;
@@ -957,6 +1068,7 @@ createApp({
             if (tab === 'console') this.connectConsole();
             if (tab === 'stats') this.loadStats();
             if (tab === 'players') this.loadPlayers();
+            if (tab === 'backups') this.loadBackups();
             if (tab === 'settings') this.loadServerProperties();
         }
     }

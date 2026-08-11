@@ -6,6 +6,8 @@ import com.mcmanager.server.instance.ServerInstanceManager;
 import com.mcmanager.server.multiplexer.TcpMultiplexer;
 import com.mcmanager.server.process.ConsoleStreamHandler;
 import com.mcmanager.server.process.MinecraftProcessManager;
+import com.mcmanager.server.service.BackupSchedulerService;
+import com.mcmanager.server.service.BackupService;
 import com.mcmanager.server.service.BomService;
 import com.mcmanager.server.service.ConfigService;
 import com.mcmanager.server.service.ModManagementService;
@@ -41,8 +43,13 @@ public class Main {
         // Multi-instance engine (isolated <data>/instances/<id>/ dirs).
         ServerInstanceManager instanceManager = new ServerInstanceManager(configService.getDataDir(), console);
 
+        // LZ4-compressed backups + the automatic scheduler (AGENT_PLAN_6).
+        BackupService backupService = new BackupService(configService.getDataDir(), instanceManager);
+        BackupSchedulerService backupScheduler = new BackupSchedulerService(instanceManager, backupService);
+        backupScheduler.start();
+
         JavalinApp webApp = new JavalinApp(configService, bomService, modService, processManager, console,
-                instanceManager);
+                instanceManager, backupService);
         webApp.start();
 
         TcpMultiplexer multiplexer = new TcpMultiplexer(configService, instanceManager);
@@ -53,6 +60,7 @@ public class Main {
             processManager.stop();
             instanceManager.listInstances().forEach(inst ->
                     instanceManager.stopInstance(inst.getId()));
+            backupScheduler.stop();
             multiplexer.stop();
             webApp.stop();
         }));

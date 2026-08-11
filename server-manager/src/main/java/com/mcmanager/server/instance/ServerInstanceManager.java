@@ -306,6 +306,26 @@ public class ServerInstanceManager {
         return instancesDir;
     }
 
+    /**
+     * Re-reads one instance's config from its {@code instance.json} on disk and
+     * replaces the in-memory copy. Used after a backup restore swaps the
+     * instance directory contents, so the running wrapper picks up whatever
+     * config was stored in the backup.
+     */
+    public synchronized void reloadInstanceFromDisk(String instanceId) throws IOException {
+        Path cfgFile = instanceDir(instanceId).resolve("instance.json");
+        if (!Files.isRegularFile(cfgFile)) {
+            throw new IOException("instance.json not found after restore: " + cfgFile);
+        }
+        InstanceConfig config = GSON.fromJson(Files.readString(cfgFile, StandardCharsets.UTF_8),
+                InstanceConfig.class);
+        if (config == null || config.getId() == null) {
+            throw new IOException("Could not parse instance config after restore: " + cfgFile);
+        }
+        instanceConfigs.put(instanceId, config);
+        log.info("Reloaded instance config from disk after restore: '{}'", config.getName());
+    }
+
     // ------------------------------------------------------------------
     // persistence
     // ------------------------------------------------------------------
