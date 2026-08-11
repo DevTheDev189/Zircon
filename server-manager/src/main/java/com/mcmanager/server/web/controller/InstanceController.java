@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * REST endpoints for multi-instance management (Phase 2/3 of the Zircon plan):
@@ -162,6 +163,28 @@ public class InstanceController {
     public void stopInstance(Context ctx) {
         instanceManager.stopInstance(ctx.pathParam("id"));
         ctx.json(Map.of("ok", true));
+    }
+
+    /** POST /api/instances/{id}/restart — stops the instance, then starts it again shortly after. */
+    public void restartInstance(Context ctx) {
+        String id = ctx.pathParam("id");
+        try {
+            instanceManager.getInstance(id); // 404 for unknown ids
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+            return;
+        }
+
+        instanceManager.stopInstance(id);
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(1500); // allow OS process cleanup before restart
+                instanceManager.startInstance(id);
+            } catch (Exception e) {
+                log.error("Failed to restart instance {}", id, e);
+            }
+        });
+        ctx.json(Map.of("ok", true, "message", "Server is restarting..."));
     }
 
     /** GET /api/instances/{id}/eula — EULA acceptance status. */
@@ -461,12 +484,13 @@ public class InstanceController {
         }
     }
 
-    /** GET /api/instances/{id}/mods/search?query=&mcVersion=&loader=&origin= */
+    /** GET /api/instances/{id}/mods/search?query=&mcVersion=&loader=&origin=&type= */
     public void searchMods(Context ctx) {
         String query = ctx.queryParam("query");
         String mcVersion = ctx.queryParam("mcVersion");
         String loader = ctx.queryParam("loader");
         String origin = ctx.queryParam("origin");
+        String type = ctx.queryParam("type"); // "mod" or "modpack" (modrinth only); null = mods
         if (query == null) query = "";
         if (origin == null) origin = "modrinth";
 
@@ -493,7 +517,7 @@ public class InstanceController {
                         .stream().map(CurseForgeApiClient.CurseForgeMod::toMap).toList());
             } else {
                 result.put("origin", "modrinth");
-                result.put("hits", mods.modrinth().searchMods(query, mcVersion, loader)
+                result.put("hits", mods.modrinth().searchMods(query, mcVersion, loader, type)
                         .stream().map(ModrinthApiClient.ModrinthSearchHit::toMap).toList());
             }
             ctx.json(result);
@@ -610,6 +634,44 @@ public class InstanceController {
                 Thread.currentThread().interrupt();
             }
             ctx.status(502).result("Install failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * POST /api/instances/{id}/modpacks/install
+     * body: {"projectId":"...","versionId":"..."}
+     * Downloads a Modrinth modpack (.mrpack) and installs every mod it lists into
+     * this instance's mods folder.
+     */
+    public void installModpack(Context ctx) {
+        InstallRequest body;
+        try {
+            body = ctx.bodyAsClass(InstallRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400).result("Invalid JSON body");
+            return;
+        }
+        if (body == null || body.projectId == null) {
+            ctx.status(400).result("projectId is required");
+            return;
+        }
+
+        ModManagementService mods;
+        try {
+            mods = modsFor(ctx.pathParam("id"));
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+            return;
+        }
+
+        try {
+            Map<String, Object> result = mods.installModrinthModpack(body.projectId, body.versionId);
+            ctx.status(201).json(result);
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            ctx.status(502).result("Modpack installation failed: " + e.getMessage());
         }
     }
 

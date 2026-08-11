@@ -7,19 +7,29 @@ import com.mcmanager.core.crypto.MurmurHash3;
 import com.mcmanager.core.model.BillOfMaterials;
 import com.mcmanager.core.model.ModEntry;
 import com.mcmanager.core.util.SecurityUtil;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * Handles the physical mod files in {@code <data>/mods} and keeps the BOM in
@@ -163,6 +173,89 @@ public class ModManagementService {
         enrichMetadata(entry);
         bomService.save();
         return entry;
+    }
+
+    /**
+     * Downloads a Modrinth modpack ({@code .mrpack}) and installs every mod listed
+     * under {@code files} in its {@code modrinth.index.json} into this instance's
+     * mods folder. Overrides (config/resource files bundled in the pack) are not
+     * applied — only the {@code mods/} entries.
+     *
+     * @param projectId Modrinth modpack project id
+     * @param versionId the exact version id to install (or {@code null} for the
+     *                  first published version)
+     */
+    public synchronized Map<String, Object> installModrinthModpack(String projectId, String versionId)
+            throws IOException, InterruptedException {
+        List<ModrinthApiClient.ModrinthVersion> versions = modrinth.listProjectVersions(projectId, null, null);
+        ModrinthApiClient.ModrinthVersion version = versions.stream()
+                .filter(v -> versionId == null || versionId.equals(v.id))
+                .findFirst()
+                .orElseThrow(() -> new IOException("Modpack version not found"));
+
+        ModrinthApiClient.ModrinthFile primaryFile = version.primaryFile();
+        if (primaryFile == null || !primaryFile.filename.toLowerCase(Locale.ROOT).endsWith(".mrpack")) {
+            throw new IOException("Selected version does not contain a valid .mrpack file");
+        }
+        if (!SecurityUtil.isSafeCdnUrl(primaryFile.url)) {
+            throw new IOException("Rejected modpack download URL (host is not an allowed CDN): " + primaryFile.url);
+        }
+
+        Path tempMrpack = Files.createTempFile("modpack-", ".mrpack");
+        int installedCount = 0;
+        List<String> failedMods = new ArrayList<>();
+        try {
+            try (InputStream in = URI.create(primaryFile.url).toURL().openStream()) {
+                Files.copy(in, tempMrpack, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            try (ZipFile zip = new ZipFile(tempMrpack.toFile())) {
+                ZipEntry indexEntry = zip.getEntry("modrinth.index.json");
+                if (indexEntry == null) {
+                    throw new IOException("Invalid .mrpack: missing modrinth.index.json");
+                }
+
+                JsonObject indexJson;
+                try (InputStreamReader reader =
+                             new InputStreamReader(zip.getInputStream(indexEntry), StandardCharsets.UTF_8)) {
+                    indexJson = JsonParser.parseReader(reader).getAsJsonObject();
+                }
+
+                JsonArray files = indexJson.getAsJsonArray("files");
+                if (files != null) {
+                    for (JsonElement element : files) {
+                        JsonObject fileObj = element.getAsJsonObject();
+                        String path = fileObj.has("path") ? fileObj.get("path").getAsString() : null;
+                        if (path == null || !path.startsWith("mods/")) {
+                            continue;
+                        }
+                        String filename = path.substring("mods/".length());
+                        JsonArray downloads = fileObj.getAsJsonArray("downloads");
+                        if (downloads == null || downloads.size() == 0) {
+                            continue;
+                        }
+                        String downloadUrl = downloads.get(0).getAsString();
+                        try {
+                            installFromUrl(downloadUrl, filename, ORIGIN_MODRINTH);
+                            installedCount++;
+                        } catch (IOException e) {
+                            log.warn("Modpack file install failed for {}: {}", filename, e.getMessage());
+                            failedMods.add(filename);
+                        }
+                    }
+                }
+            }
+        } finally {
+            Files.deleteIfExists(tempMrpack);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("installedCount", installedCount);
+        result.put("failedMods", failedMods);
+        result.put("message", "Installed modpack (" + installedCount + " mods)"
+                + (failedMods.isEmpty() ? "" : ", " + failedMods.size() + " failed"));
+        log.info("Installed Modrinth modpack {} ({} mods, {} failed)", projectId, installedCount, failedMods.size());
+        return result;
     }
 
     /**
