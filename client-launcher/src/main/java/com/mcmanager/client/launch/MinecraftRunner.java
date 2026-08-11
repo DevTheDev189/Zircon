@@ -54,11 +54,16 @@ public class MinecraftRunner {
         command.add(data.classpath());
         command.add(data.mainClass());
 
-        // Sessions are always produced by Microsoft auth (userType=msa) with a real
-        // access token; the fallbacks are purely defensive.
+        // Only genuine Microsoft sessions may launch the game. A dummy/missing
+        // token or a non-msa userType means the session did not come from
+        // Microsoft auth — refuse instead of falling back to a fake token.
         String userType = session.getUserType() == null ? "msa" : session.getUserType();
-        String accessToken = session.getAccessToken() == null || session.getAccessToken().isBlank()
-                ? "0" : session.getAccessToken();
+        String accessToken = session.getAccessToken();
+        if (!"msa".equals(userType) || accessToken == null || accessToken.isBlank()
+                || "0".equals(accessToken)) {
+            throw new IOException("Refusing to launch: no valid Microsoft session. "
+                    + "Please sign in with your Microsoft account.");
+        }
 
         if (!data.gameArgs().isEmpty()) {
             // Forge/NeoForge: the version profile (including the inherited vanilla

@@ -6,8 +6,23 @@
         </encoder>
     </appender>
 
+    <!-- Full log file for debugging: ~/.mcmanager/launcher.log -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${user.home}/.mcmanager/launcher.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Auth flow logs at DEBUG detail to the file only (console stays clean at INFO). -->
+    <logger name="com.mcmanager.client.auth" level="DEBUG" additivity="false">
+        <appender-ref ref="FILE"/>
+    </logger>
+
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
     </root>
 
 </configuration>

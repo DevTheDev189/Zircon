@@ -167,14 +167,20 @@ public class MicrosoftAuthService {
 
     private SessionData completeLogin(String authCode, String codeVerifier, String redirectUri)
             throws IOException, InterruptedException {
+        log.debug("Step 1/5: exchanging auth code for Microsoft token...");
         MsTokenResponse ms = exchangeCodeForMsToken(authCode, codeVerifier, redirectUri);
 
+        log.debug("Step 2/5: XBL authenticate...");
         String xblToken = xblAuthenticate(ms.accessToken);
+
+        log.debug("Step 3/5: XSTS authorize...");
         XstsResponse xsts = xstsAuthorize(xblToken);
 
+        log.debug("Step 4/5: Minecraft login...");
         String identityToken = "XBL3.0 x=" + xsts.uhs + ";" + xsts.token;
         McLoginResponse mc = minecraftLogin(identityToken);
 
+        log.debug("Step 5/5: fetching Minecraft profile...");
         JsonObject profile = fetchProfile(mc.accessToken);
 
         SessionData session = new SessionData(
@@ -231,7 +237,9 @@ public class MicrosoftAuthService {
         }
         try {
             SessionData data = gson.fromJson(Files.readString(CACHE_FILE), SessionData.class);
-            if (data == null || data.getUsername() == null) {
+            if (!isValidSession(data)) {
+                log.warn("Ignoring invalid auth cache (missing/dummy token or non-msa session)");
+                Files.deleteIfExists(CACHE_FILE);
                 return null;
             }
             return data;
@@ -239,6 +247,23 @@ public class MicrosoftAuthService {
             log.warn("Could not read auth cache", e);
             return null;
         }
+    }
+
+    /**
+     * A usable session must have come from Microsoft auth: a real access token
+     * and {@code userType=msa}. Rejects hand-crafted caches (dummy tokens,
+     * legacy sessions) so the launcher can never launch without signing in.
+     */
+    private static boolean isValidSession(SessionData data) {
+        if (data == null || data.getUsername() == null || data.getUsername().isBlank()) {
+            return false;
+        }
+        String token = data.getAccessToken();
+        if (token == null || token.isBlank() || "0".equals(token)) {
+            return false;
+        }
+        String userType = data.getUserType() == null ? "msa" : data.getUserType();
+        return "msa".equals(userType);
     }
 
     public void save(SessionData session) throws IOException {
@@ -267,9 +292,9 @@ public class MicrosoftAuthService {
         JsonObject json = postJson(TOKEN_URL, body, "application/x-www-form-urlencoded");
         MsTokenResponse ms = gson.fromJson(json, MsTokenResponse.class);
         if (ms.accessToken == null) {
-            throw new IOException("OAuth token exchange failed: response missing access_token "
-                    + "(HTTP 200; check the Azure app's public-client / redirect_uri config)");
+            throw new IOException("OAuth token exchange failed: response missing access_token: " + json);
         }
+        log.debug("OAuth token exchange OK (refresh_token present: {})", ms.refreshToken != null);
         return ms;
     }
 
@@ -284,7 +309,9 @@ public class MicrosoftAuthService {
         body.add("Properties", properties);
 
         JsonObject json = postJson(XBL_URL, body.toString(), "application/json");
-        return require(json, "Token", "XBL authenticate");
+        String token = require(json, "Token", "XBL authenticate");
+        log.debug("XBL authenticate OK");
+        return token;
     }
 
     private XstsResponse xstsAuthorize(String xblToken) throws IOException, InterruptedException {
@@ -302,13 +329,17 @@ public class MicrosoftAuthService {
         JsonObject displayClaims = json.getAsJsonObject("DisplayClaims");
         if (displayClaims != null && displayClaims.has("xui")) {
             var xui = displayClaims.getAsJsonArray("xui");
-            if (!xui.isEmpty()) {
-                xsts.uhs = xui.get(0).getAsJsonObject().get("uhs").getAsString();
+            if (!xui.isEmpty() && xui.get(0).isJsonObject()) {
+                JsonObject first = xui.get(0).getAsJsonObject();
+                if (first.has("uhs")) {
+                    xsts.uhs = first.get("uhs").getAsString();
+                }
             }
         }
         if (xsts.uhs == null) {
-            throw new IOException("XSTS response missing user hash (uhs)");
+            throw new IOException("XSTS response missing user hash (uhs): " + json);
         }
+        log.debug("XSTS authorize OK (uhs={})", xsts.uhs);
         return xsts;
     }
 
@@ -319,7 +350,8 @@ public class MicrosoftAuthService {
         try {
             json = postJson(MC_LOGIN_URL, body.toString(), "application/json");
         } catch (IOException e) {
-            if (e.getMessage().contains("Invalid app registration")) {
+            String message = e.getMessage();
+            if (message != null && message.contains("Invalid app registration")) {
                 throw new IOException("Minecraft rejected the login with 'Invalid app registration'. "
                         + "Two things must be true: (1) the Microsoft account owns Minecraft Java Edition, "
                         + "and (2) the Azure client ID is approved by Minecraft for authentication. "
@@ -332,6 +364,7 @@ public class MicrosoftAuthService {
         McLoginResponse mc = new McLoginResponse();
         mc.accessToken = require(json, "access_token", "Minecraft login");
         mc.expiresIn = json.has("expires_in") ? json.get("expires_in").getAsLong() : 86_400;
+        log.debug("Minecraft login OK (expires_in={}s)", mc.expiresIn);
         return mc;
     }
 
@@ -342,11 +375,19 @@ public class MicrosoftAuthService {
                 .GET()
                 .build();
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        log.debug("GET {} -> HTTP {}", MC_PROFILE_URL, response.statusCode());
         if (response.statusCode() != 200) {
             throw new IOException("Minecraft profile fetch failed: HTTP " + response.statusCode()
-                    + " " + response.body());
+                    + " " + truncate(response.body()));
         }
-        return gson.fromJson(response.body(), JsonObject.class);
+        JsonObject profile = gson.fromJson(response.body(), JsonObject.class);
+        if (profile == null || !profile.has("id") || !profile.has("name")) {
+            throw new IOException("Minecraft profile response missing 'id'/'name' "
+                    + "(does the account own Minecraft?): " + truncate(response.body()));
+        }
+        log.debug("Minecraft profile OK (id={}, name={})",
+                profile.get("id").getAsString(), profile.get("name").getAsString());
+        return profile;
     }
 
     /** Returns true if the account owns Minecraft (best effort — never aborts login). */
@@ -379,18 +420,33 @@ public class MicrosoftAuthService {
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        log.debug("POST {} -> HTTP {}: {}", url, response.statusCode(), truncate(response.body()));
         if (response.statusCode() / 100 != 2) {
             throw new IOException("POST " + url + " failed: HTTP " + response.statusCode()
-                    + " " + response.body());
+                    + " " + truncate(response.body()));
+        }
+        if (response.body() == null || response.body().isBlank()) {
+            throw new IOException("POST " + url + " returned an empty response body");
         }
         return gson.fromJson(response.body(), JsonObject.class);
     }
 
     private String require(JsonObject json, String field, String step) throws IOException {
+        if (json == null) {
+            throw new IOException(step + " failed: response was empty or not valid JSON");
+        }
         if (!json.has(field)) {
             throw new IOException(step + " failed: response missing '" + field + "': " + json);
         }
         return json.get(field).getAsString();
+    }
+
+    /** Truncates long response bodies so error messages and debug logs stay readable. */
+    private static String truncate(String s) {
+        if (s == null) {
+            return "null";
+        }
+        return s.length() > 500 ? s.substring(0, 500) + "…" : s;
     }
 
     private static String form(String... kv) {

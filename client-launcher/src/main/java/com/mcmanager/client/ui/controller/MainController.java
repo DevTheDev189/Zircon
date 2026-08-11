@@ -347,7 +347,16 @@ public class MainController {
                 }
             }
 
-            // 2. Parse the server address
+            // 2. Gate on ownership: refuse to launch unless Mojang confirms the
+            // session belongs to an account that owns Minecraft. checkEntitlements
+            // only returns false when Mojang definitively rejects the token.
+            if (!auth.checkEntitlements(session.getAccessToken())) {
+                throw new IOException("Minecraft rejected this session — the account does not own "
+                        + "Minecraft (Java Edition) or the session was revoked. "
+                        + "Please sign in again with an account that owns the game.");
+            }
+
+            // 3. Parse the server address
             String[] hostPort = parseServerAddress(serverAddress);
             String host = hostPort[0];
             int port = Integer.parseInt(hostPort[1]);
@@ -357,17 +366,17 @@ public class MainController {
             Path gameDir = instanceGameDir(host, String.valueOf(port));
             Files.createDirectories(gameDir);
 
-            // 3. Fetch BOM
+            // 4. Fetch BOM
             BillOfMaterials bom = fetchBom(baseUrl);
             ModLoaderInfo loader = bom.getModLoader();
 
-            // 4. Resolve Launch Environment
+            // 5. Resolve Launch Environment
             status("Resolving Minecraft " + bom.getMinecraftVersion() + " runtime...");
             int requiredJava = JavaRuntimeSelector.getRequiredJavaMajorVersion(bom.getMinecraftVersion());
             MinecraftClasspathBuilder.LaunchData launchData =
                     classpathBuilder.resolve(bom.getMinecraftVersion(), loader, requiredJava);
 
-            // 5. Sync Mods using Staging Area & Reconciler
+            // 6. Sync Mods using Staging Area & Reconciler
             status("Checking mod hashes & synchronizing staging area...");
             Platform.runLater(() -> progressBar.setVisible(true));
             boolean strict = strictVerifyCheck.isSelected();
@@ -390,7 +399,7 @@ public class MainController {
                 return;
             }
 
-            // 6. Launch Game
+            // 7. Launch Game
             status("Starting Minecraft process...");
             gameProcess = runner.launch(launchData, session, gameDir, host, port, null);
             status("Game running — connected to " + host + ":" + port);
@@ -405,7 +414,7 @@ public class MainController {
             });
         } catch (Exception e) {
             log.error("Launcher flow failed", e);
-            status("Error: " + e.getMessage());
+            status("Error: " + describeError(e));
         } finally {
             Platform.runLater(() -> {
                 busy.set(false);
@@ -475,6 +484,20 @@ public class MainController {
 
     private void status(String text) {
         Platform.runLater(() -> statusLabel.setText(text));
+    }
+
+    /**
+     * Builds an actionable one-liner from an exception. When the message is null
+     * (e.g. NullPointerException), falls back to the exception type and the first
+     * stack frame so the UI never shows a bare "null".
+     */
+    private static String describeError(Throwable t) {
+        if (t.getMessage() != null && !t.getMessage().isBlank()) {
+            return t.getMessage();
+        }
+        StackTraceElement top = t.getStackTrace().length > 0 ? t.getStackTrace()[0] : null;
+        return t.getClass().getSimpleName()
+                + (top != null ? " at " + top.getClassName() + ":" + top.getLineNumber() : "");
     }
 
     private void progress(double fraction) {
