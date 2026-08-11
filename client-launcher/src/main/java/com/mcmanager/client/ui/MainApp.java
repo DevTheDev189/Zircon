@@ -70,12 +70,7 @@ public class MainApp extends Application {
         HBox userHeader = new HBox(8, avatar, userLabel, logoutButton);
         userHeader.setAlignment(Pos.CENTER_LEFT);
 
-        // DEV-ONLY (temporary testing aid): REMOVE BEFORE RELEASE.
-        ToggleButton offlineToggle = new ToggleButton("Play Offline");
-        offlineToggle.setMaxWidth(Double.MAX_VALUE);
-        offlineToggle.setStyle("-fx-font-size: 11px; -fx-padding: 6 10;");
-
-        VBox userCard = new VBox(10, userHeader, offlineToggle);
+        VBox userCard = new VBox(10, userHeader);
         userCard.setStyle("-fx-background-color: #161b22; -fx-background-radius: 10; -fx-padding: 12;");
 
         VBox sidebar = new VBox(brandHeader, navBox, sidebarSpacer, userCard);
@@ -202,7 +197,7 @@ public class MainApp extends Application {
                 savedServersContainer, recommendedContainer, addServerBtn,
                 skinPreview, uploadSkinBtn, resetSkinBtn, skinStatus,
                 ramSlider, ramLabel, strictVerifyCheck, trustDirectCheck, clientIdField,
-                statusLabel, progressBar, userLabel, logoutButton, offlineToggle, stage
+                statusLabel, progressBar, userLabel, logoutButton, stage
         );
         controller.init();
 
