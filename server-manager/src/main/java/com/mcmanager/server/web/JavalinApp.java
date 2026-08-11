@@ -220,6 +220,7 @@ public class JavalinApp {
         app.delete("/api/instances/{id}", instanceController::deleteInstance);
         app.post("/api/instances/{id}/start", instanceController::startInstance);
         app.post("/api/instances/{id}/stop", instanceController::stopInstance);
+        app.post("/api/instances/{id}/restart", instanceController::restartInstance);
         app.get("/api/instances/{id}/eula", instanceController::getEula);
         app.post("/api/instances/{id}/eula", instanceController::acceptEula);
         app.get("/api/instances/{id}/server-properties", instanceController::getServerProperties);
@@ -242,6 +243,7 @@ public class JavalinApp {
         app.get("/api/instances/{id}/mods/modrinth/versions", instanceController::modrinthVersions);
         app.get("/api/instances/{id}/mods/curseforge/files", instanceController::curseForgeFiles);
         app.post("/api/instances/{id}/mods/install", instanceController::installMod);
+        app.post("/api/instances/{id}/modpacks/install", instanceController::installModpack);
 
         // Backups REST endpoints
         app.get("/api/instances/{id}/backups", backupController::listBackups);

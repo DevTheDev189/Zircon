@@ -69,8 +69,12 @@
                     </div>
                     <button v-if="!inst.running" @click.stop="startInstance(inst)"
                             class="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold py-1.5 rounded-lg transition">Start Server</button>
-                    <button v-else @click.stop="stopInstance(inst)"
-                            class="mt-2 w-full bg-red-600/80 hover:bg-red-500 text-xs font-semibold py-1.5 rounded-lg transition">Stop Server</button>
+                    <div v-else class="flex gap-1.5 mt-2">
+                        <button @click.stop="restartInstance(inst)" title="Restart Server"
+                                class="bg-amber-600/80 hover:bg-amber-500 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition">🔄</button>
+                        <button @click.stop="stopInstance(inst)"
+                                class="flex-1 bg-red-600/80 hover:bg-red-500 text-xs font-semibold py-1.5 rounded-lg transition">Stop Server</button>
+                    </div>
                 </div>
                 <p v-if="!instances.length" class="text-xs text-slate-500 text-center py-6">No servers yet — click Add Server.</p>
             </div>
@@ -140,12 +144,55 @@
                 </div>
 
                 <!-- RICH MODS VIEW -->
-                <div v-if="activeTab === 'mods'" class="grid grid-cols-2 gap-6 h-full">
+                <div v-if="activeTab === 'mods'" class="flex flex-col gap-6 h-full overflow-hidden">
+
+                    <!-- Zircon Recommended Mods -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shrink-0">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-base">⚡</span>
+                                <h3 class="font-bold text-sm text-slate-200">Zircon Team Recommended Mods</h3>
+                            </div>
+                            <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-mono">Curated</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2.5 max-h-40 overflow-y-auto pr-1">
+                            <div v-for="rec in filteredRecommendedMods" :key="rec.projectId"
+                                 class="bg-slate-800/40 border border-slate-700/30 p-2.5 rounded-lg flex items-center justify-between gap-2">
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-xs text-slate-200 truncate">{{ rec.title }}</p>
+                                    <p class="text-[11px] text-slate-400 truncate">{{ rec.description }}</p>
+                                </div>
+                                <button v-if="!isModInstalled(rec)" @click="installMod(rec)"
+                                        :disabled="installingMods[rec.projectId]"
+                                        class="bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs px-2.5 py-1 rounded font-medium shrink-0 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <svg v-if="installingMods[rec.projectId]" class="animate-spin h-3 w-3 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>{{ installingMods[rec.projectId] ? '...' : '+ Add' }}</span>
+                                </button>
+                                <span v-else class="text-[10px] text-emerald-400 font-semibold px-2 py-0.5 bg-emerald-500/10 rounded shrink-0">✓ Installed</span>
+                            </div>
+                            <p v-if="!filteredRecommendedMods.length" class="col-span-3 text-xs text-slate-500 text-center py-4">No recommended mods for this loader.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6 flex-1 min-h-0">
                     <!-- Panel 1: Search & Download -->
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
-                        <h3 class="font-bold text-sm mb-3">Find & Install Mods</h3>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold text-sm">Find & Install</h3>
+                            <div class="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-xs font-medium">
+                                <button @click="searchType = 'mod'"
+                                        :class="searchType === 'mod' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'"
+                                        class="px-2.5 py-1 rounded-md transition">Mods</button>
+                                <button @click="searchType = 'modpack'"
+                                        :class="searchType === 'modpack' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'"
+                                        class="px-2.5 py-1 rounded-md transition">Modpacks 📦</button>
+                            </div>
+                        </div>
                         <div class="flex gap-2 mb-4">
-                            <input v-model="searchQuery" @keyup.enter="searchMods" placeholder="Search Modrinth..." class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                            <input v-model="searchQuery" @keyup.enter="searchMods" :placeholder="searchType === 'modpack' ? 'Search Modrinth modpacks...' : 'Search Modrinth mods...'" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
                             <button @click="searchMods" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg text-sm font-medium">Search</button>
                         </div>
                         <div class="flex-1 overflow-y-auto space-y-3 pr-1">
@@ -154,7 +201,15 @@
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center justify-between">
                                         <p class="font-semibold text-sm truncate">{{ hit.title }}</p>
-                                        <button @click="installMod(hit)" class="bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs px-3 py-1 rounded-md font-medium shrink-0">Install</button>
+                                        <button @click="searchType === 'modpack' ? installModpack(hit) : installMod(hit)"
+                                                :disabled="installingMods[hit.projectId]"
+                                                class="bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs px-3 py-1.5 rounded-md font-medium shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <svg v-if="installingMods[hit.projectId]" class="animate-spin h-3.5 w-3.5 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>{{ installingMods[hit.projectId] ? 'Installing...' : (searchType === 'modpack' ? 'Install Pack' : 'Install') }}</span>
+                                        </button>
                                     </div>
                                     <p class="text-xs text-slate-400 line-clamp-2 mt-1">{{ hit.description }}</p>
                                     <p class="text-[10px] text-slate-500 mt-1">by {{ hit.author }}</p>
@@ -184,6 +239,7 @@
                             </div>
                             <p v-if="!installedMods.length" class="text-xs text-slate-500 text-center py-6">No mods installed yet.</p>
                         </div>
+                    </div>
                     </div>
                 </div>
 
@@ -606,7 +662,17 @@ createApp({
             profileForm: { username: 'admin', currentPassword: '', newPassword: '' },
             systemStats: {},
             searchQuery: '',
+            searchType: 'mod', // 'mod' or 'modpack'
             searchResults: [],
+            installingMods: {}, // { [projectId]: true } while an install is in flight
+            recommendedMods: [
+                { projectId: 'sodium', title: 'Sodium', description: 'Modern rendering engine that greatly improves frame rates.', loader: 'fabric' },
+                { projectId: 'lithium', title: 'Lithium', description: 'General-purpose optimization for physics, chunk loading and entity ticking.', loader: 'fabric' },
+                { projectId: 'ferritecore', title: 'FerriteCore', description: 'Memory usage optimizations for Minecraft.', loader: 'both' },
+                { projectId: 'iris', title: 'Iris Shaders', description: 'A modern shaders mod built to be compatible with Sodium.', loader: 'fabric' },
+                { projectId: 'cloth-config', title: 'Cloth Config', description: 'Configuration screen library used by many mods.', loader: 'both' },
+                { projectId: 'appleskin', title: 'AppleSkin', description: 'Adds food value information to tooltips and HUD.', loader: 'both' }
+            ],
             installedMods: [],
             whitelistEnabled: false,
             whitelistPlayers: [],
@@ -754,6 +820,17 @@ createApp({
             if (!inst) return;
             await this.api(`/api/instances/${inst.id}/stop`, { method: 'POST' });
             await this.loadInstances();
+        },
+        async restartInstance(inst) {
+            inst = inst || this.selectedInstance;
+            if (!inst) return;
+            try {
+                await this.api(`/api/instances/${inst.id}/restart`, { method: 'POST' });
+                alert(`Server "${inst.name}" is restarting...`);
+                setTimeout(() => this.loadInstances(), 2000);
+            } catch (e) {
+                alert('Restart failed: ' + e.message);
+            }
         },
         async acceptAndStart() {
             if (!this.eulaInstance) return;
@@ -905,7 +982,8 @@ createApp({
             const q = new URLSearchParams({
                 query: this.searchQuery,
                 mcVersion: this.selectedInstance.minecraftVersion,
-                loader
+                loader,
+                type: this.searchType
             });
             try {
                 const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/search?${q}`);
@@ -913,18 +991,49 @@ createApp({
             } catch (e) { alert('Search failed: ' + e.message); }
         },
         async installMod(hit) {
+            const id = hit.projectId;
+            this.installingMods[id] = true;
             try {
                 const loader = this.selectedInstance.modLoader.type === 'vanilla' ? '' : this.selectedInstance.modLoader.type;
-                const q = new URLSearchParams({ projectId: hit.projectId, mcVersion: this.selectedInstance.minecraftVersion, loader });
+                const q = new URLSearchParams({ projectId: id, mcVersion: this.selectedInstance.minecraftVersion, loader });
                 const versions = await this.api(`/api/instances/${this.selectedInstance.id}/mods/modrinth/versions?${q}`);
                 const chosen = (versions.versions || [])[0];
                 if (!chosen) { alert('No compatible version found for ' + this.selectedInstance.minecraftVersion); return; }
                 await this.api(`/api/instances/${this.selectedInstance.id}/mods/install`, {
                     method: 'POST',
-                    body: JSON.stringify({ origin: 'modrinth', projectId: hit.projectId, versionId: chosen.id })
+                    body: JSON.stringify({ origin: 'modrinth', projectId: id, versionId: chosen.id })
                 });
-                this.loadMods();
-            } catch (e) { alert('Install failed: ' + e.message); }
+                this.searchResults = this.searchResults.filter(r => r.projectId !== id);
+                await this.loadMods();
+            } catch (e) {
+                alert('Install failed: ' + e.message);
+            } finally {
+                delete this.installingMods[id];
+            }
+        },
+        async installModpack(hit) {
+            const id = hit.projectId;
+            this.installingMods[id] = true;
+            try {
+                const res = await this.api(`/api/instances/${this.selectedInstance.id}/modpacks/install`, {
+                    method: 'POST',
+                    body: JSON.stringify({ projectId: id })
+                });
+                alert(res.message || 'Modpack installed successfully!');
+                this.searchResults = this.searchResults.filter(r => r.projectId !== id);
+                await this.loadMods();
+            } catch (e) {
+                alert('Modpack install failed: ' + e.message);
+            } finally {
+                delete this.installingMods[id];
+            }
+        },
+        isModInstalled(rec) {
+            // Mods installed via the generic search flow are keyed by Modrinth's
+            // internal project id, not the slug used in the curated list, so fall
+            // back to a case-insensitive title match.
+            return this.installedMods.some(m => m.id === rec.projectId
+                || (m.title && m.title.toLowerCase() === rec.title.toLowerCase()));
         },
         async loadMods() {
             if (!this.selectedInstance) return;
@@ -1061,6 +1170,12 @@ createApp({
             return Object.keys(this.serverProps)
                 .filter(k => !CURATED_PROPERTY_KEYS.includes(k))
                 .sort();
+        },
+        // Recommended mods filtered to the selected instance's mod loader.
+        filteredRecommendedMods() {
+            if (!this.selectedInstance) return [];
+            const loader = this.selectedInstance.modLoader.type;
+            return this.recommendedMods.filter(r => r.loader === 'both' || r.loader === loader);
         }
     },
     watch: {

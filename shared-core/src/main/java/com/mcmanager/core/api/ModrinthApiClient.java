@@ -95,16 +95,35 @@ public class ModrinthApiClient {
      */
     public List<ModrinthSearchHit> searchMods(String query, String mcVersion, String loaderType)
             throws IOException, InterruptedException {
+        return searchMods(query, mcVersion, loaderType, null);
+    }
+
+    /**
+     * Searches Modrinth, optionally restricting results to a {@code project_type}
+     * (e.g. {@code "mod"} or {@code "modpack"}).
+     *
+     * @param query       search text
+     * @param mcVersion   e.g. "1.20.4" (may be {@code null} to ignore)
+     * @param loaderType  e.g. "fabric" (may be {@code null} to ignore)
+     * @param projectType {@code "mod"} or {@code "modpack"} (may be {@code null} to ignore)
+     */
+    public List<ModrinthSearchHit> searchMods(String query, String mcVersion, String loaderType, String projectType)
+            throws IOException, InterruptedException {
         StringBuilder url = new StringBuilder(BASE_URL).append("/search?query=")
                 .append(urlEncode(query == null ? "" : query));
 
-        if (mcVersion != null && loaderType != null) {
-            url.append("&facets=").append(urlEncode(
-                    "[[\"versions:" + mcVersion + "\"],[\"categories:" + loaderType + "\"]]"));
-        } else if (mcVersion != null) {
-            url.append("&facets=").append(urlEncode("[[\"versions:" + mcVersion + "\"]]"));
-        } else if (loaderType != null) {
-            url.append("&facets=").append(urlEncode("[[\"categories:" + loaderType + "\"]]"));
+        List<String> facetGroups = new ArrayList<>();
+        if (mcVersion != null && !mcVersion.isBlank()) {
+            facetGroups.add("[\"versions:" + mcVersion + "\"]");
+        }
+        if (loaderType != null && !loaderType.isBlank()) {
+            facetGroups.add("[\"categories:" + loaderType + "\"]");
+        }
+        if (projectType != null && !projectType.isBlank()) {
+            facetGroups.add("[\"project_type:" + projectType + "\"]");
+        }
+        if (!facetGroups.isEmpty()) {
+            url.append("&facets=").append(urlEncode("[" + String.join(",", facetGroups) + "]"));
         }
         url.append("&limit=25");
 
