@@ -2,6 +2,7 @@ package com.mcmanager.core.model;
 
 import com.google.gson.annotations.SerializedName;
 
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -11,10 +12,29 @@ import java.util.UUID;
  * setter for it (and no API route that mutates it), so a server's mod loader
  * type can never be switched out from under the mods that were installed for
  * it. Only {@code name}, {@code javaArgs}, {@code autoStart},
- * {@code minecraftVersion} and the loader <em>version</em> (via
- * {@link #setLoaderVersion}) are mutable after creation.
+ * {@code minecraftVersion}, the loader <em>version</em> (via
+ * {@link #setLoaderVersion}) and the backup settings
+ * ({@link #setBackupFrequency}/{@link #setBackupTime}/{@link #setBackupRetention})
+ * are mutable after creation.
  */
 public class InstanceConfig {
+
+    /** Manual backups only — the scheduler never auto-backs up. */
+    public static final String BACKUP_OFF = "off";
+    public static final String BACKUP_DAILY = "daily";
+    public static final String BACKUP_WEEKLY = "weekly";
+    public static final String BACKUP_MONTHLY = "monthly";
+
+    /** All frequency values accepted by the backup scheduler. */
+    public static final Set<String> VALID_BACKUP_FREQUENCIES =
+            Set.of(BACKUP_OFF, BACKUP_DAILY, BACKUP_WEEKLY, BACKUP_MONTHLY);
+
+    /** Default number of backups kept per instance before old ones are pruned. */
+    public static final int DEFAULT_BACKUP_RETENTION = 10;
+
+    /** Allowed bounds for the per-instance retention setting. */
+    public static final int MIN_BACKUP_RETENTION = 1;
+    public static final int MAX_BACKUP_RETENTION = 100;
 
     @SerializedName("id")
     private String id = UUID.randomUUID().toString().substring(0, 8);
@@ -37,6 +57,18 @@ public class InstanceConfig {
 
     @SerializedName("autoStart")
     private boolean autoStart = false;
+
+    /** Backup cadence: one of {@link #BACKUP_OFF}, {@link #BACKUP_DAILY}, {@link #BACKUP_WEEKLY}, {@link #BACKUP_MONTHLY}. */
+    @SerializedName("backupFrequency")
+    private String backupFrequency = BACKUP_OFF;
+
+    /** Local time of day (24-hour "HH:MM") at which scheduled backups run. */
+    @SerializedName("backupTime")
+    private String backupTime = "02:00";
+
+    /** How many backups to keep; older ones are pruned. */
+    @SerializedName("backupRetention")
+    private int backupRetention = DEFAULT_BACKUP_RETENTION;
 
     /** Gson deserialization. */
     public InstanceConfig() {
@@ -83,6 +115,18 @@ public class InstanceConfig {
         return autoStart;
     }
 
+    public String getBackupFrequency() {
+        return backupFrequency;
+    }
+
+    public String getBackupTime() {
+        return backupTime;
+    }
+
+    public int getBackupRetention() {
+        return backupRetention;
+    }
+
     // ------------------------------------------------------------------
     // The only mutable fields. Note: NO setModLoader()!
     // ------------------------------------------------------------------
@@ -97,6 +141,18 @@ public class InstanceConfig {
 
     public void setAutoStart(boolean autoStart) {
         this.autoStart = autoStart;
+    }
+
+    public void setBackupFrequency(String backupFrequency) {
+        this.backupFrequency = backupFrequency;
+    }
+
+    public void setBackupTime(String backupTime) {
+        this.backupTime = backupTime;
+    }
+
+    public void setBackupRetention(int backupRetention) {
+        this.backupRetention = backupRetention;
     }
 
     public void setMinecraftVersion(String minecraftVersion) {

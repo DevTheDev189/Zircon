@@ -6,20 +6,28 @@ import com.mcmanager.server.instance.ServerInstanceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Runs scheduled (automatic) backups for every instance on a fixed cadence.
+ * Runs scheduled (automatic) backups for every instance according to each
+ * instance's own backup schedule: {@code off} (manual only), {@code daily},
+ * {@code weekly} or {@code monthly}, at a configured local time of day.
  *
  * <p>The scheduler wakes up every {@link #POLL_INTERVAL_MINUTES} minutes and
- * backs up any instance whose most recent backup is older than
- * {@link #SCHEDULED_BACKUP_INTERVAL_MINUTES} minutes (the "interval has elapsed
- * since last backup" gate). Manual backups count as the most recent backup too,
- * so a freshly taken manual backup suppresses the next scheduled run instead of
- * double-archiving the same state. Retention pruning in {@link BackupService}
+ * backs up any instance whose next scheduled slot has been reached. The next
+ * slot is derived from the most recent backup of <em>any</em> type, so a manual
+ * backup taken at the scheduled time satisfies that slot instead of producing
+ * a redundant automatic one. An instance with no backups yet is backed up
+ * immediately on the first poll after its schedule is enabled, then settles
+ * into the configured cadence. Retention pruning in {@link BackupService}
  * bounds how many archives are kept per instance.
  */
 public class BackupSchedulerService {
@@ -29,8 +37,8 @@ public class BackupSchedulerService {
     /** How often the scheduler wakes up to check whether backups are due. */
     public static final long POLL_INTERVAL_MINUTES = 10;
 
-    /** Minimum gap between two backups of the same instance. */
-    public static final long SCHEDULED_BACKUP_INTERVAL_MINUTES = 10;
+    /** Fallback time of day when an instance's {@code backupTime} is unset or unparseable. */
+    private static final LocalTime DEFAULT_BACKUP_TIME = LocalTime.of(2, 0);
 
     private final ScheduledExecutorService scheduler;
     private final ServerInstanceManager instanceManager;
@@ -52,9 +60,8 @@ public class BackupSchedulerService {
         // archive of a large world never queues up overlapping poll passes.
         scheduler.scheduleWithFixedDelay(this::checkScheduledBackups, 1,
                 POLL_INTERVAL_MINUTES, TimeUnit.MINUTES);
-        log.info("Backup scheduler started: poll every {} min, "
-                        + "minimum interval between backups {} min",
-                POLL_INTERVAL_MINUTES, SCHEDULED_BACKUP_INTERVAL_MINUTES);
+        log.info("Backup scheduler started: checks every {} min against per-instance schedules",
+                POLL_INTERVAL_MINUTES);
     }
 
     /**
@@ -65,7 +72,7 @@ public class BackupSchedulerService {
         try {
             for (InstanceConfig inst : instanceManager.listInstances()) {
                 try {
-                    if (backupDue(inst.getId())) {
+                    if (backupDue(inst)) {
                         log.info("Running scheduled backup for instance '{}' ({})",
                                 inst.getName(), inst.getId());
                         backupService.createBackup(inst.getId(), BackupEntry.TRIGGER_SCHEDULED);
@@ -80,15 +87,62 @@ public class BackupSchedulerService {
         }
     }
 
-    /** @return {@code true} when the instance has no backup yet or its newest one is older than the interval. */
-    private boolean backupDue(String instanceId) {
-        List<BackupEntry> backups = backupService.listBackups(instanceId);
+    /**
+     * @return {@code true} when the instance's schedule is enabled and its next
+     *         scheduled slot has been reached (or it has never been backed up).
+     */
+    boolean backupDue(InstanceConfig config) {
+        String frequency = config.getBackupFrequency();
+        if (frequency == null || InstanceConfig.BACKUP_OFF.equalsIgnoreCase(frequency)) {
+            return false;
+        }
+        List<BackupEntry> backups = backupService.listBackups(config.getId());
         if (backups.isEmpty()) {
+            // Never backed up: start the cadence on the first poll after enabling.
             return true;
         }
-        long newest = backups.get(0).getTimestamp();
-        return System.currentTimeMillis() - newest
-                >= TimeUnit.MINUTES.toMillis(SCHEDULED_BACKUP_INTERVAL_MINUTES);
+        Instant last = Instant.ofEpochMilli(backups.get(0).getTimestamp());
+        ZonedDateTime next = nextScheduledSlot(frequency, parseBackupTime(config.getBackupTime()), last);
+        return !ZonedDateTime.now().isBefore(next);
+    }
+
+    /**
+     * Computes the first configured slot strictly after {@code last}: the
+     * slot's own date/time is anchored to the last backup and advanced by the
+     * frequency until it passes it. Package-private so tests can assert the
+     * exact slot math without waiting for real time.
+     *
+     * @param frequency one of {@code daily}, {@code weekly}, {@code monthly}
+     * @param time      local time of day the slot fires at
+     * @param last      the most recent backup instant (never {@code null})
+     */
+    static ZonedDateTime nextScheduledSlot(String frequency, LocalTime time, Instant last) {
+        ZoneId zone = ZoneId.systemDefault();
+        ZonedDateTime anchor = ZonedDateTime.ofInstant(last, zone);
+        ZonedDateTime candidate = anchor.toLocalDate().atTime(time).atZone(zone);
+        while (!candidate.isAfter(anchor)) {
+            candidate = advance(candidate, frequency);
+        }
+        return candidate;
+    }
+
+    private static ZonedDateTime advance(ZonedDateTime slot, String frequency) {
+        return switch (frequency) {
+            case InstanceConfig.BACKUP_WEEKLY -> slot.plusWeeks(1);
+            case InstanceConfig.BACKUP_MONTHLY -> slot.plusMonths(1);
+            default -> slot.plusDays(1); // daily (and any unknown value as a safe fallback)
+        };
+    }
+
+    private static LocalTime parseBackupTime(String time) {
+        if (time != null) {
+            try {
+                return LocalTime.parse(time);
+            } catch (DateTimeParseException e) {
+                log.warn("Invalid backupTime '{}', defaulting to {}", time, DEFAULT_BACKUP_TIME);
+            }
+        }
+        return DEFAULT_BACKUP_TIME;
     }
 
     public void stop() {

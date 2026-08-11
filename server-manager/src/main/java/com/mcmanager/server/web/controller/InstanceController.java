@@ -5,8 +5,10 @@ import com.mcmanager.core.api.ModrinthApiClient;
 import com.mcmanager.core.model.BillOfMaterials;
 import com.mcmanager.core.model.InstanceConfig;
 import com.mcmanager.core.model.ModEntry;
+import com.mcmanager.server.auth.JoinTicketManager;
 import com.mcmanager.server.instance.ServerInstanceManager;
 import com.mcmanager.server.process.MinecraftProcessManager;
+import com.mcmanager.server.process.PlayerTracker;
 import com.mcmanager.server.service.BomService;
 import com.mcmanager.server.service.ConfigService;
 import com.mcmanager.server.service.ModManagementService;
@@ -97,6 +99,15 @@ public class InstanceController {
         }
         try {
             String id = ctx.pathParam("id");
+            // Backup schedule changes are independent of version re-sync.
+            if (body != null && (body.backupFrequency != null || body.backupTime != null)) {
+                if (!validSchedule(body.backupFrequency, body.backupTime)) {
+                    ctx.status(400).result("backupFrequency must be one of off, daily, weekly, monthly "
+                            + "and backupTime must be in HH:MM 24-hour format");
+                    return;
+                }
+                instanceManager.updateBackupSchedule(id, body.backupFrequency, body.backupTime);
+            }
             boolean versionChange = false;
             if (body != null) {
                 InstanceConfig current = instanceManager.getInstance(id);
@@ -294,6 +305,20 @@ public class InstanceController {
         }
     }
 
+    /** GET /api/instances/{id}/players/history — every player that has ever joined (persisted). */
+    public void playerHistory(Context ctx) {
+        try {
+            String id = ctx.pathParam("id");
+            instanceManager.getInstance(id); // 404 for unknown ids
+            Path historyFile = instanceManager.getInstanceDir(id).resolve("players.json");
+            List<Map<String, Object>> players = PlayerTracker.loadHistory(historyFile).stream()
+                    .map(com.mcmanager.server.process.PlayerHistoryEntry::toMap).toList();
+            ctx.json(Map.of("players", players));
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+        }
+    }
+
     /** GET /api/instances/{id}/players/whitelist — contents of the instance's whitelist.json. */
     public void getWhitelist(Context ctx) {
         try {
@@ -434,6 +459,35 @@ public class InstanceController {
         } catch (IllegalArgumentException e) {
             ctx.status(404).result(e.getMessage());
         }
+    }
+
+    /**
+     * POST /api/join-intent and /api/instances/{id}/join-intent — registers a
+     * short-lived join ticket for the launcher's session so the player's
+     * connection passes the Zircon join gate (AGENT_PLAN_7). Intentionally
+     * unauthenticated: the launcher has no admin token. The {@code id} path
+     * parameter (when present) is accepted for route compatibility; tickets are
+     * global by username/UUID.
+     */
+    public void registerJoinIntent(Context ctx) {
+        JoinIntentRequest body;
+        try {
+            body = ctx.bodyAsClass(JoinIntentRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400).result("Invalid JSON body");
+            return;
+        }
+        if (body == null || (body.username == null && body.uuid == null)) {
+            ctx.status(400).result("username or uuid is required");
+            return;
+        }
+        if (body.username != null) {
+            JoinTicketManager.registerTicket(body.username);
+        }
+        if (body.uuid != null) {
+            JoinTicketManager.registerTicket(body.uuid);
+        }
+        ctx.json(Map.of("ok", true, "expiresInSeconds", JoinTicketManager.TICKET_TTL_SECONDS));
     }
 
     // ------------------------------------------------------------------
@@ -767,6 +821,16 @@ public class InstanceController {
         return s == null || s.isBlank();
     }
 
+    private boolean validSchedule(String frequency, String time) {
+        if (frequency != null && !InstanceConfig.VALID_BACKUP_FREQUENCIES.contains(frequency)) {
+            return false;
+        }
+        if (time != null && !time.matches("^\\d{2}:\\d{2}$")) {
+            return false;
+        }
+        return true;
+    }
+
     private Map<String, Object> toMap(InstanceConfig cfg) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", cfg.getId());
@@ -778,6 +842,9 @@ public class InstanceController {
         map.put("internalMcPort", cfg.getInternalMcPort());
         map.put("javaArgs", cfg.getJavaArgs());
         map.put("autoStart", cfg.isAutoStart());
+        map.put("backupFrequency", cfg.getBackupFrequency());
+        map.put("backupTime", cfg.getBackupTime());
+        map.put("backupRetention", cfg.getBackupRetention());
         map.put("running", instanceManager.isRunning(cfg.getId()));
         map.put("playerCount", instanceManager.getOnlinePlayerCount(cfg.getId()));
         map.put("onlinePlayers", List.copyOf(instanceManager.getOnlinePlayers(cfg.getId())));
@@ -796,6 +863,8 @@ public class InstanceController {
         public String mcVersion;
         public String loaderVersion;
         public String javaArgs;
+        public String backupFrequency;
+        public String backupTime;
     }
 
     public static class PlayerActionRequest {
@@ -810,6 +879,11 @@ public class InstanceController {
         public String downloadUrl;
         public String filename;
         public String fileId;
+    }
+
+    public static class JoinIntentRequest {
+        public String username;
+        public String uuid;
     }
 
     public static class EulaRequest {

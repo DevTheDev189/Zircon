@@ -41,8 +41,8 @@
                     class="w-full mb-4 px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition border"
                     :class="activeTab === 'stats'
                         ? 'border-emerald-400 ring-1 ring-emerald-400/60 shadow-[0_0_14px_rgba(16,185,129,0.35)] bg-slate-800 text-emerald-300'
-                        : 'border-transparent bg-slate-800/80 hover:bg-slate-800 text-slate-300'">
-                <span>📊</span> System Stats
+                        : 'border-transparent bg-slate-800/80 hover:bg-slate-800 text-slate-300'>
+                System Stats
             </button>
 
             <!-- Server Instance List (each entry is its own card; selected one glows) -->
@@ -150,7 +150,6 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shrink-0">
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-2">
-                                <span class="text-base">⚡</span>
                                 <h3 class="font-bold text-sm text-slate-200">Zircon Team Recommended Mods</h3>
                             </div>
                             <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-mono">Curated</span>
@@ -177,25 +176,33 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-6 flex-1 min-h-0">
+                    <div class="grid grid-cols-2 grid-rows-1 gap-6 flex-1 min-h-0">
                     <!-- Panel 1: Search & Download -->
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col min-h-0">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="font-bold text-sm">Find & Install</h3>
                             <div class="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-xs font-medium">
-                                <button @click="searchType = 'mod'"
+                                <button @click="setSearchType('mod')"
                                         :class="searchType === 'mod' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'"
                                         class="px-2.5 py-1 rounded-md transition">Mods</button>
-                                <button @click="searchType = 'modpack'"
+                                <button @click="setSearchType('modpack')"
                                         :class="searchType === 'modpack' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'"
-                                        class="px-2.5 py-1 rounded-md transition">Modpacks 📦</button>
+                                        class="px-2.5 py-1 rounded-md transition">Modpacks</button>
                             </div>
                         </div>
                         <div class="flex gap-2 mb-4">
                             <input v-model="searchQuery" @keyup.enter="searchMods" :placeholder="searchType === 'modpack' ? 'Search Modrinth modpacks...' : 'Search Modrinth mods...'" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
-                            <button @click="searchMods" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg text-sm font-medium">Search</button>
+                            <button @click="searchMods" :disabled="searching" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-4 py-1.5 rounded-lg text-sm font-medium">Search</button>
                         </div>
                         <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+                            <!-- Loading spinner while the search request is in flight -->
+                            <div v-if="searching" class="flex items-center justify-center gap-2 py-8">
+                                <svg class="animate-spin h-5 w-5 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-xs text-slate-400">Searching {{ searchType === 'modpack' ? 'modpacks' : 'mods' }}...</span>
+                            </div>
                             <div v-for="hit in searchResults" :key="hit.projectId" class="bg-slate-800/60 border border-slate-700/40 p-3 rounded-lg flex gap-3">
                                 <img :src="hit.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2310b981\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>'" class="w-10 h-10 rounded object-cover shrink-0">
                                 <div class="flex-1 min-w-0">
@@ -215,12 +222,12 @@
                                     <p class="text-[10px] text-slate-500 mt-1">by {{ hit.author }}</p>
                                 </div>
                             </div>
-                            <p v-if="!searchResults.length" class="text-xs text-slate-500 text-center py-6">No results yet — search above.</p>
+                            <p v-if="!searching && !searchResults.length" class="text-xs text-slate-500 text-center py-6">No results yet — search above.</p>
                         </div>
                     </div>
 
                     <!-- Panel 2: Installed Mods with Compatibility Badges -->
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col min-h-0">
                         <h3 class="font-bold text-sm mb-3">Installed Mods ({{ installedMods.length }})</h3>
                         <div class="flex-1 overflow-y-auto space-y-3 pr-1">
                             <div v-for="m in installedMods" :key="m.filename" class="bg-slate-800/60 border border-slate-700/40 p-3 rounded-lg flex gap-3 items-center">
@@ -271,17 +278,31 @@
                     <div class="grid grid-cols-2 gap-6">
                         <!-- Whitelisted Players -->
                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                            <h4 class="font-bold text-sm mb-3">Whitelisted Players</h4>
+                            <h4 class="font-bold text-sm mb-3 transition-colors" :class="whitelistEnabled ? 'text-slate-200' : 'text-slate-500'">Whitelisted Players
+                                <span v-if="!whitelistEnabled" class="text-[10px] font-normal text-slate-500 ml-1">(disabled — not enforced)</span>
+                            </h4>
                             <form @submit.prevent="addWhitelist" class="flex gap-2 mb-4">
-                                <input v-model="playerForms.whitelist" placeholder="Username..." class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1 text-sm">
-                                <button class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded text-xs font-semibold">Add</button>
+                                <input v-model="playerForms.whitelist" placeholder="Username..." :disabled="!whitelistEnabled"
+                                       class="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:text-slate-500">
+                                <button :disabled="!whitelistEnabled"
+                                        :class="whitelistEnabled ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-emerald-900 text-emerald-300/70 cursor-not-allowed'"
+                                        class="px-3 py-1 rounded text-xs font-semibold transition">Add</button>
                             </form>
-                            <div class="space-y-1 max-h-48 overflow-y-auto">
-                                <div v-for="p in whitelistPlayers" :key="p.uuid + p.name" class="flex items-center justify-between p-2 bg-slate-800/50 rounded text-sm">
-                                    <span>{{ p.name }}</span>
-                                    <button @click="removeWhitelist(p.name)" class="text-red-400 text-xs">Remove</button>
+                            <div class="space-y-1 max-h-48 overflow-y-auto transition" :class="whitelistEnabled ? '' : 'opacity-40'">
+                                <div v-if="playersLoading && !playersLoaded" class="flex items-center justify-center gap-2 py-4">
+                                    <svg class="animate-spin h-4 w-4 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span class="text-xs text-slate-400">Loading...</span>
                                 </div>
-                                <p v-if="!whitelistPlayers.length" class="text-xs text-slate-500 text-center py-4">Whitelist is empty.</p>
+                                <template v-else>
+                                    <div v-for="p in whitelistPlayers" :key="p.uuid + p.name" class="flex items-center justify-between p-2 bg-slate-800/50 rounded text-sm">
+                                        <span>{{ p.name }}</span>
+                                        <button @click="removeWhitelist(p.name)" class="text-red-400 text-xs">Remove</button>
+                                    </div>
+                                    <p v-if="!whitelistPlayers.length" class="text-xs text-slate-500 text-center py-4">Whitelist is empty.</p>
+                                </template>
                             </div>
                         </div>
 
@@ -293,11 +314,20 @@
                                 <button class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded text-xs font-semibold">Op</button>
                             </form>
                             <div class="space-y-1 max-h-48 overflow-y-auto">
-                                <div v-for="p in opPlayers" :key="p.uuid + p.name" class="flex items-center justify-between p-2 bg-slate-800/50 rounded text-sm">
-                                    <span>{{ p.name }}</span>
-                                    <button @click="removeOp(p.name)" class="text-red-400 text-xs">Deop</button>
+                                <div v-if="playersLoading && !playersLoaded" class="flex items-center justify-center gap-2 py-4">
+                                    <svg class="animate-spin h-4 w-4 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span class="text-xs text-slate-400">Loading...</span>
                                 </div>
-                                <p v-if="!opPlayers.length" class="text-xs text-slate-500 text-center py-4">No operators.</p>
+                                <template v-else>
+                                    <div v-for="p in opPlayers" :key="p.uuid + p.name" class="flex items-center justify-between p-2 bg-slate-800/50 rounded text-sm">
+                                        <span>{{ p.name }}</span>
+                                        <button @click="removeOp(p.name)" class="text-red-400 text-xs">Deop</button>
+                                    </div>
+                                    <p v-if="!opPlayers.length" class="text-xs text-slate-500 text-center py-4">No operators.</p>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -312,14 +342,45 @@
                             <button class="bg-red-600 hover:bg-red-500 px-3 py-1 rounded text-xs font-semibold">Ban</button>
                         </form>
                         <div class="space-y-1 max-h-48 overflow-y-auto">
-                            <div v-for="b in bannedPlayers" :key="b.uuid + b.name" class="flex items-center justify-between gap-2 p-2 bg-slate-800/50 rounded text-sm">
-                                <div class="min-w-0">
-                                    <span class="font-medium">{{ b.name }}</span>
-                                    <span v-if="b.reason" class="text-xs text-slate-400 ml-2 truncate">— {{ b.reason }}</span>
-                                </div>
-                                <button @click="removeBan(b.name)" class="text-emerald-400 hover:text-emerald-300 text-xs shrink-0">Unban</button>
+                            <div v-if="playersLoading && !playersLoaded" class="flex items-center justify-center gap-2 py-4">
+                                <svg class="animate-spin h-4 w-4 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-xs text-slate-400">Loading...</span>
                             </div>
-                            <p v-if="!bannedPlayers.length" class="text-xs text-slate-500 text-center py-4">No banned players.</p>
+                            <template v-else>
+                                <div v-for="b in bannedPlayers" :key="b.uuid + b.name" class="flex items-center justify-between gap-2 p-2 bg-slate-800/50 rounded text-sm">
+                                    <div class="min-w-0">
+                                        <span class="font-medium">{{ b.name }}</span>
+                                        <span v-if="b.reason" class="text-xs text-slate-400 ml-2 truncate">— {{ b.reason }}</span>
+                                    </div>
+                                    <button @click="removeBan(b.name)" class="text-emerald-400 hover:text-emerald-300 text-xs shrink-0">Unban</button>
+                                </div>
+                                <p v-if="!bannedPlayers.length" class="text-xs text-slate-500 text-center py-4">No banned players.</p>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Players Who Have Joined -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                        <h4 class="font-bold text-sm mb-1">Players Who Have Joined ({{ playerHistory.length }})</h4>
+                        <p class="text-xs text-slate-500 mb-3">Every player ever seen on this server, tracked automatically from the console log.</p>
+                        <div class="space-y-1 max-h-48 overflow-y-auto">
+                            <div v-if="playersLoading && !playersLoaded" class="flex items-center justify-center gap-2 py-4">
+                                <svg class="animate-spin h-4 w-4 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-xs text-slate-400">Loading...</span>
+                            </div>
+                            <template v-else>
+                                <div v-for="p in playerHistory" :key="p.name.toLowerCase()" class="flex items-center justify-between gap-2 p-2 bg-slate-800/50 rounded text-sm">
+                                    <span class="font-medium truncate">{{ p.name }}</span>
+                                    <span class="text-xs text-slate-400 shrink-0">last {{ formatDate(p.lastJoined) }} • {{ p.joinCount }} {{ p.joinCount === 1 ? 'join' : 'joins' }}</span>
+                                </div>
+                                <p v-if="!playerHistory.length" class="text-xs text-slate-500 text-center py-4">No players have joined yet.</p>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -467,6 +528,7 @@
                         <div>
                             <h3 class="font-bold text-sm text-slate-200">Server Backups</h3>
                             <p class="text-xs text-slate-400">LZ4-compressed system snapshots with automatic restoration points</p>
+                            <p class="text-xs text-emerald-400/90 mt-1 font-medium">{{ scheduleLabel }}</p>
                         </div>
                         <button @click="triggerBackup" :disabled="creatingBackup || !selectedInstance"
                                 class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 font-semibold px-4 py-2 rounded-lg text-sm transition flex items-center gap-2">
@@ -476,6 +538,40 @@
                             </svg>
                             <span>{{ creatingBackup ? 'Creating Backup...' : 'Backup Now' }}</span>
                         </button>
+                    </div>
+
+                    <!-- Backup Settings -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                        <h4 class="font-bold text-sm mb-1">Automatic Backup Settings</h4>
+                        <p class="text-xs text-slate-400 mb-3">Schedule recurring backups at a server-local time, and choose how many to keep.</p>
+                        <div class="flex items-end gap-3">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Frequency</label>
+                                <select v-model="backupForm.frequency" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                                    <option value="off">Manual only</option>
+                                    <option value="daily">Every day</option>
+                                    <option value="weekly">Every week</option>
+                                    <option value="monthly">Every month</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Time of day</label>
+                                <input type="time" v-model="backupForm.time" :disabled="backupForm.frequency === 'off'"
+                                       class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm disabled:opacity-50">
+                            </div>
+                            <button @click="saveBackupSchedule" :disabled="!selectedInstance"
+                                    class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 font-semibold px-4 py-2 rounded-lg text-sm transition">Save Schedule</button>
+                        </div>
+                        <div class="flex items-end gap-3 mt-4 pt-4 border-t border-slate-800">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Keep backups</label>
+                                <input type="number" v-model="backupForm.retention" min="1" max="100"
+                                       class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-28">
+                            </div>
+                            <p class="text-xs text-slate-500 pb-2.5">Keep the most recent {{ backupForm.retention || 0 }} backups (currently {{ backupsList.length }}).</p>
+                            <button @click="saveRetention" :disabled="!selectedInstance"
+                                    class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 font-semibold px-4 py-2 rounded-lg text-sm transition">Save Retention</button>
+                        </div>
                     </div>
 
                     <!-- Backup History -->
@@ -663,6 +759,8 @@ createApp({
             systemStats: {},
             searchQuery: '',
             searchType: 'mod', // 'mod' or 'modpack'
+            searching: false,
+            searchSeq: 0, // bumped per search so stale responses never clobber newer ones
             searchResults: [],
             installingMods: {}, // { [projectId]: true } while an install is in flight
             recommendedMods: [
@@ -678,10 +776,14 @@ createApp({
             whitelistPlayers: [],
             opPlayers: [],
             bannedPlayers: [],
+            playerHistory: [],
+            playersLoading: false,
+            playersLoaded: false,
             playerForms: { whitelist: '', op: '' },
             banForm: { name: '', reason: '' },
             settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '' },
             serverProps: {},
+            backupForm: { frequency: 'off', time: '02:00', retention: 10 },
             backupsList: [],
             creatingBackup: false,
             selectedLogBackup: null,
@@ -774,8 +876,14 @@ createApp({
             };
             this.loadMods();
             this.loadServerProperties();
+            this.playersLoaded = false; // first load of the new instance shows the spinner
             this.loadPlayers();
             this.loadBackups();
+            this.backupForm = {
+                frequency: inst.backupFrequency || 'off',
+                time: inst.backupTime || '02:00',
+                retention: inst.backupRetention || 10
+            };
             // The Stats view hides the top bar, so picking a server there must
             // also navigate back into the instance pages (mods is the landing tab).
             if (this.activeTab === 'stats') this.activeTab = 'mods';
@@ -865,6 +973,7 @@ createApp({
                     this.whitelistPlayers = [];
                     this.opPlayers = [];
                     this.bannedPlayers = [];
+                    this.playerHistory = [];
                     this.serverProps = {};
                     this.whitelistEnabled = false;
                 }
@@ -957,6 +1066,50 @@ createApp({
                 this.creatingBackup = false;
             }
         },
+        async saveBackupSchedule() {
+            if (!this.selectedInstance) return;
+            try {
+                await this.api(`/api/instances/${this.selectedInstance.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        backupFrequency: this.backupForm.frequency,
+                        backupTime: this.backupForm.time
+                    })
+                });
+                alert('Backup schedule saved!');
+                await this.loadInstances();
+            } catch (e) {
+                alert('Failed to save schedule: ' + e.message);
+            }
+        },
+        async saveRetention() {
+            if (!this.selectedInstance) return;
+            const retention = Number(this.backupForm.retention);
+            if (!Number.isInteger(retention) || retention < 1 || retention > 100) {
+                alert('Keep backups must be a whole number between 1 and 100.');
+                return;
+            }
+            const current = this.backupsList.length;
+            if (current > retention) {
+                const toDelete = current - retention;
+                if (!confirm(`This will delete ${toDelete} of your ${current} backups, keeping only the ${retention} most recent. Continue?`)) return;
+            }
+            try {
+                const res = await this.api(`/api/instances/${this.selectedInstance.id}/backups/retention`, {
+                    method: 'POST',
+                    body: JSON.stringify({ retention })
+                });
+                if (res.deletedBackups > 0) {
+                    alert(`Retention set to ${res.retention}. ${res.deletedBackups} old backup(s) deleted.`);
+                } else {
+                    alert('Retention saved.');
+                }
+                await this.loadBackups();
+                await this.loadInstances();
+            } catch (e) {
+                alert('Failed to save retention: ' + e.message);
+            }
+        },
         showLogsModal(backup) {
             this.selectedLogBackup = backup;
         },
@@ -976,6 +1129,17 @@ createApp({
             if (!ts) return '—';
             return new Date(ts).toLocaleString();
         },
+        setSearchType(t) {
+            this.searchType = t;
+            // Toggling must re-run the search with the new project type; when the
+            // query is empty, drop stale results instead of showing mods under a
+            // modpack toggle (and vice versa).
+            if (!this.searchQuery.trim()) {
+                this.searchResults = [];
+            } else {
+                this.searchMods();
+            }
+        },
         async searchMods() {
             if (!this.selectedInstance || !this.searchQuery.trim()) return;
             const loader = this.selectedInstance.modLoader.type === 'vanilla' ? '' : this.selectedInstance.modLoader.type;
@@ -985,10 +1149,17 @@ createApp({
                 loader,
                 type: this.searchType
             });
+            const mySeq = ++this.searchSeq;
+            this.searching = true;
             try {
                 const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/search?${q}`);
+                if (mySeq !== this.searchSeq) return; // superseded by a newer search
                 this.searchResults = data.hits || [];
-            } catch (e) { alert('Search failed: ' + e.message); }
+            } catch (e) {
+                if (mySeq === this.searchSeq) alert('Search failed: ' + e.message);
+            } finally {
+                if (mySeq === this.searchSeq) this.searching = false;
+            }
         },
         async installMod(hit) {
             const id = hit.projectId;
@@ -1051,16 +1222,22 @@ createApp({
         // ---- Player management ----
         async loadPlayers() {
             if (!this.selectedInstance) return;
+            this.playersLoading = true;
             try {
-                const [wl, ops, bans] = await Promise.all([
+                const [wl, ops, bans, history] = await Promise.all([
                     this.api(`/api/instances/${this.selectedInstance.id}/players/whitelist`),
                     this.api(`/api/instances/${this.selectedInstance.id}/players/ops`),
-                    this.api(`/api/instances/${this.selectedInstance.id}/players/bans`)
+                    this.api(`/api/instances/${this.selectedInstance.id}/players/bans`),
+                    this.api(`/api/instances/${this.selectedInstance.id}/players/history`)
                 ]);
                 this.whitelistPlayers = wl.players || [];
                 this.opPlayers = ops.players || [];
                 this.bannedPlayers = bans.players || [];
-            } catch (e) { /* instance may be offline / deleted */ }
+                this.playerHistory = history.players || [];
+                this.playersLoaded = true;
+            } catch (e) { /* instance may be offline / deleted */ } finally {
+                this.playersLoading = false;
+            }
         },
         async toggleWhitelist() {
             if (!this.selectedInstance) return;
@@ -1170,6 +1347,12 @@ createApp({
             return Object.keys(this.serverProps)
                 .filter(k => !CURATED_PROPERTY_KEYS.includes(k))
                 .sort();
+        },
+        scheduleLabel() {
+            const freq = this.backupForm.frequency;
+            if (!freq || freq === 'off') return 'Manual backups only';
+            const labels = { daily: 'Every day', weekly: 'Every week', monthly: 'Every month' };
+            return `${labels[freq] || freq} at ${this.backupForm.time || '--:--'}`;
         },
         // Recommended mods filtered to the selected instance's mod loader.
         filteredRecommendedMods() {

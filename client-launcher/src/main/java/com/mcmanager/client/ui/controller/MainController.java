@@ -9,6 +9,7 @@ import com.mcmanager.client.model.SavedServer;
 import com.mcmanager.client.skin.SkinManager;
 import com.mcmanager.client.sync.ModSyncEngine;
 import com.mcmanager.core.model.BillOfMaterials;
+import com.mcmanager.core.model.BomJson;
 import com.mcmanager.core.model.ModLoaderInfo;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -28,6 +29,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -399,7 +401,14 @@ public class MainController {
                 return;
             }
 
-            // 7. Launch Game
+            // 7. Register the pre-join intent ticket (AGENT_PLAN_7): the server's
+            // connection gate rejects Minecraft logins that carry no ticket, so
+            // register ours before spawning the game. Best-effort — if this fails
+            // the join will be refused by the server with a clear message.
+            status("Registering pre-join intent with Zircon server...");
+            registerPreJoinIntent(baseUrl, session.getUsername(), session.getUuid());
+
+            // 8. Launch Game
             status("Starting Minecraft process...");
             gameProcess = runner.launch(launchData, session, gameDir, host, port, null);
             status("Game running — connected to " + host + ":" + port);
@@ -420,6 +429,31 @@ public class MainController {
                 busy.set(false);
                 setBusyUi(false);
             });
+        }
+    }
+
+    /**
+     * Registers a short-lived join ticket with the server so the player's
+     * connection passes the Zircon join gate. Best-effort: a failure here must
+     * not abort the launch — the server's disconnect screen will surface it.
+     */
+    private void registerPreJoinIntent(String baseUrl, String username, String uuid) {
+        try {
+            java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+                    .connectTimeout(java.time.Duration.ofSeconds(5))
+                    .build();
+            String json = BomJson.gson().toJson(Map.of(
+                    "username", username == null ? "" : username,
+                    "uuid", uuid == null ? "" : uuid));
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(baseUrl + "/api/join-intent"))
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+            client.send(request, java.net.http.HttpResponse.BodyHandlers.discarding());
+            log.debug("Pre-join ticket registered for {}", username);
+        } catch (Exception e) {
+            log.warn("Could not pre-register join ticket: {}", e.getMessage());
         }
     }
 

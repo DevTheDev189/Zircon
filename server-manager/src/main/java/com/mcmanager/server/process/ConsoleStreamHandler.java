@@ -1,5 +1,6 @@
 package com.mcmanager.server.process;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -18,7 +19,17 @@ public class ConsoleStreamHandler {
     private int historyIndex = 0;
     private int historyCount = 0;
 
-    private final PlayerTracker playerTracker = new PlayerTracker();
+    private final PlayerTracker playerTracker;
+
+    /** No persistence: legacy single-server wiring. */
+    public ConsoleStreamHandler() {
+        this(null);
+    }
+
+    /** @param playersFile optional path for the ever-joined player log (see {@link PlayerTracker}). */
+    public ConsoleStreamHandler(Path playersFile) {
+        this.playerTracker = new PlayerTracker(playersFile);
+    }
 
     public void addListener(Consumer<String> listener) {
         listeners.add(listener);

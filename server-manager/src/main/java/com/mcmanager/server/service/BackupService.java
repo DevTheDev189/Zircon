@@ -41,9 +41,6 @@ public class BackupService {
     private static final Logger log = LoggerFactory.getLogger(BackupService.class);
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    /** Maximum number of backups retained per instance; older ones are pruned. */
-    public static final int MAX_BACKUPS_PER_INSTANCE = 10;
-
     /** How long to wait after {@code save-all} for the chunk flush to hit disk. */
     private static final long SAVE_FLUSH_WAIT_MS = 2500;
 
@@ -150,10 +147,35 @@ public class BackupService {
         entry.setLogs(auditLogs);
         Files.writeString(metadataFile, GSON.toJson(entry), StandardCharsets.UTF_8);
 
-        // 4. Enforce the retention policy.
-        pruneOldBackups(instanceId, MAX_BACKUPS_PER_INSTANCE);
+        // 4. Enforce the retention policy configured for this instance.
+        pruneOldBackups(instanceId, config.getBackupRetention());
 
         return entry;
+    }
+
+    /**
+     * Persists a new retention limit for an instance and immediately prunes any
+     * backups beyond it.
+     *
+     * @return how many backups were deleted by the new limit
+     */
+    public synchronized int setRetention(String instanceId, int retention) throws IOException {
+        if (retention < InstanceConfig.MIN_BACKUP_RETENTION
+                || retention > InstanceConfig.MAX_BACKUP_RETENTION) {
+            throw new IllegalArgumentException("retention must be between "
+                    + InstanceConfig.MIN_BACKUP_RETENTION + " and "
+                    + InstanceConfig.MAX_BACKUP_RETENTION);
+        }
+        instanceManager.updateBackupRetention(instanceId, retention);
+
+        List<BackupEntry> backups = listBackups(instanceId);
+        int toDelete = Math.max(0, backups.size() - retention);
+        if (toDelete > 0) {
+            pruneOldBackups(instanceId, retention);
+            log.info("Retention for instance {} set to {} — pruned {} old backup(s)",
+                    instanceId, retention, toDelete);
+        }
+        return toDelete;
     }
 
     /**

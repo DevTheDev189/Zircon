@@ -120,8 +120,10 @@ public class ServerInstanceManager {
         if (pm == null) {
             // Each instance gets its own console so its player activity is
             // tracked separately; every line is forwarded to the shared console
-            // so the WebSocket console and legacy views keep working.
-            ConsoleStreamHandler instConsole = new ConsoleStreamHandler();
+            // so the WebSocket console and legacy views keep working. The per
+            // instance players.json accumulates the ever-joined player log.
+            ConsoleStreamHandler instConsole = new ConsoleStreamHandler(
+                    instanceDir(instanceId).resolve("players.json"));
             instConsole.addListener(console::accept);
             playerTrackers.put(instanceId, instConsole.getPlayerTracker());
             pm = new MinecraftProcessManager(config, instanceDir(instanceId).resolve("server"),
@@ -163,6 +165,34 @@ public class ServerInstanceManager {
         InstanceConfig config = getInstance(instanceId);
         config.setAutoStart(autoStart);
         saveInstanceToDisk(config);
+    }
+
+    /**
+     * Updates the backup schedule (frequency + time of day) of an instance.
+     * {@code null} / blank values keep the current setting.
+     */
+    public synchronized void updateBackupSchedule(String instanceId, String frequency, String time) {
+        InstanceConfig config = getInstance(instanceId);
+        if (frequency != null && !frequency.isBlank()) {
+            config.setBackupFrequency(frequency);
+        }
+        if (time != null && !time.isBlank()) {
+            config.setBackupTime(time);
+        }
+        saveInstanceToDisk(config);
+        log.info("Instance '{}' backup schedule -> {} at {}",
+                config.getName(), config.getBackupFrequency(), config.getBackupTime());
+    }
+
+    /**
+     * Sets how many backups are kept for an instance; older ones are pruned by
+     * {@link com.mcmanager.server.service.BackupService}.
+     */
+    public synchronized void updateBackupRetention(String instanceId, int retention) {
+        InstanceConfig config = getInstance(instanceId);
+        config.setBackupRetention(retention);
+        saveInstanceToDisk(config);
+        log.info("Instance '{}' backup retention -> {}", config.getName(), retention);
     }
 
     /**

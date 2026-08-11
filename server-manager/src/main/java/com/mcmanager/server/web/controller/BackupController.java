@@ -1,6 +1,8 @@
 package com.mcmanager.server.web.controller;
 
 import com.mcmanager.core.model.BackupEntry;
+import com.mcmanager.core.model.InstanceConfig;
+import com.mcmanager.server.instance.ServerInstanceManager;
 import com.mcmanager.server.service.BackupService;
 import io.javalin.http.Context;
 
@@ -11,14 +13,17 @@ import java.util.Map;
 
 /**
  * REST endpoints for instance backups: list the audit trail, trigger a manual
- * backup, and restore an archive over the instance directory.
+ * backup, restore an archive over the instance directory, and configure how
+ * many backups are kept.
  */
 public class BackupController {
 
     private final BackupService backupService;
+    private final ServerInstanceManager instanceManager;
 
-    public BackupController(BackupService backupService) {
+    public BackupController(BackupService backupService, ServerInstanceManager instanceManager) {
         this.backupService = backupService;
+        this.instanceManager = instanceManager;
     }
 
     /** GET /api/instances/{id}/backups */
@@ -53,5 +58,41 @@ public class BackupController {
         } catch (IOException e) {
             ctx.status(500).result("Restore failed: " + e.getMessage());
         }
+    }
+
+    /** POST /api/instances/{id}/backups/retention — body: {retention: N} */
+    public void setRetention(Context ctx) {
+        String instanceId = ctx.pathParam("id");
+        RetentionRequest body;
+        try {
+            body = ctx.bodyAsClass(RetentionRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400).result("Invalid JSON body");
+            return;
+        }
+        if (body == null || body.retention == null) {
+            ctx.status(400).result("retention is required");
+            return;
+        }
+        try {
+            instanceManager.getInstance(instanceId); // 404 for unknown ids
+            if (body.retention < InstanceConfig.MIN_BACKUP_RETENTION
+                    || body.retention > InstanceConfig.MAX_BACKUP_RETENTION) {
+                ctx.status(400).result("retention must be between "
+                        + InstanceConfig.MIN_BACKUP_RETENTION + " and "
+                        + InstanceConfig.MAX_BACKUP_RETENTION);
+                return;
+            }
+            int deleted = backupService.setRetention(instanceId, body.retention);
+            ctx.json(Map.of("retention", body.retention, "deletedBackups", deleted));
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+        } catch (IOException e) {
+            ctx.status(500).result("Failed to save retention: " + e.getMessage());
+        }
+    }
+
+    public static class RetentionRequest {
+        public Integer retention;
     }
 }

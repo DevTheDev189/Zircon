@@ -77,7 +77,7 @@ public class JavalinApp {
         ConsoleController consoleController = new ConsoleController(console, processManager);
         InstanceController instanceController = new InstanceController(instanceManager,
                 configService.getConfig().curseforgeApiKey);
-        BackupController backupController = new BackupController(backupService);
+        BackupController backupController = new BackupController(backupService, instanceManager);
         console.addListener(consoleController::broadcast);
 
         app = Javalin.create(javalinConfig -> {
@@ -97,8 +97,14 @@ public class JavalinApp {
         // Auth
         // ------------------------------------------------------------------
         app.before("/api/*", ctx -> {
-            if (ctx.path().equals("/api/auth/login") || ctx.path().equals("/api/auth/change-password")) {
-                return; // handled below; change-password still validates credentials itself
+            String path = ctx.path();
+            // Public endpoints the launcher needs without an admin bearer token.
+            boolean publicEndpoint = path.equals("/api/auth/login")
+                    || path.equals("/api/auth/change-password")
+                    || path.equals("/api/join-intent")
+                    || (path.startsWith("/api/instances/") && path.endsWith("/join-intent"));
+            if (publicEndpoint) {
+                return; // change-password still validates credentials itself
             }
             String token = ctx.header("Authorization");
             if (token == null || !token.startsWith("Bearer ")
@@ -180,6 +186,11 @@ public class JavalinApp {
         // ------------------------------------------------------------------
         // Legacy single-server API (BOM / mods / players / config / console)
         // ------------------------------------------------------------------
+        // Launcher pre-join ticket registration (AGENT_PLAN_7): the launcher has
+        // no admin JWT, so these routes are exempted from auth in the before filter.
+        app.post("/api/join-intent", instanceController::registerJoinIntent);
+        app.post("/api/instances/{id}/join-intent", instanceController::registerJoinIntent);
+
         app.get("/bom", bomController::getBom);
 
         app.get("/api/mods", modController::listMods);
@@ -226,6 +237,7 @@ public class JavalinApp {
         app.get("/api/instances/{id}/server-properties", instanceController::getServerProperties);
         app.post("/api/instances/{id}/server-properties", instanceController::saveServerProperties);
         app.get("/api/instances/{id}/players/online", instanceController::onlinePlayers);
+        app.get("/api/instances/{id}/players/history", instanceController::playerHistory);
         app.get("/api/instances/{id}/players/whitelist", instanceController::getWhitelist);
         app.post("/api/instances/{id}/players/whitelist", instanceController::addWhitelist);
         app.delete("/api/instances/{id}/players/whitelist/{name}", instanceController::removeWhitelist);
@@ -248,6 +260,7 @@ public class JavalinApp {
         // Backups REST endpoints
         app.get("/api/instances/{id}/backups", backupController::listBackups);
         app.post("/api/instances/{id}/backups", backupController::createBackup);
+        app.post("/api/instances/{id}/backups/retention", backupController::setRetention);
         app.post("/api/instances/{id}/backups/{backupId}/restore", backupController::restoreBackup);
 
         // Static fallback: serve index.html for unknown GETs (SPA deep links).

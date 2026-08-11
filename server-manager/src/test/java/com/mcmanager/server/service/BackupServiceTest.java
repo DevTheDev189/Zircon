@@ -88,13 +88,13 @@ class BackupServiceTest {
         Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
 
         BackupService service = newService(manager);
-        int target = BackupService.MAX_BACKUPS_PER_INSTANCE + 3;
+        int target = InstanceConfig.DEFAULT_BACKUP_RETENTION + 3;
         for (int i = 0; i < target; i++) {
             service.createBackup(cfg.getId(), BackupEntry.TRIGGER_SCHEDULED);
         }
 
         List<BackupEntry> backups = service.listBackups(cfg.getId());
-        assertEquals(BackupService.MAX_BACKUPS_PER_INSTANCE, backups.size());
+        assertEquals(InstanceConfig.DEFAULT_BACKUP_RETENTION, backups.size());
         // Every remaining entry has both its archive and metadata on disk.
         Path backupsDir = tempDir.resolve("backups").resolve(cfg.getId());
         for (BackupEntry b : backups) {
@@ -133,5 +133,76 @@ class BackupServiceTest {
         Path backupsDir = tempDir.resolve("backups").resolve(cfg.getId());
         assertTrue(Files.isRegularFile(backupsDir.resolve(entry.getId() + ".json")));
         assertFalse(Files.exists(backupsDir.resolve(entry.getFilename())));
+    }
+
+    @Test
+    void setRetentionPrunesOldBackupsAndPersists() throws IOException {
+        ServerInstanceManager manager = newInstanceManager();
+        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
+
+        BackupService service = newService(manager);
+        for (int i = 0; i < 5; i++) {
+            service.createBackup(cfg.getId(), BackupEntry.TRIGGER_MANUAL);
+        }
+        assertEquals(5, service.listBackups(cfg.getId()).size());
+
+        int deleted = service.setRetention(cfg.getId(), 2);
+
+        assertEquals(3, deleted);
+        List<BackupEntry> backups = service.listBackups(cfg.getId());
+        assertEquals(2, backups.size());
+        // The new limit is persisted on the instance config.
+        assertEquals(2, manager.getInstance(cfg.getId()).getBackupRetention());
+        // Only the retained archives remain on disk.
+        Path backupsDir = tempDir.resolve("backups").resolve(cfg.getId());
+        for (BackupEntry b : backups) {
+            assertTrue(Files.isRegularFile(backupsDir.resolve(b.getFilename())));
+        }
+    }
+
+    @Test
+    void setRetentionAboveCurrentCountDeletesNothing() throws IOException {
+        ServerInstanceManager manager = newInstanceManager();
+        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
+
+        BackupService service = newService(manager);
+        for (int i = 0; i < 2; i++) {
+            service.createBackup(cfg.getId(), BackupEntry.TRIGGER_MANUAL);
+        }
+
+        int deleted = service.setRetention(cfg.getId(), 5);
+
+        assertEquals(0, deleted);
+        assertEquals(2, service.listBackups(cfg.getId()).size());
+        assertEquals(5, manager.getInstance(cfg.getId()).getBackupRetention());
+    }
+
+    @Test
+    void createBackupRespectsConfiguredRetention() throws IOException {
+        ServerInstanceManager manager = newInstanceManager();
+        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
+        cfg.setBackupRetention(2);
+
+        BackupService service = newService(manager);
+        for (int i = 0; i < 5; i++) {
+            service.createBackup(cfg.getId(), BackupEntry.TRIGGER_SCHEDULED);
+        }
+
+        assertEquals(2, service.listBackups(cfg.getId()).size());
+    }
+
+    @Test
+    void setRetentionRejectsOutOfRangeValues() throws IOException {
+        ServerInstanceManager manager = newInstanceManager();
+        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+
+        BackupService service = newService(manager);
+        assertThrows(IllegalArgumentException.class,
+                () -> service.setRetention(cfg.getId(), 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.setRetention(cfg.getId(), 101));
     }
 }
