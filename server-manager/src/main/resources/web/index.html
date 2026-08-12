@@ -252,11 +252,34 @@
 
                 <!-- CONSOLE VIEW -->
                 <div v-if="activeTab === 'console'" class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col h-full">
-                    <h3 class="font-bold text-sm mb-3">Server Console</h3>
-                    <div ref="consoleBox" class="flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-0.5 min-h-0">
-                        <div v-for="(line, i) in consoleLines" :key="i" :class="consoleColor(line)">{{ line }}</div>
-                        <p v-if="!consoleLines.length" class="text-slate-600">Waiting for console output...</p>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-bold text-sm">Server Console</h3>
+
+                        <!-- NEW: Filters & Actions -->
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
+                                <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition">
+                                    <input type="checkbox" v-model="consoleFilters.info" class="accent-emerald-500"> Info
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer text-yellow-400 hover:text-yellow-300 transition">
+                                    <input type="checkbox" v-model="consoleFilters.warnings" class="accent-emerald-500"> Warn
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer text-red-400 hover:text-red-300 transition">
+                                    <input type="checkbox" v-model="consoleFilters.errors" class="accent-emerald-500"> Error
+                                </label>
+                            </div>
+                            <button @click="clearConsole" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition">
+                                Clear
+                            </button>
+                        </div>
                     </div>
+
+                    <div ref="consoleBox" class="flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-0.5 min-h-0">
+                        <!-- NEW: Loop through filteredConsoleLines instead of consoleLines -->
+                        <div v-for="(line, i) in filteredConsoleLines" :key="i" :class="consoleColor(line)">{{ line }}</div>
+                        <p v-if="!filteredConsoleLines.length" class="text-slate-600">Waiting for console output (or all lines filtered out)...</p>
+                    </div>
+
                     <form @submit.prevent="sendCommand" class="flex gap-2 mt-3">
                         <input v-model="command" placeholder="Type a server command..." class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
                         <button class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-medium">Send</button>
@@ -794,7 +817,8 @@ createApp({
             command: '',
             consoleWs: null,
             autoScroll: true,
-            pollTimer: null
+            pollTimer: null,
+            consoleFilters: { info: true, warnings: true, errors: true }
         };
     },
     methods: {
@@ -1319,6 +1343,10 @@ createApp({
             const proto = location.protocol === 'https:' ? 'wss' : 'ws';
             this.consoleWs = new WebSocket(`${proto}://${location.host}/api/console`);
             this.consoleWs.onmessage = (ev) => {
+                if (ev.data === '__CLEAR__') {
+                    this.consoleLines = [];
+                    return;
+                }
                 this.consoleLines.push(ev.data);
                 if (this.consoleLines.length > 1000) this.consoleLines.shift();
                 this.$nextTick(() => {
@@ -1327,6 +1355,11 @@ createApp({
                 });
             };
             this.consoleWs.onclose = () => { this.consoleWs = null; };
+        },
+        clearConsole() {
+            if (this.consoleWs && this.consoleWs.readyState === WebSocket.OPEN) {
+                this.consoleWs.send('__CLEAR__');
+            }
         },
         sendCommand() {
             if (this.consoleWs && this.consoleWs.readyState === WebSocket.OPEN && this.command.trim()) {
@@ -1342,6 +1375,25 @@ createApp({
         }
     },
     computed: {
+        // NEW: Client-side filtering logic
+        filteredConsoleLines() {
+            return this.consoleLines.filter(line => {
+                const upper = line.toUpperCase();
+
+                // Categorize the line
+                const isError = upper.includes('ERROR') || upper.includes('EXCEPTION') || upper.includes('AT JAVA.');
+                const isWarn = !isError && (upper.includes('WARN') || upper.includes('WARNING:'));
+                const isInfo = !isError && !isWarn;
+
+                // Return true if its category's checkbox is checked
+                if (isError && this.consoleFilters.errors) return true;
+                if (isWarn && this.consoleFilters.warnings) return true;
+                if (isInfo && this.consoleFilters.info) return true;
+
+                return false;
+            });
+        },
+
         // Every property not covered by the curated fields above.
         advancedPropertyKeys() {
             return Object.keys(this.serverProps)

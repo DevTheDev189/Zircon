@@ -37,9 +37,15 @@ public class ConsoleController {
                 ctx.session.getRemote().sendString(line);
             }
         });
+
         ws.onMessage(ctx -> {
             String command = ctx.message();
             if (command == null || command.isBlank()) {
+                return;
+            }
+            if (command.trim().equals("__CLEAR__")) {
+                console.clearHistory();
+                broadcast("__CLEAR__");
                 return;
             }
             try {
