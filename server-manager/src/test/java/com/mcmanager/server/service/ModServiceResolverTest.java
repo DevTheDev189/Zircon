@@ -29,7 +29,9 @@ class ModServiceResolverTest {
 
     private ModServiceResolver resolver(ServerInstanceManager manager, BomService bom,
                                         ModManagementService mods) {
-        return new ModServiceResolver(manager, bom, mods, "");
+        PackManagementService packs = new PackManagementService(bom,
+                tempDir.resolve("legacy").resolve("shaderpacks"), tempDir.resolve("legacy").resolve("resourcepacks"));
+        return new ModServiceResolver(manager, bom, mods, packs, "");
     }
 
     @Test

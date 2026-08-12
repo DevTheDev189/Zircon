@@ -6,11 +6,15 @@ import com.mcmanager.client.launch.JavaRuntimeSelector;
 import com.mcmanager.client.launch.MinecraftClasspathBuilder;
 import com.mcmanager.client.launch.MinecraftRunner;
 import com.mcmanager.client.model.SavedServer;
+import com.mcmanager.client.pack.ClientPackManager;
+import com.mcmanager.client.pack.PackSelection;
 import com.mcmanager.client.skin.SkinManager;
 import com.mcmanager.client.sync.ModSyncEngine;
+import com.mcmanager.client.sync.PackSyncEngine;
 import com.mcmanager.core.model.BillOfMaterials;
 import com.mcmanager.core.model.BomJson;
 import com.mcmanager.core.model.ModLoaderInfo;
+import com.mcmanager.core.model.PackEntry;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -18,6 +22,8 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -78,14 +84,29 @@ public class MainController {
     private final Button logoutButton;
     private final Stage stage;
 
+    // Shaders & Packs View Controls
+    private final Button navShadersPacks;
+    private final Node shadersPacksView;
+    private final ComboBox<SavedServer> packServerPicker;
+    private final Button packSyncBtn;
+    private final Label packStatusLabel;
+    private final VBox shaderpackListContainer;
+    private final VBox resourcepackListContainer;
+    private final VBox shaderpackCard;
+    private final VBox resourcepackCard;
+    private final Button addShaderpackBtn;
+    private final Button addResourcepackBtn;
+
     private final MicrosoftAuthService auth = new MicrosoftAuthService();
     private final ModSyncEngine syncEngine = new ModSyncEngine();
+    private final PackSyncEngine packSyncEngine = new PackSyncEngine();
     private final MinecraftClasspathBuilder classpathBuilder = new MinecraftClasspathBuilder();
     private final MinecraftRunner runner = new MinecraftRunner();
 
     private final AtomicBoolean busy = new AtomicBoolean(false);
     private volatile SessionData session;
     private volatile Process gameProcess;
+    private volatile BillOfMaterials lastPackBom = new BillOfMaterials();
 
     public MainController(Button navServerList, Button navChangeSkin, Button navSettings,
                           Node serverListView, Node changeSkinView, Node settingsView,
@@ -93,7 +114,11 @@ public class MainController {
                           ImageView skinPreview, Button uploadSkinBtn, Button resetSkinBtn, Label skinStatus,
                           Slider ramSlider, Label ramLabel, CheckBox strictVerifyCheck, CheckBox trustDirectCheck,
                           TextField clientIdField, Label statusLabel, ProgressBar progressBar,
-                          Label userLabel, Button logoutButton, Stage stage) {
+                          Label userLabel, Button logoutButton, Stage stage,
+                          Button navShadersPacks, Node shadersPacksView, ComboBox<SavedServer> packServerPicker,
+                          Button packSyncBtn, Label packStatusLabel, VBox shaderpackListContainer,
+                          VBox resourcepackListContainer, VBox shaderpackCard, VBox resourcepackCard,
+                          Button addShaderpackBtn, Button addResourcepackBtn) {
         this.navServerList = navServerList;
         this.navChangeSkin = navChangeSkin;
         this.navSettings = navSettings;
@@ -117,6 +142,17 @@ public class MainController {
         this.userLabel = userLabel;
         this.logoutButton = logoutButton;
         this.stage = stage;
+        this.navShadersPacks = navShadersPacks;
+        this.shadersPacksView = shadersPacksView;
+        this.packServerPicker = packServerPicker;
+        this.packSyncBtn = packSyncBtn;
+        this.packStatusLabel = packStatusLabel;
+        this.shaderpackListContainer = shaderpackListContainer;
+        this.resourcepackListContainer = resourcepackListContainer;
+        this.shaderpackCard = shaderpackCard;
+        this.resourcepackCard = resourcepackCard;
+        this.addShaderpackBtn = addShaderpackBtn;
+        this.addResourcepackBtn = addResourcepackBtn;
     }
 
     public void init() {
@@ -124,6 +160,10 @@ public class MainController {
         navServerList.setOnAction(e -> switchTab(serverListView, navServerList));
         navChangeSkin.setOnAction(e -> switchTab(changeSkinView, navChangeSkin));
         navSettings.setOnAction(e -> switchTab(settingsView, navSettings));
+        navShadersPacks.setOnAction(e -> {
+            switchTab(shadersPacksView, navShadersPacks);
+            populatePackServerPicker();
+        });
         switchTab(serverListView, navServerList);
 
         // Auth initialization — Microsoft sign-in is mandatory; the cached session
@@ -146,14 +186,31 @@ public class MainController {
         });
 
         logoutButton.setOnAction(e -> onLogout());
+
+        // Shaders & Packs Setup
+        packServerPicker.setOnAction(e -> loadPacksForSelectedServer());
+        packSyncBtn.setOnAction(e -> loadPacksForSelectedServer());
+        addShaderpackBtn.setOnAction(e -> handleAddLocalPack(true));
+        addResourcepackBtn.setOnAction(e -> handleAddLocalPack(false));
+        for (VBox card : new VBox[]{shaderpackCard, resourcepackCard}) {
+            boolean shader = card == shaderpackCard;
+            card.setOnDragOver(event -> {
+                if (event.getDragboard().hasFiles()) {
+                    event.acceptTransferModes(TransferMode.COPY);
+                }
+                event.consume();
+            });
+            card.setOnDragDropped(event -> handlePackDrop(event, shader));
+        }
     }
 
     private void switchTab(Node targetView, Button activeBtn) {
         serverListView.setVisible(targetView == serverListView);
         changeSkinView.setVisible(targetView == changeSkinView);
         settingsView.setVisible(targetView == settingsView);
+        shadersPacksView.setVisible(targetView == shadersPacksView);
 
-        for (Button btn : new Button[]{navServerList, navChangeSkin, navSettings}) {
+        for (Button btn : new Button[]{navServerList, navChangeSkin, navSettings, navShadersPacks}) {
             if (btn == activeBtn) {
                 btn.setStyle("-fx-font-size: 14px; -fx-padding: 10 14; -fx-background-radius: 8; "
                         + "-fx-background-color: #21262d; -fx-text-fill: white; -fx-font-weight: bold;");
@@ -312,6 +369,177 @@ public class MainController {
         SkinManager.resetSkin();
         refreshSkinPreview();
         status("Reset skin to default.");
+    }
+
+    // ------------------------------------------------------------------
+    // Shaders & Texture Packs
+    // ------------------------------------------------------------------
+
+    private void populatePackServerPicker() {
+        List<SavedServer> servers = SavedServer.load();
+        packServerPicker.getItems().setAll(servers);
+        if (packServerPicker.getValue() == null && !servers.isEmpty()) {
+            packServerPicker.setValue(servers.get(0));
+        }
+        if (packServerPicker.getValue() != null) {
+            loadPacksForSelectedServer();
+        }
+    }
+
+    /**
+     * Fetches the selected server's BOM, downloads every shaderpack/resourcepack it
+     * offers (never activating any of them), then rebuilds the pick lists from what's
+     * on disk plus the player's saved local selection. Auto-download, opt-in use.
+     */
+    private void loadPacksForSelectedServer() {
+        SavedServer server = packServerPicker.getValue();
+        if (server == null) {
+            return;
+        }
+        Platform.runLater(() -> packStatusLabel.setText("Syncing packs..."));
+        Thread.ofVirtual().name("pack-sync").start(() -> {
+            try {
+                String[] hostPort = parseServerAddress(server.getAddress());
+                String host = hostPort[0];
+                int port = Integer.parseInt(hostPort[1]);
+                String baseUrl = "http://" + host + ":" + port;
+                Path gameDir = instanceGameDir(host, String.valueOf(port));
+
+                BillOfMaterials bom = fetchBom(baseUrl);
+                PackSelection selection = PackSelection.load(gameDir);
+                packSyncEngine.sync(bom, baseUrl, gameDir, selection.getLocallyAddedShaderpacks(),
+                        selection.getLocallyAddedResourcepacks(),
+                        msg -> Platform.runLater(() -> packStatusLabel.setText(msg)));
+
+                lastPackBom = bom;
+                Platform.runLater(() -> {
+                    packStatusLabel.setText("Synced " + bom.getShaderpacks().size() + " shaderpack(s), "
+                            + bom.getResourcepacks().size() + " texture pack(s).");
+                    rebuildPackLists(bom, gameDir, selection);
+                });
+            } catch (Exception e) {
+                log.warn("Pack sync failed", e);
+                Platform.runLater(() -> packStatusLabel.setText("Sync failed: " + describeError(e)));
+            }
+        });
+    }
+
+    /** Rebuilds the shaderpack (single-select) and texture pack (multi-select) rows from disk + BOM titles. */
+    private void rebuildPackLists(BillOfMaterials bom, Path gameDir, PackSelection selection) {
+        shaderpackListContainer.getChildren().clear();
+        resourcepackListContainer.getChildren().clear();
+
+        ToggleGroup shaderGroup = new ToggleGroup();
+        RadioButton noneBtn = new RadioButton("None (shaders disabled)");
+        noneBtn.setStyle("-fx-text-fill: #c9d1d9; -fx-font-size: 12px;");
+        noneBtn.setToggleGroup(shaderGroup);
+        noneBtn.setSelected(!selection.isShadersEnabled() || selection.getActiveShaderpack() == null);
+        noneBtn.setOnAction(e -> {
+            selection.setShadersEnabled(false);
+            selection.setActiveShaderpack(null);
+            selection.save(gameDir);
+        });
+        shaderpackListContainer.getChildren().add(noneBtn);
+
+        for (String filename : listPackFiles(gameDir.resolve("shaderpacks"))) {
+            RadioButton rb = new RadioButton(titleFor(bom.getShaderpacks(), filename));
+            rb.setStyle("-fx-text-fill: #c9d1d9; -fx-font-size: 12px;");
+            rb.setToggleGroup(shaderGroup);
+            rb.setSelected(selection.isShadersEnabled() && filename.equals(selection.getActiveShaderpack()));
+            rb.setOnAction(e -> {
+                selection.setShadersEnabled(true);
+                selection.setActiveShaderpack(filename);
+                selection.save(gameDir);
+            });
+            shaderpackListContainer.getChildren().add(rb);
+        }
+
+        for (String filename : listPackFiles(gameDir.resolve("resourcepacks"))) {
+            CheckBox cb = new CheckBox(titleFor(bom.getResourcepacks(), filename));
+            cb.setStyle("-fx-text-fill: #c9d1d9; -fx-font-size: 12px;");
+            cb.setSelected(selection.getActiveResourcepacks().contains(filename));
+            cb.setOnAction(e -> {
+                if (cb.isSelected()) {
+                    if (!selection.getActiveResourcepacks().contains(filename)) {
+                        selection.getActiveResourcepacks().add(filename);
+                    }
+                } else {
+                    selection.getActiveResourcepacks().remove(filename);
+                }
+                selection.save(gameDir);
+            });
+            resourcepackListContainer.getChildren().add(cb);
+        }
+    }
+
+    private List<String> listPackFiles(Path dir) {
+        try (var stream = Files.list(dir)) {
+            return stream.filter(Files::isRegularFile)
+                    .map(p -> p.getFileName().toString())
+                    .filter(n -> n.toLowerCase().endsWith(".zip"))
+                    .sorted()
+                    .toList();
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
+    private String titleFor(List<PackEntry> entries, String filename) {
+        for (PackEntry entry : entries) {
+            if (filename.equals(entry.getFilename())) {
+                return entry.getTitle() != null ? entry.getTitle() : filename;
+            }
+        }
+        return filename;
+    }
+
+    private void handleAddLocalPack(boolean shader) {
+        SavedServer server = packServerPicker.getValue();
+        if (server == null) {
+            status("Choose a server first.");
+            return;
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(shader ? "Select Shaderpack (.zip)" : "Select Texture Pack (.zip)");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("ZIP Archives", "*.zip"));
+        List<File> selected = chooser.showOpenMultipleDialog(stage);
+        if (selected != null) {
+            addLocalFiles(server, selected, shader);
+        }
+    }
+
+    private void handlePackDrop(DragEvent event, boolean shader) {
+        SavedServer server = packServerPicker.getValue();
+        if (server != null && event.getDragboard().hasFiles()) {
+            List<File> zips = event.getDragboard().getFiles().stream()
+                    .filter(f -> f.getName().toLowerCase().endsWith(".zip"))
+                    .toList();
+            addLocalFiles(server, zips, shader);
+            event.setDropCompleted(true);
+        }
+        event.consume();
+    }
+
+    private void addLocalFiles(SavedServer server, List<File> files, boolean shader) {
+        if (files.isEmpty()) {
+            return;
+        }
+        try {
+            String[] hostPort = parseServerAddress(server.getAddress());
+            Path gameDir = instanceGameDir(hostPort[0], hostPort[1]);
+            PackSelection selection = PackSelection.load(gameDir);
+            for (File file : files) {
+                if (shader) {
+                    ClientPackManager.addLocalShaderpack(gameDir, file, selection);
+                } else {
+                    ClientPackManager.addLocalResourcepack(gameDir, file, selection);
+                }
+            }
+            rebuildPackLists(lastPackBom, gameDir, selection);
+            status("Added " + files.size() + " local " + (shader ? "shaderpack(s)." : "texture pack(s)."));
+        } catch (IOException e) {
+            status("Failed to add local pack: " + e.getMessage());
+        }
     }
 
     // ------------------------------------------------------------------

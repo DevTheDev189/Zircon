@@ -3,6 +3,7 @@ package com.mcmanager.client.sync;
 import com.mcmanager.core.crypto.HashUtil;
 import com.mcmanager.core.crypto.MurmurHash3;
 import com.mcmanager.core.model.ModEntry;
+import com.mcmanager.core.model.PackEntry;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -10,8 +11,8 @@ import java.nio.file.Path;
 import java.util.Locale;
 
 /**
- * Verifies a local mod file against the hashes pinned in a {@link ModEntry}:
- * SHA-1 for Modrinth / direct mods, CurseForge fingerprint for CurseForge mods.
+ * Verifies a local file against pinned SHA-1 / CurseForge-fingerprint hashes,
+ * shared by {@link ModEntry} (mods) and {@link PackEntry} (shaderpacks/resourcepacks).
  */
 public class HashVerifier {
 
@@ -25,14 +26,23 @@ public class HashVerifier {
      *         is missing or fails verification.
      */
     public static boolean matches(Path file, ModEntry entry) throws IOException {
+        return matches(file, entry.getSha1(), entry.getMurmur3());
+    }
+
+    /** Same check as {@link #matches(Path, ModEntry)}, for a {@link PackEntry}. */
+    public static boolean matches(Path file, PackEntry entry) throws IOException {
+        return matches(file, entry.getSha1(), entry.getMurmur3());
+    }
+
+    private static boolean matches(Path file, String sha1, long murmur3) throws IOException {
         if (!Files.isRegularFile(file)) {
             return false;
         }
-        if (entry.getSha1() != null && !entry.getSha1().isBlank()) {
-            return entry.getSha1().equalsIgnoreCase(HashUtil.getSha1(file));
+        if (sha1 != null && !sha1.isBlank()) {
+            return sha1.equalsIgnoreCase(HashUtil.getSha1(file));
         }
-        if (entry.getMurmur3() != 0) {
-            return entry.getMurmur3() == MurmurHash3.curseForgeFingerprint(file);
+        if (murmur3 != 0) {
+            return murmur3 == MurmurHash3.curseForgeFingerprint(file);
         }
         // No hash pinned: treat as "unknown", caller decides (strict mode aborts).
         return false;
@@ -43,5 +53,11 @@ public class HashVerifier {
                 && filename.toLowerCase(Locale.ROOT).endsWith(".jar")
                 && !filename.toLowerCase(Locale.ROOT).startsWith(".") // .DS_Store etc.
                 ;
+    }
+
+    public static boolean isZip(String filename) {
+        return filename != null
+                && filename.toLowerCase(Locale.ROOT).endsWith(".zip")
+                && !filename.toLowerCase(Locale.ROOT).startsWith(".");
     }
 }

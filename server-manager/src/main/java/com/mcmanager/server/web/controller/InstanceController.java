@@ -5,6 +5,8 @@ import com.mcmanager.core.api.ModrinthApiClient;
 import com.mcmanager.core.model.BillOfMaterials;
 import com.mcmanager.core.model.InstanceConfig;
 import com.mcmanager.core.model.ModEntry;
+import com.mcmanager.core.model.PackEntry;
+import com.mcmanager.core.model.ShaderEngineType;
 import com.mcmanager.server.auth.JoinTicketManager;
 import com.mcmanager.server.instance.ServerInstanceManager;
 import com.mcmanager.server.process.MinecraftProcessManager;
@@ -12,6 +14,7 @@ import com.mcmanager.server.process.PlayerTracker;
 import com.mcmanager.server.service.BomService;
 import com.mcmanager.server.service.ConfigService;
 import com.mcmanager.server.service.ModManagementService;
+import com.mcmanager.server.service.PackManagementService;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
@@ -497,7 +500,7 @@ public class InstanceController {
     /** GET /api/instances/{id}/mods */
     public void listMods(Context ctx) {
         try {
-            ctx.json(Map.of("mods", modsFor(ctx.pathParam("id")).listMods()
+            ctx.json(Map.of("mods", modsFor(ctx.pathParam("id")).listModsFiltered()
                     .stream().map(ModEntry::toMap).toList()));
         } catch (IllegalArgumentException e) {
             ctx.status(404).result(e.getMessage());
@@ -730,6 +733,183 @@ public class InstanceController {
     }
 
     // ------------------------------------------------------------------
+    // Per-instance shaders & texture packs
+    // ------------------------------------------------------------------
+
+    /** GET /api/instances/{id}/shaders — shader engine status for this instance's loader. */
+    public void getShaderStatus(Context ctx) {
+        String id = ctx.pathParam("id");
+        try {
+            InstanceConfig cfg = instanceManager.getInstance(id);
+            ShaderEngineType engine = ShaderEngineType.forLoader(cfg.getModLoader().getType());
+            boolean enabled = engineInstalled(modsFor(id), engine);
+            ctx.json(Map.of("engine", engine.getDisplayName(), "enabled", enabled));
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+        }
+    }
+
+    /** POST /api/instances/{id}/shaders/toggle body: {"enabled": true|false} */
+    public void toggleShaderEngine(Context ctx) {
+        String id = ctx.pathParam("id");
+        ToggleRequest body;
+        try {
+            body = ctx.bodyAsClass(ToggleRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400).result("Invalid JSON body");
+            return;
+        }
+        try {
+            InstanceConfig cfg = instanceManager.getInstance(id);
+            ModManagementService mods = modsFor(id);
+            ShaderEngineType engine = ShaderEngineType.forLoader(cfg.getModLoader().getType());
+            if (body != null && body.enabled) {
+                mods.installModrinthVersion(engine.getPrimaryProjectId(), null,
+                        cfg.getMinecraftVersion(), cfg.getModLoader().getType());
+                mods.installModrinthVersion(engine.getDependencyProjectId(), null,
+                        cfg.getMinecraftVersion(), cfg.getModLoader().getType());
+            } else {
+                for (ModEntry mod : new ArrayList<>(mods.listMods())) {
+                    if (engine.getPrimaryProjectId().equals(mod.getId())
+                            || engine.getDependencyProjectId().equals(mod.getId())) {
+                        mods.removeMod(mod.getFilename());
+                    }
+                }
+            }
+            ctx.json(Map.of("enabled", body != null && body.enabled, "engine", engine.getDisplayName()));
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            ctx.status(502).result("Shader engine toggle failed: " + e.getMessage());
+        }
+    }
+
+    private boolean engineInstalled(ModManagementService mods, ShaderEngineType engine) {
+        return mods.listMods().stream().anyMatch(m ->
+                engine.getPrimaryProjectId().equals(m.getId()) || engine.getDependencyProjectId().equals(m.getId()));
+    }
+
+    /** GET /api/instances/{id}/shaderpacks */
+    public void listShaderpacks(Context ctx) {
+        try {
+            ctx.json(Map.of("shaderpacks", packsFor(ctx.pathParam("id")).listShaderpacks()
+                    .stream().map(PackEntry::toMap).toList()));
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+        }
+    }
+
+    /** POST /api/instances/{id}/shaderpacks/upload (multipart, field "file") */
+    public void uploadShaderpack(Context ctx) {
+        uploadPack(ctx, true);
+    }
+
+    /** POST /api/instances/{id}/shaderpacks/install body: {"downloadUrl":"...","filename":"..."} */
+    public void installShaderpack(Context ctx) {
+        installPack(ctx, true);
+    }
+
+    /** DELETE /api/instances/{id}/shaderpacks/{filename} */
+    public void removeShaderpack(Context ctx) {
+        removePack(ctx, true);
+    }
+
+    /** GET /api/instances/{id}/resourcepacks */
+    public void listResourcepacks(Context ctx) {
+        try {
+            ctx.json(Map.of("resourcepacks", packsFor(ctx.pathParam("id")).listResourcepacks()
+                    .stream().map(PackEntry::toMap).toList()));
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+        }
+    }
+
+    /** POST /api/instances/{id}/resourcepacks/upload (multipart, field "file") */
+    public void uploadResourcepack(Context ctx) {
+        uploadPack(ctx, false);
+    }
+
+    /** POST /api/instances/{id}/resourcepacks/install body: {"downloadUrl":"...","filename":"..."} */
+    public void installResourcepack(Context ctx) {
+        installPack(ctx, false);
+    }
+
+    /** DELETE /api/instances/{id}/resourcepacks/{filename} */
+    public void removeResourcepack(Context ctx) {
+        removePack(ctx, false);
+    }
+
+    private void uploadPack(Context ctx, boolean shader) {
+        List<UploadedFile> files = ctx.uploadedFiles("file");
+        if (files == null || files.isEmpty()) {
+            ctx.status(400).result("No file uploaded (form field 'file')");
+            return;
+        }
+        UploadedFile uploaded = files.get(0);
+        String origin = ctx.queryParam("origin");
+        try {
+            PackManagementService packs = packsFor(ctx.pathParam("id"));
+            try (InputStream in = uploaded.content()) {
+                PackEntry entry = shader
+                        ? packs.addShaderpack(in, uploaded.filename(), origin)
+                        : packs.addResourcepack(in, uploaded.filename(), origin);
+                ctx.status(201).json(entry.toMap());
+            }
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+        } catch (IOException e) {
+            log.warn("Pack upload failed", e);
+            ctx.status(500).result("Upload failed: " + e.getMessage());
+        }
+    }
+
+    private void installPack(Context ctx, boolean shader) {
+        InstallRequest body;
+        try {
+            body = ctx.bodyAsClass(InstallRequest.class);
+        } catch (RuntimeException e) {
+            ctx.status(400).result("Invalid JSON body");
+            return;
+        }
+        if (body == null || body.downloadUrl == null || body.filename == null) {
+            ctx.status(400).result("downloadUrl and filename are required");
+            return;
+        }
+        try {
+            PackManagementService packs = packsFor(ctx.pathParam("id"));
+            PackEntry entry = shader
+                    ? packs.installShaderpackFromUrl(body.downloadUrl, body.filename,
+                            body.origin == null ? "modrinth" : body.origin)
+                    : packs.installResourcepackFromUrl(body.downloadUrl, body.filename,
+                            body.origin == null ? "modrinth" : body.origin);
+            ctx.status(201).json(entry.toMap());
+        } catch (IllegalArgumentException e) {
+            ctx.status(404).result(e.getMessage());
+        } catch (IOException e) {
+            ctx.status(502).result("Pack install failed: " + e.getMessage());
+        }
+    }
+
+    private void removePack(Context ctx, boolean shader) {
+        try {
+            PackManagementService packs = packsFor(ctx.pathParam("id"));
+            boolean removed = shader
+                    ? packs.removeShaderpack(ctx.pathParam("filename"))
+                    : packs.removeResourcepack(ctx.pathParam("filename"));
+            if (!removed) {
+                ctx.status(404).result("Pack not found");
+                return;
+            }
+            ctx.status(204);
+        } catch (IOException e) {
+            ctx.status(500).result("Delete failed: " + e.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
 
@@ -739,6 +919,15 @@ public class InstanceController {
         BomService bom = new BomService(instanceDir.resolve("bom.json"),
                 new BillOfMaterials(cfg.getMinecraftVersion(), cfg.getModLoader(), cfg.getName()));
         return new ModManagementService(bom, instanceDir.resolve("mods"), curseForgeApiKey);
+    }
+
+    private PackManagementService packsFor(String instanceId) {
+        InstanceConfig cfg = instanceManager.getInstance(instanceId);
+        Path instanceDir = instanceManager.getInstanceDir(instanceId);
+        BomService bom = new BomService(instanceDir.resolve("bom.json"),
+                new BillOfMaterials(cfg.getMinecraftVersion(), cfg.getModLoader(), cfg.getName()));
+        return new PackManagementService(bom, instanceDir.resolve("shaderpacks"),
+                instanceDir.resolve("resourcepacks"));
     }
 
     /** Sends a command to the instance's own server process (no-op when offline). */
@@ -879,6 +1068,10 @@ public class InstanceController {
         public String downloadUrl;
         public String filename;
         public String fileId;
+    }
+
+    public static class ToggleRequest {
+        public boolean enabled;
     }
 
     public static class JoinIntentRequest {

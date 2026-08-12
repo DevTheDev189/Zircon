@@ -1,6 +1,7 @@
 package com.mcmanager.client.ui;
 
 import atlantafx.base.theme.PrimerDark;
+import com.mcmanager.client.model.SavedServer;
 import com.mcmanager.client.ui.controller.MainController;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -45,15 +46,16 @@ public class MainApp extends Application {
         Button navServerList = new Button("⚡  Server List");
         Button navChangeSkin = new Button("👕  Change Skin");
         Button navSettings = new Button("⚙️  Settings");
+        Button navShadersPacks = new Button("🎨  Shaders & Packs");
 
-        for (Button btn : new Button[]{navServerList, navChangeSkin, navSettings}) {
+        for (Button btn : new Button[]{navServerList, navChangeSkin, navSettings, navShadersPacks}) {
             btn.setMaxWidth(Double.MAX_VALUE);
             btn.setAlignment(Pos.CENTER_LEFT);
             btn.setStyle("-fx-font-size: 14px; -fx-padding: 10 14; -fx-background-radius: 8; "
                     + "-fx-background-color: transparent; -fx-text-fill: #c9d1d9;");
         }
 
-        VBox navBox = new VBox(6, navServerList, navChangeSkin, navSettings);
+        VBox navBox = new VBox(6, navServerList, navChangeSkin, navSettings, navShadersPacks);
         navBox.setPadding(new Insets(0, 12, 0, 12));
 
         Region sidebarSpacer = new Region();
@@ -165,10 +167,71 @@ public class MainApp extends Application {
         settingsView.setPadding(new Insets(24));
         settingsView.setMaxWidth(500);
 
+        // --- View 4: Shaders & Texture Packs ---
+        Label packsTitle = new Label("Shaders & Texture Packs");
+        packsTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
+
+        ComboBox<SavedServer> packServerPicker = new ComboBox<>();
+        packServerPicker.setPromptText("Choose a server");
+        packServerPicker.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(SavedServer item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getName());
+            }
+        });
+        packServerPicker.setButtonCell(packServerPicker.getCellFactory().call(null));
+        packServerPicker.setPrefWidth(220);
+
+        Button packSyncBtn = new Button("Sync Now");
+        packSyncBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 12px; -fx-padding: 6 14;");
+
+        Label packStatusLabel = new Label("Choose a server to sync its packs.");
+        packStatusLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8b949e;");
+
+        HBox packServerRow = new HBox(10, packServerPicker, packSyncBtn);
+        packServerRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox packHeader = new VBox(6, packsTitle, packServerRow, packStatusLabel);
+
+        Label shaderpackHeader = new Label("Shader Packs (pick one, or None)");
+        shaderpackHeader.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: white;");
+        VBox shaderpackListContainer = new VBox(6);
+        ScrollPane shaderpackScroll = new ScrollPane(shaderpackListContainer);
+        shaderpackScroll.setFitToWidth(true);
+        shaderpackScroll.setPrefHeight(180);
+        shaderpackScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        Button addShaderpackBtn = new Button("+ Add Local Shaderpack (.zip)");
+        addShaderpackBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 11px; -fx-padding: 6 10;");
+        VBox shaderpackCard = new VBox(8, shaderpackHeader, shaderpackScroll, addShaderpackBtn);
+        shaderpackCard.setPadding(new Insets(14));
+        shaderpackCard.setStyle("-fx-background-color: #161b22; -fx-border-color: #30363d; -fx-border-radius: 10; -fx-background-radius: 10;");
+        HBox.setHgrow(shaderpackCard, Priority.ALWAYS);
+
+        Label resourcepackHeader = new Label("Texture Packs (check any you want)");
+        resourcepackHeader.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: white;");
+        VBox resourcepackListContainer = new VBox(6);
+        ScrollPane resourcepackScroll = new ScrollPane(resourcepackListContainer);
+        resourcepackScroll.setFitToWidth(true);
+        resourcepackScroll.setPrefHeight(180);
+        resourcepackScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        Button addResourcepackBtn = new Button("+ Add Local Texture Pack (.zip)");
+        addResourcepackBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 11px; -fx-padding: 6 10;");
+        VBox resourcepackCard = new VBox(8, resourcepackHeader, resourcepackScroll, addResourcepackBtn);
+        resourcepackCard.setPadding(new Insets(14));
+        resourcepackCard.setStyle("-fx-background-color: #161b22; -fx-border-color: #30363d; -fx-border-radius: 10; -fx-background-radius: 10;");
+        HBox.setHgrow(resourcepackCard, Priority.ALWAYS);
+
+        HBox packCardsRow = new HBox(16, shaderpackCard, resourcepackCard);
+
+        VBox shadersPacksView = new VBox(16, packHeader, packCardsRow);
+        shadersPacksView.setPadding(new Insets(24));
+
         // --- Central View Switcher ---
-        StackPane centerContainer = new StackPane(serverListView, changeSkinView, settingsView);
+        StackPane centerContainer = new StackPane(serverListView, changeSkinView, settingsView, shadersPacksView);
         changeSkinView.setVisible(false);
         settingsView.setVisible(false);
+        shadersPacksView.setVisible(false);
 
         // --- Bottom Notification / Launch Bar ---
         Label statusLabel = new Label("Ready to play.");
@@ -197,7 +260,10 @@ public class MainApp extends Application {
                 savedServersContainer, recommendedContainer, addServerBtn,
                 skinPreview, uploadSkinBtn, resetSkinBtn, skinStatus,
                 ramSlider, ramLabel, strictVerifyCheck, trustDirectCheck, clientIdField,
-                statusLabel, progressBar, userLabel, logoutButton, stage
+                statusLabel, progressBar, userLabel, logoutButton, stage,
+                navShadersPacks, shadersPacksView, packServerPicker, packSyncBtn, packStatusLabel,
+                shaderpackListContainer, resourcepackListContainer, shaderpackCard, resourcepackCard,
+                addShaderpackBtn, addResourcepackBtn
         );
         controller.init();
 
