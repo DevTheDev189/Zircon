@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -107,6 +108,11 @@ public class MinecraftClasspathBuilder {
         classpath.add(clientJar);
 
         // --- vanilla libraries + natives ---
+        // Keyed by "group:artifact" so a loader-provided version of a shared
+        // dependency (e.g. ASM, pulled in by Fabric Loader) replaces the vanilla
+        // one instead of both landing on the classpath — Fabric's Knot loader
+        // refuses to start if it sees duplicate ASM classes.
+        Map<String, Path> libraryByArtifact = new LinkedHashMap<>();
         JsonArray libraries = versionJson.getAsJsonArray("libraries");
         for (JsonElement element : libraries) {
             JsonObject lib = element.getAsJsonObject();
@@ -122,7 +128,7 @@ public class MinecraftClasspathBuilder {
                 JsonObject artifact = downloads.getAsJsonObject("artifact");
                 Path jar = librariesDir.resolve(artifactPath(artifact, name, null));
                 downloadIfMissing(artifact.get("url").getAsString(), jar);
-                classpath.add(jar);
+                libraryByArtifact.put(groupAndArtifact(name), jar);
             }
             if (downloads.has("classifiers")) {
                 JsonObject classifiers = downloads.getAsJsonObject("classifiers");
@@ -142,15 +148,22 @@ public class MinecraftClasspathBuilder {
         List<String> jvmArgs = new ArrayList<>();
         List<String> gameArgs = new ArrayList<>();
         switch (loaderType.toLowerCase(Locale.ROOT)) {
-            case "fabric" -> mainClass = resolveLoaderProfile(mcVersion, loader,
-                    FABRIC_META_URL + "/versions/loader/%s/%s/profile/json", classpath, librariesDir);
-            case "quilt" -> mainClass = resolveLoaderProfile(mcVersion, loader,
-                    QUILT_META_URL + "/versions/loader/%s/%s/profile/json", classpath, librariesDir);
+            case "fabric" -> {
+                mainClass = resolveLoaderProfile(mcVersion, loader,
+                        FABRIC_META_URL + "/versions/loader/%s/%s/profile/json", libraryByArtifact, librariesDir);
+                classpath.addAll(libraryByArtifact.values());
+            }
+            case "quilt" -> {
+                mainClass = resolveLoaderProfile(mcVersion, loader,
+                        QUILT_META_URL + "/versions/loader/%s/%s/profile/json", libraryByArtifact, librariesDir);
+                classpath.addAll(libraryByArtifact.values());
+            }
             case "neoforge", "forge" -> {
                 if (loader.getVersion() == null || loader.getVersion().isBlank()) {
                     throw new IOException("Loader version is required for " + loaderType
                             + " (set 'modLoader.version' in the server BOM)");
                 }
+                classpath.addAll(libraryByArtifact.values());
                 // Install the loader headlessly, parse the generated version
                 // profile and merge its libraries/arguments into the launch.
                 Path vanillaJson = cacheDir.resolve("versions")
@@ -162,7 +175,10 @@ public class MinecraftClasspathBuilder {
                 jvmArgs.addAll(forge.jvmArgs());
                 gameArgs.addAll(forge.gameArgs());
             }
-            default -> log.info("No loader configured — launching vanilla");
+            default -> {
+                classpath.addAll(libraryByArtifact.values());
+                log.info("No loader configured — launching vanilla");
+            }
         }
 
         // --- asset index + objects ---
@@ -218,7 +234,7 @@ public class MinecraftClasspathBuilder {
     }
 
     private String resolveLoaderProfile(String mcVersion, ModLoaderInfo loader, String urlTemplate,
-                                        List<Path> classpath, Path librariesDir)
+                                        Map<String, Path> libraryByArtifact, Path librariesDir)
             throws IOException, InterruptedException {
         String loaderVersion = loader.getVersion();
         if (loaderVersion == null || loaderVersion.isBlank()) {
@@ -245,11 +261,13 @@ public class MinecraftClasspathBuilder {
             String repo = lib.has("url") ? lib.get("url").getAsString() : "https://maven.fabricmc.net/";
             Path jar = librariesDir.resolve(mavenPath(name));
             downloadIfMissing(repo + mavenPath(name), jar);
-            classpath.add(jar);
+            // Loader-provided libraries take precedence over vanilla ones with
+            // the same group:artifact (e.g. a newer ASM required by Fabric Loader).
+            libraryByArtifact.put(groupAndArtifact(name), jar);
         }
         String mainClass = profile.get("mainClass").getAsString();
         log.info("{} loader profile resolved: mainClass={}, {} libraries",
-                loader.getType(), mainClass, classpath.size());
+                loader.getType(), mainClass, libraryByArtifact.size());
         return mainClass;
     }
 
@@ -277,6 +295,22 @@ public class MinecraftClasspathBuilder {
     // ------------------------------------------------------------------
     // Libraries & natives helpers
     // ------------------------------------------------------------------
+
+    /**
+     * Maven coordinate "group:artifact:version[:classifier]" -> "group:artifact[:classifier]"
+     * (the version is dropped so a loader-provided version of a dependency can replace
+     * the vanilla one, but the classifier is kept so per-OS native jars — which modern
+     * version manifests list as their own "group:artifact:version:natives-xxx" library
+     * entries with a real "downloads.artifact" — don't collide with the main artifact
+     * or with each other).
+     */
+    private static String groupAndArtifact(String mavenCoordinate) {
+        String[] parts = mavenCoordinate.split(":");
+        if (parts.length >= 4) {
+            return parts[0] + ":" + parts[1] + ":" + parts[3];
+        }
+        return parts.length >= 2 ? parts[0] + ":" + parts[1] : mavenCoordinate;
+    }
 
     private boolean rulesAllow(JsonObject lib) {
         if (!lib.has("rules")) {
