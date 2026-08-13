@@ -28,6 +28,12 @@ public class BillOfMaterials {
     @SerializedName("mods")
     private List<ModEntry> mods = new ArrayList<>();
 
+    @SerializedName("shaderpacks")
+    private List<PackEntry> shaderpacks = new ArrayList<>();
+
+    @SerializedName("resourcepacks")
+    private List<PackEntry> resourcepacks = new ArrayList<>();
+
     @SerializedName("serverTitle")
     private String serverTitle;
 
@@ -70,6 +76,22 @@ public class BillOfMaterials {
 
     public void setMods(List<ModEntry> mods) {
         this.mods = mods != null ? mods : new ArrayList<>();
+    }
+
+    public List<PackEntry> getShaderpacks() {
+        return shaderpacks;
+    }
+
+    public void setShaderpacks(List<PackEntry> shaderpacks) {
+        this.shaderpacks = shaderpacks != null ? shaderpacks : new ArrayList<>();
+    }
+
+    public List<PackEntry> getResourcepacks() {
+        return resourcepacks;
+    }
+
+    public void setResourcepacks(List<PackEntry> resourcepacks) {
+        this.resourcepacks = resourcepacks != null ? resourcepacks : new ArrayList<>();
     }
 
     public String getServerTitle() {
@@ -142,5 +164,59 @@ public class BillOfMaterials {
             }
         }
         return total;
+    }
+
+    // ------------------------------------------------------------------
+    // Shaderpacks
+    // ------------------------------------------------------------------
+
+    public void addShaderpack(PackEntry entry) {
+        if (shaderpacks == null) {
+            shaderpacks = new ArrayList<>();
+        }
+        shaderpacks.add(entry);
+    }
+
+    public boolean removeShaderpack(String filename) {
+        return shaderpacks != null && shaderpacks.removeIf(p -> Objects.equals(p.getFilename(), filename));
+    }
+
+    public PackEntry getShaderpackByFilename(String filename) {
+        if (shaderpacks == null) {
+            return null;
+        }
+        for (PackEntry pack : shaderpacks) {
+            if (Objects.equals(pack.getFilename(), filename)) {
+                return pack;
+            }
+        }
+        return null;
+    }
+
+    // ------------------------------------------------------------------
+    // Resourcepacks
+    // ------------------------------------------------------------------
+
+    public void addResourcepack(PackEntry entry) {
+        if (resourcepacks == null) {
+            resourcepacks = new ArrayList<>();
+        }
+        resourcepacks.add(entry);
+    }
+
+    public boolean removeResourcepack(String filename) {
+        return resourcepacks != null && resourcepacks.removeIf(p -> Objects.equals(p.getFilename(), filename));
+    }
+
+    public PackEntry getResourcepackByFilename(String filename) {
+        if (resourcepacks == null) {
+            return null;
+        }
+        for (PackEntry pack : resourcepacks) {
+            if (Objects.equals(pack.getFilename(), filename)) {
+                return pack;
+            }
+        }
+        return null;
     }
 }

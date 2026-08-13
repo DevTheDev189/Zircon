@@ -90,7 +90,7 @@
             <!-- Top Navbar (hidden on the Stats tab — it's a global view, not an instance page) -->
             <header v-if="activeTab !== 'stats'" class="h-16 border-b border-slate-800 px-6 flex items-center justify-between">
                 <nav class="flex gap-2">
-                    <button v-for="t in ['mods', 'console', 'players', 'backups', 'settings']" :key="t" @click="activeTab = t"
+                    <button v-for="t in ['mods', 'shaders', 'console', 'players', 'backups', 'settings']" :key="t" @click="activeTab = t"
                             class="px-4 py-2 text-sm rounded-lg capitalize transition"
                             :class="activeTab === t ? 'bg-slate-800 text-white font-medium' : 'text-slate-400 hover:text-slate-200'">
                         {{ t }}
@@ -250,13 +250,119 @@
                     </div>
                 </div>
 
+                <!-- SHADERS & TEXTURE PACKS VIEW -->
+                <div v-if="activeTab === 'shaders'" class="space-y-6">
+                    <!-- Shader Engine -->
+                    <div class="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                        <div>
+                            <h3 class="font-bold text-sm text-slate-200">Shader Engine</h3>
+                            <p class="text-xs text-slate-400">{{ shaderEngine.engine || '...' }} — installs the rendering-engine mods shaders need for this loader.</p>
+                        </div>
+                        <button @click="toggleShaderEngine" :disabled="togglingShaderEngine || !selectedInstance"
+                                class="font-semibold px-4 py-2 rounded-lg text-sm transition disabled:opacity-50 flex items-center gap-2"
+                                :class="shaderEngine.enabled ? 'bg-red-600/80 hover:bg-red-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'">
+                            <svg v-if="togglingShaderEngine" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>{{ togglingShaderEngine ? 'Working...' : (shaderEngine.enabled ? 'Disable Shaders' : 'Enable Shaders') }}</span>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- Shaderpacks -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3"
+                             @dragover.prevent @drop.prevent="handlePackDrop($event, 'shaderpack')">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-bold text-sm">Shaderpacks</h3>
+                                <span class="text-[10px] text-slate-500">Drop a .zip here, or search below</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <input v-model="shaderSearchQuery" @keyup.enter="searchPacks('shaderpack')" placeholder="Search Modrinth shaderpacks..."
+                                       class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                                <button @click="searchPacks('shaderpack')" :disabled="packSearching" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-4 py-1.5 rounded-lg text-sm font-medium">Search</button>
+                            </div>
+                            <div v-if="packSearchType === 'shaderpack' && packSearchResults.length" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                <div v-for="hit in packSearchResults" :key="hit.projectId" class="bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex items-center justify-between gap-2">
+                                    <p class="font-semibold text-xs truncate">{{ hit.title }}</p>
+                                    <button @click="installPack(hit, 'shaderpack')" :disabled="installingPacks[hit.projectId]"
+                                            class="bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs px-2.5 py-1 rounded font-medium shrink-0 disabled:opacity-50">
+                                        {{ installingPacks[hit.projectId] ? '...' : 'Install' }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto space-y-2 pr-1 border-t border-slate-800 pt-3">
+                                <div v-for="p in shaderpacks" :key="p.filename" class="bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex items-center justify-between gap-2">
+                                    <p class="text-xs font-medium truncate">{{ p.title || p.filename }}</p>
+                                    <button @click="deletePack(p.filename, 'shaderpack')" class="text-red-400 hover:text-red-300 text-xs px-2 py-1 shrink-0">Delete</button>
+                                </div>
+                                <p v-if="!shaderpacks.length" class="text-xs text-slate-500 text-center py-6">No shaderpacks installed yet.</p>
+                            </div>
+                        </div>
+
+                        <!-- Resource Packs -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3"
+                             @dragover.prevent @drop.prevent="handlePackDrop($event, 'resourcepack')">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-bold text-sm">Texture Packs</h3>
+                                <span class="text-[10px] text-slate-500">Drop a .zip here, or search below</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <input v-model="texturePackSearchQuery" @keyup.enter="searchPacks('resourcepack')" placeholder="Search Modrinth texture packs..."
+                                       class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+                                <button @click="searchPacks('resourcepack')" :disabled="packSearching" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-4 py-1.5 rounded-lg text-sm font-medium">Search</button>
+                            </div>
+                            <div v-if="packSearchType === 'resourcepack' && packSearchResults.length" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                <div v-for="hit in packSearchResults" :key="hit.projectId" class="bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex items-center justify-between gap-2">
+                                    <p class="font-semibold text-xs truncate">{{ hit.title }}</p>
+                                    <button @click="installPack(hit, 'resourcepack')" :disabled="installingPacks[hit.projectId]"
+                                            class="bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs px-2.5 py-1 rounded font-medium shrink-0 disabled:opacity-50">
+                                        {{ installingPacks[hit.projectId] ? '...' : 'Install' }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto space-y-2 pr-1 border-t border-slate-800 pt-3">
+                                <div v-for="p in resourcepacks" :key="p.filename" class="bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex items-center justify-between gap-2">
+                                    <p class="text-xs font-medium truncate">{{ p.title || p.filename }}</p>
+                                    <button @click="deletePack(p.filename, 'resourcepack')" class="text-red-400 hover:text-red-300 text-xs px-2 py-1 shrink-0">Delete</button>
+                                </div>
+                                <p v-if="!resourcepacks.length" class="text-xs text-slate-500 text-center py-6">No texture packs installed yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500">Packs installed here sync to every connecting player automatically — players individually choose which ones to actually use in their client.</p>
+                </div>
+
                 <!-- CONSOLE VIEW -->
                 <div v-if="activeTab === 'console'" class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col h-full">
-                    <h3 class="font-bold text-sm mb-3">Server Console</h3>
-                    <div ref="consoleBox" class="flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-0.5 min-h-0">
-                        <div v-for="(line, i) in consoleLines" :key="i" :class="consoleColor(line)">{{ line }}</div>
-                        <p v-if="!consoleLines.length" class="text-slate-600">Waiting for console output...</p>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-bold text-sm">Server Console</h3>
+
+                        <!-- NEW: Filters & Actions -->
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
+                                <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition">
+                                    <input type="checkbox" v-model="consoleFilters.info" class="accent-emerald-500"> Info
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer text-yellow-400 hover:text-yellow-300 transition">
+                                    <input type="checkbox" v-model="consoleFilters.warnings" class="accent-emerald-500"> Warn
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer text-red-400 hover:text-red-300 transition">
+                                    <input type="checkbox" v-model="consoleFilters.errors" class="accent-emerald-500"> Error
+                                </label>
+                            </div>
+                            <button @click="clearConsole" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition">
+                                Clear
+                            </button>
+                        </div>
                     </div>
+
+                    <div ref="consoleBox" class="flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-0.5 min-h-0">
+                        <!-- NEW: Loop through filteredConsoleLines instead of consoleLines -->
+                        <div v-for="(line, i) in filteredConsoleLines" :key="i" :class="consoleColor(line)">{{ line }}</div>
+                        <p v-if="!filteredConsoleLines.length" class="text-slate-600">Waiting for console output (or all lines filtered out)...</p>
+                    </div>
+
                     <form @submit.prevent="sendCommand" class="flex gap-2 mt-3">
                         <input v-model="command" placeholder="Type a server command..." class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
                         <button class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-medium">Send</button>
@@ -767,11 +873,20 @@ createApp({
                 { projectId: 'sodium', title: 'Sodium', description: 'Modern rendering engine that greatly improves frame rates.', loader: 'fabric' },
                 { projectId: 'lithium', title: 'Lithium', description: 'General-purpose optimization for physics, chunk loading and entity ticking.', loader: 'fabric' },
                 { projectId: 'ferritecore', title: 'FerriteCore', description: 'Memory usage optimizations for Minecraft.', loader: 'both' },
-                { projectId: 'iris', title: 'Iris Shaders', description: 'A modern shaders mod built to be compatible with Sodium.', loader: 'fabric' },
                 { projectId: 'cloth-config', title: 'Cloth Config', description: 'Configuration screen library used by many mods.', loader: 'both' },
                 { projectId: 'appleskin', title: 'AppleSkin', description: 'Adds food value information to tooltips and HUD.', loader: 'both' }
             ],
             installedMods: [],
+            shaderEngine: {},
+            togglingShaderEngine: false,
+            shaderpacks: [],
+            resourcepacks: [],
+            shaderSearchQuery: '',
+            texturePackSearchQuery: '',
+            packSearchType: 'shaderpack', // 'shaderpack' or 'resourcepack' — which panel's results are shown
+            packSearching: false,
+            packSearchResults: [],
+            installingPacks: {}, // { [projectId]: true } while an install is in flight
             whitelistEnabled: false,
             whitelistPlayers: [],
             opPlayers: [],
@@ -794,7 +909,8 @@ createApp({
             command: '',
             consoleWs: null,
             autoScroll: true,
-            pollTimer: null
+            pollTimer: null,
+            consoleFilters: { info: true, warnings: true, errors: true }
         };
     },
     methods: {
@@ -1219,6 +1335,108 @@ createApp({
             await this.api(`/api/instances/${this.selectedInstance.id}/mods/${encodeURIComponent(filename)}`, { method: 'DELETE' });
             this.loadMods();
         },
+        // ---- Shaders & texture packs ----
+        packEndpoint(type) {
+            return type === 'shaderpack' ? 'shaderpacks' : 'resourcepacks';
+        },
+        async loadShaders() {
+            if (!this.selectedInstance) return;
+            try {
+                this.shaderEngine = await this.api(`/api/instances/${this.selectedInstance.id}/shaders`);
+            } catch (e) {
+                this.shaderEngine = {};
+            }
+            try {
+                const sp = await this.api(`/api/instances/${this.selectedInstance.id}/shaderpacks`);
+                this.shaderpacks = sp.shaderpacks || [];
+            } catch (e) {
+                this.shaderpacks = [];
+            }
+            try {
+                const rp = await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks`);
+                this.resourcepacks = rp.resourcepacks || [];
+            } catch (e) {
+                this.resourcepacks = [];
+            }
+        },
+        async toggleShaderEngine() {
+            if (!this.selectedInstance) return;
+            this.togglingShaderEngine = true;
+            try {
+                this.shaderEngine = await this.api(`/api/instances/${this.selectedInstance.id}/shaders/toggle`, {
+                    method: 'POST',
+                    body: JSON.stringify({ enabled: !this.shaderEngine.enabled })
+                });
+            } catch (e) {
+                alert('Shader engine toggle failed: ' + e.message);
+            } finally {
+                this.togglingShaderEngine = false;
+            }
+        },
+        async searchPacks(type) {
+            this.packSearchType = type;
+            const modrinthType = type === 'shaderpack' ? 'shader' : 'resourcepack';
+            // Modrinth doesn't tag shaderpacks/resourcepacks by mod loader (they aren't
+            // loader-specific like mods are) — a loader facet here returns zero hits.
+            const q = new URLSearchParams({
+                query: type === 'shaderpack' ? this.shaderSearchQuery : this.texturePackSearchQuery,
+                mcVersion: this.selectedInstance.minecraftVersion,
+                origin: 'modrinth',
+                type: modrinthType
+            });
+            this.packSearching = true;
+            try {
+                const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/search?${q}`);
+                this.packSearchResults = data.hits || [];
+            } catch (e) {
+                alert('Search failed: ' + e.message);
+            } finally {
+                this.packSearching = false;
+            }
+        },
+        async installPack(hit, type) {
+            const id = hit.projectId;
+            this.installingPacks[id] = true;
+            try {
+                // No loader filter here either — pack versions aren't tagged per mod loader.
+                const q = new URLSearchParams({ projectId: id, mcVersion: this.selectedInstance.minecraftVersion });
+                const versions = await this.api(`/api/instances/${this.selectedInstance.id}/mods/modrinth/versions?${q}`);
+                const chosen = (versions.versions || [])[0];
+                const file = chosen && chosen.file;
+                if (!file) { alert('No installable version found for ' + hit.title); return; }
+                await this.api(`/api/instances/${this.selectedInstance.id}/${this.packEndpoint(type)}/install`, {
+                    method: 'POST',
+                    body: JSON.stringify({ downloadUrl: file.url, filename: file.filename, origin: 'modrinth' })
+                });
+                this.packSearchResults = this.packSearchResults.filter(r => r.projectId !== id);
+                await this.loadShaders();
+            } catch (e) {
+                alert('Install failed: ' + e.message);
+            } finally {
+                delete this.installingPacks[id];
+            }
+        },
+        async deletePack(filename, type) {
+            await this.api(`/api/instances/${this.selectedInstance.id}/${this.packEndpoint(type)}/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+            this.loadShaders();
+        },
+        async handlePackDrop(event, type) {
+            const files = Array.from(event.dataTransfer.files || []).filter(f => f.name.toLowerCase().endsWith('.zip'));
+            for (const file of files) {
+                const form = new FormData();
+                form.append('file', file);
+                try {
+                    await fetch(`/api/instances/${this.selectedInstance.id}/${this.packEndpoint(type)}/upload`, {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + this.jwtToken },
+                        body: form
+                    });
+                } catch (e) {
+                    alert('Upload failed for ' + file.name + ': ' + e.message);
+                }
+            }
+            this.loadShaders();
+        },
         // ---- Player management ----
         async loadPlayers() {
             if (!this.selectedInstance) return;
@@ -1319,6 +1537,10 @@ createApp({
             const proto = location.protocol === 'https:' ? 'wss' : 'ws';
             this.consoleWs = new WebSocket(`${proto}://${location.host}/api/console`);
             this.consoleWs.onmessage = (ev) => {
+                if (ev.data === '__CLEAR__') {
+                    this.consoleLines = [];
+                    return;
+                }
                 this.consoleLines.push(ev.data);
                 if (this.consoleLines.length > 1000) this.consoleLines.shift();
                 this.$nextTick(() => {
@@ -1327,6 +1549,11 @@ createApp({
                 });
             };
             this.consoleWs.onclose = () => { this.consoleWs = null; };
+        },
+        clearConsole() {
+            if (this.consoleWs && this.consoleWs.readyState === WebSocket.OPEN) {
+                this.consoleWs.send('__CLEAR__');
+            }
         },
         sendCommand() {
             if (this.consoleWs && this.consoleWs.readyState === WebSocket.OPEN && this.command.trim()) {
@@ -1342,6 +1569,25 @@ createApp({
         }
     },
     computed: {
+        // NEW: Client-side filtering logic
+        filteredConsoleLines() {
+            return this.consoleLines.filter(line => {
+                const upper = line.toUpperCase();
+
+                // Categorize the line
+                const isError = upper.includes('ERROR') || upper.includes('EXCEPTION') || upper.includes('AT JAVA.');
+                const isWarn = !isError && (upper.includes('WARN') || upper.includes('WARNING:'));
+                const isInfo = !isError && !isWarn;
+
+                // Return true if its category's checkbox is checked
+                if (isError && this.consoleFilters.errors) return true;
+                if (isWarn && this.consoleFilters.warnings) return true;
+                if (isInfo && this.consoleFilters.info) return true;
+
+                return false;
+            });
+        },
+
         // Every property not covered by the curated fields above.
         advancedPropertyKeys() {
             return Object.keys(this.serverProps)
@@ -1368,6 +1614,7 @@ createApp({
             if (tab === 'players') this.loadPlayers();
             if (tab === 'backups') this.loadBackups();
             if (tab === 'settings') this.loadServerProperties();
+            if (tab === 'shaders') this.loadShaders();
         }
     }
 }).mount('#app');

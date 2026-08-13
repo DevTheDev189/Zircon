@@ -22,13 +22,16 @@ public class ModServiceResolver {
     private final ServerInstanceManager instanceManager;
     private final BomService legacyBom;
     private final ModManagementService legacyMods;
+    private final PackManagementService legacyPacks;
     private final String curseForgeApiKey;
 
     public ModServiceResolver(ServerInstanceManager instanceManager, BomService legacyBom,
-                              ModManagementService legacyMods, String curseForgeApiKey) {
+                              ModManagementService legacyMods, PackManagementService legacyPacks,
+                              String curseForgeApiKey) {
         this.instanceManager = instanceManager;
         this.legacyBom = legacyBom;
         this.legacyMods = legacyMods;
+        this.legacyPacks = legacyPacks;
         this.curseForgeApiKey = curseForgeApiKey == null ? "" : curseForgeApiKey;
     }
 
@@ -49,16 +52,24 @@ public class ModServiceResolver {
         return active == null ? legacyMods : instanceService(active).mods;
     }
 
-    /** Freshly built per-instance service pair (disk is always the source of truth). */
+    /** Resolves the pack service backing {@code /files/shaderpacks/*} and {@code /files/resourcepacks/*}. */
+    public PackManagementService packs() {
+        InstanceConfig active = activeInstance();
+        return active == null ? legacyPacks : instanceService(active).packs;
+    }
+
+    /** Freshly built per-instance service trio (disk is always the source of truth). */
     private InstanceServices instanceService(InstanceConfig cfg) {
         Path instanceDir = instanceManager.getInstanceDir(cfg.getId());
         BomService bom = new BomService(instanceDir.resolve("bom.json"),
                 new BillOfMaterials(cfg.getMinecraftVersion(), cfg.getModLoader(), cfg.getName()));
         ModManagementService mods = new ModManagementService(bom, instanceDir.resolve("mods"),
                 curseForgeApiKey);
-        return new InstanceServices(bom, mods);
+        PackManagementService packs = new PackManagementService(bom, instanceDir.resolve("shaderpacks"),
+                instanceDir.resolve("resourcepacks"));
+        return new InstanceServices(bom, mods, packs);
     }
 
-    private record InstanceServices(BomService bom, ModManagementService mods) {
+    private record InstanceServices(BomService bom, ModManagementService mods, PackManagementService packs) {
     }
 }

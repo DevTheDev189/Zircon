@@ -116,6 +116,10 @@ public class MinecraftRunner {
         // opens fullscreen even when the profile args differ between loaders.
         enableFullscreen(gameDir);
 
+        // Apply the player's local shaderpack/resourcepack choices (never the
+        // server's full synced set — see PackSelection/PackOptionsWriter).
+        PackOptionsWriter.apply(gameDir);
+
         log.info("Launching Minecraft: {} --quickPlayMultiplayer {}:{} ...",
                 String.join(" ", command.subList(0, 6)), serverIp, serverPort);
 
@@ -181,22 +185,8 @@ public class MinecraftRunner {
     /** Upserts a {@code key:value} entry in the instance's {@code options.txt}. */
     private static void setOptionsEntry(Path gameDir, String key, String value) throws IOException {
         Path options = gameDir.resolve("options.txt");
-        List<String> lines = Files.isRegularFile(options)
-                ? Files.readAllLines(options, StandardCharsets.UTF_8)
-                : new ArrayList<>();
-        String prefix = key + ":";
-        boolean found = false;
-        for (int i = 0; i < lines.size(); i++) {
-            if (lines.get(i).startsWith(prefix)) {
-                lines.set(i, prefix + value);
-                found = true;
-            }
-        }
-        if (!found) {
-            lines.add(prefix + value);
-        }
-        Files.write(options, lines, StandardCharsets.UTF_8);
-        log.info("Set {} in {}", prefix + value, options);
+        OptionsFileUtil.upsertLine(options, key + ":", value);
+        log.info("Set {}:{} in {}", key, value, options);
     }
 
     private void pump(Process process, Consumer<String> output) {

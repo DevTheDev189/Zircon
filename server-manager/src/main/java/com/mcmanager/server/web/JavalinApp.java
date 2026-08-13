@@ -10,6 +10,7 @@ import com.mcmanager.server.service.BomService;
 import com.mcmanager.server.service.ConfigService;
 import com.mcmanager.server.service.ModManagementService;
 import com.mcmanager.server.service.ModServiceResolver;
+import com.mcmanager.server.service.PackManagementService;
 import com.mcmanager.server.stats.SystemMetricsService;
 import com.mcmanager.server.web.controller.BackupController;
 import com.mcmanager.server.web.controller.BomController;
@@ -17,6 +18,7 @@ import com.mcmanager.server.web.controller.ConfigController;
 import com.mcmanager.server.web.controller.ConsoleController;
 import com.mcmanager.server.web.controller.InstanceController;
 import com.mcmanager.server.web.controller.ModController;
+import com.mcmanager.server.web.controller.PackFileController;
 import com.mcmanager.server.web.controller.PlayerController;
 import io.javalin.Javalin;
 import io.javalin.http.UnauthorizedResponse;
@@ -67,10 +69,14 @@ public class JavalinApp {
         // Client-facing legacy endpoints (/bom, /files/mods/*, /api/mods/*) serve the
         // active instance's data when instances exist, so the client always syncs
         // against the same mods the admin UI manages (see ModServiceResolver).
+        PackManagementService legacyPacks = new PackManagementService(bomService,
+                configService.getDataDir().resolve("shaderpacks"),
+                configService.getDataDir().resolve("resourcepacks"));
         ModServiceResolver serviceResolver = new ModServiceResolver(instanceManager, bomService,
-                modService, configService.getConfig().curseforgeApiKey);
+                modService, legacyPacks, configService.getConfig().curseforgeApiKey);
         BomController bomController = new BomController(serviceResolver::bom);
         ModController modController = new ModController(serviceResolver::mods);
+        PackFileController packFileController = new PackFileController(serviceResolver::packs);
         PlayerController playerController = new PlayerController(configService, processManager, console);
         ConfigController configController = new ConfigController(configService, bomService,
                 processManager, console);
@@ -202,6 +208,9 @@ public class JavalinApp {
         app.get("/api/mods/curseforge/files", modController::curseForgeFiles);
         app.post("/api/mods/install", modController::installMod);
 
+        app.get("/files/shaderpacks/{filename}", packFileController::downloadShaderpack);
+        app.get("/files/resourcepacks/{filename}", packFileController::downloadResourcepack);
+
         app.get("/api/players/online", playerController::online);
         app.get("/api/players/whitelist", playerController::getWhitelist);
         app.post("/api/players/whitelist", playerController::addWhitelist);
@@ -256,6 +265,18 @@ public class JavalinApp {
         app.get("/api/instances/{id}/mods/curseforge/files", instanceController::curseForgeFiles);
         app.post("/api/instances/{id}/mods/install", instanceController::installMod);
         app.post("/api/instances/{id}/modpacks/install", instanceController::installModpack);
+
+        // Shaders & texture packs REST endpoints
+        app.get("/api/instances/{id}/shaders", instanceController::getShaderStatus);
+        app.post("/api/instances/{id}/shaders/toggle", instanceController::toggleShaderEngine);
+        app.get("/api/instances/{id}/shaderpacks", instanceController::listShaderpacks);
+        app.post("/api/instances/{id}/shaderpacks/upload", instanceController::uploadShaderpack);
+        app.post("/api/instances/{id}/shaderpacks/install", instanceController::installShaderpack);
+        app.delete("/api/instances/{id}/shaderpacks/{filename}", instanceController::removeShaderpack);
+        app.get("/api/instances/{id}/resourcepacks", instanceController::listResourcepacks);
+        app.post("/api/instances/{id}/resourcepacks/upload", instanceController::uploadResourcepack);
+        app.post("/api/instances/{id}/resourcepacks/install", instanceController::installResourcepack);
+        app.delete("/api/instances/{id}/resourcepacks/{filename}", instanceController::removeResourcepack);
 
         // Backups REST endpoints
         app.get("/api/instances/{id}/backups", backupController::listBackups);
