@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -130,6 +131,107 @@ public class MinecraftRunner {
 
         Thread.ofVirtual().name("mc-client-output").start(() -> pump(process, output));
         return process;
+    }
+
+    /**
+     * Launches the game in offline (single-player) mode using a local username
+     * instead of a Microsoft session. This is the "Play Offline" path: no
+     * server connection is attempted, and the game runs with a vanilla/loader
+     * offline session (accessToken {@code 0}, userType {@code legacy}).
+     *
+     * @param data      resolved launch environment
+     * @param username  display name to launch as
+     * @param javaArgs  optional JVM memory/extra args (e.g. {@code "-Xms2G -Xmx4G"})
+     * @param gameDir   the offline instance directory (contains mods/, ...)
+     * @param output    receives game stdout lines (may be {@code null})
+     */
+    public Process launchOffline(MinecraftClasspathBuilder.LaunchData data, String username,
+                                 String javaArgs, Path gameDir, Consumer<String> output)
+            throws IOException {
+        String playerName = username == null || username.isBlank() ? "Player" : username.trim();
+        Path java = data.javaHome().resolve("bin/java"
+                + (System.getProperty("os.name").toLowerCase().contains("win") ? ".exe" : ""));
+
+        List<String> command = new ArrayList<>();
+        command.add(java.toString());
+        command.addAll(data.jvmArgs());
+        addJvmMemoryArgs(command, javaArgs);
+        command.add("-Djava.library.path=" + data.nativesDir());
+        command.add("-cp");
+        command.add(data.classpath());
+        command.add(data.mainClass());
+
+        String offlineUuid = UUID.nameUUIDFromBytes(
+                ("OfflinePlayer:" + playerName).getBytes(StandardCharsets.UTF_8)).toString();
+
+        if (!data.gameArgs().isEmpty()) {
+            // Forge/NeoForge: substitute the version profile's game-argument
+            // placeholders with offline credentials instead of a live session.
+            Map<String, String> tokens = new HashMap<>();
+            tokens.put("auth_player_name", playerName);
+            tokens.put("auth_uuid", offlineUuid);
+            tokens.put("auth_access_token", "0");
+            tokens.put("auth_xuid", "");
+            tokens.put("clientid", "");
+            tokens.put("user_type", "legacy");
+            tokens.put("version_type", "release");
+            tokens.put("version_name", data.versionName());
+            tokens.put("game_directory", gameDir.toString());
+            tokens.put("assets_root", data.assetsDir().toString());
+            tokens.put("assets_index_name", data.assetIndexId());
+            tokens.put("quickPlayMultiplayer", "");
+            tokens.put("launcher_name", "mcmanager");
+            tokens.put("launcher_version", "1.0.0");
+
+            List<String> profileGameArgs = new ArrayList<>();
+            for (String arg : data.gameArgs()) {
+                profileGameArgs.add(VersionProfileResolver.substitute(arg, tokens));
+            }
+            // Drop any quick-play multiplayer args so offline stays single-player.
+            for (int i = 0; i < profileGameArgs.size(); i++) {
+                if ("--quickPlayMultiplayer".equals(profileGameArgs.get(i)) && i + 1 < profileGameArgs.size()) {
+                    profileGameArgs.remove(i + 1);
+                    profileGameArgs.remove(i);
+                    i--;
+                }
+            }
+            command.addAll(profileGameArgs);
+        } else {
+            addArg(command, "--username", playerName);
+            addArg(command, "--version", data.versionName());
+            addArg(command, "--gameDir", gameDir.toString());
+            addArg(command, "--assetsDir", data.assetsDir().toString());
+            addArg(command, "--assetIndex", data.assetIndexId());
+            addArg(command, "--uuid", offlineUuid);
+            addArg(command, "--accessToken", "0");
+            addArg(command, "--userType", "legacy");
+            addArg(command, "--versionType", "release");
+        }
+
+        // Apply the instance's local shaderpack/resourcepack choices so offline
+        // worlds honor the same pack selection as online play (PackSelection).
+        PackOptionsWriter.apply(gameDir);
+
+        log.info("Launching Minecraft (offline) as '{}': {} ...", playerName,
+                String.join(" ", command.subList(0, Math.min(6, command.size()))));
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(gameDir.toFile());
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+
+        Thread.ofVirtual().name("mc-client-output").start(() -> pump(process, output));
+        return process;
+    }
+
+    /** Appends JVM memory/extra args, defaulting to {@code -Xmx4G} when blank. */
+    private static void addJvmMemoryArgs(List<String> command, String javaArgs) {
+        String args = javaArgs == null || javaArgs.isBlank() ? "-Xmx4G" : javaArgs.trim();
+        for (String token : args.split("\\s+")) {
+            if (!token.isBlank()) {
+                command.add(token);
+            }
+        }
     }
 
     private static void addArg(List<String> command, String key, String value) {

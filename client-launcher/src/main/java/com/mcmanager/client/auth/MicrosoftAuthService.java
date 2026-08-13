@@ -36,14 +36,39 @@ import java.util.concurrent.TimeUnit;
  * {@code ~/.mcmanager/auth_cache.json}.
  *
  * <p>You must register an Azure application with a localhost redirect URI and pass
- * its client id via the {@code mcmanager.clientId} system property (or replace
- * {@link #DEFAULT_CLIENT_ID}).
+ * its client id via the {@code mcmanager.clientId} system property, the
+ * {@code --clientId=...} launcher argument, the {@code ~/.mcmanager/client_id.txt}
+ * file, or the obfuscated embedded default ({@link #EMBEDDED_CLIENT_ID_BYTES}).
  */
 public class MicrosoftAuthService {
 
     private static final Logger log = LoggerFactory.getLogger(MicrosoftAuthService.class);
 
+    /**
+     * Sentinel value meaning "no real client id configured yet". {@code login()}
+     * refuses to start the OAuth flow while the resolved id equals this value.
+     */
     public static final String DEFAULT_CLIENT_ID = "REPLACE_WITH_AZURE_CLIENT_ID";
+
+    /**
+     * Fixed key used to XOR-obfuscate the embedded default client id so the source
+     * tree never holds the plaintext literal. This is obfuscation, not encryption —
+     * anyone with the source can reverse it, and that is intentional.
+     */
+    private static final byte[] OBFUSCATION_KEY = "ZIRCON".getBytes(StandardCharsets.UTF_8);
+
+    /**
+     * XOR-obfuscated default Azure client id, decoded via
+     * {@link #decodeClientId(byte[])}. Currently decodes to the
+     * {@link #DEFAULT_CLIENT_ID} placeholder so the "not configured" guard in
+     * {@link #login()} still fires; replace this byte array with the output of
+     * {@code encodeClientId("<your real client id>")} to ship a working default
+     * that lets users launch without {@code --clientId}.
+     */
+    static final byte[] EMBEDDED_CLIENT_ID_BYTES = new byte[]{
+            8, 12, 2, 15, 14, 13, 31, 22, 5, 10, 27, 6, 5, 8,
+            8, 22, 29, 11, 5, 10, 30, 10, 10, 0, 14, 22, 27, 7
+    };
 
     private static final String REDIRECT_URI = "http://localhost:8080/callback";
 
@@ -82,7 +107,7 @@ public class MicrosoftAuthService {
     /**
      * Resolution order: {@code -Dmcmanager.clientId}, the {@code --clientId=...}
      * launcher argument (converted to a system property by {@code Main}), then the
-     * {@code ~/.mcmanager/client_id.txt} file, then the placeholder constant.
+     * {@code ~/.mcmanager/client_id.txt} file, then the obfuscated embedded default.
      */
     private static String resolveClientId() {
         String fromProp = System.getProperty("mcmanager.clientId");
@@ -97,9 +122,42 @@ public class MicrosoftAuthService {
                 }
             }
         } catch (IOException e) {
-            // fall through to the placeholder
+            // fall through to the embedded default
         }
-        return DEFAULT_CLIENT_ID;
+        return decodeClientId(EMBEDDED_CLIENT_ID_BYTES);
+    }
+
+    // ------------------------------------------------------------------
+    // Embedded client id obfuscation
+    // ------------------------------------------------------------------
+
+    /**
+     * Reverses {@link #encodeClientId(String)}: XORs each byte with
+     * {@link #OBFUSCATION_KEY} and interprets the result as UTF-8.
+     */
+    static String decodeClientId(byte[] data) {
+        if (data == null) {
+            return null;
+        }
+        byte[] out = new byte[data.length];
+        for (int i = 0; i < data.length; i++) {
+            out[i] = (byte) (data[i] ^ OBFUSCATION_KEY[i % OBFUSCATION_KEY.length]);
+        }
+        return new String(out, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * XOR-obfuscates a client id (UTF-8 bytes) with {@link #OBFUSCATION_KEY}.
+     * Package-private so maintainers can regenerate {@link #EMBEDDED_CLIENT_ID_BYTES}
+     * for a real client id and so the round-trip is unit-tested.
+     */
+    static byte[] encodeClientId(String plain) {
+        byte[] in = plain.getBytes(StandardCharsets.UTF_8);
+        byte[] out = new byte[in.length];
+        for (int i = 0; i < in.length; i++) {
+            out[i] = (byte) (in[i] ^ OBFUSCATION_KEY[i % OBFUSCATION_KEY.length]);
+        }
+        return out;
     }
 
     // ------------------------------------------------------------------
@@ -118,7 +176,8 @@ public class MicrosoftAuthService {
             throw new IllegalStateException(
                     "Microsoft client id not configured. Run the launcher with "
                     + "--clientId=<AZURE_CLIENT_ID> (e.g. java -jar client-launcher-1.0.0-all.jar "
-                    + "--clientId=abc123) or create " + CLIENT_ID_FILE + " containing the id. "
+                    + "--clientId=abc123), create " + CLIENT_ID_FILE + " containing the id, or replace "
+                    + "EMBEDDED_CLIENT_ID_BYTES in MicrosoftAuthService to ship a working default. "
                     + "The Azure app must allow localhost redirect URIs (http://localhost:<port>/callback).");
         }
 
@@ -490,6 +549,57 @@ public class MicrosoftAuthService {
         }
     }
 
+    /**
+     * Renders the local OAuth callback page in Zircon's dark theme (matching the
+     * launcher UI: {@code #0d1117} background, {@code #161b22} cards, emerald
+     * {@code #2da44e} accents). The page confirms a successful sign-in or surfaces
+     * the Azure error returned in the redirect query string.
+     */
+    private static String callbackPage(boolean success, String error, String errorDescription) {
+        String title = success ? "Authentication Successful!" : "Authentication Failed";
+        String message = success
+                ? "You may now close this browser window and return to the launcher."
+                : "Something went wrong — close this window and return to the launcher.";
+        String errorHtml = error != null
+                ? "<p class='error'>" + escapeHtml(error)
+                + (errorDescription != null ? " — " + escapeHtml(errorDescription) : "") + "</p>"
+                : "";
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        body { background-color: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; text-align: center; padding-top: 100px; margin: 0; }
+                        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; display: inline-block; padding: 40px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+                        .logo { background: #2da44e; color: white; border-radius: 8px; font-weight: bold; padding: 6px 12px; font-size: 20px; display: inline-block; margin-bottom: 16px; }
+                        h2 { margin: 0 0 12px 0; color: #ffffff; }
+                        p { color: #8b949e; font-size: 14px; margin: 0; }
+                        .error { color: #f85149; margin-top: 12px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <div class="logo">⚡ Zircon</div>
+                        <h2>%s</h2>
+                        <p>%s</p>%s
+                    </div>
+                </body>
+                </html>
+                """.formatted(title, message, errorHtml);
+    }
+
+    /** Minimal HTML escaping so Azure error text can't break out of the page markup. */
+    private static String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
     // ------------------------------------------------------------------
     // Local callback server
     // ------------------------------------------------------------------
@@ -530,14 +640,8 @@ public class MicrosoftAuthService {
                         }
                     }
                 }
-                String message = code != null
-                        ? "Signed in! You can close this window and return to the launcher."
-                        : "Authentication failed — close this window and return to the launcher.";
-                byte[] response = ("<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'>"
-                        + "<h2>McManager</h2><p>" + message + "</p>"
-                        + (error != null ? "<p style='color:#cf222e'>" + error
-                        + (errorDescription != null ? " — " + errorDescription : "") + "</p>" : "")
-                        + "</body></html>").getBytes(StandardCharsets.UTF_8);
+                byte[] response = callbackPage(code != null, error, errorDescription)
+                        .getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
                 exchange.sendResponseHeaders(200, response.length);
                 try (OutputStream out = exchange.getResponseBody()) {
