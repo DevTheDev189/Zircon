@@ -6,6 +6,39 @@
     <title>Zircon Server Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        /* Console filter checkboxes: unchecked state matches the page background
+           (bg-slate-950) instead of the browser default white. */
+        .console-check {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+            background-color: #020617; /* slate-950 */
+            border: 1px solid #334155; /* slate-700 */
+            border-radius: 4px;
+            display: inline-block;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.15s, border-color 0.15s;
+        }
+        .console-check:checked {
+            background-color: #10b981; /* emerald-500 */
+            border-color: #10b981;
+        }
+        .console-check:checked::after {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 1px;
+            width: 4px;
+            height: 8px;
+            border: solid #022c22;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+    </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans h-screen flex overflow-hidden">
 <div id="app" class="flex w-full h-full">
@@ -67,11 +100,12 @@
                             {{ inst.running ? inst.playerCount + ' online' : 'offline' }}
                         </span>
                     </div>
+                    <p v-if="inst.running" class="text-[10px] font-mono text-emerald-400/90 mt-0.5">Port {{ inst.externalPort }}</p>
                     <button v-if="!inst.running" @click.stop="startInstance(inst)"
                             class="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold py-1.5 rounded-lg transition">Start Server</button>
                     <div v-else class="flex gap-1.5 mt-2">
                         <button @click.stop="restartInstance(inst)" title="Restart Server"
-                                class="bg-amber-600/80 hover:bg-amber-500 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition">🔄</button>
+                                class="bg-amber-600/80 hover:bg-amber-500 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition">⟳</button>
                         <button @click.stop="stopInstance(inst)"
                                 class="flex-1 bg-red-600/80 hover:bg-red-500 text-xs font-semibold py-1.5 rounded-lg transition">Stop Server</button>
                     </div>
@@ -220,6 +254,15 @@
                                     </div>
                                     <p class="text-xs text-slate-400 line-clamp-2 mt-1">{{ hit.description }}</p>
                                     <p class="text-[10px] text-slate-500 mt-1">by {{ hit.author }}</p>
+                                    <div v-if="searchType === 'mod'" class="flex items-center gap-2 mt-1.5">
+                                        <label class="text-[10px] text-slate-500 shrink-0">Version</label>
+                                        <select v-model="hit.selectedVersionId" :disabled="installingMods[hit.projectId]"
+                                                class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 disabled:opacity-50">
+                                            <option v-if="hit.versionsFailed" value="" disabled>No versions available</option>
+                                            <option v-else-if="!hit.versionOptions || !hit.versionOptions.length" value="" disabled>Loading versions…</option>
+                                            <option v-for="v in hit.versionOptions" :key="v.id" :value="v.id">{{ v.versionNumber || v.name }}</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                             <p v-if="!searching && !searchResults.length" class="text-xs text-slate-500 text-center py-6">No results yet — search above.</p>
@@ -252,23 +295,6 @@
 
                 <!-- SHADERS & TEXTURE PACKS VIEW -->
                 <div v-if="activeTab === 'shaders'" class="space-y-6">
-                    <!-- Shader Engine -->
-                    <div class="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                        <div>
-                            <h3 class="font-bold text-sm text-slate-200">Shader Engine</h3>
-                            <p class="text-xs text-slate-400">{{ shaderEngine.engine || '...' }} — installs the rendering-engine mods shaders need for this loader.</p>
-                        </div>
-                        <button @click="toggleShaderEngine" :disabled="togglingShaderEngine || !selectedInstance"
-                                class="font-semibold px-4 py-2 rounded-lg text-sm transition disabled:opacity-50 flex items-center gap-2"
-                                :class="shaderEngine.enabled ? 'bg-red-600/80 hover:bg-red-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'">
-                            <svg v-if="togglingShaderEngine" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span>{{ togglingShaderEngine ? 'Working...' : (shaderEngine.enabled ? 'Disable Shaders' : 'Enable Shaders') }}</span>
-                        </button>
-                    </div>
-
                     <div class="grid grid-cols-2 gap-6">
                         <!-- Shaderpacks -->
                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3"
@@ -330,7 +356,8 @@
                             </div>
                         </div>
                     </div>
-                    <p class="text-xs text-slate-500">Packs installed here sync to every connecting player automatically — players individually choose which ones to actually use in their client.</p>
+                    <p class="text-xs text-slate-500">Players need a shader engine mod to use these packs — add Iris (Fabric/Quilt) or Oculus (Forge/NeoForge) in the Mods tab if it isn't already in your mod list.</p>
+                    <p class="text-xs text-slate-500">Shaders are always optional for the player, and they can choose to accept or decline them.</p>
                 </div>
 
                 <!-- CONSOLE VIEW -->
@@ -342,13 +369,13 @@
                         <div class="flex items-center gap-4">
                             <div class="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
                                 <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition">
-                                    <input type="checkbox" v-model="consoleFilters.info" class="accent-emerald-500"> Info
+                                    <input type="checkbox" v-model="consoleFilters.info" class="console-check"> Info
                                 </label>
                                 <label class="flex items-center gap-1.5 cursor-pointer text-yellow-400 hover:text-yellow-300 transition">
-                                    <input type="checkbox" v-model="consoleFilters.warnings" class="accent-emerald-500"> Warn
+                                    <input type="checkbox" v-model="consoleFilters.warnings" class="console-check"> Warn
                                 </label>
                                 <label class="flex items-center gap-1.5 cursor-pointer text-red-400 hover:text-red-300 transition">
-                                    <input type="checkbox" v-model="consoleFilters.errors" class="accent-emerald-500"> Error
+                                    <input type="checkbox" v-model="consoleFilters.errors" class="console-check"> Error
                                 </label>
                             </div>
                             <button @click="clearConsole" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition">
@@ -514,6 +541,12 @@
                             <div>
                                 <label class="block text-xs text-slate-400 mb-1">JVM Args</label>
                                 <input v-model="settingsForm.javaArgs" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Server Port</label>
+                                <input v-model.number="settingsForm.externalPort" type="number" min="1" max="65535"
+                                       placeholder="e.g. 25565" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                                <p class="text-[10px] text-slate-500 mt-1">Player-facing port; change to free up the port for a reverse proxy.</p>
                             </div>
                             <p class="text-xs text-yellow-400/90 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-lg">
                                 <strong>Mod Loader Type ({{ selectedInstance.modLoader.type }}) is locked.</strong> Changing Minecraft or Loader version will automatically check and update mod compatibility.
@@ -877,8 +910,6 @@ createApp({
                 { projectId: 'appleskin', title: 'AppleSkin', description: 'Adds food value information to tooltips and HUD.', loader: 'both' }
             ],
             installedMods: [],
-            shaderEngine: {},
-            togglingShaderEngine: false,
             shaderpacks: [],
             resourcepacks: [],
             shaderSearchQuery: '',
@@ -896,7 +927,7 @@ createApp({
             playersLoaded: false,
             playerForms: { whitelist: '', op: '' },
             banForm: { name: '', reason: '' },
-            settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '' },
+            settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '', externalPort: null },
             serverProps: {},
             backupForm: { frequency: 'off', time: '02:00', retention: 10 },
             backupsList: [],
@@ -988,7 +1019,8 @@ createApp({
                 name: inst.name,
                 mcVersion: inst.minecraftVersion,
                 loaderVersion: inst.modLoader ? inst.modLoader.version : '',
-                javaArgs: inst.javaArgs || ''
+                javaArgs: inst.javaArgs || '',
+                externalPort: inst.externalPort || null
             };
             this.loadMods();
             this.loadServerProperties();
@@ -1131,7 +1163,14 @@ createApp({
             try {
                 const res = await this.api(`/api/instances/${this.selectedInstance.id}`, {
                     method: 'PATCH',
-                    body: JSON.stringify(this.settingsForm)
+                    body: JSON.stringify({
+                        name: this.settingsForm.name,
+                        mcVersion: this.settingsForm.mcVersion,
+                        loaderVersion: this.settingsForm.loaderVersion,
+                        javaArgs: this.settingsForm.javaArgs,
+                        // 0 / blank leaves the player-facing port unchanged.
+                        externalPort: Number(this.settingsForm.externalPort) || 0
+                    })
                 });
                 alert(`Instance updated! ${res.updatedCount || 0} mods auto-updated, ${res.incompatibleCount || 0} flagged incompatible.`);
                 await this.loadInstances();
@@ -1271,24 +1310,50 @@ createApp({
                 const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/search?${q}`);
                 if (mySeq !== this.searchSeq) return; // superseded by a newer search
                 this.searchResults = data.hits || [];
+                // Auto-detect the best version for each mod hit, but keep the
+                // full option list so the admin can override the pick manually.
+                if (this.searchType === 'mod') this.attachVersionOptions(data.hits || []);
             } catch (e) {
                 if (mySeq === this.searchSeq) alert('Search failed: ' + e.message);
             } finally {
                 if (mySeq === this.searchSeq) this.searching = false;
             }
         },
+        /** Fetches the compatible Modrinth versions for every search hit and pre-selects the best one. */
+        async attachVersionOptions(hits) {
+            const loader = this.selectedInstance.modLoader.type === 'vanilla' ? '' : this.selectedInstance.modLoader.type;
+            const base = `/api/instances/${this.selectedInstance.id}/mods/modrinth/versions?`;
+            await Promise.all(hits.map(async (hit) => {
+                hit.versionOptions = [];
+                hit.selectedVersionId = '';
+                try {
+                    const q = new URLSearchParams({ projectId: hit.projectId, mcVersion: this.selectedInstance.minecraftVersion, loader });
+                    const data = await this.api(base + q);
+                    hit.versionOptions = data.versions || [];
+                    hit.selectedVersionId = hit.versionOptions[0] ? hit.versionOptions[0].id : '';
+                } catch (e) {
+                    hit.versionsFailed = true;
+                }
+            }));
+        },
         async installMod(hit) {
             const id = hit.projectId;
             this.installingMods[id] = true;
             try {
                 const loader = this.selectedInstance.modLoader.type === 'vanilla' ? '' : this.selectedInstance.modLoader.type;
-                const q = new URLSearchParams({ projectId: id, mcVersion: this.selectedInstance.minecraftVersion, loader });
-                const versions = await this.api(`/api/instances/${this.selectedInstance.id}/mods/modrinth/versions?${q}`);
-                const chosen = (versions.versions || [])[0];
-                if (!chosen) { alert('No compatible version found for ' + this.selectedInstance.minecraftVersion); return; }
+                // Use the version picked in the dropdown when available;
+                // otherwise (e.g. Recommended Mods cards) auto-detect the best one.
+                let versionId = hit.selectedVersionId;
+                if (!versionId) {
+                    const q = new URLSearchParams({ projectId: id, mcVersion: this.selectedInstance.minecraftVersion, loader });
+                    const versions = await this.api(`/api/instances/${this.selectedInstance.id}/mods/modrinth/versions?${q}`);
+                    const chosen = (versions.versions || [])[0];
+                    if (!chosen) { alert('No compatible version found for ' + this.selectedInstance.minecraftVersion); return; }
+                    versionId = chosen.id;
+                }
                 await this.api(`/api/instances/${this.selectedInstance.id}/mods/install`, {
                     method: 'POST',
-                    body: JSON.stringify({ origin: 'modrinth', projectId: id, versionId: chosen.id })
+                    body: JSON.stringify({ origin: 'modrinth', projectId: id, versionId })
                 });
                 this.searchResults = this.searchResults.filter(r => r.projectId !== id);
                 await this.loadMods();
@@ -1342,11 +1407,6 @@ createApp({
         async loadShaders() {
             if (!this.selectedInstance) return;
             try {
-                this.shaderEngine = await this.api(`/api/instances/${this.selectedInstance.id}/shaders`);
-            } catch (e) {
-                this.shaderEngine = {};
-            }
-            try {
                 const sp = await this.api(`/api/instances/${this.selectedInstance.id}/shaderpacks`);
                 this.shaderpacks = sp.shaderpacks || [];
             } catch (e) {
@@ -1357,20 +1417,6 @@ createApp({
                 this.resourcepacks = rp.resourcepacks || [];
             } catch (e) {
                 this.resourcepacks = [];
-            }
-        },
-        async toggleShaderEngine() {
-            if (!this.selectedInstance) return;
-            this.togglingShaderEngine = true;
-            try {
-                this.shaderEngine = await this.api(`/api/instances/${this.selectedInstance.id}/shaders/toggle`, {
-                    method: 'POST',
-                    body: JSON.stringify({ enabled: !this.shaderEngine.enabled })
-                });
-            } catch (e) {
-                alert('Shader engine toggle failed: ' + e.message);
-            } finally {
-                this.togglingShaderEngine = false;
             }
         },
         async searchPacks(type) {
@@ -1609,7 +1655,15 @@ createApp({
     },
     watch: {
         activeTab(tab) {
-            if (tab === 'console') this.connectConsole();
+            if (tab === 'console') {
+                this.connectConsole();
+                // Start at the bottom so the most recent activity is visible
+                // immediately (the server replays up to 500 lines on connect).
+                this.$nextTick(() => {
+                    const box = this.$refs.consoleBox;
+                    if (box) box.scrollTop = box.scrollHeight;
+                });
+            }
             if (tab === 'stats') this.loadStats();
             if (tab === 'players') this.loadPlayers();
             if (tab === 'backups') this.loadBackups();

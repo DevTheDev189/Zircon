@@ -33,7 +33,7 @@ public class ClientPackManager {
     }
 
     public static void removeShaderpack(Path gameDir, String filename, PackSelection selection) throws IOException {
-        Files.deleteIfExists(gameDir.resolve("shaderpacks").resolve(sanitize(filename)));
+        Files.deleteIfExists(gameDir.resolve("shaderpacks").resolve(filename));
         selection.getLocallyAddedShaderpacks().remove(filename);
         if (filename.equals(selection.getActiveShaderpack())) {
             selection.setActiveShaderpack(null);
@@ -42,7 +42,7 @@ public class ClientPackManager {
     }
 
     public static void removeResourcepack(Path gameDir, String filename, PackSelection selection) throws IOException {
-        Files.deleteIfExists(gameDir.resolve("resourcepacks").resolve(sanitize(filename)));
+        Files.deleteIfExists(gameDir.resolve("resourcepacks").resolve(filename));
         selection.getLocallyAddedResourcepacks().remove(filename);
         selection.getActiveResourcepacks().remove(filename);
         selection.save(gameDir);

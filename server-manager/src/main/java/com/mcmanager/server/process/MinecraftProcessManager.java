@@ -105,7 +105,7 @@ public class MinecraftProcessManager {
                 config.getModLoader(),
                 config.getJavaArgs(),
                 config.getInternalMcPort(),
-                -1); // no dedicated public port per instance; the multiplexer routes by hostname
+                config.getExternalMcPort()); // dedicated player-facing port proxied by the multiplexer
         this.console = console;
     }
 
@@ -136,6 +136,17 @@ public class MinecraftProcessManager {
             // fabric / quilt / forge / neoforge) before launching it.
             ServerInstaller.ensureServerInstalled(context.serverDir, context.serverJar,
                     context.installerCacheDir, context.minecraftVersion, context.loaderInfo);
+
+            // Pin the server to its internal port on loopback only: players reach
+            // it exclusively through the multiplexer, and internal ports never
+            // bind publicly or collide with the player-facing range.
+            Path propsFile = context.serverDir.resolve("server.properties");
+            ConfigService.ServerProperties props = Files.isRegularFile(propsFile)
+                    ? ConfigService.ServerProperties.load(propsFile)
+                    : new ConfigService.ServerProperties();
+            props.set("server-port", String.valueOf(context.mcPort));
+            props.set("server-ip", "127.0.0.1");
+            props.save(propsFile);
 
             List<String> command = new ArrayList<>();
             command.add(javaBin());

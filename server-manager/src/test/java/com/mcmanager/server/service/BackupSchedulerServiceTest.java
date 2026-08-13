@@ -30,7 +30,7 @@ class BackupSchedulerServiceTest {
     }
 
     private InstanceConfig newInstance(ServerInstanceManager manager) throws IOException {
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
         Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
         return cfg;
     }

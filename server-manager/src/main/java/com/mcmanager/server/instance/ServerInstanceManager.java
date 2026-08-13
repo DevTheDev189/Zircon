@@ -3,6 +3,7 @@ package com.mcmanager.server.instance;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.mcmanager.core.model.BillOfMaterials;
+import com.mcmanager.core.model.BomJson;
 import com.mcmanager.core.model.InstanceConfig;
 import com.mcmanager.server.process.ConsoleStreamHandler;
 import com.mcmanager.server.process.MinecraftProcessManager;
@@ -42,8 +43,26 @@ public class ServerInstanceManager {
     private static final Logger log = LoggerFactory.getLogger(ServerInstanceManager.class);
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    /** First automatically assigned internal MC port (incremented per instance). */
-    public static final int MC_PORT_BASE = 25566;
+    /** First automatically assigned internal MC port. Disjoint from the player-facing range. */
+    public static final int MC_PORT_BASE = 25700;
+
+    /** Lowest player-facing (external) port an instance can be assigned. */
+    public static final int EXTERNAL_PORT_BASE = 25565;
+
+    /** Highest player-facing (external) port an instance can be assigned. */
+    public static final int EXTERNAL_PORT_MAX = 25665;
+
+    /**
+     * Implemented by the TCP multiplexer so per-instance external ports are bound
+     * as instances are created, updated or deleted.
+     */
+    public interface PortBindingListener {
+        void onInstanceAdded(InstanceConfig config);
+
+        void onInstanceUpdated(InstanceConfig config);
+
+        void onInstanceRemoved(String instanceId);
+    }
 
     /** Standard Mojang eula.txt content; the server refuses to boot without it. */
     private static final String EULA_TEXT = """
@@ -61,12 +80,13 @@ public class ServerInstanceManager {
     /** Per-instance player sets, fed by each instance's own console stream. */
     private final Map<String, PlayerTracker> playerTrackers = new ConcurrentHashMap<>();
 
-    /**
-     * The instance whose data the client-facing legacy endpoints ({@code /bom},
+    /** The instance whose data the client-facing legacy endpoints ({@code /bom},
      * {@code /files/mods/*}) serve. Falls back to the first-created instance on
      * startup; starting an instance makes it the active one.
      */
     private volatile String activeInstanceId;
+
+    private volatile PortBindingListener portBindingListener;
 
     public ServerInstanceManager(Path dataDir, ConsoleStreamHandler console) throws IOException {
         this.dataDir = dataDir;
@@ -89,7 +109,7 @@ public class ServerInstanceManager {
     public synchronized InstanceConfig createInstance(String name, String mcVersion,
                                                       String loaderType, String loaderVersion) {
         InstanceConfig config = new InstanceConfig(name, mcVersion, loaderType, loaderVersion,
-                allocateNextPort());
+                allocateNextPort(), allocateNextExternalPort());
         try {
             Files.createDirectories(instanceDir(config.getId()));
             Files.createDirectories(instanceDir(config.getId()).resolve("mods"));
@@ -103,8 +123,13 @@ public class ServerInstanceManager {
             activeInstanceId = config.getId();
             log.info("Instance '{}' is now the active instance (first created)", name);
         }
-        log.info("Created instance '{}' ({} {} / loader {}, internal port {})",
-                name, mcVersion, loaderType, loaderVersion, config.getInternalMcPort());
+        PortBindingListener listener = portBindingListener;
+        if (listener != null) {
+            listener.onInstanceAdded(config);
+        }
+        log.info("Created instance '{}' ({} {} / loader {}, internal port {}, external port {})",
+                name, mcVersion, loaderType, loaderVersion, config.getInternalMcPort(),
+                config.getExternalMcPort());
         return config;
     }
 
@@ -154,6 +179,7 @@ public class ServerInstanceManager {
         InstanceConfig config = getInstance(instanceId);
         if (newName != null && !newName.isBlank()) {
             config.setName(newName);
+            syncBomTitle(instanceId, newName);
         }
         if (newJavaArgs != null) {
             config.setJavaArgs(sanitizeJavaArgs(newJavaArgs));
@@ -211,6 +237,9 @@ public class ServerInstanceManager {
         if (newMcVersion != null && !newMcVersion.isBlank()) config.setMinecraftVersion(newMcVersion);
         if (newLoaderVersion != null) config.setLoaderVersion(newLoaderVersion);
         saveInstanceToDisk(config);
+        if (newName != null && !newName.isBlank()) {
+            syncBomTitle(instanceId, newName);
+        }
 
         Path instanceDir = instanceDir(instanceId);
         BomService bom = new BomService(instanceDir.resolve("bom.json"),
@@ -230,6 +259,10 @@ public class ServerInstanceManager {
         }
         stopInstance(instanceId);
         instanceConfigs.remove(instanceId);
+        PortBindingListener listener = portBindingListener;
+        if (listener != null) {
+            listener.onInstanceRemoved(instanceId);
+        }
         if (instanceId.equals(activeInstanceId)) {
             activeInstanceId = pickDefaultActiveInstance();
             log.info("Active instance is now {}", activeInstanceId == null ? "none (legacy mode)" : activeInstanceId);
@@ -311,6 +344,43 @@ public class ServerInstanceManager {
         return activeProcesses.get(instanceId);
     }
 
+    /** Registers the component that binds per-instance external ports (the TCP multiplexer). */
+    public void setPortBindingListener(PortBindingListener listener) {
+        this.portBindingListener = listener;
+    }
+
+    /**
+     * Sets the instance's player-facing port manually (e.g. for reverse proxies).
+     * The port must be valid and unique — it cannot collide with another instance's
+     * external or internal port. The multiplexer rebinds immediately.
+     */
+    public synchronized void updateExternalPort(String instanceId, int port) {
+        InstanceConfig config = getInstance(instanceId);
+        if (port <= 0 || port > 65535) {
+            throw new IllegalArgumentException("Port must be between 1 and 65535");
+        }
+        for (InstanceConfig other : instanceConfigs.values()) {
+            if (other.getId().equals(instanceId)) {
+                continue;
+            }
+            if (other.getExternalMcPort() == port) {
+                throw new IllegalArgumentException(
+                        "Port " + port + " is already used by instance '" + other.getName() + "'");
+            }
+            if (other.getInternalMcPort() == port) {
+                throw new IllegalArgumentException(
+                        "Port " + port + " is already used internally by instance '" + other.getName() + "'");
+            }
+        }
+        config.setExternalMcPort(port);
+        saveInstanceToDisk(config);
+        PortBindingListener listener = portBindingListener;
+        if (listener != null) {
+            listener.onInstanceUpdated(config);
+        }
+        log.info("Instance '{}' external port -> {}", config.getName(), port);
+    }
+
     /** Resolves the instance whose id or (normalized) name matches a handshake hostname. */
     public InstanceConfig findByHostname(String hostname) {
         if (hostname == null || hostname.isBlank()) {
@@ -322,6 +392,16 @@ public class ServerInstanceManager {
                 return cfg;
             }
             if (normalizeName(cfg.getName()).equals(h)) {
+                return cfg;
+            }
+        }
+        return null;
+    }
+
+    /** @return the instance whose player-facing port matches, or {@code null}. */
+    public InstanceConfig findByExternalPort(int port) {
+        for (InstanceConfig cfg : instanceConfigs.values()) {
+            if (cfg.getExternalMcPort() == port) {
                 return cfg;
             }
         }
@@ -371,6 +451,22 @@ public class ServerInstanceManager {
                     InstanceConfig config = GSON.fromJson(Files.readString(cfgFile, StandardCharsets.UTF_8),
                             InstanceConfig.class);
                     if (config != null && config.getId() != null) {
+                        // Pre-external-port instances (externalMcPort missing/0) get a
+                        // player-facing port assigned and persisted on first load.
+                        if (config.getExternalMcPort() <= 0) {
+                            config.setExternalMcPort(allocateNextExternalPort());
+                            saveInstanceToDisk(config);
+                        }
+                        // Instances created before internal ports moved out of the
+                        // player-facing range may carry an internal port inside
+                        // [EXTERNAL_PORT_BASE..EXTERNAL_PORT_MAX] (e.g. 25566). Relocate
+                        // it so the MC process and a multiplexer external listener can
+                        // never fight over the same port.
+                        if (config.getInternalMcPort() >= EXTERNAL_PORT_BASE
+                                && config.getInternalMcPort() <= EXTERNAL_PORT_MAX) {
+                            config.setInternalMcPort(allocateNextPort());
+                            saveInstanceToDisk(config);
+                        }
                         instanceConfigs.put(config.getId(), config);
                         log.info("Loaded instance '{}' ({} {}, internal port {})",
                                 config.getName(), config.getMinecraftVersion(),
@@ -418,6 +514,29 @@ public class ServerInstanceManager {
         }
     }
 
+    /**
+     * Keeps the instance's published BOM title in sync with its (web-app) name.
+     * The BOM is what the client launcher displays, so renaming an instance in
+     * the admin UI must propagate to {@code bom.json}. A BOM that has not been
+     * created yet (it is written lazily on the first client connect) needs no
+     * update — its default title is built from the current name at that point.
+     */
+    private void syncBomTitle(String instanceId, String name) {
+        Path bomFile = instanceDir(instanceId).resolve("bom.json");
+        if (!Files.isRegularFile(bomFile)) {
+            return;
+        }
+        try {
+            BillOfMaterials bom = BomJson.fromJson(Files.readString(bomFile, StandardCharsets.UTF_8));
+            if (bom != null) {
+                bom.setServerTitle(name);
+                Files.writeString(bomFile, BomJson.toJson(bom), StandardCharsets.UTF_8);
+            }
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not update BOM title for instance '{}'", name, e);
+        }
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
@@ -435,6 +554,26 @@ public class ServerInstanceManager {
             }
         }
         return max + 1;
+    }
+
+    /**
+     * Picks the lowest free player-facing port in [EXTERNAL_PORT_BASE .. EXTERNAL_PORT_MAX].
+     * 25565 is the shared web/main port — only the first instance may own it, so later
+     * instances never reclaim it when it becomes free.
+     */
+    private int allocateNextExternalPort() {
+        int start = instanceConfigs.isEmpty() ? EXTERNAL_PORT_BASE : EXTERNAL_PORT_BASE + 1;
+        for (int port = start; port <= EXTERNAL_PORT_MAX; port++) {
+            final int candidate = port;
+            boolean used = instanceConfigs.values().stream()
+                    .anyMatch(cfg -> cfg.getExternalMcPort() == candidate);
+            if (!used) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("No free player-facing ports left in "
+                + start + "-" + EXTERNAL_PORT_MAX
+                + " (free a port manually or lower EXTERNAL_PORT_MAX)");
     }
 
     private static String normalizeName(String name) {

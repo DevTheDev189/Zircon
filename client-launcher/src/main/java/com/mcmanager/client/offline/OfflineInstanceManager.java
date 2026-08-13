@@ -79,7 +79,7 @@ public final class OfflineInstanceManager {
                                                  String loaderType, String loaderVersion) throws IOException {
         OfflineInstance instance = new OfflineInstance();
         instance.setId(UUID.randomUUID().toString());
-        instance.setName(name == null || name.isBlank() ? "New World" : name.trim());
+        instance.setName(name == null || name.isBlank() ? "New Instance" : name.trim());
         instance.setMinecraftVersion(mcVersion == null || mcVersion.isBlank() ? "1.20.4" : mcVersion.trim());
         instance.setModLoader(new ModLoaderInfo(
                 loaderType == null || loaderType.isBlank() ? "fabric" : loaderType.trim(),
@@ -130,6 +130,14 @@ public final class OfflineInstanceManager {
     /** @return the instance's {@code mods/} directory (does not create it). */
     public static Path modsDir(OfflineInstance instance) {
         return instanceDir(instance.getId()).resolve("mods");
+    }
+
+    /** Deletes a single mod jar from the instance's {@code mods/} folder. */
+    public static void deleteMod(OfflineInstance instance, String filename) throws IOException {
+        if (instance == null || instance.getId() == null || filename == null || filename.isBlank()) {
+            return;
+        }
+        Files.deleteIfExists(modsDir(instance).resolve(filename));
     }
 
     /** @return sorted list of {@code .jar} files in the instance's mods folder. */

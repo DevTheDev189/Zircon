@@ -9,9 +9,9 @@ import java.util.List;
 
 /**
  * Upserts a single "prefix + value" line in a Minecraft-style options file
- * ({@code options.txt} uses {@code key:value}, {@code optionsiris.txt} uses
- * {@code key=value} — the separator is just part of {@code prefix}), preserving
- * every other line. Shared by {@link MinecraftRunner} and {@code PackOptionsWriter}.
+ * ({@code options.txt} uses {@code key:value}, {@code config/iris.properties}
+ * uses {@code key=value} — the separator is just part of {@code prefix}),
+ * preserving every other line. Shared by {@link MinecraftRunner} and {@code PackOptionsWriter}.
  */
 final class OptionsFileUtil {
 

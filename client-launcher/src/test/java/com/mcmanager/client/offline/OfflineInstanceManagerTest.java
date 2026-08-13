@@ -32,7 +32,7 @@ class OfflineInstanceManagerTest {
     @Test
     void savesAndLoadsInstance() throws IOException {
         OfflineInstance created = OfflineInstanceManager.createInstance(
-                "Test World", "1.20.4", "fabric", "0.15.11");
+                "Test Instance", "1.20.4", "fabric", "0.15.11");
 
         assertTrue(Files.isRegularFile(
                 OfflineInstanceManager.instanceDir(created.getId()).resolve("instance.json")));
@@ -41,7 +41,7 @@ class OfflineInstanceManagerTest {
 
         List<OfflineInstance> loaded = OfflineInstanceManager.loadAll();
         assertEquals(1, loaded.size());
-        assertEquals("Test World", loaded.get(0).getName());
+        assertEquals("Test Instance", loaded.get(0).getName());
         assertEquals("1.20.4", loaded.get(0).getMinecraftVersion());
         assertEquals("fabric", loaded.get(0).getModLoader().getType());
         assertEquals("0.15.11", loaded.get(0).getModLoader().getVersion());
@@ -61,6 +61,32 @@ class OfflineInstanceManagerTest {
         assertEquals(2, modsList.size());
         assertEquals("a-mod.jar", modsList.get(0).getFileName().toString());
         assertEquals("b-mod.jar", modsList.get(1).getFileName().toString());
+    }
+
+    @Test
+    void deletesSingleModJar() throws IOException {
+        OfflineInstance instance = OfflineInstanceManager.createInstance(
+                "Modded", "1.20.4", "fabric", "0.15.11");
+        Path mods = OfflineInstanceManager.modsDir(instance);
+        Files.createDirectories(mods);
+        Files.writeString(mods.resolve("a-mod.jar"), "a");
+        Files.writeString(mods.resolve("b-mod.jar"), "b");
+
+        OfflineInstanceManager.deleteMod(instance, "a-mod.jar");
+
+        assertEquals(List.of("b-mod.jar"),
+                OfflineInstanceManager.listMods(instance).stream()
+                        .map(p -> p.getFileName().toString()).toList());
+    }
+
+    @Test
+    void deleteMissingModIsNoop() throws IOException {
+        OfflineInstance instance = OfflineInstanceManager.createInstance(
+                "Modded", "1.20.4", "fabric", "0.15.11");
+
+        OfflineInstanceManager.deleteMod(instance, "does-not-exist.jar");
+
+        assertTrue(OfflineInstanceManager.listMods(instance).isEmpty());
     }
 
     @Test

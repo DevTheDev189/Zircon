@@ -10,7 +10,7 @@ import com.mcmanager.client.offline.OfflineInstance;
 import com.mcmanager.client.offline.OfflineInstanceManager;
 import com.mcmanager.client.pack.ClientPackManager;
 import com.mcmanager.client.pack.PackSelection;
-import com.mcmanager.client.skin.DefaultSkinFactory;
+import com.mcmanager.client.skin.BundledSkins;
 import com.mcmanager.client.skin.MojangSkinService;
 import com.mcmanager.client.skin.SkinManager;
 import com.mcmanager.client.sync.ModSyncEngine;
@@ -34,6 +34,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
@@ -56,6 +57,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -64,12 +66,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * Controller driving the full Zircon launcher UI: Microsoft login overlay,
@@ -81,10 +89,6 @@ public class MainController {
     private static final Logger log = LoggerFactory.getLogger(MainController.class);
     private static final String DEFAULT_SERVER_PORT = "25565";
 
-    /** Gallery selection keys for the built-in default skins (not real files). */
-    private static final String SKIN_DEFAULT_STEVE = "default:steve";
-    private static final String SKIN_DEFAULT_ALEX = "default:alex";
-
     /** Offline packs combo value meaning "no shaderpack selected". */
     private static final String SHADERPACK_NONE = "None (shaders disabled)";
 
@@ -95,6 +99,12 @@ public class MainController {
             + "-fx-background-color: transparent; -fx-text-fill: #c9d1d9;";
     private static final String NAV_ACTIVE_STYLE = "-fx-font-size: 14px; -fx-padding: 10 14; -fx-background-radius: 8; "
             + "-fx-background-color: #21262d; -fx-text-fill: white; -fx-font-weight: bold;";
+    private static final String PLAY_BTN_STYLE = "-fx-background-color: #2da44e; -fx-text-fill: white; "
+            + "-fx-font-weight: bold; -fx-padding: 6 16; -fx-background-radius: 6;";
+    private static final String PLAY_BTN_BUSY_STYLE = "-fx-background-color: #1a7f37; -fx-text-fill: white; "
+            + "-fx-font-weight: bold; -fx-padding: 6 16; -fx-background-radius: 6; -fx-graphic-text-gap: 6;";
+    private static final String PLAY_BTN_DISABLED_STYLE = "-fx-background-color: #21262d; -fx-text-fill: #6e7681; "
+            + "-fx-font-weight: bold; -fx-padding: 6 16; -fx-background-radius: 6;";
 
     // Login overlay & global chrome
     private final Button loginButton;
@@ -135,7 +145,7 @@ public class MainController {
 
     // Offline instance controls
     private final VBox offlineInstancesContainer;
-    private final Button newWorldBtn;
+    private final Button newInstanceBtn;
     private final Label offlineDetailTitle;
     private final Label offlineVersionLabel;
     private final Label offlineLoaderLabel;
@@ -145,21 +155,25 @@ public class MainController {
     private final TextField modrinthQuery;
     private final Button modrinthSearchBtn;
     private final VBox modrinthResultsContainer;
-    private final ComboBox<String> offlineGameModeCombo;
-    private final CheckBox offlineAllowCheatsCheck;
     private final Button offlinePlayBtn;
     private final Button offlineDeleteBtn;
     private final ComboBox<String> offlineShaderpackCombo;
+    private final VBox offlineShaderpackList;
     private final VBox offlineResourcepackContainer;
     private final Button offlineAddShaderpackBtn;
     private final Button offlineAddResourcepackBtn;
+    private final TextField offlineShaderQuery;
+    private final Button offlineShaderSearchBtn;
+    private final VBox offlineShaderResultsContainer;
+    private final TextField offlineTextureQuery;
+    private final Button offlineTextureSearchBtn;
+    private final VBox offlineTextureResultsContainer;
 
     // Settings controls
     private final Slider ramSlider;
     private final Label ramLabel;
     private final CheckBox strictVerifyCheck;
     private final CheckBox trustDirectCheck;
-    private final TextField clientIdField;
 
     private final MicrosoftAuthService auth = new MicrosoftAuthService();
     private final ModSyncEngine syncEngine = new ModSyncEngine();
@@ -177,8 +191,22 @@ public class MainController {
     private volatile Process gameProcess;
     private volatile OfflineInstance selectedOfflineInstance;
 
+    /** Modrinth project ids with an install download in flight (shows row spinners). */
+    private final Set<String> installingProjects = ConcurrentHashMap.newKeySet();
+    private final AtomicInteger modSearchSeq = new AtomicInteger();
+    private final AtomicInteger shaderSearchSeq = new AtomicInteger();
+    private final AtomicInteger textureSearchSeq = new AtomicInteger();
+    private List<ModrinthApiClient.ModrinthSearchHit> modSearchHits = List.of();
+    private List<ModrinthApiClient.ModrinthSearchHit> shaderSearchHits = List.of();
+    private List<ModrinthApiClient.ModrinthSearchHit> textureSearchHits = List.of();
+
     /** Gallery selection: a {@link Path} string or one of the {@code SKIN_DEFAULT_*} keys. */
     private volatile String selectedSkinKey;
+
+    /** True while a server launch flow is running — PLAY buttons render busy. */
+    private volatile boolean launchingPlay;
+    /** True while a game process is alive — PLAY buttons render greyed out. */
+    private volatile boolean gameRunning;
 
     public MainController(Button loginButton, Label loginStatus, Node loginView, Node mainLayout,
                           Label userLabel, ImageView userAvatar, Button logoutButton,
@@ -191,17 +219,22 @@ public class MainController {
                           Player3DRenderer serverRenderer, Player3DRenderer skinsRenderer,
                           Button saveSkinBtn, Button removeSkinBtn, Label skinStatus,
                           TilePane skinsGalleryContainer,
-                          VBox offlineInstancesContainer, Button newWorldBtn,
+                          VBox offlineInstancesContainer, Button newInstanceBtn,
                           Label offlineDetailTitle, Label offlineVersionLabel,
                           Label offlineLoaderLabel, Label offlineLoaderVersionLabel,
                           VBox offlineModsContainer, VBox offlineDropZone,
                           TextField modrinthQuery, Button modrinthSearchBtn,
-                          VBox modrinthResultsContainer, ComboBox<String> offlineGameModeCombo,
-                          CheckBox offlineAllowCheatsCheck, Button offlinePlayBtn, Button offlineDeleteBtn,
-                          ComboBox<String> offlineShaderpackCombo, VBox offlineResourcepackContainer,
+                          VBox modrinthResultsContainer,
+                          Button offlinePlayBtn, Button offlineDeleteBtn,
+                          ComboBox<String> offlineShaderpackCombo, VBox offlineShaderpackList,
+                          VBox offlineResourcepackContainer,
                           Button offlineAddShaderpackBtn, Button offlineAddResourcepackBtn,
+                          TextField offlineShaderQuery, Button offlineShaderSearchBtn,
+                          VBox offlineShaderResultsContainer,
+                          TextField offlineTextureQuery, Button offlineTextureSearchBtn,
+                          VBox offlineTextureResultsContainer,
                           Slider ramSlider, Label ramLabel, CheckBox strictVerifyCheck,
-                          CheckBox trustDirectCheck, TextField clientIdField) {
+                          CheckBox trustDirectCheck) {
         this.loginButton = loginButton;
         this.loginStatus = loginStatus;
         this.loginView = loginView;
@@ -235,7 +268,7 @@ public class MainController {
         this.skinsGalleryContainer = skinsGalleryContainer;
 
         this.offlineInstancesContainer = offlineInstancesContainer;
-        this.newWorldBtn = newWorldBtn;
+        this.newInstanceBtn = newInstanceBtn;
         this.offlineDetailTitle = offlineDetailTitle;
         this.offlineVersionLabel = offlineVersionLabel;
         this.offlineLoaderLabel = offlineLoaderLabel;
@@ -245,20 +278,24 @@ public class MainController {
         this.modrinthQuery = modrinthQuery;
         this.modrinthSearchBtn = modrinthSearchBtn;
         this.modrinthResultsContainer = modrinthResultsContainer;
-        this.offlineGameModeCombo = offlineGameModeCombo;
-        this.offlineAllowCheatsCheck = offlineAllowCheatsCheck;
         this.offlinePlayBtn = offlinePlayBtn;
         this.offlineDeleteBtn = offlineDeleteBtn;
         this.offlineShaderpackCombo = offlineShaderpackCombo;
+        this.offlineShaderpackList = offlineShaderpackList;
         this.offlineResourcepackContainer = offlineResourcepackContainer;
         this.offlineAddShaderpackBtn = offlineAddShaderpackBtn;
         this.offlineAddResourcepackBtn = offlineAddResourcepackBtn;
+        this.offlineShaderQuery = offlineShaderQuery;
+        this.offlineShaderSearchBtn = offlineShaderSearchBtn;
+        this.offlineShaderResultsContainer = offlineShaderResultsContainer;
+        this.offlineTextureQuery = offlineTextureQuery;
+        this.offlineTextureSearchBtn = offlineTextureSearchBtn;
+        this.offlineTextureResultsContainer = offlineTextureResultsContainer;
 
         this.ramSlider = ramSlider;
         this.ramLabel = ramLabel;
         this.strictVerifyCheck = strictVerifyCheck;
         this.trustDirectCheck = trustDirectCheck;
-        this.clientIdField = clientIdField;
     }
 
     public void init() {
@@ -277,6 +314,7 @@ public class MainController {
         addServerBtn.setOnAction(e -> promptAddServer());
         populateServerList();
         populateRecommendedServers();
+        refreshSavedServerNames();
 
         // Skins
         refreshPlayerSkins();
@@ -287,11 +325,9 @@ public class MainController {
 
         // Offline instances
         populateOfflineInstances();
-        newWorldBtn.setOnAction(e -> promptNewWorld());
+        newInstanceBtn.setOnAction(e -> promptNewInstance());
         offlinePlayBtn.setOnAction(e -> handleOfflinePlay());
         offlineDeleteBtn.setOnAction(e -> handleOfflineDelete());
-        offlineGameModeCombo.setOnAction(e -> persistOfflineSettings());
-        offlineAllowCheatsCheck.setOnAction(e -> persistOfflineSettings());
         offlineDropZone.setOnMouseClicked(this::browseOfflineMods);
         offlineDropZone.setOnDragOver(this::onOfflineDragOver);
         offlineDropZone.setOnDragDropped(this::onOfflineDrop);
@@ -302,6 +338,10 @@ public class MainController {
         offlineShaderpackCombo.setOnAction(e -> persistOfflineShaderpack());
         offlineAddShaderpackBtn.setOnAction(e -> handleOfflineAddPack(true));
         offlineAddResourcepackBtn.setOnAction(e -> handleOfflineAddPack(false));
+        offlineShaderSearchBtn.setOnAction(e -> handleShaderSearch());
+        offlineShaderQuery.setOnAction(e -> handleShaderSearch());
+        offlineTextureSearchBtn.setOnAction(e -> handleTextureSearch());
+        offlineTextureQuery.setOnAction(e -> handleTextureSearch());
 
         // Settings
         ramSlider.valueProperty().addListener((obs, oldVal, newVal) ->
@@ -446,6 +486,62 @@ public class MainController {
         }
     }
 
+    /**
+     * Re-fetches each saved server's BOM title in the background and updates the
+     * recorded name, so "Your Servers" shows the server's real name (the one its
+     * owner set in the web app) even when it was saved under a placeholder like
+     * "Custom Server". Runs on a virtual thread; unreachable servers keep their
+     * current name and the UI is never blocked.
+     */
+    private void refreshSavedServerNames() {
+        List<SavedServer> saved = SavedServer.load();
+        if (saved.isEmpty()) {
+            return;
+        }
+        Thread.ofVirtual().name("server-name-refresh").start(() -> {
+            boolean changed = false;
+            for (SavedServer s : saved) {
+                try {
+                    String[] hostPort = parseServerAddress(s.getAddress());
+                    String title = fetchBomTitle("http://" + hostPort[0] + ":" + hostPort[1]);
+                    if (title != null && !title.isBlank() && !title.equals(s.getName())) {
+                        s.setName(title.trim());
+                        changed = true;
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not refresh name for {}: {}", s.getAddress(), e.getMessage());
+                }
+            }
+            if (changed) {
+                SavedServer.save(saved);
+                Platform.runLater(this::populateServerList);
+            }
+        });
+    }
+
+    /**
+     * Fetches just the title advertised by {@code GET /bom} with a short connect
+     * timeout, so a background name refresh never stalls on an unreachable host.
+     * Returns {@code null} when the server is unreachable or has no title.
+     */
+    private String fetchBomTitle(String baseUrl) throws IOException, InterruptedException {
+        java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(3))
+                .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+                .build();
+        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(baseUrl + "/bom"))
+                .GET()
+                .build();
+        java.net.http.HttpResponse<String> response = client.send(request,
+                java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() / 100 != 2) {
+            return null;
+        }
+        BillOfMaterials bom = BomJson.fromJson(response.body());
+        return bom == null ? null : bom.getServerTitle();
+    }
+
     private HBox createSavedServerCard(SavedServer server) {
         Label badge = serverBadge(server.getName());
         Label nameLbl = new Label(server.getName());
@@ -460,7 +556,16 @@ public class MainController {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Button playBtn = new Button("PLAY");
-        playBtn.setStyle("-fx-background-color: #2da44e; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 6 16;");
+        if (launchingPlay) {
+            playBtn.setDisable(true);
+            playBtn.setStyle(PLAY_BTN_BUSY_STYLE);
+            playBtn.setGraphic(spinner(14));
+        } else if (gameRunning) {
+            playBtn.setDisable(true);
+            playBtn.setStyle(PLAY_BTN_DISABLED_STYLE);
+        } else {
+            playBtn.setStyle(PLAY_BTN_STYLE);
+        }
         playBtn.setOnAction(e -> launchServer(server.getName(), server.getAddress()));
 
         HBox card = new HBox(12, badge, text, spacer, playBtn);
@@ -541,7 +646,10 @@ public class MainController {
     private void refreshPlayerSkins() {
         Image active = SkinManager.loadActiveSkinImage();
         if (active == null) {
-            active = DefaultSkinFactory.steve();
+            active = BundledSkins.fallback().map(BundledSkins.Skin::image).orElse(null);
+        }
+        if (active == null) {
+            return; // no custom skin and no bundled defaults — nothing to preview
         }
         serverRenderer.updateSkin(active);
         skinsRenderer.updateSkin(active);
@@ -551,10 +659,15 @@ public class MainController {
     private void populateSkinsGallery() {
         skinsGalleryContainer.getChildren().clear();
         skinsGalleryContainer.getChildren().add(skinCardAdd());
-        skinsGalleryContainer.getChildren().add(skinCard(DefaultSkinFactory.steve(), "Steve",
-                SKIN_DEFAULT_STEVE, () -> selectDefaultSkin(false)));
-        skinsGalleryContainer.getChildren().add(skinCard(DefaultSkinFactory.alex(), "Alex",
-                SKIN_DEFAULT_ALEX, () -> selectDefaultSkin(true)));
+        // Bundled defaults: every PNG shipped in the skins/ resources folder.
+        for (BundledSkins.Skin skin : BundledSkins.all()) {
+            String key = BundledSkins.key(skin.fileName());
+            skinsGalleryContainer.getChildren().add(skinCard(skin.image(), skin.label(),
+                    key, () -> selectSkin(key)));
+        }
+
+        Image activeImage = SkinManager.loadActiveSkinImage();
+        boolean activeInHistory = false;
         for (Path path : SkinManager.getSkinHistory()) {
             Image skin = SkinManager.loadImage(path);
             if (skin == null) {
@@ -562,8 +675,45 @@ public class MainController {
             }
             skinsGalleryContainer.getChildren().add(skinCard(skin, path.getFileName().toString(),
                     path.toString(), () -> selectSkinFile(path)));
+            if (activeImage != null && sameImage(skin, activeImage)) {
+                activeInHistory = true;
+            }
         }
+        // The active skin is not part of history (e.g. it was synced straight from
+        // Mojang), so surface it as its own card — otherwise the equipped skin
+        // could never be highlighted in the gallery.
+        if (activeImage != null && !activeInHistory) {
+            Path active = SkinManager.getActiveSkinPath();
+            skinsGalleryContainer.getChildren().add(skinCard(activeImage, "Current Skin",
+                    active.toString(), () -> selectSkinFile(active)));
+        }
+
+        selectedSkinKey = resolveActiveSkinKey();
         updateSelectionHighlight();
+    }
+
+    /**
+     * Resolves the gallery key of the currently equipped skin so it gets the
+     * selection highlight every time the Skins tab is opened: the matching
+     * history card, the active-skin card, or the first bundled default when no
+     * custom skin is set.
+     */
+    private String resolveActiveSkinKey() {
+        if (!SkinManager.hasCustomSkin()) {
+            return BundledSkins.fallback()
+                    .map(s -> BundledSkins.key(s.fileName()))
+                    .orElse(null);
+        }
+        Image active = SkinManager.loadActiveSkinImage();
+        if (active != null) {
+            for (Path path : SkinManager.getSkinHistory()) {
+                Image skin = SkinManager.loadImage(path);
+                if (skin != null && sameImage(skin, active)) {
+                    return path.toString();
+                }
+            }
+        }
+        return SkinManager.getActiveSkinPath().toString();
     }
 
     /** The "Add Skin" tile: imports a PNG into the gallery history and selects it. */
@@ -628,13 +778,12 @@ public class MainController {
     }
 
     /**
-     * The Remove button is only usable when a non-default skin that is not the
-     * currently active skin is selected.
+     * The Remove button is only usable when a non-bundled skin that is not the
+     * currently active skin is selected (bundled defaults can't be removed).
      */
     private void updateSkinActionStates() {
         boolean removable = selectedSkinKey != null
-                && !SKIN_DEFAULT_STEVE.equals(selectedSkinKey)
-                && !SKIN_DEFAULT_ALEX.equals(selectedSkinKey)
+                && !BundledSkins.isBundled(selectedSkinKey)
                 && !isActiveSkin(selectedSkinKey);
         removeSkinBtn.setDisable(!removable);
     }
@@ -670,28 +819,21 @@ public class MainController {
         return true;
     }
 
-    /** Pre-selects the active skin (or Steve) when the gallery first opens. */
+    /** Pre-selects the active skin (or the first bundled default) when the gallery first opens. */
     private void initSkinSelection() {
         selectedSkinKey = SkinManager.hasCustomSkin()
                 ? SkinManager.getActiveSkinPath().toString()
-                : SKIN_DEFAULT_STEVE;
+                : BundledSkins.fallback().map(s -> BundledSkins.key(s.fileName())).orElse(null);
     }
 
-    private void applyDefaultSkin(boolean alex) {
-        SkinManager.resetSkin();
-        Image image = alex ? DefaultSkinFactory.alex() : DefaultSkinFactory.steve();
-        serverRenderer.updateSkin(image);
-        skinsRenderer.updateSkin(image);
-        userAvatar.setImage(SkinManager.extractHeadIconScaled(image, 4));
-        skinStatus.setText("Active Skin: Default " + (alex ? "Alex" : "Steve"));
-    }
-
-    /** Previews a default skin in all previews without persisting (SAVE commits). */
-    private void selectDefaultSkin(boolean alex) {
-        Image image = alex ? DefaultSkinFactory.alex() : DefaultSkinFactory.steve();
-        serverRenderer.updateSkin(image);
-        skinsRenderer.updateSkin(image);
-        skinStatus.setText("Preview: Default " + (alex ? "Alex" : "Steve") + " — press SAVE to activate.");
+    /** Previews a bundled default skin in all previews without persisting (SAVE commits). */
+    private void selectSkin(String key) {
+        BundledSkins.byKey(key).ifPresent(skin -> {
+            Image image = skin.image();
+            serverRenderer.updateSkin(image);
+            skinsRenderer.updateSkin(image);
+            skinStatus.setText("Preview: " + skin.label() + " — press SAVE to activate.");
+        });
     }
 
     /** Previews a skin file in all previews without persisting (SAVE commits). */
@@ -712,8 +854,7 @@ public class MainController {
      */
     private void handleRemoveSkin() {
         if (selectedSkinKey == null
-                || SKIN_DEFAULT_STEVE.equals(selectedSkinKey)
-                || SKIN_DEFAULT_ALEX.equals(selectedSkinKey)
+                || BundledSkins.isBundled(selectedSkinKey)
                 || isActiveSkin(selectedSkinKey)) {
             return;
         }
@@ -739,21 +880,16 @@ public class MainController {
 
     /**
      * SAVE: persists the selected skin locally and, when signed in, uploads it to
-     * Mojang so it follows the player everywhere. Default selections just reset
-     * the local active skin (there is nothing to upload).
+     * Mojang so it follows the player everywhere. Bundled defaults are real PNGs,
+     * so they are copied to the active skin just like any other file skin.
      */
     private void handleSaveSkin() {
         if (selectedSkinKey == null) {
             status("Select a skin first.");
             return;
         }
-        if (SKIN_DEFAULT_STEVE.equals(selectedSkinKey)) {
-            applyDefaultSkin(false);
-            updateSkinActionStates();
-            return;
-        }
-        if (SKIN_DEFAULT_ALEX.equals(selectedSkinKey)) {
-            applyDefaultSkin(true);
+        if (BundledSkins.isBundled(selectedSkinKey)) {
+            BundledSkins.byKey(selectedSkinKey).ifPresent(this::activateBundledSkin);
             updateSkinActionStates();
             return;
         }
@@ -764,6 +900,26 @@ public class MainController {
         }
         saveAndUploadSkin(file);
         updateSkinActionStates();
+    }
+
+    /** Copies a bundled default skin PNG to the active local skin, then uploads to Mojang. */
+    private void activateBundledSkin(BundledSkins.Skin skin) {
+        try (InputStream in = BundledSkins.open(skin)) {
+            if (in == null) {
+                status("Bundled skin file missing: " + skin.fileName());
+                return;
+            }
+            Files.createDirectories(SkinManager.getActiveSkinPath().getParent());
+            Files.copy(in, SkinManager.getActiveSkinPath(), StandardCopyOption.REPLACE_EXISTING);
+            refreshPlayerSkins();
+            skinStatus.setText("Active Skin: " + skin.label());
+            status("Skin saved locally.");
+        } catch (IOException e) {
+            log.warn("Failed to activate bundled skin", e);
+            status("Failed to save skin: " + e.getMessage());
+            return;
+        }
+        uploadActiveSkin();
     }
 
     /** Copies the selected skin to the active local skin, then uploads to Mojang. */
@@ -779,7 +935,11 @@ public class MainController {
             status("Failed to save skin: " + e.getMessage());
             return;
         }
+        uploadActiveSkin();
+    }
 
+    /** Uploads the active skin file to Mojang when signed in; no-op otherwise. */
+    private void uploadActiveSkin() {
         if (session == null || session.getAccessToken() == null || session.getAccessToken().isBlank()) {
             status("Skin saved locally — sign in to also upload it to Mojang.");
             return;
@@ -787,7 +947,7 @@ public class MainController {
         Thread.ofVirtual().name("mojang-skin-save").start(() -> {
             try {
                 SessionData fresh = ensureFreshSession();
-                MojangSkinService.upload(fresh.getAccessToken(), file, "classic");
+                MojangSkinService.upload(fresh.getAccessToken(), SkinManager.getActiveSkinPath(), "classic");
                 Platform.runLater(() -> status("Skin saved & uploaded to Mojang."));
             } catch (Exception e) {
                 log.warn("Mojang skin upload failed", e);
@@ -879,11 +1039,7 @@ public class MainController {
         versionBadge.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; "
                 + "-fx-font-size: 10px; -fx-padding: 2 6; -fx-background-radius: 6;");
 
-        Label gameModeBadge = new Label(defaultString(instance.getGameMode(), "survival"));
-        gameModeBadge.setStyle("-fx-background-color: #21262d; -fx-text-fill: #2da44e; "
-                + "-fx-font-size: 10px; -fx-padding: 2 6; -fx-background-radius: 6;");
-
-        HBox badges = new HBox(6, versionBadge, gameModeBadge);
+        HBox badges = new HBox(6, versionBadge);
         VBox text = new VBox(4, nameLbl, badges);
 
         Region spacer = new Region();
@@ -927,15 +1083,14 @@ public class MainController {
     private void renderOfflineDetail(OfflineInstance instance) {
         selectedOfflineInstance = instance;
         if (instance == null) {
-            offlineDetailTitle.setText("Select a world");
+            offlineDetailTitle.setText("Select an instance");
             offlineVersionLabel.setText("Minecraft: —");
             offlineLoaderLabel.setText("Loader: —");
             offlineLoaderVersionLabel.setText("Loader version: —");
             offlineModsContainer.getChildren().clear();
-            offlineGameModeCombo.setValue("survival");
-            offlineAllowCheatsCheck.setSelected(false);
             offlineShaderpackCombo.getItems().clear();
             offlineShaderpackCombo.setValue(null);
+            offlineShaderpackList.getChildren().clear();
             offlineResourcepackContainer.getChildren().clear();
             offlinePlayBtn.setDisable(true);
             offlineDeleteBtn.setDisable(true);
@@ -946,8 +1101,6 @@ public class MainController {
         offlineVersionLabel.setText("Minecraft: " + instance.getMinecraftVersion());
         offlineLoaderLabel.setText("Loader: " + instance.getModLoader().getType());
         offlineLoaderVersionLabel.setText("Loader version: " + defaultString(instance.getModLoader().getVersion(), ""));
-        offlineGameModeCombo.setValue(defaultString(instance.getGameMode(), "survival"));
-        offlineAllowCheatsCheck.setSelected(instance.isAllowCheats());
         offlinePlayBtn.setDisable(false);
         offlineDeleteBtn.setDisable(false);
         renderOfflineMods(instance);
@@ -962,29 +1115,39 @@ public class MainController {
             return;
         }
         for (Path mod : mods) {
-            Label name = new Label(mod.getFileName().toString());
-            name.setStyle("-fx-font-size: 12px; -fx-text-fill: #c9d1d9;");
-            offlineModsContainer.getChildren().add(name);
+            offlineModsContainer.getChildren().add(createInstalledModRow(mod.getFileName().toString()));
         }
     }
 
-    private void persistOfflineSettings() {
+    /** A single installed mod row: filename + delete button. */
+    private HBox createInstalledModRow(String filename) {
+        Label name = new Label(filename);
+        name.setStyle("-fx-font-size: 12px; -fx-text-fill: #c9d1d9;");
+        name.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(name, Priority.ALWAYS);
+        HBox row = new HBox(8, name, createDeleteButton(() -> deleteInstalledMod(filename)));
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+
+    private void deleteInstalledMod(String filename) {
         OfflineInstance instance = selectedOfflineInstance;
         if (instance == null) {
             return;
         }
-        instance.setGameMode(offlineGameModeCombo.getValue());
-        instance.setAllowCheats(offlineAllowCheatsCheck.isSelected());
         try {
-            OfflineInstanceManager.save(instance);
+            OfflineInstanceManager.deleteMod(instance, filename);
+            renderOfflineMods(instance);
+            status("Removed " + filename);
         } catch (IOException e) {
-            status("Could not save world settings: " + e.getMessage());
+            status("Could not remove " + filename + ": " + e.getMessage());
         }
     }
 
     /**
-     * Fills the offline shaderpack combo and texture-pack checkboxes from the
-     * instance's {@code pack-selection.json} and local pack folders.
+     * Fills the offline shaderpack combo, the installed shaderpack list and the
+     * texture-pack rows (enable checkbox + delete) from the instance's
+     * {@code pack-selection.json} and local pack folders.
      */
     private void renderOfflinePacks(OfflineInstance instance) {
         Path gameDir = OfflineInstanceManager.instanceDir(instance.getId());
@@ -996,15 +1159,27 @@ public class MainController {
         boolean shadersOn = selection.isShadersEnabled() && selection.getActiveShaderpack() != null;
         offlineShaderpackCombo.setValue(shadersOn ? selection.getActiveShaderpack() : SHADERPACK_NONE);
 
+        offlineShaderpackList.getChildren().clear();
+        List<String> shaderpacks = listPackFiles(gameDir.resolve("shaderpacks"));
+        if (shaderpacks.isEmpty()) {
+            offlineShaderpackList.getChildren().add(infoLabel("No shaderpacks installed."));
+        } else {
+            for (String filename : shaderpacks) {
+                offlineShaderpackList.getChildren().add(createInstalledPackRow(filename, true));
+            }
+        }
+
         offlineResourcepackContainer.getChildren().clear();
         List<String> packs = listPackFiles(gameDir.resolve("resourcepacks"));
         if (packs.isEmpty()) {
-            offlineResourcepackContainer.getChildren().add(infoLabel("No texture packs added."));
+            offlineResourcepackContainer.getChildren().add(infoLabel("No texture packs installed."));
         } else {
             for (String filename : packs) {
                 CheckBox cb = new CheckBox(filename);
                 cb.setStyle("-fx-text-fill: #c9d1d9; -fx-font-size: 12px;");
                 cb.setSelected(selection.getActiveResourcepacks().contains(filename));
+                cb.setMaxWidth(Double.MAX_VALUE);
+                HBox.setHgrow(cb, Priority.ALWAYS);
                 cb.setOnAction(e -> {
                     if (cb.isSelected()) {
                         if (!selection.getActiveResourcepacks().contains(filename)) {
@@ -1015,8 +1190,49 @@ public class MainController {
                     }
                     selection.save(gameDir);
                 });
-                offlineResourcepackContainer.getChildren().add(cb);
+                HBox row = new HBox(8, cb, createDeleteButton(() -> deleteInstalledPack(filename, false)));
+                row.setAlignment(Pos.CENTER_LEFT);
+                offlineResourcepackContainer.getChildren().add(row);
             }
+        }
+    }
+
+    /** A single installed pack row: filename + delete button. */
+    private HBox createInstalledPackRow(String filename, boolean shader) {
+        Label name = new Label(filename);
+        name.setStyle("-fx-font-size: 12px; -fx-text-fill: #c9d1d9;");
+        name.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(name, Priority.ALWAYS);
+        HBox row = new HBox(8, name, createDeleteButton(() -> deleteInstalledPack(filename, shader)));
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+
+    /** Small red "✕" button that runs {@code action}. */
+    private static Button createDeleteButton(Runnable action) {
+        Button btn = new Button("✕");
+        btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #f85149; -fx-font-size: 12px; -fx-padding: 0 6; -fx-cursor: hand;");
+        btn.setOnAction(e -> action.run());
+        return btn;
+    }
+
+    private void deleteInstalledPack(String filename, boolean shader) {
+        OfflineInstance instance = selectedOfflineInstance;
+        if (instance == null) {
+            return;
+        }
+        try {
+            Path gameDir = OfflineInstanceManager.instanceDir(instance.getId());
+            PackSelection selection = PackSelection.load(gameDir);
+            if (shader) {
+                ClientPackManager.removeShaderpack(gameDir, filename, selection);
+            } else {
+                ClientPackManager.removeResourcepack(gameDir, filename, selection);
+            }
+            renderOfflinePacks(instance);
+            status("Removed " + filename);
+        } catch (IOException e) {
+            status("Could not remove " + filename + ": " + e.getMessage());
         }
     }
 
@@ -1039,11 +1255,11 @@ public class MainController {
         selection.save(gameDir);
     }
 
-    /** Adds local {@code .zip} shaderpacks/resourcepacks to the selected offline world. */
+    /** Adds local {@code .zip} shaderpacks/resourcepacks to the selected offline instance. */
     private void handleOfflineAddPack(boolean shader) {
         OfflineInstance instance = selectedOfflineInstance;
         if (instance == null) {
-            status("Select a world first.");
+            status("Select an instance first.");
             return;
         }
         FileChooser chooser = new FileChooser();
@@ -1070,10 +1286,30 @@ public class MainController {
         }
     }
 
-    private void promptNewWorld() {
+    /** Loader types the launcher can actually launch, in display order. */
+    private static final LinkedHashMap<String, String> SUPPORTED_LOADERS = new LinkedHashMap<>();
+
+    static {
+        SUPPORTED_LOADERS.put("vanilla", "Vanilla");
+        SUPPORTED_LOADERS.put("fabric", "Fabric");
+        SUPPORTED_LOADERS.put("forge", "Forge");
+        SUPPORTED_LOADERS.put("neoforge", "NeoForge");
+        SUPPORTED_LOADERS.put("quilt", "Quilt");
+    }
+
+    private static String loaderValue(String displayName) {
+        for (Map.Entry<String, String> entry : SUPPORTED_LOADERS.entrySet()) {
+            if (entry.getValue().equals(displayName)) {
+                return entry.getKey();
+            }
+        }
+        return displayName == null ? null : displayName.toLowerCase(Locale.ROOT);
+    }
+
+    private void promptNewInstance() {
         Dialog<OfflineInstance> dialog = new Dialog<>();
-        dialog.setTitle("New Offline World");
-        dialog.setHeaderText("Create a new offline Minecraft world");
+        dialog.setTitle("New Offline Instance");
+        dialog.setHeaderText("Create a new offline Minecraft instance");
 
         ButtonType createType = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(createType, ButtonType.CANCEL);
@@ -1083,30 +1319,83 @@ public class MainController {
         grid.setVgap(10);
         grid.setPadding(new Insets(20));
 
-        TextField nameField = new TextField("My World");
-        TextField versionField = new TextField("1.20.4");
+        TextField nameField = new TextField("My Instance");
+        ComboBox<String> versionCombo = new ComboBox<>();
+        versionCombo.setEditable(true);
+        versionCombo.setPrefWidth(200);
+        versionCombo.setPromptText("Loading versions…");
         ComboBox<String> loaderCombo = new ComboBox<>();
-        loaderCombo.getItems().addAll("fabric", "forge", "neoforge", "quilt");
-        loaderCombo.setValue("fabric");
-        TextField loaderVersionField = new TextField("0.15.11");
+        loaderCombo.setPrefWidth(200);
+        loaderCombo.setPromptText("Loading loaders…");
+        TextField loaderVersionField = new TextField();
+        loaderVersionField.setPrefWidth(200);
+        loaderVersionField.setPromptText("e.g. 0.15.11");
 
         grid.add(new Label("Name:"), 0, 0);
         grid.add(nameField, 1, 0);
         grid.add(new Label("Minecraft:"), 0, 1);
-        grid.add(versionField, 1, 1);
+        grid.add(versionCombo, 1, 1);
         grid.add(new Label("Loader:"), 0, 2);
         grid.add(loaderCombo, 1, 2);
         grid.add(new Label("Loader version:"), 0, 3);
         grid.add(loaderVersionField, 1, 3);
         dialog.getDialogPane().setContent(grid);
 
+        // Minecraft versions (Modrinth tag endpoint, releases only).
+        Thread.ofVirtual().name("modrinth-versions").start(() -> {
+            try {
+                List<String> versions = modrinth.listGameVersions();
+                Platform.runLater(() -> {
+                    versionCombo.getItems().setAll(versions);
+                    if (versions.contains("1.20.4")) {
+                        versionCombo.setValue("1.20.4");
+                    } else if (!versions.isEmpty()) {
+                        versionCombo.setValue(versions.get(0));
+                    } else {
+                        versionCombo.setPromptText("No versions available");
+                    }
+                });
+            } catch (Exception e) {
+                log.warn("Could not fetch Minecraft versions from Modrinth", e);
+                // Leave the combo editable so the user can still type a version.
+                Platform.runLater(() -> versionCombo.setPromptText("Couldn't load versions — type one"));
+            }
+        });
+
+        // Loaders (Modrinth tag endpoint, filtered to what this launcher can run).
+        Thread.ofVirtual().name("modrinth-loaders").start(() -> {
+            try {
+                List<String> modrinthLoaders = modrinth.listLoaders();
+                Platform.runLater(() -> {
+                    List<String> items = new ArrayList<>();
+                    for (Map.Entry<String, String> entry : SUPPORTED_LOADERS.entrySet()) {
+                        if ("vanilla".equals(entry.getKey()) || modrinthLoaders.contains(entry.getKey())) {
+                            items.add(entry.getValue());
+                        }
+                    }
+                    loaderCombo.getItems().setAll(items);
+                    if (items.contains("Fabric")) {
+                        loaderCombo.setValue("Fabric");
+                    } else if (!items.isEmpty()) {
+                        loaderCombo.setValue(items.get(0));
+                    }
+                });
+            } catch (Exception e) {
+                log.warn("Could not fetch loaders from Modrinth", e);
+                Platform.runLater(() -> {
+                    loaderCombo.getItems().setAll(SUPPORTED_LOADERS.values());
+                    loaderCombo.setValue("Fabric");
+                });
+            }
+        });
+
         dialog.setResultConverter(btn -> {
             if (btn == createType) {
                 OfflineInstance draft = new OfflineInstance();
                 draft.setName(nameField.getText());
-                draft.setMinecraftVersion(versionField.getText());
+                draft.setMinecraftVersion(versionCombo.getValue());
                 draft.setModLoader(new ModLoaderInfo(
-                        loaderCombo.getValue(), loaderVersionField.getText(), ""));
+                        loaderValue(loaderCombo.getValue()), loaderVersionField.getText(), ""));
                 return draft;
             }
             return null;
@@ -1121,7 +1410,7 @@ public class MainController {
                 populateOfflineInstances();
                 status("Created " + instance.getName());
             } catch (IOException e) {
-                status("Failed to create world: " + e.getMessage());
+                status("Failed to create instance: " + e.getMessage());
             }
         });
     }
@@ -1129,16 +1418,17 @@ public class MainController {
     private void handleOfflinePlay() {
         OfflineInstance instance = selectedOfflineInstance;
         if (instance == null) {
-            status("Select a world first.");
+            status("Select an instance first.");
             return;
         }
         if (gameProcess != null && gameProcess.isAlive()) {
             gameProcess.destroy();
             status("Game process stopped.");
             gameProcess = null;
+            gameRunning = false;
+            populateServerList();
             return;
         }
-        persistOfflineSettings();
         if (busy.compareAndSet(false, true)) {
             setBusyUi(true);
             Thread.ofVirtual().name("offline-launch").start(() -> launchOfflineFlow(instance));
@@ -1155,10 +1445,12 @@ public class MainController {
             Path gameDir = OfflineInstanceManager.instanceDir(instance.getId());
             Files.createDirectories(gameDir);
 
-            status("Starting offline world '" + instance.getName() + "'...");
+            status("Starting offline instance '" + instance.getName() + "'...");
             String playerName = (session != null && session.getUsername() != null && !session.getUsername().isBlank())
                     ? session.getUsername() : "Player";
             gameProcess = runner.launchOffline(launchData, playerName, instance.getJavaArgs(), gameDir, null);
+            gameRunning = true;
+            Platform.runLater(() -> populateServerList());
 
             instance.setLastPlayed(System.currentTimeMillis());
             try {
@@ -1172,7 +1464,11 @@ public class MainController {
                 try {
                     int code = gameProcess.waitFor();
                     gameProcess = null;
-                    Platform.runLater(() -> status("Game exited (code " + code + ")."));
+                    gameRunning = false;
+                    Platform.runLater(() -> {
+                        status("Game exited (code " + code + ").");
+                        populateServerList();
+                    });
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -1195,7 +1491,7 @@ public class MainController {
         }
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
                 "Delete '" + instance.getName() + "' and all of its files?", ButtonType.YES, ButtonType.NO);
-        confirm.setTitle("Delete Offline World");
+        confirm.setTitle("Delete Offline Instance");
         confirm.setHeaderText(null);
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.YES) {
@@ -1233,7 +1529,7 @@ public class MainController {
     private void browseOfflineMods(MouseEvent event) {
         OfflineInstance instance = selectedOfflineInstance;
         if (instance == null) {
-            status("Select a world first.");
+            status("Select an instance first.");
             return;
         }
         FileChooser chooser = new FileChooser();
@@ -1270,7 +1566,7 @@ public class MainController {
     private void handleModrinthSearch() {
         OfflineInstance instance = selectedOfflineInstance;
         if (instance == null) {
-            status("Select a world first.");
+            status("Select an instance first.");
             return;
         }
         String query = modrinthQuery.getText();
@@ -1278,16 +1574,25 @@ public class MainController {
             status("Enter a mod name to search.");
             return;
         }
+        int seq = modSearchSeq.incrementAndGet();
         modrinthSearchBtn.setDisable(true);
         modrinthResultsContainer.getChildren().clear();
-        modrinthResultsContainer.getChildren().add(infoLabel("Searching Modrinth..."));
+        modrinthResultsContainer.getChildren().add(searchingLabel("Searching Modrinth..."));
+        // Modrinth doesn't tag projects with a "vanilla" loader category.
+        String loader = "vanilla".equalsIgnoreCase(instance.getModLoader().getType())
+                ? null : instance.getModLoader().getType();
         Thread.ofVirtual().name("modrinth-search").start(() -> {
             try {
                 List<ModrinthApiClient.ModrinthSearchHit> hits = modrinth.searchMods(
-                        query.trim(), instance.getMinecraftVersion(),
-                        instance.getModLoader().getType(), "mod");
+                        query.trim(), instance.getMinecraftVersion(), loader, "mod");
+                if (seq != modSearchSeq.get()) {
+                    return; // superseded by a newer search
+                }
                 Platform.runLater(() -> renderModrinthResults(hits));
             } catch (Exception e) {
+                if (seq != modSearchSeq.get()) {
+                    return;
+                }
                 log.warn("Modrinth search failed", e);
                 Platform.runLater(() -> {
                     modrinthResultsContainer.getChildren().clear();
@@ -1299,6 +1604,7 @@ public class MainController {
     }
 
     private void renderModrinthResults(List<ModrinthApiClient.ModrinthSearchHit> hits) {
+        modSearchHits = hits;
         modrinthResultsContainer.getChildren().clear();
         modrinthSearchBtn.setDisable(false);
         if (hits.isEmpty()) {
@@ -1306,38 +1612,68 @@ public class MainController {
             return;
         }
         for (ModrinthApiClient.ModrinthSearchHit hit : hits) {
-            Label title = new Label(hit.title);
-            title.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: white;");
+            modrinthResultsContainer.getChildren().add(createModSearchRow(hit));
+        }
+    }
 
-            Label desc = new Label(hit.description == null ? "" : hit.description);
-            desc.setMaxWidth(300);
-            desc.setWrapText(true);
-            desc.setStyle("-fx-font-size: 10px; -fx-text-fill: #8b949e;");
+    private HBox createModSearchRow(ModrinthApiClient.ModrinthSearchHit hit) {
+        return createSearchRow(hit, () -> installModrinthMod(hit));
+    }
 
-            VBox text = new VBox(2, title, desc);
+    private HBox createPackSearchRow(ModrinthApiClient.ModrinthSearchHit hit, boolean shader) {
+        return createSearchRow(hit, () -> installModrinthPack(hit, shader));
+    }
 
-            Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
+    /** One Modrinth search result: title/description + an Install button (spinner while downloading). */
+    private HBox createSearchRow(ModrinthApiClient.ModrinthSearchHit hit, Runnable installAction) {
+        Label title = new Label(hit.title);
+        title.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: white;");
 
+        Label desc = new Label(hit.description == null ? "" : hit.description);
+        desc.setMaxWidth(280);
+        desc.setWrapText(true);
+        desc.setStyle("-fx-font-size: 10px; -fx-text-fill: #8b949e;");
+
+        VBox text = new VBox(2, title, desc);
+        HBox.setHgrow(text, Priority.ALWAYS);
+
+        Node action;
+        if (installingProjects.contains(hit.projectId)) {
+            action = spinner(16);
+        } else {
             Button installBtn = new Button("Install");
             installBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-padding: 4 10; -fx-font-size: 11px;");
-            installBtn.setOnAction(e -> installModrinthMod(hit));
-
-            HBox row = new HBox(10, text, spacer, installBtn);
-            row.setAlignment(Pos.CENTER_LEFT);
-            row.setPadding(new Insets(8));
-            row.setStyle("-fx-background-color: #0d1117; -fx-border-color: #21262d; -fx-border-radius: 6; -fx-background-radius: 6;");
-            modrinthResultsContainer.getChildren().add(row);
+            installBtn.setOnAction(e -> installAction.run());
+            action = installBtn;
         }
+
+        HBox row = new HBox(10, text, action);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(8));
+        row.setStyle("-fx-background-color: #0d1117; -fx-border-color: #21262d; -fx-border-radius: 6; -fx-background-radius: 6;");
+        return row;
+    }
+
+    /** Row label + spinner shown while a search request is in flight. */
+    private HBox searchingLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-font-size: 12px; -fx-text-fill: #8b949e;");
+        HBox box = new HBox(8, spinner(14), label);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
     }
 
     private void installModrinthMod(ModrinthApiClient.ModrinthSearchHit hit) {
         OfflineInstance instance = selectedOfflineInstance;
         if (instance == null) {
-            status("Select a world first.");
+            status("Select an instance first.");
             return;
         }
+        if (!installingProjects.add(hit.projectId)) {
+            return; // already downloading
+        }
         status("Installing " + hit.title + "...");
+        renderModrinthResults(modSearchHits); // swap the row's button for a spinner
         Thread.ofVirtual().name("modrinth-install").start(() -> {
             try {
                 List<ModrinthApiClient.ModrinthVersion> versions = modrinth.listProjectVersions(
@@ -1357,12 +1693,162 @@ public class MainController {
                 Path dest = OfflineInstanceManager.modsDir(instance).resolve(filename);
                 downloadFile(file.url, dest);
                 Platform.runLater(() -> {
+                    modSearchHits = modSearchHits.stream()
+                            .filter(h -> !h.projectId.equals(hit.projectId)).toList();
+                    renderModrinthResults(modSearchHits);
                     renderOfflineMods(instance);
                     status("Installed " + filename);
                 });
             } catch (Exception e) {
                 log.warn("Modrinth install failed", e);
                 Platform.runLater(() -> status("Install failed: " + describeError(e)));
+            } finally {
+                Platform.runLater(() -> {
+                    installingProjects.remove(hit.projectId);
+                    renderModrinthResults(modSearchHits); // restore the Install button
+                });
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Offline shaderpacks / texture packs: Modrinth search + install
+    // ------------------------------------------------------------------
+
+    private void handleShaderSearch() {
+        runPackSearch(offlineShaderQuery, offlineShaderSearchBtn, offlineShaderResultsContainer,
+                shaderSearchSeq, "shader", "shaderpack", this::renderShaderResults);
+    }
+
+    private void handleTextureSearch() {
+        runPackSearch(offlineTextureQuery, offlineTextureSearchBtn, offlineTextureResultsContainer,
+                textureSearchSeq, "resourcepack", "texture pack", this::renderTextureResults);
+    }
+
+    private void runPackSearch(TextField queryField, Button searchBtn, VBox resultsContainer,
+                               AtomicInteger seq, String projectType, String displayName,
+                               Consumer<List<ModrinthApiClient.ModrinthSearchHit>> render) {
+        OfflineInstance instance = selectedOfflineInstance;
+        if (instance == null) {
+            status("Select an instance first.");
+            return;
+        }
+        String query = queryField.getText();
+        if (query == null || query.isBlank()) {
+            status("Enter a " + displayName + " name to search.");
+            return;
+        }
+        int mySeq = seq.incrementAndGet();
+        searchBtn.setDisable(true);
+        resultsContainer.getChildren().clear();
+        resultsContainer.getChildren().add(searchingLabel("Searching Modrinth..."));
+        // Packs aren't loader-specific, so no loader facet (it returns zero hits).
+        Thread.ofVirtual().name("modrinth-pack-search").start(() -> {
+            try {
+                List<ModrinthApiClient.ModrinthSearchHit> hits = modrinth.searchMods(
+                        query.trim(), instance.getMinecraftVersion(), null, projectType);
+                if (mySeq != seq.get()) {
+                    return; // superseded by a newer search
+                }
+                Platform.runLater(() -> render.accept(hits));
+            } catch (Exception e) {
+                if (mySeq != seq.get()) {
+                    return;
+                }
+                log.warn("Modrinth {} search failed", projectType, e);
+                Platform.runLater(() -> {
+                    resultsContainer.getChildren().clear();
+                    resultsContainer.getChildren().add(infoLabel("Search failed: " + describeError(e)));
+                    searchBtn.setDisable(false);
+                });
+            }
+        });
+    }
+
+    private void renderShaderResults(List<ModrinthApiClient.ModrinthSearchHit> hits) {
+        shaderSearchHits = hits;
+        offlineShaderResultsContainer.getChildren().clear();
+        offlineShaderSearchBtn.setDisable(false);
+        if (hits.isEmpty()) {
+            offlineShaderResultsContainer.getChildren().add(infoLabel("No results found."));
+            return;
+        }
+        for (ModrinthApiClient.ModrinthSearchHit hit : hits) {
+            offlineShaderResultsContainer.getChildren().add(createPackSearchRow(hit, true));
+        }
+    }
+
+    private void renderTextureResults(List<ModrinthApiClient.ModrinthSearchHit> hits) {
+        textureSearchHits = hits;
+        offlineTextureResultsContainer.getChildren().clear();
+        offlineTextureSearchBtn.setDisable(false);
+        if (hits.isEmpty()) {
+            offlineTextureResultsContainer.getChildren().add(infoLabel("No results found."));
+            return;
+        }
+        for (ModrinthApiClient.ModrinthSearchHit hit : hits) {
+            offlineTextureResultsContainer.getChildren().add(createPackSearchRow(hit, false));
+        }
+    }
+
+    private void installModrinthPack(ModrinthApiClient.ModrinthSearchHit hit, boolean shader) {
+        OfflineInstance instance = selectedOfflineInstance;
+        if (instance == null) {
+            return;
+        }
+        if (!installingProjects.add(hit.projectId)) {
+            return; // already downloading
+        }
+        status("Installing " + hit.title + "...");
+        if (shader) {
+            renderShaderResults(shaderSearchHits);
+        } else {
+            renderTextureResults(textureSearchHits);
+        }
+        Thread.ofVirtual().name("modrinth-pack-install").start(() -> {
+            try {
+                List<ModrinthApiClient.ModrinthVersion> versions = modrinth.listProjectVersions(
+                        hit.projectId, instance.getMinecraftVersion(), null);
+                if (versions.isEmpty()) {
+                    Platform.runLater(() -> status("No compatible version of " + hit.title + " found."));
+                    return;
+                }
+                ModrinthApiClient.ModrinthFile file = versions.get(0).primaryFile();
+                if (file == null || file.url == null || file.url.isBlank()) {
+                    Platform.runLater(() -> status("No downloadable file for " + hit.title + "."));
+                    return;
+                }
+                String filename = file.filename == null || file.filename.isBlank()
+                        ? hit.title + ".zip" : file.filename;
+                Path gameDir = OfflineInstanceManager.instanceDir(instance.getId());
+                Path dest = (shader ? gameDir.resolve("shaderpacks") : gameDir.resolve("resourcepacks"))
+                        .resolve(filename);
+                downloadFile(file.url, dest);
+                Platform.runLater(() -> {
+                    if (shader) {
+                        shaderSearchHits = shaderSearchHits.stream()
+                                .filter(h -> !h.projectId.equals(hit.projectId)).toList();
+                        renderShaderResults(shaderSearchHits);
+                    } else {
+                        textureSearchHits = textureSearchHits.stream()
+                                .filter(h -> !h.projectId.equals(hit.projectId)).toList();
+                        renderTextureResults(textureSearchHits);
+                    }
+                    renderOfflinePacks(instance);
+                    status("Installed " + filename);
+                });
+            } catch (Exception e) {
+                log.warn("Modrinth pack install failed", e);
+                Platform.runLater(() -> status("Install failed: " + describeError(e)));
+            } finally {
+                Platform.runLater(() -> {
+                    installingProjects.remove(hit.projectId);
+                    if (shader) {
+                        renderShaderResults(shaderSearchHits);
+                    } else {
+                        renderTextureResults(textureSearchHits);
+                    }
+                });
             }
         });
     }
@@ -1405,10 +1891,15 @@ public class MainController {
             gameProcess.destroy();
             status("Game process stopped.");
             gameProcess = null;
+            gameRunning = false;
+            populateServerList();
             return;
         }
         if (busy.compareAndSet(false, true)) {
             SavedServer.recordPlayed(name, serverAddress);
+            // Rebuild the list so the (newly recorded) server's PLAY button
+            // renders in its busy state while the launch flow runs.
+            launchingPlay = true;
             populateServerList();
             setBusyUi(true);
             Thread.ofVirtual().name("launcher-flow").start(() -> runFlow(serverAddress));
@@ -1499,18 +1990,44 @@ public class MainController {
             BillOfMaterials bom = fetchBom(baseUrl);
             ModLoaderInfo loader = bom.getModLoader();
 
-            // Server-driven pack sync: if the server recommends shaderpacks or
-            // texture packs, ask the player before downloading & enabling them.
+            // The BOM's serverTitle is the server's real name (set by its owner
+            // in the web app) — use it for the entry shown in "Your Servers" so
+            // the list never keeps a placeholder like "Custom Server". recordPlayed
+            // matches by address, so a blank title keeps the existing name.
+            if (bom.getServerTitle() != null && !bom.getServerTitle().isBlank()) {
+                SavedServer.recordPlayed(bom.getServerTitle().trim(), serverAddress);
+                Platform.runLater(this::populateServerList);
+            }
+
+            // Reconcile pack folders against the BOM on every connect: download
+            // packs the server offers and delete server packs it no longer lists
+            // (a player's locally added packs are never touched). This keeps the
+            // client in sync when the server owner adds or removes shaders.
+            PackSelection selection = PackSelection.load(gameDir);
+            status("Checking server shaderpacks & texture packs...");
+            packSyncEngine.sync(bom, baseUrl, gameDir,
+                    selection.getLocallyAddedShaderpacks(),
+                    selection.getLocallyAddedResourcepacks(),
+                    msg -> status(msg));
+
+            // If the server removed the pack the player had active, drop it from
+            // the selection so the game never points at a missing pack.
+            if (selection.getActiveShaderpack() != null
+                    && !Files.isRegularFile(gameDir.resolve("shaderpacks").resolve(selection.getActiveShaderpack()))) {
+                selection.setActiveShaderpack(null);
+            }
+            List<String> presentResourcepacks = selection.getActiveResourcepacks().stream()
+                    .filter(name -> Files.isRegularFile(gameDir.resolve("resourcepacks").resolve(name)))
+                    .toList();
+            if (presentResourcepacks.size() != selection.getActiveResourcepacks().size()) {
+                selection.setActiveResourcepacks(presentResourcepacks);
+            }
+            selection.save(gameDir);
+
+            // If the server recommends packs, ask the player whether to activate them.
             if (bomOffersPacks(bom)) {
                 boolean enablePacks = promptForServerPacksBlocking(bom);
                 if (enablePacks) {
-                    status("Syncing server shaderpacks & texture packs...");
-                    PackSelection selection = PackSelection.load(gameDir);
-                    packSyncEngine.sync(bom, baseUrl, gameDir,
-                            selection.getLocallyAddedShaderpacks(),
-                            selection.getLocallyAddedResourcepacks(),
-                            msg -> status(msg));
-
                     selection.setShadersEnabled(true);
                     if (!bom.getShaderpacks().isEmpty()) {
                         selection.setActiveShaderpack(bom.getShaderpacks().get(0).getFilename());
@@ -1553,12 +2070,19 @@ public class MainController {
 
             status("Starting Minecraft process...");
             gameProcess = runner.launch(launchData, session, gameDir, host, port, null);
+            gameRunning = true;
+            launchingPlay = false;
+            Platform.runLater(() -> populateServerList());
             status("Game running — connected to " + host + ":" + port);
             Thread.ofVirtual().name("game-wait").start(() -> {
                 try {
                     int code = gameProcess.waitFor();
                     gameProcess = null;
-                    Platform.runLater(() -> status("Game exited (code " + code + ")."));
+                    gameRunning = false;
+                    Platform.runLater(() -> {
+                        status("Game exited (code " + code + ").");
+                        populateServerList();
+                    });
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -1569,6 +2093,10 @@ public class MainController {
         } finally {
             Platform.runLater(() -> {
                 busy.set(false);
+                launchingPlay = false;
+                // Restore the PLAY buttons to their idle state now that the
+                // launch flow has finished (success, failure or abort).
+                populateServerList();
                 setBusyUi(false);
             });
         }
@@ -1694,5 +2222,14 @@ public class MainController {
             progressBar.setProgress(busy ? ProgressBar.INDETERMINATE_PROGRESS : 0);
             progressBar.setVisible(busy);
         });
+    }
+
+    /** Small white throbber for busy buttons. */
+    private static ProgressIndicator spinner(double size) {
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setPrefSize(size, size);
+        spinner.setMaxSize(size, size);
+        spinner.setStyle("-fx-progress-color: white;");
+        return spinner;
     }
 }

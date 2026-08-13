@@ -6,7 +6,6 @@ import com.mcmanager.core.model.BillOfMaterials;
 import com.mcmanager.core.model.InstanceConfig;
 import com.mcmanager.core.model.ModEntry;
 import com.mcmanager.core.model.PackEntry;
-import com.mcmanager.core.model.ShaderEngineType;
 import com.mcmanager.server.auth.JoinTicketManager;
 import com.mcmanager.server.instance.ServerInstanceManager;
 import com.mcmanager.server.process.MinecraftProcessManager;
@@ -102,6 +101,16 @@ public class InstanceController {
         }
         try {
             String id = ctx.pathParam("id");
+            // Manual player-facing port override (reverse proxies etc.) — rebinds
+            // the multiplexer listener via the instance manager.
+            if (body != null && body.externalPort > 0) {
+                try {
+                    instanceManager.updateExternalPort(id, body.externalPort);
+                } catch (IllegalArgumentException e) {
+                    ctx.status(400).result(e.getMessage());
+                    return;
+                }
+            }
             // Backup schedule changes are independent of version re-sync.
             if (body != null && (body.backupFrequency != null || body.backupTime != null)) {
                 if (!validSchedule(body.backupFrequency, body.backupTime)) {
@@ -500,7 +509,7 @@ public class InstanceController {
     /** GET /api/instances/{id}/mods */
     public void listMods(Context ctx) {
         try {
-            ctx.json(Map.of("mods", modsFor(ctx.pathParam("id")).listModsFiltered()
+            ctx.json(Map.of("mods", modsFor(ctx.pathParam("id")).listMods()
                     .stream().map(ModEntry::toMap).toList()));
         } catch (IllegalArgumentException e) {
             ctx.status(404).result(e.getMessage());
@@ -735,62 +744,6 @@ public class InstanceController {
     // ------------------------------------------------------------------
     // Per-instance shaders & texture packs
     // ------------------------------------------------------------------
-
-    /** GET /api/instances/{id}/shaders — shader engine status for this instance's loader. */
-    public void getShaderStatus(Context ctx) {
-        String id = ctx.pathParam("id");
-        try {
-            InstanceConfig cfg = instanceManager.getInstance(id);
-            ShaderEngineType engine = ShaderEngineType.forLoader(cfg.getModLoader().getType());
-            boolean enabled = engineInstalled(modsFor(id), engine);
-            ctx.json(Map.of("engine", engine.getDisplayName(), "enabled", enabled));
-        } catch (IllegalArgumentException e) {
-            ctx.status(404).result(e.getMessage());
-        }
-    }
-
-    /** POST /api/instances/{id}/shaders/toggle body: {"enabled": true|false} */
-    public void toggleShaderEngine(Context ctx) {
-        String id = ctx.pathParam("id");
-        ToggleRequest body;
-        try {
-            body = ctx.bodyAsClass(ToggleRequest.class);
-        } catch (RuntimeException e) {
-            ctx.status(400).result("Invalid JSON body");
-            return;
-        }
-        try {
-            InstanceConfig cfg = instanceManager.getInstance(id);
-            ModManagementService mods = modsFor(id);
-            ShaderEngineType engine = ShaderEngineType.forLoader(cfg.getModLoader().getType());
-            if (body != null && body.enabled) {
-                mods.installModrinthVersion(engine.getPrimaryProjectId(), null,
-                        cfg.getMinecraftVersion(), cfg.getModLoader().getType());
-                mods.installModrinthVersion(engine.getDependencyProjectId(), null,
-                        cfg.getMinecraftVersion(), cfg.getModLoader().getType());
-            } else {
-                for (ModEntry mod : new ArrayList<>(mods.listMods())) {
-                    if (engine.getPrimaryProjectId().equals(mod.getId())
-                            || engine.getDependencyProjectId().equals(mod.getId())) {
-                        mods.removeMod(mod.getFilename());
-                    }
-                }
-            }
-            ctx.json(Map.of("enabled", body != null && body.enabled, "engine", engine.getDisplayName()));
-        } catch (IllegalArgumentException e) {
-            ctx.status(404).result(e.getMessage());
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            ctx.status(502).result("Shader engine toggle failed: " + e.getMessage());
-        }
-    }
-
-    private boolean engineInstalled(ModManagementService mods, ShaderEngineType engine) {
-        return mods.listMods().stream().anyMatch(m ->
-                engine.getPrimaryProjectId().equals(m.getId()) || engine.getDependencyProjectId().equals(m.getId()));
-    }
 
     /** GET /api/instances/{id}/shaderpacks */
     public void listShaderpacks(Context ctx) {
@@ -1029,6 +982,7 @@ public class InstanceController {
                 "type", cfg.getModLoader() == null ? "vanilla" : cfg.getModLoader().getType(),
                 "version", cfg.getModLoader() == null ? "" : cfg.getModLoader().getVersion()));
         map.put("internalMcPort", cfg.getInternalMcPort());
+        map.put("externalPort", cfg.getExternalMcPort());
         map.put("javaArgs", cfg.getJavaArgs());
         map.put("autoStart", cfg.isAutoStart());
         map.put("backupFrequency", cfg.getBackupFrequency());
@@ -1054,6 +1008,8 @@ public class InstanceController {
         public String javaArgs;
         public String backupFrequency;
         public String backupTime;
+        /** Player-facing port; 0 / absent leaves it unchanged. */
+        public int externalPort;
     }
 
     public static class PlayerActionRequest {
@@ -1068,10 +1024,6 @@ public class InstanceController {
         public String downloadUrl;
         public String filename;
         public String fileId;
-    }
-
-    public static class ToggleRequest {
-        public boolean enabled;
     }
 
     public static class JoinIntentRequest {

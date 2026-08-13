@@ -34,7 +34,7 @@ class BackupServiceTest {
     @Test
     void createBackupWritesArchiveAndMetadata() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
         Path worldDir = manager.getInstanceDir(cfg.getId()).resolve("world");
         Files.createDirectories(worldDir);
         Files.writeString(worldDir.resolve("level.dat"), "world data");
@@ -60,7 +60,7 @@ class BackupServiceTest {
     @Test
     void restoreReplacesInstanceStateAndDropsRollback() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
         Path instanceDir = manager.getInstanceDir(cfg.getId());
         Files.writeString(instanceDir.resolve("level.dat"), "original");
 
@@ -84,7 +84,7 @@ class BackupServiceTest {
     @Test
     void prunesOldestBackupsBeyondRetentionLimit() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
         Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
 
         BackupService service = newService(manager);
@@ -105,7 +105,7 @@ class BackupServiceTest {
     @Test
     void restoreUnknownBackupThrows() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
 
         BackupService service = newService(manager);
         assertThrows(FileNotFoundException.class,
@@ -115,7 +115,7 @@ class BackupServiceTest {
     @Test
     void failedBackupRecordsFailureAndDropsPartialArchive() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
         // Removing the instance directory forces the archive walk to fail.
         Path instanceDir = manager.getInstanceDir(cfg.getId());
         try (var walk = Files.walk(instanceDir)) {
@@ -138,7 +138,7 @@ class BackupServiceTest {
     @Test
     void setRetentionPrunesOldBackupsAndPersists() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
         Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
 
         BackupService service = newService(manager);
@@ -164,7 +164,7 @@ class BackupServiceTest {
     @Test
     void setRetentionAboveCurrentCountDeletesNothing() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
         Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
 
         BackupService service = newService(manager);
@@ -182,7 +182,7 @@ class BackupServiceTest {
     @Test
     void createBackupRespectsConfiguredRetention() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
         Files.writeString(manager.getInstanceDir(cfg.getId()).resolve("level.dat"), "data");
         cfg.setBackupRetention(2);
 
@@ -197,7 +197,7 @@ class BackupServiceTest {
     @Test
     void setRetentionRejectsOutOfRangeValues() throws IOException {
         ServerInstanceManager manager = newInstanceManager();
-        InstanceConfig cfg = manager.createInstance("Test World", "1.21.4", "vanilla", "");
+        InstanceConfig cfg = manager.createInstance("Test Instance", "1.21.4", "vanilla", "");
 
         BackupService service = newService(manager);
         assertThrows(IllegalArgumentException.class,

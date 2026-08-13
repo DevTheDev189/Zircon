@@ -4,6 +4,7 @@ import com.mcmanager.core.model.BillOfMaterials;
 import com.mcmanager.core.model.BomJson;
 import com.mcmanager.core.model.ModEntry;
 import com.mcmanager.core.model.ModLoaderInfo;
+import com.mcmanager.core.model.PackEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -62,5 +63,25 @@ class BomJsonTest {
         assertTrue(bom.removeMod("a.jar"));
         assertNull(bom.getModByFilename("a.jar"));
         assertEquals(List.of("b.jar"), bom.getMods().stream().map(ModEntry::getFilename).toList());
+    }
+
+    @Test
+    void roundTripPreservesShaderpacksAndResourcepacks() {
+        // Packs are advertised to clients through the BOM, so they must survive
+        // the JSON round-trip the server uses when serving /bom.
+        BillOfMaterials bom = new BillOfMaterials("1.21.4", null, "t");
+        bom.addShaderpack(new PackEntry("complementary", "ComplementaryShaders.zip", "sha1", 0,
+                "direct", "https://server/files/shaderpacks/ComplementaryShaders.zip", 1024));
+        bom.addResourcepack(new PackEntry("vanillatweaks", "VanillaTweaks.zip", "sha1", 0,
+                "direct", "https://server/files/resourcepacks/VanillaTweaks.zip", 2048));
+
+        BillOfMaterials parsed = BomJson.fromJson(BomJson.toJson(bom));
+
+        assertEquals(1, parsed.getShaderpacks().size());
+        assertEquals("ComplementaryShaders.zip", parsed.getShaderpacks().get(0).getFilename());
+        assertEquals("https://server/files/shaderpacks/ComplementaryShaders.zip",
+                parsed.getShaderpacks().get(0).getDownloadUrl());
+        assertEquals(1, parsed.getResourcepacks().size());
+        assertEquals("VanillaTweaks.zip", parsed.getResourcepacks().get(0).getFilename());
     }
 }

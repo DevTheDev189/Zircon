@@ -47,7 +47,7 @@ class InstanceConfigTest {
 
     @Test
     void updatesLoaderVersionButKeepsLoaderTypeLocked() {
-        InstanceConfig config = new InstanceConfig("Fabric World", "1.21.4", "fabric", "0.15.11", 25566);
+        InstanceConfig config = new InstanceConfig("Fabric Instance", "1.21.4", "fabric", "0.15.11", 25566);
 
         config.setLoaderVersion("0.16.5");
         config.setMinecraftVersion("1.21.1");

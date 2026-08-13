@@ -3,7 +3,7 @@ package com.mcmanager.client.offline;
 import com.mcmanager.core.model.ModLoaderInfo;
 
 /**
- * A locally-managed Minecraft world/instance that can be launched without
+ * A locally-managed Minecraft instance that can be launched without
  * connecting to a Zircon server. Each instance owns its own {@code mods/}
  * folder and persists its configuration to {@code instance.json}.
  *
@@ -15,8 +15,6 @@ public class OfflineInstance {
     private String name;
     private String minecraftVersion = "1.20.4";
     private ModLoaderInfo modLoader = new ModLoaderInfo("fabric", "0.15.11", "");
-    private String gameMode = "survival";
-    private boolean allowCheats = false;
     private String javaArgs = "-Xms2G -Xmx4G";
     private long lastPlayed = System.currentTimeMillis();
 
@@ -57,22 +55,6 @@ public class OfflineInstance {
 
     public void setModLoader(ModLoaderInfo modLoader) {
         this.modLoader = modLoader;
-    }
-
-    public String getGameMode() {
-        return gameMode;
-    }
-
-    public void setGameMode(String gameMode) {
-        this.gameMode = gameMode;
-    }
-
-    public boolean isAllowCheats() {
-        return allowCheats;
-    }
-
-    public void setAllowCheats(boolean allowCheats) {
-        this.allowCheats = allowCheats;
     }
 
     public String getJavaArgs() {

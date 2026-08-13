@@ -53,6 +53,8 @@ public class Main {
         webApp.start();
 
         TcpMultiplexer multiplexer = new TcpMultiplexer(configService, instanceManager);
+        // Bind/unbind per-instance player-facing ports as instances are created/deleted.
+        instanceManager.setPortBindingListener(multiplexer);
         multiplexer.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

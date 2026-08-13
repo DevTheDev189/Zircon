@@ -209,7 +209,7 @@ public class MinecraftRunner {
         }
 
         // Apply the instance's local shaderpack/resourcepack choices so offline
-        // worlds honor the same pack selection as online play (PackSelection).
+        // instances honor the same pack selection as online play (PackSelection).
         PackOptionsWriter.apply(gameDir);
 
         log.info("Launching Minecraft (offline) as '{}': {} ...", playerName,

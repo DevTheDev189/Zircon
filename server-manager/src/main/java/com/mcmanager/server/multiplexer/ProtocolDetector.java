@@ -55,18 +55,46 @@ public class ProtocolDetector extends ByteToMessageDecoder {
     private final String mcHost;
     private final int mcPort;
     private final ServerInstanceManager instanceManager; // nullable → legacy single-server routing
+    /** When set, MC traffic is routed to this instance's internal port (per-instance port binding). */
+    private final InstanceConfig fixedInstance;
+    /** The shared multiplexer port (25565); the instance owning it is the main-server fallback. */
+    private final int publicPort;
 
     public ProtocolDetector(String webHost, int webPort, String mcHost, int mcPort) {
-        this(webHost, webPort, mcHost, mcPort, null);
+        this(webHost, webPort, mcHost, mcPort, null, null, 0);
     }
 
     public ProtocolDetector(String webHost, int webPort, String mcHost, int mcPort,
                             ServerInstanceManager instanceManager) {
+        this(webHost, webPort, mcHost, mcPort, instanceManager, null, 0);
+    }
+
+    /**
+     * Per-instance public-port binding: MC traffic always goes to
+     * {@code fixedInstance}'s internal port (no hostname lookup), while the
+     * join-ticket gate and status pings behave exactly as on the shared port.
+     */
+    public ProtocolDetector(String webHost, int webPort, String mcHost, int mcPort,
+                            ServerInstanceManager instanceManager, InstanceConfig fixedInstance) {
+        this(webHost, webPort, mcHost, mcPort, instanceManager, fixedInstance, 0);
+    }
+
+    /** Main multiplexer listener: hostname routing, with the owner of {@code publicPort} as fallback. */
+    public ProtocolDetector(String webHost, int webPort, String mcHost, int mcPort,
+                            ServerInstanceManager instanceManager, int publicPort) {
+        this(webHost, webPort, mcHost, mcPort, instanceManager, null, publicPort);
+    }
+
+    private ProtocolDetector(String webHost, int webPort, String mcHost, int mcPort,
+                             ServerInstanceManager instanceManager, InstanceConfig fixedInstance,
+                             int publicPort) {
         this.webHost = webHost;
         this.webPort = webPort;
         this.mcHost = mcHost;
         this.mcPort = mcPort;
         this.instanceManager = instanceManager;
+        this.fixedInstance = fixedInstance;
+        this.publicPort = publicPort;
     }
 
     @Override
@@ -89,10 +117,26 @@ public class ProtocolDetector extends ByteToMessageDecoder {
                 return; // wait for more bytes before deciding
             }
             if (handshake != HandshakeResult.NOT_A_HANDSHAKE) {
-                InstanceConfig cfg = instanceManager.findByHostname(handshake.hostname);
-                if (cfg != null) {
-                    targetPort = cfg.getInternalMcPort();
-                    kind = "Minecraft->" + cfg.getName();
+                if (fixedInstance != null) {
+                    // Dedicated per-instance port: the instance is already known,
+                    // so no hostname lookup is needed.
+                    targetPort = fixedInstance.getInternalMcPort();
+                    kind = "Minecraft->" + fixedInstance.getName();
+                } else {
+                    InstanceConfig cfg = instanceManager.findByHostname(handshake.hostname);
+                    if (cfg == null) {
+                        // Unknown hostname (e.g. bare IP / localhost): route to the
+                        // instance owning the main port (the one the web app serves
+                        // for this port), falling back to the active instance.
+                        cfg = instanceManager.findByExternalPort(publicPort);
+                        if (cfg == null) {
+                            cfg = instanceManager.getActiveInstance();
+                        }
+                    }
+                    if (cfg != null) {
+                        targetPort = cfg.getInternalMcPort();
+                        kind = "Minecraft->" + cfg.getName();
+                    }
                 }
 
                 // Zircon join gate (AGENT_PLAN_7): login connections must present a

@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,10 +29,16 @@ final class PackOptionsWriter {
         applyResourcepacks(gameDir, selection);
     }
 
-    /** Writes {@code optionsiris.txt}: only the pack the player selected, or disabled entirely. */
+    /**
+     * Writes {@code config/iris.properties} — the file both Iris and Oculus read
+     * for their shader state — with only the pack the player selected, or disabled
+     * entirely. Packs live in {@code shaderpacks/} as {@code .zip} files, which is
+     * exactly the form Iris accepts for the {@code shaderPack} value.
+     */
     private static void applyShaderpack(Path gameDir, PackSelection selection) throws IOException {
         boolean enabled = selection.isShadersEnabled() && selection.getActiveShaderpack() != null;
-        Path irisOptions = gameDir.resolve("optionsiris.txt");
+        Path irisOptions = gameDir.resolve("config").resolve("iris.properties");
+        Files.createDirectories(irisOptions.getParent());
         OptionsFileUtil.upsertLine(irisOptions, "enableShaders=", String.valueOf(enabled));
         OptionsFileUtil.upsertLine(irisOptions, "shaderPack=", enabled ? selection.getActiveShaderpack() : "");
         log.info("Shaders: enabled={}, pack={}", enabled, enabled ? selection.getActiveShaderpack() : "(none)");

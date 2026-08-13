@@ -1,35 +1,47 @@
 package com.mcmanager.server.web.controller;
 
+import com.mcmanager.server.service.ModServiceResolver;
 import com.mcmanager.server.service.PackManagementService;
 import io.javalin.http.Context;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.function.Supplier;
 
 /**
  * Serves shaderpack/resourcepack downloads to the client's sync engine, mirroring
- * {@link ModController#downloadMod(Context)}. Resolved per request via
- * {@link Supplier} so these transparently follow the active instance in
- * multi-instance mode (see {@code ModServiceResolver}).
+ * {@link ModController#downloadMod(Context)}. Resolved per request from the
+ * {@code Host} header port so downloads follow the instance whose port the client
+ * connected through (falling back to the active instance).
  */
 public class PackFileController {
 
-    private final Supplier<PackManagementService> packs;
+    private final ModServiceResolver resolver;
 
-    public PackFileController(Supplier<PackManagementService> packs) {
-        this.packs = packs;
+    public PackFileController(ModServiceResolver resolver) {
+        this.resolver = resolver;
+    }
+
+    /** The pack service for the instance owning the request's port, else the active instance. */
+    private PackManagementService resolvePacks(Context ctx) {
+        Integer port = ModServiceResolver.hostPort(ctx);
+        if (port != null) {
+            PackManagementService perInstance = resolver.packsByExternalPort(port);
+            if (perInstance != null) {
+                return perInstance;
+            }
+        }
+        return resolver.packs();
     }
 
     /** GET /files/shaderpacks/{filename} */
     public void downloadShaderpack(Context ctx) {
-        stream(ctx, packs.get().getShaderpackFile(ctx.pathParam("filename")));
+        stream(ctx, resolvePacks(ctx).getShaderpackFile(ctx.pathParam("filename")));
     }
 
     /** GET /files/resourcepacks/{filename} */
     public void downloadResourcepack(Context ctx) {
-        stream(ctx, packs.get().getResourcepackFile(ctx.pathParam("filename")));
+        stream(ctx, resolvePacks(ctx).getResourcepackFile(ctx.pathParam("filename")));
     }
 
     private void stream(Context ctx, Path file) {

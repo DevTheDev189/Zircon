@@ -52,6 +52,10 @@ public class InstanceConfig {
     @SerializedName("internalMcPort")
     private int internalMcPort; // Automatically assigned, e.g. 25566, 25567
 
+    /** Player-facing port where the multiplexer accepts connections for this instance (0 = unassigned). */
+    @SerializedName("externalMcPort")
+    private int externalMcPort;
+
     @SerializedName("javaArgs")
     private String javaArgs = "-Xms2G -Xmx4G";
 
@@ -77,14 +81,21 @@ public class InstanceConfig {
     /**
      * Creates a new instance configuration. {@code loaderType} is one of
      * "vanilla", "fabric", "quilt", "forge", "neoforge"; the loader is frozen
-     * in place from this moment on.
+     * in place from this moment on. The external (player-facing) port is left
+     * unassigned (0) and allocated by the instance manager.
      */
     public InstanceConfig(String name, String minecraftVersion, String loaderType,
                           String loaderVersion, int internalMcPort) {
+        this(name, minecraftVersion, loaderType, loaderVersion, internalMcPort, 0);
+    }
+
+    public InstanceConfig(String name, String minecraftVersion, String loaderType,
+                          String loaderVersion, int internalMcPort, int externalMcPort) {
         this.name = name;
         this.minecraftVersion = minecraftVersion;
         this.modLoader = new ModLoaderInfo(loaderType, loaderVersion, "");
         this.internalMcPort = internalMcPort;
+        this.externalMcPort = externalMcPort;
     }
 
     public String getId() {
@@ -105,6 +116,19 @@ public class InstanceConfig {
 
     public int getInternalMcPort() {
         return internalMcPort;
+    }
+
+    /** Only used by the instance manager to relocate legacy internal ports out of the player-facing range. */
+    public void setInternalMcPort(int internalMcPort) {
+        this.internalMcPort = internalMcPort;
+    }
+
+    public int getExternalMcPort() {
+        return externalMcPort;
+    }
+
+    public void setExternalMcPort(int externalMcPort) {
+        this.externalMcPort = externalMcPort;
     }
 
     public String getJavaArgs() {

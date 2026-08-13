@@ -40,6 +40,62 @@ public class ModServiceResolver {
         return instanceManager.getActiveInstance();
     }
 
+    /** @return the instance owning {@code externalPort}, or {@code null}. */
+    public InstanceConfig instanceByExternalPort(int externalPort) {
+        return instanceManager.findByExternalPort(externalPort);
+    }
+
+    /** BOM service of the instance owning the port, or {@code null} when unowned. */
+    public BomService bomByExternalPort(int externalPort) {
+        InstanceConfig cfg = instanceByExternalPort(externalPort);
+        return cfg == null ? null : instanceService(cfg).bom;
+    }
+
+    /** Mod service of the instance owning the port, or {@code null} when unowned. */
+    public ModManagementService modsByExternalPort(int externalPort) {
+        InstanceConfig cfg = instanceByExternalPort(externalPort);
+        return cfg == null ? null : instanceService(cfg).mods;
+    }
+
+    /** Pack service of the instance owning the port, or {@code null} when unowned. */
+    public PackManagementService packsByExternalPort(int externalPort) {
+        InstanceConfig cfg = instanceByExternalPort(externalPort);
+        return cfg == null ? null : instanceService(cfg).packs;
+    }
+
+    /**
+     * @return the port from a request's {@code Host} header (e.g. {@code localhost:25566}
+     *         → {@code 25566}), or {@code null} when absent or unparseable. This is how
+     *         the web app tells which instance's port a client connected through.
+     */
+    public static Integer hostPort(io.javalin.http.Context ctx) {
+        String host = ctx.header("Host");
+        if (host == null || host.isBlank()) {
+            return null;
+        }
+        String h = host.trim();
+        if (h.startsWith("[")) { // IPv6 literal, e.g. [::1]:25565
+            int end = h.indexOf(']');
+            if (end < 0 || end + 1 >= h.length() || h.charAt(end + 1) != ':') {
+                return null;
+            }
+            try {
+                return Integer.parseInt(h.substring(end + 2));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        int colon = h.lastIndexOf(':');
+        if (colon < 0) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(h.substring(colon + 1));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     /** Resolves the BOM service backing {@code GET /bom}. */
     public BomService bom() {
         InstanceConfig active = activeInstance();

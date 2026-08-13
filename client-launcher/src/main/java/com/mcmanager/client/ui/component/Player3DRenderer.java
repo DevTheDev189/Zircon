@@ -3,10 +3,11 @@ package com.mcmanager.client.ui.component;
 import com.mcmanager.client.render.GlContext;
 import com.mcmanager.client.render.GlViewport;
 import com.mcmanager.client.render.PlayerRenderer;
-import com.mcmanager.client.skin.DefaultSkinFactory;
+import com.mcmanager.client.skin.BundledSkins;
 import javafx.scene.Node;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelFormat;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.StackPane;
 import org.lwjgl.BufferUtils;
 
@@ -71,7 +72,7 @@ public class Player3DRenderer {
         node.heightProperty().addListener((obs, oldVal, newVal) ->
                 viewport.resize(roundSize(node.getWidth()), roundSize(newVal)));
 
-        player.setSkin(toBgra(DefaultSkinFactory.steve()), 64, 64);
+        player.setSkin(toBgra(fallbackSkin()), 64, 64);
         viewport.requestRender();
     }
 
@@ -95,9 +96,27 @@ public class Player3DRenderer {
      * actual texture upload happens asynchronously on the GL render thread.
      */
     public void updateSkin(Image skinImage) {
-        Image image = skinImage != null ? skinImage : DefaultSkinFactory.steve();
+        Image image = skinImage != null ? skinImage : fallbackSkin();
         player.setSkin(toBgra(image), (int) image.getWidth(), (int) image.getHeight());
         viewport.requestRender();
+    }
+
+    /** The first bundled default skin, or a flat neutral placeholder when none ship. */
+    private static Image fallbackSkin() {
+        return BundledSkins.fallback()
+                .map(BundledSkins.Skin::image)
+                .orElseGet(Player3DRenderer::neutralPlaceholder);
+    }
+
+    /** Flat neutral texture used only when the skins resources folder is empty. */
+    private static Image neutralPlaceholder() {
+        WritableImage image = new WritableImage(64, 64);
+        for (int y = 0; y < 64; y++) {
+            for (int x = 0; x < 64; x++) {
+                image.getPixelWriter().setArgb(x, y, 0xFF3A3F44);
+            }
+        }
+        return image;
     }
 
     private static int roundSize(Number value) {

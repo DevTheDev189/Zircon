@@ -19,12 +19,15 @@ import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.TilePane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
@@ -141,13 +144,13 @@ public class MainApp extends Application {
         // ------------------------------------------------------------------
         // View 2: Play Offline
         // ------------------------------------------------------------------
-        Label offlineTitle = sectionLabel("Offline Worlds");
-        Button newWorldBtn = new Button("+ New World");
-        newWorldBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold;");
+        Label offlineTitle = sectionLabel("Offline Instances");
+        Button newInstanceBtn = new Button("+ New Instance");
+        newInstanceBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold;");
 
         Region offlineSpacer = new Region();
         HBox.setHgrow(offlineSpacer, Priority.ALWAYS);
-        HBox offlineHeader = new HBox(offlineTitle, offlineSpacer, newWorldBtn);
+        HBox offlineHeader = new HBox(offlineTitle, offlineSpacer, newInstanceBtn);
         offlineHeader.setAlignment(Pos.CENTER_LEFT);
 
         VBox offlineInstancesContainer = new VBox(10);
@@ -159,27 +162,13 @@ public class MainApp extends Application {
         offlineLeft.setStyle("-fx-background-color: " + CARD + "; -fx-border-color: " + BORDER + "; "
                 + "-fx-border-radius: 12; -fx-background-radius: 12; -fx-padding: 16;");
 
-        // Right column: world detail & options, grouped into clean sub-cards.
-        Label offlineDetailTitle = sectionLabel("Select a world");
+        // Right column: instance detail & options, grouped into clean sub-cards.
+        Label offlineDetailTitle = sectionLabel("Select an instance");
         Label offlineVersionLabel = infoLabel("Minecraft: —");
         Label offlineLoaderLabel = infoLabel("Loader: —");
         Label offlineLoaderVersionLabel = infoLabel("Loader version: —");
         VBox offlineMetaCard = groupCard(offlineDetailTitle, offlineVersionLabel,
                 offlineLoaderLabel, offlineLoaderVersionLabel);
-
-        Label gameSettingsHeader = sectionLabel("Game Settings");
-        gameSettingsHeader.setStyle(gameSettingsHeader.getStyle() + " -fx-font-size: 13px;");
-        ComboBox<String> offlineGameModeCombo = new ComboBox<>();
-        offlineGameModeCombo.getItems().addAll("survival", "creative", "adventure", "spectator");
-        offlineGameModeCombo.setValue("survival");
-        offlineGameModeCombo.setPrefWidth(160);
-
-        CheckBox offlineAllowCheatsCheck = new CheckBox("Allow cheats");
-        offlineAllowCheatsCheck.setStyle("-fx-text-fill: " + TEXT + ";");
-
-        HBox offlineOptionsRow = new HBox(14, offlineGameModeCombo, offlineAllowCheatsCheck);
-        offlineOptionsRow.setAlignment(Pos.CENTER_LEFT);
-        VBox offlineSettingsCard = groupCard(gameSettingsHeader, offlineOptionsRow);
 
         Label offlineModsHeader = sectionLabel("Mods");
         offlineModsHeader.setStyle(offlineModsHeader.getStyle() + " -fx-font-size: 13px;");
@@ -210,32 +199,60 @@ public class MainApp extends Application {
         VBox offlineModsCard = groupCard(offlineModsHeader, offlineDropZone, offlineModsScroll,
                 modrinthLabel, modrinthRow, modrinthResultsScroll);
 
-        // Shaders & texture packs for this world: a per-instance local selection.
+        // Shaders & texture packs for this instance: a per-instance local selection.
         Label offlinePacksHeader = sectionLabel("Shaders & Texture Packs");
         offlinePacksHeader.setStyle(offlinePacksHeader.getStyle() + " -fx-font-size: 13px;");
+
+        // --- Shaders section ---
+        Label offlineShadersSubHeader = sectionLabel("Shaders");
+        offlineShadersSubHeader.setStyle(offlineShadersSubHeader.getStyle() + " -fx-font-size: 12px;");
         ComboBox<String> offlineShaderpackCombo = new ComboBox<>();
         offlineShaderpackCombo.setPrefWidth(220);
         offlineShaderpackCombo.setPromptText("Shaderpack (or None)");
-        VBox offlineResourcepackContainer = new VBox(6);
+        VBox offlineShaderpackList = new VBox(6);
+        ScrollPane offlineShaderpackScroll = scrollPane(offlineShaderpackList, 90);
         Button offlineAddShaderpackBtn = new Button("+ Add Shaderpack (.zip)");
         offlineAddShaderpackBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 11px; -fx-padding: 6 10;");
+        TextField offlineShaderQuery = new TextField();
+        offlineShaderQuery.setPromptText("Search Modrinth shaderpacks...");
+        Button offlineShaderSearchBtn = new Button("Search");
+        offlineShaderSearchBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 12px;");
+        HBox offlineShaderRow = new HBox(8, offlineShaderQuery, offlineShaderSearchBtn);
+        HBox.setHgrow(offlineShaderQuery, Priority.ALWAYS);
+        VBox offlineShaderResultsContainer = new VBox(8);
+        ScrollPane offlineShaderResultsScroll = scrollPane(offlineShaderResultsContainer, 100);
+        VBox offlineShadersSection = new VBox(6, offlineShadersSubHeader, offlineShaderpackCombo,
+                offlineShaderpackScroll, offlineAddShaderpackBtn, offlineShaderRow, offlineShaderResultsScroll);
+
+        // --- Texture Packs section ---
+        Label offlineTextureSubHeader = sectionLabel("Texture Packs");
+        offlineTextureSubHeader.setStyle(offlineTextureSubHeader.getStyle() + " -fx-font-size: 12px;");
+        VBox offlineResourcepackContainer = new VBox(6);
+        ScrollPane offlineResourcepackScroll = scrollPane(offlineResourcepackContainer, 90);
         Button offlineAddResourcepackBtn = new Button("+ Add Texture Pack (.zip)");
         offlineAddResourcepackBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 11px; -fx-padding: 6 10;");
-        HBox offlinePackButtons = new HBox(8, offlineAddShaderpackBtn, offlineAddResourcepackBtn);
-        HBox.setHgrow(offlineAddShaderpackBtn, Priority.ALWAYS);
-        HBox.setHgrow(offlineAddResourcepackBtn, Priority.ALWAYS);
-        VBox offlinePacksCard = groupCard(offlinePacksHeader, offlineShaderpackCombo,
-                offlineResourcepackContainer, offlinePackButtons);
+        TextField offlineTextureQuery = new TextField();
+        offlineTextureQuery.setPromptText("Search Modrinth texture packs...");
+        Button offlineTextureSearchBtn = new Button("Search");
+        offlineTextureSearchBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 12px;");
+        HBox offlineTextureRow = new HBox(8, offlineTextureQuery, offlineTextureSearchBtn);
+        HBox.setHgrow(offlineTextureQuery, Priority.ALWAYS);
+        VBox offlineTextureResultsContainer = new VBox(8);
+        ScrollPane offlineTextureResultsScroll = scrollPane(offlineTextureResultsContainer, 100);
+        VBox offlineTextureSection = new VBox(6, offlineTextureSubHeader,
+                offlineResourcepackScroll, offlineAddResourcepackBtn, offlineTextureRow, offlineTextureResultsScroll);
+
+        VBox offlinePacksCard = groupCard(offlinePacksHeader, offlineShadersSection, offlineTextureSection);
 
         Button offlinePlayBtn = new Button("Play Offline");
         offlinePlayBtn.setMaxWidth(Double.MAX_VALUE);
         offlinePlayBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 16;");
 
-        Button offlineDeleteBtn = new Button("Delete World");
+        Button offlineDeleteBtn = new Button("Delete Instance");
         offlineDeleteBtn.setMaxWidth(Double.MAX_VALUE);
         offlineDeleteBtn.setStyle("-fx-background-color: #8b2b2b; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16;");
 
-        VBox offlineDetail = new VBox(12, offlineMetaCard, offlineSettingsCard, offlineModsCard, offlinePacksCard);
+        VBox offlineDetail = new VBox(12, offlineMetaCard, offlineModsCard, offlinePacksCard);
         ScrollPane offlineDetailScroll = new ScrollPane(offlineDetail);
         offlineDetailScroll.setFitToWidth(true);
         offlineDetailScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
@@ -329,13 +346,8 @@ public class MainApp extends Application {
         trustDirectCheck.setSelected(false);
         trustDirectCheck.setStyle("-fx-text-fill: " + TEXT + ";");
 
-        Label clientIdLabel = infoLabel("Azure App Client ID");
-        TextField clientIdField = new TextField();
-        clientIdField.setPromptText("Microsoft App Client ID");
-        clientIdField.setPrefWidth(380);
-
         VBox settingsView = new VBox(18, settingsTitle, ramLabel, ramSlider, strictVerifyCheck,
-                trustDirectCheck, clientIdLabel, clientIdField);
+                trustDirectCheck);
         settingsView.setPadding(new Insets(24));
         settingsView.setMaxWidth(520);
 
@@ -371,14 +383,31 @@ public class MainApp extends Application {
         // Login overlay
         // ------------------------------------------------------------------
         Label loginTitle = new Label("Welcome to Zircon");
-        loginTitle.setStyle("-fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: white;");
+        loginTitle.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
 
         Label loginSubtitle = new Label("Sign in with Microsoft to sync mods and play.");
         loginSubtitle.setStyle("-fx-font-size: 13px; -fx-text-fill: " + MUTED + ";");
 
-        Button loginButton = new Button("Login with Microsoft");
+        // Microsoft-branded sign-in button: "Login with" + a white pill holding
+        // the four-square logo and the Microsoft wordmark (official button style).
+        Label loginPrefix = new Label("Login with");
+        loginPrefix.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 15px;");
+
+        Label microsoftWordmark = new Label("Microsoft");
+        microsoftWordmark.setStyle("-fx-text-fill: #5e5e5e; -fx-font-weight: bold; -fx-font-size: 15px;");
+        HBox microsoftPill = new HBox(7, microsoftLogo(16), microsoftWordmark);
+        microsoftPill.setAlignment(Pos.CENTER);
+        microsoftPill.setPadding(new Insets(5, 16, 5, 16));
+        // A large radius turns the pill into a fully rounded capsule.
+        microsoftPill.setStyle("-fx-background-color: white; -fx-background-radius: 999;");
+
+        HBox loginButtonContent = new HBox(10, loginPrefix, microsoftPill);
+        loginButtonContent.setAlignment(Pos.CENTER);
+
+        Button loginButton = new Button();
+        loginButton.setGraphic(loginButtonContent);
         loginButton.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; -fx-font-weight: bold; "
-                + "-fx-font-size: 15px; -fx-padding: 12 26; -fx-background-radius: 8;");
+                + "-fx-font-size: 15px; -fx-padding: 10 10 10 20; -fx-background-radius: 999;");
 
         Label loginStatus = new Label("");
         loginStatus.setStyle("-fx-font-size: 12px; -fx-text-fill: " + MUTED + ";");
@@ -386,8 +415,11 @@ public class MainApp extends Application {
 
         VBox loginCard = new VBox(14, loginTitle, loginSubtitle, loginButton, loginStatus);
         loginCard.setAlignment(Pos.CENTER);
-        loginCard.setMaxWidth(420);
-        loginCard.setPadding(new Insets(40));
+        loginCard.setMaxWidth(400);
+        // Cap the height so the overlay's StackPane doesn't stretch the card to
+        // fill the whole window — it should hug its content instead.
+        loginCard.setMaxHeight(Region.USE_PREF_SIZE);
+        loginCard.setPadding(new Insets(30));
         loginCard.setStyle("-fx-background-color: " + CARD + "; -fx-border-color: " + BORDER + "; "
                 + "-fx-border-radius: 14; -fx-background-radius: 14;");
 
@@ -407,14 +439,16 @@ public class MainApp extends Application {
                 savedServersContainer, recommendedContainer, addServerBtn,
                 serverRenderer, skinsRenderer,
                 saveSkinBtn, removeSkinBtn, skinStatus, skinsGallery,
-                offlineInstancesContainer, newWorldBtn,
+                offlineInstancesContainer, newInstanceBtn,
                 offlineDetailTitle, offlineVersionLabel, offlineLoaderLabel, offlineLoaderVersionLabel,
                 offlineModsContainer, offlineDropZone, modrinthQuery, modrinthSearchBtn,
-                modrinthResultsContainer, offlineGameModeCombo, offlineAllowCheatsCheck,
+                modrinthResultsContainer,
                 offlinePlayBtn, offlineDeleteBtn,
-                offlineShaderpackCombo, offlineResourcepackContainer,
+                offlineShaderpackCombo, offlineShaderpackList, offlineResourcepackContainer,
                 offlineAddShaderpackBtn, offlineAddResourcepackBtn,
-                ramSlider, ramLabel, strictVerifyCheck, trustDirectCheck, clientIdField);
+                offlineShaderQuery, offlineShaderSearchBtn, offlineShaderResultsContainer,
+                offlineTextureQuery, offlineTextureSearchBtn, offlineTextureResultsContainer,
+                ramSlider, ramLabel, strictVerifyCheck, trustDirectCheck);
         controller.init();
 
         Scene scene = new Scene(root, 1160, 720);
@@ -480,5 +514,24 @@ public class MainApp extends Application {
         card.setStyle("-fx-background-color: " + BG + "; -fx-border-color: #21262d; "
                 + "-fx-border-radius: 10; -fx-background-radius: 10;");
         return card;
+    }
+
+    /**
+     * The four-square Microsoft logo mark (red/green/blue/yellow) rendered as
+     * JavaFX shapes — the equivalent of the official SVG without SVG support.
+     */
+    private static Node microsoftLogo(double size) {
+        String[] brandColors = {"#F25022", "#7FBA00", "#00A4EF", "#FFB900"};
+        GridPane grid = new GridPane();
+        grid.setHgap(1.5);
+        grid.setVgap(1.5);
+        for (int i = 0; i < 4; i++) {
+            Rectangle tile = new Rectangle(size, size);
+            tile.setArcWidth(size * 0.15);
+            tile.setArcHeight(size * 0.15);
+            tile.setFill(Color.web(brandColors[i]));
+            grid.add(tile, i % 2, i / 2);
+        }
+        return grid;
     }
 }

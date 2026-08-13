@@ -352,18 +352,6 @@ public class ModManagementService {
         return bomService.getBom().getMods();
     }
 
-    /**
-     * Lists mods excluding shader-engine mods ({@code iris}/{@code sodium}/{@code oculus}/
-     * {@code embeddium}/{@code rubidium}) so they don't clutter the generic Installed Mods
-     * panel — those are managed from the dedicated Shaders tab instead.
-     */
-    public List<ModEntry> listModsFiltered() {
-        return listMods().stream()
-                .filter(m -> !com.mcmanager.core.model.ShaderEngineType.SHADER_MOD_PROJECT_IDS.contains(
-                        m.getId() == null ? "" : m.getId().toLowerCase(Locale.ROOT)))
-                .toList();
-    }
-
     /** Lists the files physically present in the mods folder. */
     public List<Path> listModFiles() throws IOException {
         try (var stream = Files.list(modsDir)) {

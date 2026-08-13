@@ -74,9 +74,9 @@ public class JavalinApp {
                 configService.getDataDir().resolve("resourcepacks"));
         ModServiceResolver serviceResolver = new ModServiceResolver(instanceManager, bomService,
                 modService, legacyPacks, configService.getConfig().curseforgeApiKey);
-        BomController bomController = new BomController(serviceResolver::bom);
-        ModController modController = new ModController(serviceResolver::mods);
-        PackFileController packFileController = new PackFileController(serviceResolver::packs);
+        BomController bomController = new BomController(serviceResolver);
+        ModController modController = new ModController(serviceResolver);
+        PackFileController packFileController = new PackFileController(serviceResolver);
         PlayerController playerController = new PlayerController(configService, processManager, console);
         ConfigController configController = new ConfigController(configService, bomService,
                 processManager, console);
@@ -267,8 +267,6 @@ public class JavalinApp {
         app.post("/api/instances/{id}/modpacks/install", instanceController::installModpack);
 
         // Shaders & texture packs REST endpoints
-        app.get("/api/instances/{id}/shaders", instanceController::getShaderStatus);
-        app.post("/api/instances/{id}/shaders/toggle", instanceController::toggleShaderEngine);
         app.get("/api/instances/{id}/shaderpacks", instanceController::listShaderpacks);
         app.post("/api/instances/{id}/shaderpacks/upload", instanceController::uploadShaderpack);
         app.post("/api/instances/{id}/shaderpacks/install", instanceController::installShaderpack);

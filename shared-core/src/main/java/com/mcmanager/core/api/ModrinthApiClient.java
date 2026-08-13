@@ -1,6 +1,8 @@
 package com.mcmanager.core.api;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
 
@@ -146,6 +148,45 @@ public class ModrinthApiClient {
             root.getAsJsonArray("hits").forEach(h -> hits.add(gson.fromJson(h, ModrinthSearchHit.class)));
         }
         return hits;
+    }
+
+    /**
+     * Fetches the stable (release) Minecraft versions known to Modrinth, newest
+     * first. Used to populate the launcher's game-version dropdown.
+     */
+    public List<String> listGameVersions() throws IOException, InterruptedException {
+        JsonArray tags = getJsonArray("/tag/game_version");
+        List<String> releases = new ArrayList<>();
+        if (tags != null) {
+            for (JsonElement element : tags) {
+                JsonObject tag = element.getAsJsonObject();
+                String type = tag.has("version_type") ? tag.get("version_type").getAsString() : "";
+                if ("release".equals(type) && tag.has("version")) {
+                    releases.add(tag.get("version").getAsString());
+                }
+            }
+        }
+        releases.sort(ModrinthApiClient::compareVersions);
+        return releases;
+    }
+
+    /**
+     * Fetches the mod loader types Modrinth knows about (e.g. {@code "fabric"},
+     * {@code "forge"}, {@code "neoforge"}, {@code "quilt"}).
+     */
+    public List<String> listLoaders() throws IOException, InterruptedException {
+        JsonArray tags = getJsonArray("/tag/loader");
+        List<String> loaders = new ArrayList<>();
+        if (tags != null) {
+            for (JsonElement element : tags) {
+                JsonObject tag = element.getAsJsonObject();
+                if (tag.has("name")) {
+                    loaders.add(tag.get("name").getAsString());
+                }
+            }
+        }
+        loaders.sort(String::compareTo);
+        return loaders;
     }
 
     /**
@@ -342,5 +383,48 @@ public class ModrinthApiClient {
 
     private static String urlEncode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    /** GETs a Modrinth API path and parses the response as a JSON array. */
+    private JsonArray getJsonArray(String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + path))
+                .header("User-Agent", userAgent)
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() / 100 != 2) {
+            throw new IOException("Modrinth request failed: HTTP " + response.statusCode()
+                    + " " + response.body());
+        }
+        return gson.fromJson(response.body(), JsonArray.class);
+    }
+
+    /**
+     * Numeric, dot/dash-separated version comparison (e.g. {@code 1.21.4 > 1.8.9},
+     * {@code 0.15.11 > 0.15.9}). Sorts newest-first when used as a descending comparator.
+     */
+    private static int compareVersions(String a, String b) {
+        String[] pa = a.split("[.\\-]");
+        String[] pb = b.split("[.\\-]");
+        int n = Math.max(pa.length, pb.length);
+        for (int i = 0; i < n; i++) {
+            int na = i < pa.length ? parseVersionSegment(pa[i]) : 0;
+            int nb = i < pb.length ? parseVersionSegment(pb[i]) : 0;
+            if (na != nb) {
+                return Integer.compare(nb, na);
+            }
+        }
+        return 0;
+    }
+
+    private static int parseVersionSegment(String segment) {
+        try {
+            return Integer.parseInt(segment);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }
