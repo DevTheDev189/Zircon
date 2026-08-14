@@ -1,0 +1,57 @@
+        /* Console filter checkboxes: unchecked state matches the page background
+           (bg-slate-950) instead of the browser default white. */
+        .console-check {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+            background-color: #020617; /* slate-950 */
+            border: 1px solid #334155; /* slate-700 */
+            border-radius: 4px;
+            display: inline-block;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.15s, border-color 0.15s;
+        }
+        .console-check:checked {
+            background-color: #47d2c9; /* brand teal */
+            border-color: #47d2c9;
+        }
+        .console-check:checked::after {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 1px;
+            width: 4px;
+            height: 8px;
+            border: solid #022c22;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        /* Dark scrollbars matching the app's slate theme (slate-700 thumb on a
+           slate-900 track, brighter on hover). Firefox uses the standard props;
+           Chromium/Safari use the ::-webkit-scrollbar pseudo-elements. */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #334155 #0f172a; /* slate-700 / slate-900 */
+        }
+        *::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        *::-webkit-scrollbar-track {
+            background: #0f172a; /* slate-900 */
+            border-radius: 5px;
+        }
+        *::-webkit-scrollbar-thumb {
+            background: #334155; /* slate-700 */
+            border-radius: 5px;
+            border: 2px solid #0f172a;
+        }
+        *::-webkit-scrollbar-thumb:hover {
+            background: #64748b; /* slate-500 */
+        }
+        *::-webkit-scrollbar-corner {
+            background: #0f172a;
+        }
