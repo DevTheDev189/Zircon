@@ -1,6 +1,7 @@
 package com.mcmanager.client.render;
 
 import javafx.application.Platform;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.PixelBuffer;
 import javafx.scene.image.PixelFormat;
@@ -54,7 +55,16 @@ public final class GlViewport {
 
         this.frame = new Frame(BufferUtils.createByteBuffer(width * height * 4), width, height);
         this.pixelBuffer = new PixelBuffer<>(width, height, frame.pixels(), PixelFormat.getByteBgraPreInstance());
-        this.node = new StackPane(createImageView(pixelBuffer));
+        this.node = new StackPane();
+        this.node.getChildren().add(createImageView(pixelBuffer));
+
+        // Preferred size is a layout hint only; the offscreen buffer resolution
+        // must never dictate how much screen space the preview claims. Without an
+        // explicit preference here, the ImageView's intrinsic size (which tracks
+        // the buffer) would pin the viewport to the largest size it ever reached,
+        // e.g. after a fullscreen session.
+        this.node.setPrefWidth(width);
+        this.node.setPrefHeight(height);
     }
 
     /** @return the JavaFX node displaying this viewport (a pickable StackPane). */
@@ -191,13 +201,57 @@ public final class GlViewport {
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
     }
 
-    private static ImageView createImageView(PixelBuffer<ByteBuffer> buffer) {
-        ImageView view = new ImageView(new WritableImage(buffer));
+    private ImageView createImageView(PixelBuffer<ByteBuffer> buffer) {
+        FittedImageView view = new FittedImageView(new WritableImage(buffer));
         view.setSmooth(false);
         // OpenGL readback is bottom-up; JavaFX images are top-down. Flip here so
         // the GL coordinate system, winding, and lighting stay untouched.
         view.setScaleY(-1.0);
+
+        // ImageView is a plain Node (not a Region): its min/max size defaults to
+        // the image size, which would pin the surrounding layout to the buffer
+        // resolution — the preview would stay as large as it was at fullscreen and
+        // squeeze everything else. FittedImageView neutralizes those intrinsic
+        // constraints so the layout (not the buffer) decides the preview's size.
+        view.setPreserveRatio(false);
+        view.fitWidthProperty().bind(node.widthProperty());
+        view.fitHeightProperty().bind(node.heightProperty());
         return view;
+    }
+
+    /**
+     * An {@link ImageView} that never imposes its image size on the layout.
+     * ImageView extends {@code Node} directly, where {@code minWidth}/{@code minHeight}
+     * default to the image size (and max likewise), so a fullscreen-sized buffer
+     * would prevent the viewport from ever shrinking back down. Overriding the
+     * intrinsic constraints lets the image simply fill whatever space the layout
+     * gives it.
+     */
+    private static final class FittedImageView extends ImageView {
+
+        FittedImageView(Image image) {
+            super(image);
+        }
+
+        @Override
+        public double minWidth(double height) {
+            return 0;
+        }
+
+        @Override
+        public double minHeight(double width) {
+            return 0;
+        }
+
+        @Override
+        public double maxWidth(double height) {
+            return Double.MAX_VALUE;
+        }
+
+        @Override
+        public double maxHeight(double width) {
+            return Double.MAX_VALUE;
+        }
     }
 
     private record Frame(ByteBuffer pixels, int width, int height) {

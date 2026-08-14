@@ -39,6 +39,16 @@ public class Player3DRenderer {
     private volatile double pitchDegrees;
 
     public Player3DRenderer(double width, double height) {
+        this(width, height, 0.0);
+    }
+
+    /**
+     * @param initialRotationDegrees base yaw offset applied at startup (drag-rotate
+     *                               builds on top of it). Positive turns the model's
+     *                               face toward the right of the preview.
+     */
+    public Player3DRenderer(double width, double height, double initialRotationDegrees) {
+        this.rotationDegrees = initialRotationDegrees;
         this.viewport = new GlViewport((int) width, (int) height, player);
         GlContext.instance().register(viewport);
 
@@ -73,6 +83,7 @@ public class Player3DRenderer {
                 viewport.resize(roundSize(node.getWidth()), roundSize(newVal)));
 
         player.setSkin(toBgra(fallbackSkin()), 64, 64);
+        player.setRotation((float) Math.toRadians(rotationDegrees));
         viewport.requestRender();
     }
 

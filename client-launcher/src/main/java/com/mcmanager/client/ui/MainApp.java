@@ -112,7 +112,8 @@ public class MainApp extends Application {
         // ------------------------------------------------------------------
         // View 1: Servers
         // ------------------------------------------------------------------
-        Player3DRenderer serverRenderer = new Player3DRenderer(360, 440);
+        // Turn the figure slightly toward the servers list on its left.
+        Player3DRenderer serverRenderer = new Player3DRenderer(360, 440, -10.0);
 
         Label sectionYourServers = sectionLabel("Your Servers");
         Button addServerBtn = new Button("+ Add Server");
@@ -270,7 +271,8 @@ public class MainApp extends Application {
         // ------------------------------------------------------------------
         // View 3: Skins
         // ------------------------------------------------------------------
-        Player3DRenderer skinsRenderer = new Player3DRenderer(380, 460);
+        // Turn the figure slightly toward the skin gallery on its right.
+        Player3DRenderer skinsRenderer = new Player3DRenderer(380, 460, 10.0);
 
         StackPane skinsPlayerBox = viewport(skinsRenderer.getNode(), "3D Player Preview");
         HBox.setHgrow(skinsPlayerBox, Priority.ALWAYS);
@@ -320,7 +322,8 @@ public class MainApp extends Application {
         skinsRight.setStyle("-fx-background-color: " + CARD + "; -fx-border-color: " + BORDER + "; "
                 + "-fx-border-radius: 12; -fx-background-radius: 12; -fx-padding: 14;");
         skinsRight.setPrefWidth(460);
-        skinsRight.setMinWidth(380);
+        skinsRight.setMinWidth(300);
+        HBox.setHgrow(skinsRight, Priority.ALWAYS);
 
         HBox skinsView = new HBox(20, skinsLeft, skinsRight);
         skinsView.setPadding(new Insets(20));
