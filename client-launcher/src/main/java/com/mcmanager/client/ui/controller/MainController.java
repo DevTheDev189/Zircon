@@ -99,9 +99,9 @@ public class MainController {
             + "-fx-background-color: transparent; -fx-text-fill: #c9d1d9;";
     private static final String NAV_ACTIVE_STYLE = "-fx-font-size: 14px; -fx-padding: 10 14; -fx-background-radius: 8; "
             + "-fx-background-color: #21262d; -fx-text-fill: white; -fx-font-weight: bold;";
-    private static final String PLAY_BTN_STYLE = "-fx-background-color: #2da44e; -fx-text-fill: white; "
+    private static final String PLAY_BTN_STYLE = "-fx-background-color: #47d2c9; -fx-text-fill: #022c29; "
             + "-fx-font-weight: bold; -fx-padding: 6 16; -fx-background-radius: 6;";
-    private static final String PLAY_BTN_BUSY_STYLE = "-fx-background-color: #1a7f37; -fx-text-fill: white; "
+    private static final String PLAY_BTN_BUSY_STYLE = "-fx-background-color: #47d2c9; -fx-text-fill: #022c29; "
             + "-fx-font-weight: bold; -fx-padding: 6 16; -fx-background-radius: 6; -fx-graphic-text-gap: 6;";
     private static final String PLAY_BTN_DISABLED_STYLE = "-fx-background-color: #21262d; -fx-text-fill: #6e7681; "
             + "-fx-font-weight: bold; -fx-padding: 6 16; -fx-background-radius: 6;";
@@ -597,7 +597,7 @@ public class MainController {
             HBox.setHgrow(spacer, Priority.ALWAYS);
 
             Button joinBtn = new Button("Add & Play");
-            joinBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-padding: 4 12; -fx-font-size: 11px;");
+            joinBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #47d2c9; -fx-padding: 4 12; -fx-font-size: 11px;");
             joinBtn.setOnAction(e -> {
                 SavedServer.recordPlayed(rec[0], rec[1]);
                 populateServerList();
@@ -618,7 +618,7 @@ public class MainController {
         badge.setMinSize(30, 30);
         badge.setMaxSize(30, 30);
         badge.setAlignment(Pos.CENTER);
-        badge.setStyle("-fx-background-color: #2da44e; -fx-text-fill: white; -fx-font-weight: bold; "
+        badge.setStyle("-fx-background-color: #47d2c9; -fx-text-fill: #022c29; -fx-font-weight: bold; "
                 + "-fx-background-radius: 15; -fx-font-size: 13px;");
         return badge;
     }
@@ -763,7 +763,7 @@ public class MainController {
     }
 
     private static String cardStyle(boolean active) {
-        return "-fx-background-color: #0d1117; -fx-border-color: " + (active ? "#2da44e" : "#21262d")
+        return "-fx-background-color: #0d1117; -fx-border-color: " + (active ? "#47d2c9" : "#21262d")
                 + "; -fx-border-width: 2; -fx-border-radius: 10; -fx-background-radius: 10; -fx-cursor: hand;";
     }
 
@@ -1036,7 +1036,7 @@ public class MainController {
         nameLbl.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: white;");
 
         Label versionBadge = new Label(instance.getMinecraftVersion());
-        versionBadge.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; "
+        versionBadge.setStyle("-fx-background-color: #21262d; -fx-text-fill: #47d2c9; "
                 + "-fx-font-size: 10px; -fx-padding: 2 6; -fx-background-radius: 6;");
 
         HBox badges = new HBox(6, versionBadge);
@@ -1046,7 +1046,7 @@ public class MainController {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Button playBtn = new Button("PLAY");
-        playBtn.setStyle("-fx-background-color: #2da44e; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 4 12; -fx-font-size: 11px;");
+        playBtn.setStyle("-fx-background-color: #47d2c9; -fx-text-fill: #022c29; -fx-font-weight: bold; -fx-padding: 4 12; -fx-font-size: 11px;");
         playBtn.setOnAction(e -> {
             renderOfflineDetail(instance);
             updateInstanceCardHighlight();
@@ -1066,7 +1066,7 @@ public class MainController {
     }
 
     private static String offlineCardStyle(boolean active) {
-        return "-fx-background-color: #161b22; -fx-border-color: " + (active ? "#2da44e" : "#30363d")
+        return "-fx-background-color: #161b22; -fx-border-color: " + (active ? "#47d2c9" : "#30363d")
                 + "; -fx-border-width: 2; -fx-border-radius: 8; -fx-background-radius: 8; -fx-cursor: hand;";
     }
 
@@ -1642,7 +1642,7 @@ public class MainController {
             action = spinner(16);
         } else {
             Button installBtn = new Button("Install");
-            installBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-padding: 4 10; -fx-font-size: 11px;");
+            installBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #47d2c9; -fx-padding: 4 10; -fx-font-size: 11px;");
             installBtn.setOnAction(e -> installAction.run());
             action = installBtn;
         }

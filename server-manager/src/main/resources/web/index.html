@@ -4,7 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zircon Server Admin</title>
+    <link rel="icon" type="image/svg+xml" href="zircon-icon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        /* Re-map the Tailwind emerald scale to the Zircon brand teal so the
+           whole admin dashboard shares the launcher's accent color (#47d2c9). */
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            300: '#7be3dc',
+                            400: '#47d2c9',
+                            500: '#47d2c9',
+                            600: '#2f8f88',
+                            900: '#0f3d3a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         /* Console filter checkboxes: unchecked state matches the page background
@@ -24,8 +44,8 @@
             transition: background-color 0.15s, border-color 0.15s;
         }
         .console-check:checked {
-            background-color: #10b981; /* emerald-500 */
-            border-color: #10b981;
+            background-color: #47d2c9; /* brand teal */
+            border-color: #47d2c9;
         }
         .console-check:checked::after {
             content: "";
@@ -38,6 +58,32 @@
             border-width: 0 2px 2px 0;
             transform: rotate(45deg);
         }
+        /* Dark scrollbars matching the app's slate theme (slate-700 thumb on a
+           slate-900 track, brighter on hover). Firefox uses the standard props;
+           Chromium/Safari use the ::-webkit-scrollbar pseudo-elements. */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #334155 #0f172a; /* slate-700 / slate-900 */
+        }
+        *::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        *::-webkit-scrollbar-track {
+            background: #0f172a; /* slate-900 */
+            border-radius: 5px;
+        }
+        *::-webkit-scrollbar-thumb {
+            background: #334155; /* slate-700 */
+            border-radius: 5px;
+            border: 2px solid #0f172a;
+        }
+        *::-webkit-scrollbar-thumb:hover {
+            background: #64748b; /* slate-500 */
+        }
+        *::-webkit-scrollbar-corner {
+            background: #0f172a;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans h-screen flex overflow-hidden">
@@ -46,8 +92,8 @@
     <!-- LOGIN OVERLAY -->
     <div v-if="!authenticated" class="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center">
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-xl w-96 shadow-2xl">
-            <h2 class="text-2xl font-bold text-emerald-400 mb-1">Zircon Admin</h2>
-            <p class="text-xs text-slate-400 mb-6">Enter credentials printed to stdout on startup.</p>
+            <img src="zircon-title.svg" alt="Zircon" class="h-8 w-auto block mx-auto mb-4">
+            <p class="text-xs text-slate-400 mb-6 text-center">Enter credentials printed to stdout on startup.</p>
             <form @submit.prevent="login">
                 <label class="block text-xs text-slate-400 mb-1">Username</label>
                 <input v-model="loginForm.username" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-4 border border-slate-700">
@@ -64,16 +110,15 @@
         <!-- LEFT SIDEBAR -->
         <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4">
             <!-- Branding -->
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-8 h-8 rounded bg-emerald-500 font-bold text-slate-950 flex items-center justify-center">Z</div>
-                <span class="font-bold text-lg tracking-wide">Zircon</span>
+            <div class="mb-6">
+                <img src="zircon-title.svg" alt="Zircon" class="h-8 w-auto">
             </div>
 
             <!-- Global Stats Button — gets the same glowing outline as a selected server -->
             <button @click="activeTab = 'stats'"
                     class="w-full mb-4 px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition border"
                     :class="activeTab === 'stats'
-                        ? 'border-emerald-400 ring-1 ring-emerald-400/60 shadow-[0_0_14px_rgba(16,185,129,0.35)] bg-slate-800 text-emerald-300'
+                        ? 'border-emerald-400 ring-1 ring-emerald-400/60 shadow-[0_0_14px_rgba(71,210,201,0.35)] bg-slate-800 text-emerald-300'
                         : 'border-transparent bg-slate-800/80 hover:bg-slate-800 text-slate-300'">
                 System Stats
             </button>
@@ -84,7 +129,7 @@
                 <div v-for="inst in instances" :key="inst.id" @click="selectInstance(inst)"
                      class="bg-slate-800 border rounded-lg p-3 cursor-pointer transition"
                      :class="activeTab !== 'stats' && selectedInstance?.id === inst.id
-                         ? 'border-emerald-400 ring-1 ring-emerald-400/60 shadow-[0_0_14px_rgba(16,185,129,0.35)]'
+                         ? 'border-emerald-400 ring-1 ring-emerald-400/60 shadow-[0_0_14px_rgba(71,210,201,0.35)]'
                          : 'border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/90'">
                     <div class="flex items-center justify-between gap-2">
                         <p class="font-semibold text-sm truncate">{{ inst.name }}</p>
@@ -238,7 +283,7 @@
                                 <span class="text-xs text-slate-400">Searching {{ searchType === 'modpack' ? 'modpacks' : 'mods' }}...</span>
                             </div>
                             <div v-for="hit in searchResults" :key="hit.projectId" class="bg-slate-800/60 border border-slate-700/40 p-3 rounded-lg flex gap-3">
-                                <img :src="hit.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2310b981\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>'" class="w-10 h-10 rounded object-cover shrink-0">
+                                <img :src="hit.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2347d2c9\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>'" class="w-10 h-10 rounded object-cover shrink-0">
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center justify-between">
                                         <p class="font-semibold text-sm truncate">{{ hit.title }}</p>
@@ -274,7 +319,7 @@
                         <h3 class="font-bold text-sm mb-3">Installed Mods ({{ installedMods.length }})</h3>
                         <div class="flex-1 overflow-y-auto space-y-3 pr-1">
                             <div v-for="m in installedMods" :key="m.filename" class="bg-slate-800/60 border border-slate-700/40 p-3 rounded-lg flex gap-3 items-center">
-                                <img :src="m.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2310b981\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>'" class="w-10 h-10 rounded object-cover shrink-0">
+                                <img :src="m.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2347d2c9\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>'" class="w-10 h-10 rounded object-cover shrink-0">
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2">
                                         <p class="font-semibold text-sm truncate">{{ m.title || m.filename }}</p>

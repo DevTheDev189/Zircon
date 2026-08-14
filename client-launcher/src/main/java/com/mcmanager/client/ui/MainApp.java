@@ -17,6 +17,7 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
@@ -28,7 +29,6 @@ import javafx.scene.layout.TilePane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 /**
@@ -44,7 +44,7 @@ public class MainApp extends Application {
     private static final String BG = "#0d1117";
     private static final String CARD = "#161b22";
     private static final String BORDER = "#30363d";
-    private static final String ACCENT = "#2da44e";
+    private static final String ACCENT = "#47d2c9";
     private static final String MUTED = "#8b949e";
     private static final String TEXT = "#c9d1d9";
 
@@ -55,18 +55,12 @@ public class MainApp extends Application {
         // ------------------------------------------------------------------
         // Sidebar
         // ------------------------------------------------------------------
-        Label logo = new Label("⚡");
-        logo.setFont(new Font(22));
-        logo.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; "
-                + "-fx-background-radius: 8; -fx-padding: 4 10;");
+        ImageView brandLockup = new ImageView(new Image(MainApp.class.getResourceAsStream("/zircon-title.png")));
+        brandLockup.setFitHeight(26);
+        brandLockup.setPreserveRatio(true);
+        brandLockup.setSmooth(true);
 
-        Label appName = new Label("Zircon");
-        appName.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white;");
-        Label appSubtitle = new Label("mod-synced launcher");
-        appSubtitle.setStyle("-fx-font-size: 10px; -fx-text-fill: " + MUTED + ";");
-        VBox titleBox = new VBox(2, appName, appSubtitle);
-
-        HBox brandHeader = new HBox(10, logo, titleBox);
+        HBox brandHeader = new HBox(brandLockup);
         brandHeader.setAlignment(Pos.CENTER_LEFT);
         brandHeader.setPadding(new Insets(16, 16, 20, 16));
 
@@ -117,7 +111,7 @@ public class MainApp extends Application {
 
         Label sectionYourServers = sectionLabel("Your Servers");
         Button addServerBtn = new Button("+ Add Server");
-        addServerBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 12px; -fx-font-weight: bold;");
+        addServerBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: " + ACCENT + "; -fx-font-size: 12px; -fx-font-weight: bold;");
 
         Region yourSpacer = new Region();
         HBox.setHgrow(yourSpacer, Priority.ALWAYS);
@@ -147,7 +141,7 @@ public class MainApp extends Application {
         // ------------------------------------------------------------------
         Label offlineTitle = sectionLabel("Offline Instances");
         Button newInstanceBtn = new Button("+ New Instance");
-        newInstanceBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold;");
+        newInstanceBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: #022c29; -fx-font-size: 12px; -fx-font-weight: bold;");
 
         Region offlineSpacer = new Region();
         HBox.setHgrow(offlineSpacer, Priority.ALWAYS);
@@ -190,7 +184,7 @@ public class MainApp extends Application {
         TextField modrinthQuery = new TextField();
         modrinthQuery.setPromptText("Search mods (e.g. Sodium)");
         Button modrinthSearchBtn = new Button("Search");
-        modrinthSearchBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 12px;");
+        modrinthSearchBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: " + ACCENT + "; -fx-font-size: 12px;");
         HBox modrinthRow = new HBox(8, modrinthQuery, modrinthSearchBtn);
         HBox.setHgrow(modrinthQuery, Priority.ALWAYS);
 
@@ -213,11 +207,11 @@ public class MainApp extends Application {
         VBox offlineShaderpackList = new VBox(6);
         ScrollPane offlineShaderpackScroll = scrollPane(offlineShaderpackList, 90);
         Button offlineAddShaderpackBtn = new Button("+ Add Shaderpack (.zip)");
-        offlineAddShaderpackBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 11px; -fx-padding: 6 10;");
+        offlineAddShaderpackBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: " + ACCENT + "; -fx-font-size: 11px; -fx-padding: 6 10;");
         TextField offlineShaderQuery = new TextField();
         offlineShaderQuery.setPromptText("Search Modrinth shaderpacks...");
         Button offlineShaderSearchBtn = new Button("Search");
-        offlineShaderSearchBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 12px;");
+        offlineShaderSearchBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: " + ACCENT + "; -fx-font-size: 12px;");
         HBox offlineShaderRow = new HBox(8, offlineShaderQuery, offlineShaderSearchBtn);
         HBox.setHgrow(offlineShaderQuery, Priority.ALWAYS);
         VBox offlineShaderResultsContainer = new VBox(8);
@@ -231,11 +225,11 @@ public class MainApp extends Application {
         VBox offlineResourcepackContainer = new VBox(6);
         ScrollPane offlineResourcepackScroll = scrollPane(offlineResourcepackContainer, 90);
         Button offlineAddResourcepackBtn = new Button("+ Add Texture Pack (.zip)");
-        offlineAddResourcepackBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 11px; -fx-padding: 6 10;");
+        offlineAddResourcepackBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: " + ACCENT + "; -fx-font-size: 11px; -fx-padding: 6 10;");
         TextField offlineTextureQuery = new TextField();
         offlineTextureQuery.setPromptText("Search Modrinth texture packs...");
         Button offlineTextureSearchBtn = new Button("Search");
-        offlineTextureSearchBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: #58a6ff; -fx-font-size: 12px;");
+        offlineTextureSearchBtn.setStyle("-fx-background-color: #21262d; -fx-text-fill: " + ACCENT + "; -fx-font-size: 12px;");
         HBox offlineTextureRow = new HBox(8, offlineTextureQuery, offlineTextureSearchBtn);
         HBox.setHgrow(offlineTextureQuery, Priority.ALWAYS);
         VBox offlineTextureResultsContainer = new VBox(8);
@@ -247,7 +241,7 @@ public class MainApp extends Application {
 
         Button offlinePlayBtn = new Button("Play Offline");
         offlinePlayBtn.setMaxWidth(Double.MAX_VALUE);
-        offlinePlayBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 16;");
+        offlinePlayBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: #022c29; -fx-font-weight: bold; -fx-padding: 10 16;");
 
         Button offlineDeleteBtn = new Button("Delete Instance");
         offlineDeleteBtn.setMaxWidth(Double.MAX_VALUE);
@@ -279,7 +273,7 @@ public class MainApp extends Application {
 
         Button saveSkinBtn = new Button("SAVE");
         saveSkinBtn.setMaxWidth(Double.MAX_VALUE);
-        saveSkinBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; "
+        saveSkinBtn.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: #022c29; "
                 + "-fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 20; "
                 + "-fx-background-radius: 8; -fx-cursor: hand;");
 
@@ -409,14 +403,19 @@ public class MainApp extends Application {
 
         Button loginButton = new Button();
         loginButton.setGraphic(loginButtonContent);
-        loginButton.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: white; -fx-font-weight: bold; "
+        loginButton.setStyle("-fx-background-color: " + ACCENT + "; -fx-text-fill: #022c29; -fx-font-weight: bold; "
                 + "-fx-font-size: 15px; -fx-padding: 10 10 10 20; -fx-background-radius: 999;");
 
         Label loginStatus = new Label("");
         loginStatus.setStyle("-fx-font-size: 12px; -fx-text-fill: " + MUTED + ";");
         loginStatus.setWrapText(true);
 
-        VBox loginCard = new VBox(14, loginTitle, loginSubtitle, loginButton, loginStatus);
+        ImageView loginBrand = new ImageView(new Image(MainApp.class.getResourceAsStream("/zircon-title.png")));
+        loginBrand.setFitHeight(38);
+        loginBrand.setPreserveRatio(true);
+        loginBrand.setMouseTransparent(true);
+
+        VBox loginCard = new VBox(14, loginBrand, loginTitle, loginSubtitle, loginButton, loginStatus);
         loginCard.setAlignment(Pos.CENTER);
         loginCard.setMaxWidth(400);
         // Cap the height so the overlay's StackPane doesn't stretch the card to
@@ -430,6 +429,8 @@ public class MainApp extends Application {
         loginView.setStyle("-fx-background-color: " + BG + ";");
 
         StackPane root = new StackPane(mainLayout, loginView);
+        // Cascade the brand accent to progress bars, sliders and checkboxes.
+        root.setStyle("-fx-accent: " + ACCENT + ";");
 
         // ------------------------------------------------------------------
         // Controller wiring
@@ -457,6 +458,13 @@ public class MainApp extends Application {
         Scene scene = new Scene(root, 1160, 720);
         stage.setTitle("Zircon Launcher");
         stage.setScene(scene);
+        stage.getIcons().addAll(
+                new Image(MainApp.class.getResourceAsStream("/zircon-icon-16.png")),
+                new Image(MainApp.class.getResourceAsStream("/zircon-icon-32.png")),
+                new Image(MainApp.class.getResourceAsStream("/zircon-icon-48.png")),
+                new Image(MainApp.class.getResourceAsStream("/zircon-icon-64.png")),
+                new Image(MainApp.class.getResourceAsStream("/zircon-icon-128.png")),
+                new Image(MainApp.class.getResourceAsStream("/zircon-icon-256.png")));
         stage.setMinWidth(900);
         stage.setMinHeight(560);
         stage.show();
