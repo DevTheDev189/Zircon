@@ -27,3 +27,14 @@ client_id.txt
 .env
 *.key
 *.pem
+
+# ---------- Rust ----------
+target/
+**/target/
+
+# ---------- Launcher frontend ----------
+crates/zircon-launcher/ui/node_modules/
+crates/zircon-launcher/ui/dist/
+
+# ---------- Launcher runtime state (never commit) ----------
+~/.mcmanager/

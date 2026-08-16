@@ -1,0 +1,35 @@
+[package]
+name = "zircon-server"
+version = "0.1.0"
+edition = "2021"
+description = "Zircon server manager daemon: process supervisor, TCP multiplexer, backup engine, Axum admin API"
+license = "MIT"
+
+[dependencies]
+zircon-core = { path = "../zircon-core" }
+
+tokio = { workspace = true, features = ["full"] }
+axum = { workspace = true }
+tower-http = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+reqwest = { workspace = true }
+bcrypt.workspace = true
+jsonwebtoken.workspace = true
+sysinfo.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+dashmap.workspace = true
+bytes.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+url.workspace = true
+zip.workspace = true
+getrandom = "0.3"
+tokio-util = { workspace = true, features = ["io"] }
+futures-util = "0.3"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

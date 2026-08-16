@@ -1,0 +1,57 @@
+# Zircon (MCManager) — Rust workspace
+#
+# Re-write of the Java (JavaFX / Javalin / Netty) codebase into a modern Rust
+# workspace. See RUST_AGENT_PLAN.md for the full migration plan.
+#
+#   crates/zircon-core      Shared domain: models, hashes, archive, metadata, API clients
+#   crates/zircon-server    Server manager daemon: process supervisor, TCP multiplexer,
+#                           backup engine, Axum REST/WebSocket admin API
+#   crates/zircon-launcher  Companion launcher: Tauri v2 shell + Vue 3 frontend
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/zircon-core",
+    "crates/zircon-server",
+    "crates/zircon-launcher",
+]
+
+[workspace.dependencies]
+tokio = { version = "1.40", features = ["full"] }
+axum = { version = "0.7", features = ["ws", "multipart"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
+sha1 = "0.10"
+sha2 = "0.10"
+hex = "0.4"
+tar = "0.4"
+lz4_flex = "0.11"
+bcrypt = "0.15"
+jsonwebtoken = "9.3"
+sysinfo = "0.31"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+toml = "0.8"
+zip = "2.2"
+uuid = { version = "1.10", features = ["v4", "v3", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+url = "2.5"
+open = "5.3"
+image = "0.25"
+dashmap = "6.0"
+bytes = "1.7"
+tokio-util = { version = "0.7", features = ["codec", "io"] }
+semver = "1.0"
+tauri = { version = "2.1", features = ["protocol-asset"] }
+tauri-build = "2.0"
+base64 = "0.22"
+
+# Phase 6: release build optimization
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
