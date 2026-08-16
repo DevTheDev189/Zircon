@@ -23,6 +23,11 @@ window.Zircon.core = {
     async api(path, opts = {}) {
         opts.headers = { ...opts.headers, 'Authorization': 'Bearer ' + this.jwtToken, 'Content-Type': 'application/json' };
         const res = await fetch(path, opts);
+        if (res.status === 401) {
+            // Session expired or revoked (JWT TTL is 12h) — drop it and show login.
+            this.logout();
+            throw new Error('Session expired. Please log in again.');
+        }
         if (!res.ok) throw new Error(await res.text());
         // 204 No Content (e.g. DELETE endpoints) has no body to parse.
         if (res.status === 204) return {};

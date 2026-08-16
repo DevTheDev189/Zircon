@@ -59,9 +59,23 @@ pub fn active_skin_file() -> PathBuf {
     skins_dir().join("active_skin.png")
 }
 
+/// `~/.mcmanager/skins/active_skin.json` — the arm variant (`classic`/`slim`)
+/// of the active custom skin, kept alongside the PNG so the UI can restore the
+/// correct model and upload without silently flipping the player's arms.
+pub fn active_skin_variant_file() -> PathBuf {
+    skins_dir().join("active_skin.json")
+}
+
 /// `~/.mcmanager/skins/history` — archived skins (pruned to 25 entries).
 pub fn skin_history_dir() -> PathBuf {
     skins_dir().join("history")
+}
+
+/// `~/.mcmanager/skins/presets` — the user-editable preset gallery. Drop PNG
+/// files here to add or replace preset skins; seeded with the bundled defaults
+/// on first use.
+pub fn skin_presets_dir() -> PathBuf {
+    skins_dir().join("presets")
 }
 
 /// `~/.zircon/instances` — per-server game directories keyed by host_port

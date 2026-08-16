@@ -5,6 +5,7 @@ pub mod app;
 pub mod auth;
 pub mod config_routes;
 pub mod controllers;
+pub mod rate_limit;
 pub mod views;
 
 pub use app::{router, AppState};

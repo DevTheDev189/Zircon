@@ -18,6 +18,8 @@ pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
     "meta.fabricmc.net",
     "meta.quiltmc.org",
     "piston-meta.mojang.com",
+    "piston-data.mojang.com",
+    "launcher.mojang.com",
     "launchermeta.mojang.com",
 ];
 
@@ -53,6 +55,13 @@ mod tests {
         ));
         assert!(is_safe_cdn_url(
             "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+        ));
+        // Mojang's data CDN serves the actual server jars listed in manifests.
+        assert!(is_safe_cdn_url(
+            "https://piston-data.mojang.com/v1/objects/0123456789abcdef/server.jar"
+        ));
+        assert!(is_safe_cdn_url(
+            "https://launcher.mojang.com/v1/objects/0123456789abcdef/server.jar"
         ));
     }
 

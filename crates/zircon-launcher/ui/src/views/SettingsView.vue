@@ -25,35 +25,6 @@
         </p>
       </div>
 
-      <!-- Toggles -->
-      <label class="flex items-start gap-3 mb-4 cursor-pointer">
-        <input
-          v-model="settings.strictVerification"
-          type="checkbox"
-          class="mt-0.5 accent-[#47d2c9]"
-        />
-        <span>
-          <span class="block text-sm font-bold text-white">Strict hash verification</span>
-          <span class="block text-xs text-muted">
-            Abort a mod sync when a mod's hash cannot be verified against Modrinth/CurseForge.
-          </span>
-        </span>
-      </label>
-
-      <label class="flex items-start gap-3 mb-6 cursor-pointer">
-        <input
-          v-model="settings.trustDirectMods"
-          type="checkbox"
-          class="mt-0.5 accent-[#47d2c9]"
-        />
-        <span>
-          <span class="block text-sm font-bold text-white">Trust direct custom mods</span>
-          <span class="block text-xs text-muted">
-            Accept server mods with no provider to verify against (needed when strict mode is on).
-          </span>
-        </span>
-      </label>
-
       <button class="z-btn-accent" :disabled="saving" @click="save">
         {{ saving ? 'Saving…' : 'Save Settings' }}
       </button>
@@ -66,7 +37,7 @@
 import { onMounted, ref } from 'vue';
 import { api } from '../lib/api';
 
-const settings = ref({ memoryGb: 4, strictVerification: true, trustDirectMods: false });
+const settings = ref({ memoryGb: 4 });
 const saving = ref(false);
 const savedAt = ref('');
 

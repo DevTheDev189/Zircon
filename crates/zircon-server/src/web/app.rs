@@ -12,10 +12,10 @@ use axum::middleware;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::Router;
-use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::auth::jwt;
+use crate::auth::sessions::SessionRegistry;
 use crate::config::ConfigService;
 use crate::instance::ServerInstanceManager;
 use crate::process::console::ConsoleStreamHandler;
@@ -32,6 +32,7 @@ use super::controllers::{
     auth_controller, backup_controller, bom_controller, console_controller, instance_controller,
     mod_controller, pack_controller, player_controller, stats_controller,
 };
+use super::rate_limit::FixedWindowLimiter;
 
 /// Shared application state handed to every handler.
 #[derive(Clone)]
@@ -48,6 +49,10 @@ pub struct AppState {
     pub resolver: Arc<ModServiceResolver>,
     pub tickets: Arc<JoinTicketManager>,
     pub curseforge_api_key: String,
+    /// Server-side session registry (sign-out / password-change revocation).
+    pub sessions: Arc<SessionRegistry>,
+    /// Fixed-window limiter for authentication endpoints.
+    pub login_limiter: Arc<FixedWindowLimiter>,
 }
 
 /// Errors mapped to HTTP responses.
@@ -57,6 +62,8 @@ pub enum ApiError {
     Unauthorized(String),
     NotFound(String),
     Conflict(String),
+    /// Authentication endpoints rate-limited (too many attempts).
+    TooManyRequests(String),
     Internal(String),
     /// Provider/upstream failures (Modrinth/CurseForge/install steps).
     BadGateway(String),
@@ -69,6 +76,7 @@ impl fmt::Display for ApiError {
             | ApiError::Unauthorized(m)
             | ApiError::NotFound(m)
             | ApiError::Conflict(m)
+            | ApiError::TooManyRequests(m)
             | ApiError::Internal(m)
             | ApiError::BadGateway(m) => write!(f, "{m}"),
         }
@@ -82,6 +90,7 @@ impl IntoResponse for ApiError {
             ApiError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m),
             ApiError::NotFound(m) => (StatusCode::NOT_FOUND, m),
             ApiError::Conflict(m) => (StatusCode::CONFLICT, m),
+            ApiError::TooManyRequests(m) => (StatusCode::TOO_MANY_REQUESTS, m),
             ApiError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m),
             ApiError::BadGateway(m) => (StatusCode::BAD_GATEWAY, m),
         };
@@ -149,10 +158,6 @@ pub fn router(state: AppState) -> Router {
     let public_api = Router::new()
         .route("/api/auth/login", post(auth_controller::login))
         .route(
-            "/api/auth/change-password",
-            post(auth_controller::change_password),
-        )
-        .route(
             "/api/join-intent",
             post(instance_controller::register_join_intent),
         )
@@ -168,6 +173,11 @@ pub fn router(state: AppState) -> Router {
         // Auth
         .route("/api/auth/me", get(auth_controller::me))
         .route("/api/auth/profile", post(auth_controller::profile))
+        .route(
+            "/api/auth/change-password",
+            post(auth_controller::change_password),
+        )
+        .route("/api/auth/logout", post(auth_controller::logout))
         // Stats
         .route("/api/stats", get(stats_controller::stats))
         // Legacy single-server endpoints (serve the active instance's data)
@@ -362,13 +372,18 @@ pub fn router(state: AppState) -> Router {
             "/api/instances/:id/backups/:backup_id/restore",
             post(backup_controller::restore_backup),
         )
-        .route("/api/console", get(console_controller::console_ws))
-        .route_layer(middleware::from_fn(require_auth));
+        .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
+
+    // The console WebSocket authenticates with its first message (browsers
+    // cannot set headers on the handshake, and a ?token= URL would leak into
+    // logs), so it is deliberately NOT covered by the header-auth middleware.
+    let console_router = Router::new().route("/api/console", get(console_controller::console_ws));
 
     // ----------------------------------------------------------------------
     // Client-facing legacy endpoints (public, outside /api)
     // ----------------------------------------------------------------------
     let client_routes = Router::new()
+        .route("/status", get(config_routes::client_status))
         .route("/bom", get(bom_controller::get_bom))
         .route("/files/mods/:filename", get(mod_controller::download_mod))
         .route(
@@ -383,10 +398,10 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(public_api)
         .merge(protected_api)
+        .merge(console_router)
         .merge(client_routes)
         .route("/", get(spa_index))
         .fallback(spa_fallback)
-        .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::max(512 * 1024 * 1024))
         .with_state(state)
@@ -415,12 +430,34 @@ async fn spa_fallback(request: Request) -> impl IntoResponse {
 
 fn spa_response(path: &str) -> Response {
     match static_file(path) {
-        Some((content_type, content)) => {
-            ([(header::CONTENT_TYPE, content_type)], content).into_response()
-        }
+        Some((content_type, content)) => (
+            [
+                (header::CONTENT_TYPE, content_type),
+                (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+                (header::X_FRAME_OPTIONS, "DENY"),
+                (header::REFERRER_POLICY, "no-referrer"),
+                (header::CONTENT_SECURITY_POLICY, SPA_CSP),
+            ],
+            content,
+        )
+            .into_response(),
         None => (StatusCode::NOT_FOUND, "Not found").into_response(),
     }
 }
+
+/// Content-Security-Policy for the embedded SPA. The dashboard loads Vue and
+/// Tailwind from CDNs and compiles in-DOM templates at runtime (which needs
+/// `unsafe-eval`), so this can't be lock-tight — it still blocks arbitrary
+/// external script origins, inline data: execution and clickjacking.
+const SPA_CSP: &str = "default-src 'self'; \
+    script-src 'self' https://cdn.tailwindcss.com https://unpkg.com 'unsafe-inline' 'unsafe-eval'; \
+    style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; \
+    img-src 'self' data: https:; \
+    font-src 'self' data:; \
+    connect-src 'self' ws: wss:; \
+    frame-ancestors 'none'; \
+    base-uri 'self'; \
+    form-action 'self'";
 
 /// Embedded static assets for the admin SPA.
 pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
@@ -486,9 +523,14 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
     Some((content_type, content))
 }
 
-/// Returns a short-lived JWT for a username (used by the auth controller).
-pub fn issue_token(username: &str) -> String {
-    jwt::generate_token(username)
+/// Issues a JWT for `username` and registers the session so it can be revoked
+/// server-side on sign-out or password change.
+pub fn issue_token(state: &AppState, username: &str) -> String {
+    let token = jwt::generate_token(username);
+    if let Some(claims) = jwt::decode_claims(&token) {
+        state.sessions.register(&claims.jti, username, claims.exp);
+    }
+    token
 }
 
 use super::config_routes;

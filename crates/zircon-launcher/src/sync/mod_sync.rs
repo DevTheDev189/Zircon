@@ -172,15 +172,18 @@ pub struct SyncResult {
     pub abort_reason: Option<String>,
 }
 
-/// If `strict` and any mods are unverified, marks the result aborted with the
-/// Java abort message. Factored out so tests can exercise the abort decision
-/// without any network access.
-fn apply_strict_abort(result: &mut SyncResult, strict: bool) {
-    if strict && !result.unverified.is_empty() {
+/// If any mods are unverified, marks the result aborted with the Java abort
+/// message. Verification is always strict — the removed security toggles could
+/// never be re-enabled — so this gate cannot be weakened. Factored out so
+/// tests can exercise the abort decision without any network access.
+fn apply_strict_abort(result: &mut SyncResult) {
+    if !result.unverified.is_empty() {
         result.aborted = true;
         result.abort_reason = Some(format!(
             "The following mods could not be verified against their source: {}. \
-             Enable 'trust custom mods' or fix the server BOM to continue.",
+             This can happen if the server is not running the official Zircon \
+             wrapper, a mod was modified, or the mod provider is unreachable. \
+             Fix the server BOM or your connection and try again.",
             result.unverified.join(", ")
         ));
     }
@@ -222,19 +225,19 @@ impl ModSyncEngine {
     ///   tolerated).
     /// * `game_dir` — the instance directory containing `mods/` and (created
     ///   here) `.mod_staging/`.
-    /// * `strict_verification` — when true, any mod whose hash could not be
-    ///   confirmed against Modrinth/CurseForge aborts the sync. Provider
-    ///   unreachability never aborts (mirroring the Java).
-    /// * `trust_direct_mods` — when true, `direct`-origin mods (no provider to
-    ///   verify against) are trusted unconditionally.
     ///
-    /// Port of the Java `sync`.
+    /// Verification is **always strict and always on**: every mod must be
+    /// confirmed against Modrinth/CurseForge, and every downloaded file must
+    /// match the hash pinned in the server's BOM. Any mod that cannot be
+    /// verified (including when a provider is unreachable, or a mod has no
+    /// provider at all) aborts the sync so nothing unverified is installed.
+    ///
+    /// Port of the Java `sync`, hardened: the Java-era "strict" / "trust
+    /// direct mods" toggles and fail-open provider checks were removed.
     pub async fn sync(
         &self,
         server_base_url: &str,
         game_dir: &Path,
-        strict_verification: bool,
-        trust_direct_mods: bool,
         listener: Option<&dyn ProgressListener>,
     ) -> Result<SyncResult, LauncherError> {
         let base = server_base_url
@@ -262,14 +265,7 @@ impl ModSyncEngine {
         // --- Step 2: verify hashes against Modrinth / CurseForge ---
         emit_status(listener, "Verifying mod hashes...");
         let curseforge_key = self.resolve_curseforge_key(&base).await;
-        verify_against_providers(
-            &mods,
-            curseforge_key,
-            &mut result,
-            strict_verification,
-            trust_direct_mods,
-        )
-        .await;
+        verify_against_providers(&mods, curseforge_key, &mut result).await;
         if result.aborted {
             return Ok(result);
         }
@@ -279,6 +275,9 @@ impl ModSyncEngine {
         let mut downloaded_bytes: u64 = 0;
 
         for (i, mod_entry) in mods.iter().enumerate() {
+            // The filename comes from the untrusted server BOM; a hostile
+            // server must not be able to write outside the instance directory.
+            validate_entry_filename(&mod_entry.filename).map_err(LauncherError::InvalidInput)?;
             let staged_target = staging_dir.join(&mod_entry.filename);
 
             if HashVerifier::matches(&staged_target, mod_entry) {
@@ -296,6 +295,21 @@ impl ModSyncEngine {
                 ),
             );
             let size = self.download(&url, &staged_target).await?;
+
+            // The file must match the hash pinned in the server's BOM. The BOM
+            // claims were already verified against Modrinth/CurseForge above;
+            // this catches a server serving something different than it
+            // advertised (compromised or malicious wrapper).
+            if !HashVerifier::matches(&staged_target, mod_entry) {
+                let _ = std::fs::remove_file(&staged_target);
+                result.unverified.push(mod_entry.filename.clone());
+                warn!(
+                    "Downloaded mod failed hash check: {} (server served a different file than its BOM claims)",
+                    mod_entry.filename
+                );
+                continue;
+            }
+
             downloaded_bytes += size;
             result.downloaded.push(mod_entry.filename.clone());
 
@@ -305,6 +319,14 @@ impl ModSyncEngine {
                 0.0
             };
             emit_progress(listener, fraction, &mod_entry.filename);
+        }
+
+        // Downloads that failed their hash check are treated like any other
+        // unverified mod: strict verification aborts before anything is
+        // installed into the active mods/ folder.
+        apply_strict_abort(&mut result);
+        if result.aborted {
+            return Ok(result);
         }
 
         // --- Step 4: dynamically reconcile the active instance mods/ directory ---
@@ -365,18 +387,19 @@ impl ModSyncEngine {
 }
 
 /// Batch-verifies mod hashes against Modrinth (SHA-1) and CurseForge
-/// (fingerprints). "Checked" means the provider responded; if the provider was
-/// unreachable (network down, no API key) we do NOT abort — the mods are
-/// simply not confirmable, which must not block testing.
+/// (fingerprints). Verification is **fail-closed**: a mod counts as verified
+/// only when its provider explicitly confirmed the pinned hash. A provider
+/// being unreachable, a missing API key, a mod with no pinned hash, or a mod
+/// with no provider (`direct`) all leave the mod unverified, which aborts the
+/// sync.
 ///
-/// Port of the Java `verifyAgainstProviders`, including the exact
-/// verified/unverified and strict-abort semantics.
+/// Port of the Java `verifyAgainstProviders`, hardened: the Java treated
+/// "provider unreachable" as verified and trusted `direct` mods when the
+/// (removed) setting was enabled — both fail-open behaviors are gone.
 async fn verify_against_providers(
     mods: &[ModEntry],
     curseforge_api_key: Option<String>,
     result: &mut SyncResult,
-    strict: bool,
-    trust_direct: bool,
 ) {
     let mut sha1s: Vec<String> = Vec::new();
     let mut fingerprints: Vec<u64> = Vec::new();
@@ -391,7 +414,9 @@ async fn verify_against_providers(
     let mut verified_sha1: HashSet<String> = HashSet::new();
     let mut verified_fingerprints: HashSet<u64> = HashSet::new();
 
-    // "checked" means the provider responded; empty input lists count as checked.
+    // "checked" means the provider responded; empty input lists count as
+    // checked. A provider that does not respond leaves its mods unverified
+    // (fail-closed) rather than trusting them.
     let mut modrinth_checked = sha1s.is_empty();
     let mut curseforge_checked = fingerprints.is_empty();
 
@@ -403,7 +428,7 @@ async fn verify_against_providers(
                 modrinth_checked = true;
             }
             Err(e) => warn!(
-                "Modrinth hash verification unavailable: {}",
+                "Modrinth hash verification unavailable: {} — Modrinth mods will block launch",
                 map_api_error(e)
             ),
         }
@@ -412,7 +437,7 @@ async fn verify_against_providers(
     if !fingerprints.is_empty() {
         match curseforge_api_key.as_deref().map(str::trim) {
             None | Some("") => {
-                info!("No CurseForge API key configured — skipping fingerprint verification (CurseForge mods will not block launch)");
+                info!("No CurseForge API key configured — CurseForge mods will block launch (nothing can be verified without it)");
             }
             Some(key) => {
                 let curseforge = CurseForgeApiClient::new(key);
@@ -424,7 +449,7 @@ async fn verify_against_providers(
                         curseforge_checked = true;
                     }
                     Err(e) => warn!(
-                        "CurseForge fingerprint verification unavailable: {}",
+                        "CurseForge fingerprint verification unavailable: {} — CurseForge mods will block launch",
                         map_api_error(e)
                     ),
                 }
@@ -433,23 +458,18 @@ async fn verify_against_providers(
     }
 
     for mod_entry in mods {
-        let verified = match mod_entry.origin.as_deref() {
-            // Verified when: no hash pinned, or provider unreachable, or hash found.
-            Some("modrinth") => {
-                mod_entry.sha1.is_none()
-                    || !modrinth_checked
-                    || mod_entry
-                        .sha1
-                        .as_deref()
-                        .is_some_and(|sha1| verified_sha1.contains(sha1))
-            }
-            Some("curseforge") => {
-                mod_entry.murmur3 == 0
-                    || !curseforge_checked
-                    || verified_fingerprints.contains(&mod_entry.murmur3)
-            }
-            _ => trust_direct,
-        };
+        // Verified only when the provider explicitly confirmed the pinned hash.
+        // Mods with no pinned hash, an unreachable provider, or no provider
+        // (direct) are unverified and block the sync.
+        let verified = is_mod_verified(
+            mod_entry.origin.as_deref(),
+            mod_entry.sha1.as_deref(),
+            mod_entry.murmur3,
+            modrinth_checked,
+            &verified_sha1,
+            curseforge_checked,
+            &verified_fingerprints,
+        );
         if !verified {
             result.unverified.push(mod_entry.filename.clone());
             warn!(
@@ -460,7 +480,28 @@ async fn verify_against_providers(
         }
     }
 
-    apply_strict_abort(result, strict);
+    apply_strict_abort(result);
+}
+
+/// Decides whether a mod counts as verified. **Fail-closed**: `true` only when
+/// the mod's provider responded and explicitly confirmed the pinned hash.
+/// A provider that did not respond, a missing pinned hash, or a mod with no
+/// provider (`direct`/unknown origin) are never verified. Pure so the security
+/// decision is unit-testable without network access.
+fn is_mod_verified(
+    origin: Option<&str>,
+    sha1: Option<&str>,
+    murmur3: u64,
+    modrinth_checked: bool,
+    verified_sha1: &HashSet<String>,
+    curseforge_checked: bool,
+    verified_fingerprints: &HashSet<u64>,
+) -> bool {
+    match origin {
+        Some("modrinth") => modrinth_checked && sha1.is_some_and(|s| verified_sha1.contains(s)),
+        Some("curseforge") => curseforge_checked && verified_fingerprints.contains(&murmur3),
+        _ => false,
+    }
 }
 
 /// Best-effort mapping of a provider [`ApiError`] into a [`LauncherError`].
@@ -601,6 +642,23 @@ impl ModSyncEngine {
 /// rather than Java's `+`, which servers decode identically).
 fn url_encode(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+}
+
+/// Rejects a server-supplied filename that could escape the instance directory.
+/// The BOM comes from an untrusted server, so a filename is only accepted when
+/// it is a plain basename: no path separators, no `..`, no leading dot, non-
+/// empty. Anything else aborts the sync before any file is written.
+pub(crate) fn validate_entry_filename(filename: &str) -> Result<(), String> {
+    if filename.is_empty()
+        || filename.contains('/')
+        || filename.contains('\\')
+        || filename.contains("..")
+        || filename.starts_with('.')
+        || filename == ".."
+    {
+        return Err(format!("invalid filename in server BOM: {filename:?}"));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -761,6 +819,31 @@ mod tests {
         assert!(!HashVerifier::is_zip("mod.jar"));
     }
 
+    #[test]
+    fn validate_entry_filename_rejects_traversal_and_dotfiles() {
+        // Legitimate basenames pass.
+        assert!(validate_entry_filename("sodium-0.5.8.jar").is_ok());
+        assert!(validate_entry_filename("a b.jar").is_ok());
+        assert!(validate_entry_filename("mod-1.0-rc1.jar").is_ok());
+
+        // Anything a hostile server could use to escape the instance directory.
+        for bad in [
+            "../../evil.jar",
+            "..\\evil.jar",
+            "sub/mod.jar",
+            "sub\\mod.jar",
+            "/abs.jar",
+            "..",
+            ".hidden.jar",
+            "",
+        ] {
+            assert!(
+                validate_entry_filename(bad).is_err(),
+                "should reject {bad:?}"
+            );
+        }
+    }
+
     // ------------------------------------------------------------------
     // SyncResult / strict abort
     // ------------------------------------------------------------------
@@ -776,24 +859,103 @@ mod tests {
         assert!(!result.aborted);
         assert!(result.abort_reason.is_none());
 
-        // Nothing unverified -> strict mode does not abort.
-        apply_strict_abort(&mut result, true);
+        // Nothing unverified -> no abort.
+        apply_strict_abort(&mut result);
         assert!(!result.aborted);
 
-        // Unverified mods + strict -> aborted with the ported message.
+        // Any unverified mod aborts — verification is always strict, there is
+        // no setting that can weaken it.
         result.unverified.push("a.jar".to_string());
         result.unverified.push("b.jar".to_string());
-        apply_strict_abort(&mut result, true);
+        apply_strict_abort(&mut result);
         assert!(result.aborted);
         let reason = result.abort_reason.as_deref().expect("abort reason");
         assert!(reason.contains("a.jar, b.jar"));
-        assert!(reason.contains("trust custom mods"));
+        assert!(reason.contains("could not be verified"));
+    }
 
-        // Non-strict mode never aborts.
-        let mut loose = SyncResult::default();
-        loose.unverified.push("a.jar".to_string());
-        apply_strict_abort(&mut loose, false);
-        assert!(!loose.aborted);
+    // ------------------------------------------------------------------
+    // Fail-closed verification decision
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn verified_only_when_provider_confirms_the_pinned_hash() {
+        let sha1s = HashSet::from(["good-sha1".to_string()]);
+        let fps = HashSet::from([42u64]);
+
+        // Modrinth: confirmed hash + responding provider -> verified.
+        assert!(is_mod_verified(
+            Some("modrinth"),
+            Some("good-sha1"),
+            0,
+            true,
+            &sha1s,
+            false,
+            &fps,
+        ));
+        // Modrinth: provider unreachable -> NOT verified (fail-closed).
+        assert!(!is_mod_verified(
+            Some("modrinth"),
+            Some("good-sha1"),
+            0,
+            false,
+            &sha1s,
+            false,
+            &fps,
+        ));
+        // Modrinth: no pinned hash -> NOT verified.
+        assert!(!is_mod_verified(
+            Some("modrinth"),
+            None,
+            0,
+            true,
+            &sha1s,
+            false,
+            &fps,
+        ));
+        // Modrinth: hash not confirmed by provider -> NOT verified.
+        assert!(!is_mod_verified(
+            Some("modrinth"),
+            Some("evil-sha1"),
+            0,
+            true,
+            &sha1s,
+            false,
+            &fps,
+        ));
+
+        // CurseForge: confirmed fingerprint + responding provider -> verified.
+        assert!(is_mod_verified(
+            Some("curseforge"),
+            None,
+            42,
+            false,
+            &sha1s,
+            true,
+            &fps,
+        ));
+        // CurseForge: no API key / provider unreachable -> NOT verified.
+        assert!(!is_mod_verified(
+            Some("curseforge"),
+            None,
+            42,
+            false,
+            &sha1s,
+            false,
+            &fps,
+        ));
+
+        // Direct / unknown origin is never trusted.
+        assert!(!is_mod_verified(
+            Some("direct"),
+            Some("good-sha1"),
+            0,
+            true,
+            &sha1s,
+            false,
+            &fps,
+        ));
+        assert!(!is_mod_verified(None, None, 0, true, &sha1s, true, &fps,));
     }
 
     // ------------------------------------------------------------------

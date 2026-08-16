@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 use zircon_core::model::{ModLoaderInfo, ModLoaderType};
+use zircon_core::security::ssrf;
 
 use crate::config::ServerConfig;
 
@@ -439,6 +440,11 @@ async fn run_installer(command: &[&str], working_dir: &Path) -> Result<i32, Inst
 // --------------------------------------------------------------------------
 
 async fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, InstallError> {
+    if !ssrf::is_safe_cdn_url(url) {
+        return Err(InstallError::Http(format!(
+            "Rejected metadata URL (host is not an allowed CDN): {url}"
+        )));
+    }
     let client = reqwest::Client::new();
     let response = client
         .get(url)
@@ -461,6 +467,11 @@ async fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, Instal
 }
 
 async fn download(url: &str, target: &Path) -> Result<(), InstallError> {
+    if !ssrf::is_safe_cdn_url(url) {
+        return Err(InstallError::Http(format!(
+            "Rejected download URL (host is not an allowed CDN): {url}"
+        )));
+    }
     let client = reqwest::Client::new();
     let response = client
         .get(url)

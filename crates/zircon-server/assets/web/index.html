@@ -32,7 +32,7 @@
 <div id="app" class="flex w-full h-full">
 
     <!-- LOGIN OVERLAY -->
-    <div v-if="!authenticated" class="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center">
+    <div v-if="!authenticated && !sessionRestoring" class="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center">
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-xl w-96 shadow-2xl">
             <img src="zircon-title.svg" alt="Zircon" class="h-8 w-auto block mx-auto mb-4">
             <p class="text-xs text-slate-400 mb-6 text-center">Enter credentials printed to stdout on startup.</p>
@@ -47,7 +47,7 @@
     </div>
 
     <!-- MAIN APP SHELL -->
-    <div v-else class="flex w-full h-full">
+    <div v-else-if="authenticated" class="flex w-full h-full">
 
         <!-- LEFT SIDEBAR -->
         <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4">
@@ -735,6 +735,9 @@
             </div>
         </main>
     </div>
+
+    <!-- SESSION RESTORE (brief blank while a persisted token is validated) -->
+    <div v-else class="flex w-full h-full"></div>
 
     <!-- PROFILE MODAL -->
     <div v-if="showProfileModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center">

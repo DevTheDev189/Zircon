@@ -1,6 +1,10 @@
 //! Launcher UI settings persisted at `~/.mcmanager/settings.json`: the RAM
-//! allocation slider (2–16 GB), strict hash verification and the trust-direct-
-//! mods toggle from the JavaFX Settings view.
+//! allocation slider (2–16 GB).
+//!
+//! The JavaFX-era security toggles (strict hash verification, trust-direct-mods)
+//! were removed deliberately: mod verification is always strict and mods with
+//! no provider to verify against are always rejected, so a player can never
+//! weaken the download protection.
 
 use std::path::PathBuf;
 
@@ -18,18 +22,12 @@ pub const DEFAULT_MEMORY_GB: u32 = 4;
 pub struct LauncherSettings {
     /// Max JVM heap in GB (UI slider range 2–16).
     pub memory_gb: u32,
-    /// Strict mode aborts a mod sync when a hash cannot be verified.
-    pub strict_verification: bool,
-    /// Trust `direct`-origin mods (no provider to verify against).
-    pub trust_direct_mods: bool,
 }
 
 impl Default for LauncherSettings {
     fn default() -> Self {
         Self {
             memory_gb: DEFAULT_MEMORY_GB,
-            strict_verification: true,
-            trust_direct_mods: false,
         }
     }
 }
@@ -110,39 +108,38 @@ mod tests {
     fn default_settings() {
         let settings = LauncherSettings::default();
         assert_eq!(DEFAULT_MEMORY_GB, settings.memory_gb);
-        assert!(settings.strict_verification);
-        assert!(!settings.trust_direct_mods);
     }
 
     #[test]
     fn save_load_round_trip() {
         let file = temp_file();
-        save_to(
-            &file,
-            &LauncherSettings {
-                memory_gb: 8,
-                strict_verification: false,
-                trust_direct_mods: true,
-            },
-        );
+        save_to(&file, &LauncherSettings { memory_gb: 8 });
         let loaded = load_from(&file);
         assert_eq!(8, loaded.memory_gb);
-        assert!(!loaded.strict_verification);
-        assert!(loaded.trust_direct_mods);
+        let _ = std::fs::remove_file(&file);
+    }
+
+    #[test]
+    fn legacy_security_toggles_are_ignored() {
+        // Files written by older launcher versions carry strictVerification /
+        // trustDirectMods; they must load fine and the toggles must have no
+        // effect (verification is always strict, direct mods always rejected).
+        let file = temp_file();
+        std::fs::write(
+            &file,
+            r#"{"memoryGb": 6, "strictVerification": false, "trustDirectMods": true}"#,
+        )
+        .unwrap();
+        let loaded = load_from(&file);
+        assert_eq!(6, loaded.memory_gb);
+        assert_eq!(LauncherSettings { memory_gb: 6 }, loaded);
         let _ = std::fs::remove_file(&file);
     }
 
     #[test]
     fn memory_is_clamped_to_slider_range() {
         let file = temp_file();
-        save_to(
-            &file,
-            &LauncherSettings {
-                memory_gb: 64,
-                strict_verification: true,
-                trust_direct_mods: false,
-            },
-        );
+        save_to(&file, &LauncherSettings { memory_gb: 64 });
         let loaded = load_from(&file);
         assert_eq!(16, loaded.memory_gb);
         let _ = std::fs::remove_file(&file);

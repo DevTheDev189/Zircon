@@ -24,7 +24,7 @@ use tracing::{info, warn};
 
 use zircon_core::model::{BillOfMaterials, PackEntry};
 
-use super::mod_sync::HashVerifier;
+use super::mod_sync::{validate_entry_filename, HashVerifier};
 
 /// Receives human-readable pack sync progress. Port of the Java
 /// `PackSyncEngine.ProgressListener` — status only, the Java reports no
@@ -148,6 +148,12 @@ impl PackSyncEngine {
         let wanted: Vec<String> = packs.iter().map(|p| p.filename.clone()).collect();
 
         for pack in packs {
+            // Filenames come from the untrusted server BOM; never allow one to
+            // escape the pack directory.
+            if let Err(e) = validate_entry_filename(&pack.filename) {
+                warn!("Skipping pack with {e}");
+                continue;
+            }
             let target = dir.join(&pack.filename);
             if HashVerifier::matches_pack(&target, pack) {
                 continue;
@@ -155,7 +161,19 @@ impl PackSyncEngine {
             emit_status(listener, &format!("Downloading {}...", pack.filename));
             let url = format!("{base}{url_prefix}{}", url_encode(&pack.filename));
             match self.download(&url, &target).await {
-                Ok(_) => downloaded.push(pack.filename.clone()),
+                Ok(_) => {
+                    // The downloaded archive must match the hash pinned in the
+                    // BOM; a server serving something else is discarded.
+                    if HashVerifier::matches_pack(&target, pack) {
+                        downloaded.push(pack.filename.clone());
+                    } else {
+                        let _ = std::fs::remove_file(&target);
+                        warn!(
+                            "Pack download failed hash check and was discarded: {}",
+                            pack.filename
+                        );
+                    }
+                }
                 Err(e) => warn!("Pack sync failed for {}: {}", pack.filename, e),
             }
         }

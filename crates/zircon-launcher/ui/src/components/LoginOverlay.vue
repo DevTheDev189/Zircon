@@ -1,13 +1,23 @@
 <template>
   <div
     v-if="visible"
-    class="absolute inset-0 z-50 flex items-center justify-center bg-bg"
+    class="absolute inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-[#0b1218] via-[#0d1117] to-[#10212a]"
   >
-    <div class="z-card w-[420px] text-center p-8 shadow-2xl">
+    <!-- Soft teal glow behind the card -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div
-        class="inline-block bg-accent text-[#022c29] font-bold rounded-lg px-3 py-1.5 text-xl mb-4"
+        class="absolute -top-24 left-1/2 -translate-x-1/2 w-[460px] h-[460px] rounded-full bg-accent/10 blur-3xl"
+      ></div>
+    </div>
+
+    <div class="z-card w-[420px] text-center p-8 shadow-2xl relative">
+      <div
+        class="inline-flex items-center gap-2 bg-gradient-to-br from-accent to-[#1f8f87] text-[#032b28] font-extrabold rounded-lg px-4 py-2 text-xl mb-5 shadow-lg shadow-accent/25"
       >
-        ⚡ Zircon
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+        </svg>
+        Zircon
       </div>
       <h2 class="text-white text-lg font-bold mb-2">Sign in with Microsoft</h2>
       <p class="text-muted text-sm mb-6">

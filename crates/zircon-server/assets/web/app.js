@@ -7,6 +7,9 @@ createApp({
     data() {
         return {
             authenticated: false,
+            // True while a persisted session is being validated on boot; gates
+            // the login overlay vs. dashboard so neither flashes prematurely.
+            sessionRestoring: true,
             loginForm: { username: 'admin', password: '' },
             currentUser: { username: 'admin', icon: 'emerald' },
             jwtToken: '',
@@ -70,6 +73,11 @@ createApp({
         Zircon.core, Zircon.auth, Zircon.instances, Zircon.settings,
         Zircon.mods, Zircon.packs, Zircon.players, Zircon.backups,
         Zircon.console),
+    created() {
+        // Restore a persisted session (js/auth.js) before the login overlay /
+        // dashboard decision is made.
+        this.restoreSession();
+    },
     computed: {
         // NEW: Client-side filtering logic
         filteredConsoleLines() {

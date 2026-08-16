@@ -21,6 +21,11 @@ pub const TICKET_TTL_MS: u64 = 300_000;
 /// TTL in whole seconds, exposed to clients via the join-intent endpoint.
 pub const TICKET_TTL_SECONDS: u64 = TICKET_TTL_MS / 1000;
 
+/// Upper bound on live tickets. `/api/join-intent` is a public endpoint, so a
+/// remote attacker could otherwise grow the store without limit; past the cap,
+/// registrations are dropped until the housekeeping task purges expired ones.
+pub const MAX_TICKETS: usize = 5000;
+
 /// In-memory join ticket store. Keys are lower-cased identifiers
 /// (username or UUID); values are expiry instants.
 #[derive(Default)]
@@ -38,11 +43,22 @@ impl JoinTicketManager {
         self.register_ticket_ttl(identifier, Duration::from_millis(TICKET_TTL_MS));
     }
 
-    /// Registers a ticket with a custom TTL (tests use short TTLs).
+    /// Registers a ticket with a custom TTL (tests use short TTLs). Drops the
+    /// registration when the store is full so a public endpoint cannot grow
+    /// memory without bound.
     pub fn register_ticket_ttl(&self, identifier: &str, ttl: Duration) {
         let trimmed = identifier.trim();
         if trimmed.is_empty() {
             return;
+        }
+        if self.active_tickets.len() >= MAX_TICKETS {
+            self.purge_expired();
+            if self.active_tickets.len() >= MAX_TICKETS {
+                tracing::warn!(
+                    "Join ticket store is full ({MAX_TICKETS}); dropping registration for '{trimmed}'"
+                );
+                return;
+            }
         }
         self.active_tickets
             .insert(trimmed.to_lowercase(), Instant::now() + ttl);
@@ -107,5 +123,24 @@ mod tests {
         manager.purge_expired();
         assert!(!manager.consume_ticket("Old"));
         assert!(manager.consume_ticket("New"));
+    }
+
+    #[test]
+    fn ticket_store_is_bounded() {
+        let manager = JoinTicketManager::new();
+        for i in 0..MAX_TICKETS {
+            manager.register_ticket(&format!("player-{i}"));
+        }
+        assert_eq!(MAX_TICKETS, manager.active_tickets.len());
+
+        // Past the cap, new registrations are dropped (not grown unboundedly).
+        manager.register_ticket("overflow");
+        assert_eq!(MAX_TICKETS, manager.active_tickets.len());
+
+        // Consuming a ticket frees its slot for a new registration.
+        assert!(manager.consume_ticket("player-0"));
+        manager.register_ticket("new-player");
+        assert_eq!(MAX_TICKETS, manager.active_tickets.len());
+        assert!(manager.consume_ticket("new-player"));
     }
 }

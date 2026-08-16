@@ -129,7 +129,15 @@ impl JavaRuntimeResolver {
             "Downloading Java {} runtime from Adoptium (this can take a few minutes)...",
             required_major
         );
-        let archive = self.cache_dir.join(format!("jdk-{required_major}.zip"));
+        // Adoptium serves .zip on Windows and .tar.gz on Linux/macOS.
+        let archive_ext = if cfg!(target_os = "windows") {
+            "zip"
+        } else {
+            "tar.gz"
+        };
+        let archive = self
+            .cache_dir
+            .join(format!("jdk-{required_major}.{archive_ext}"));
         self.download(&adoptium_url(required_major), &archive)
             .await?;
         self.extract(&archive, &jdk_dir)?;
@@ -152,12 +160,25 @@ impl JavaRuntimeResolver {
     }
 
     async fn download(&self, url: &str, target: &Path) -> Result<(), LauncherError> {
-        let response = self
+        // The Adoptium binary endpoint only negotiates `application/octet-stream`;
+        // requesting `application/zip` yields HTTP 406. The archive format (zip vs
+        // tar.gz) is chosen by Adoptium based on the platform, not the Accept header.
+        let accept = "application/octet-stream";
+        tracing::info!("Requesting {url} with Accept: {accept}");
+        let mut response = self
             .http
             .get(url)
-            .header(reqwest::header::ACCEPT, "application/zip")
+            .header(reqwest::header::ACCEPT, accept)
             .send()
             .await?;
+        if response.status() == reqwest::StatusCode::NOT_ACCEPTABLE {
+            // A few Adoptium deployments reject any explicit Accept value; retry
+            // with reqwest's default (`*/*`), which the endpoint also accepts.
+            tracing::warn!(
+                "Adoptium returned 406 for Accept: {accept}; retrying without the header"
+            );
+            response = self.http.get(url).send().await?;
+        }
         if !response.status().is_success() {
             return Err(LauncherError::Http {
                 status: response.status().as_u16(),
@@ -174,6 +195,16 @@ impl JavaRuntimeResolver {
 
     fn extract(&self, archive: &Path, target_dir: &Path) -> Result<(), LauncherError> {
         std::fs::create_dir_all(target_dir)?;
+        if archive.to_string_lossy().ends_with(".tar.gz") {
+            self.extract_tar_gz(archive, target_dir)?;
+        } else {
+            self.extract_zip(archive, target_dir)?;
+        }
+        std::fs::remove_file(archive)?;
+        Ok(())
+    }
+
+    fn extract_zip(&self, archive: &Path, target_dir: &Path) -> Result<(), LauncherError> {
         let file = std::fs::File::open(archive)?;
         let mut zip = zip::ZipArchive::new(file).map_err(zip_error)?;
         for i in 0..zip.len() {
@@ -196,7 +227,19 @@ impl JavaRuntimeResolver {
                 std::io::copy(&mut entry, &mut out)?;
             }
         }
-        std::fs::remove_file(archive)?;
+        Ok(())
+    }
+
+    /// Extracts a `.tar.gz` archive into `target_dir`.
+    ///
+    /// Uses `unpack`, which never writes outside `target_dir` (tar-slip
+    /// protection) and preserves Unix permissions such as the executable bit on
+    /// `bin/java`.
+    fn extract_tar_gz(&self, archive: &Path, target_dir: &Path) -> Result<(), LauncherError> {
+        let file = std::fs::File::open(archive)?;
+        let decoder = flate2::read::GzDecoder::new(file);
+        let mut tar = tar::Archive::new(decoder);
+        tar.unpack(target_dir)?;
         Ok(())
     }
 }

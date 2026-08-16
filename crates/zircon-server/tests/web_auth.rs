@@ -5,6 +5,7 @@
 //! valid login token unlocks them.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
@@ -15,6 +16,7 @@ use tower::ServiceExt;
 
 use zircon_server::auth::auth_service::AuthService;
 use zircon_server::auth::jwt;
+use zircon_server::auth::sessions::SessionRegistry;
 use zircon_server::config::ConfigService;
 use zircon_server::instance::ServerInstanceManager;
 use zircon_server::process::console::ConsoleStreamHandler;
@@ -26,6 +28,7 @@ use zircon_server::services::packs::PackManagementService;
 use zircon_server::services::resolver::ModServiceResolver;
 use zircon_server::tickets::JoinTicketManager;
 use zircon_server::web::app::{router, AppState};
+use zircon_server::web::rate_limit::FixedWindowLimiter;
 
 const ADMIN_PASSWORD: &str = "test-password-123";
 
@@ -45,6 +48,11 @@ fn temp_dir(prefix: &str) -> std::path::PathBuf {
 /// Builds a fully wired router over a throwaway temp data dir. The initial
 /// admin account is created with a known password.
 fn test_app() -> Router {
+    test_app_with_limits(10)
+}
+
+/// Like `test_app` but with a configurable login rate-limit window cap.
+fn test_app_with_limits(max_attempts: u32) -> Router {
     let dir = temp_dir("web-auth");
     let config = Arc::new(
         ConfigService::load_with_data_dir(Some(dir.display().to_string())).expect("config load"),
@@ -96,6 +104,11 @@ fn test_app() -> Router {
         resolver,
         tickets,
         curseforge_api_key: String::new(),
+        sessions: Arc::new(SessionRegistry::new()),
+        login_limiter: Arc::new(FixedWindowLimiter::new(
+            Duration::from_secs(60),
+            max_attempts,
+        )),
     };
     router(state)
 }
@@ -187,26 +200,11 @@ async fn public_login_issues_token() {
 }
 
 #[tokio::test]
-async fn change_password_is_public_but_requires_current_password() {
+async fn change_password_requires_auth_and_current_password() {
     let app = test_app();
 
-    // Wrong current password -> 401 (public route, but proof of knowledge).
+    // Admin-only route now: without a token it is rejected before the handler.
     let (status, _) = send(
-        &app,
-        "POST",
-        "/api/auth/change-password",
-        None,
-        Some(json!({
-            "username": "admin",
-            "currentPassword": "wrong",
-            "newPassword": "new-password-456"
-        })),
-    )
-    .await;
-    assert_eq!(StatusCode::UNAUTHORIZED, status);
-
-    // Correct current password -> 200 without any token.
-    let (status, body) = send(
         &app,
         "POST",
         "/api/auth/change-password",
@@ -218,8 +216,49 @@ async fn change_password_is_public_but_requires_current_password() {
         })),
     )
     .await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // With a token but the wrong current password -> 401.
+    let token = login(&app).await;
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/change-password",
+        Some(&token),
+        Some(json!({
+            "username": "admin",
+            "currentPassword": "wrong",
+            "newPassword": "new-password-456"
+        })),
+    )
+    .await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // Correct current password -> 200 and a fresh token (old sessions die).
+    let (status, body) = send(
+        &app,
+        "POST",
+        "/api/auth/change-password",
+        Some(&token),
+        Some(json!({
+            "username": "admin",
+            "currentPassword": ADMIN_PASSWORD,
+            "newPassword": "new-password-456"
+        })),
+    )
+    .await;
     assert_eq!(StatusCode::OK, status);
     assert_eq!(true, body["ok"]);
+    let new_token = body["token"].as_str().expect("fresh token").to_string();
+    assert!(!new_token.is_empty());
+
+    // The old token was revoked by the password change.
+    let (status, _) = send(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // The fresh token works.
+    let (status, _) = send(&app, "GET", "/api/auth/me", Some(&new_token), None).await;
+    assert_eq!(StatusCode::OK, status);
 
     // The new password now authenticates.
     let (status, _) = send(
@@ -288,9 +327,10 @@ async fn protected_routes_reject_missing_or_invalid_tokens() {
         ("GET", "/api/config"),
         ("GET", "/api/status"),
         ("GET", "/api/instances/unknown-id"),
-        ("GET", "/api/console"),
         ("POST", "/api/server/start"),
         ("POST", "/api/players/kick"),
+        ("POST", "/api/auth/logout"),
+        ("POST", "/api/auth/change-password"),
         ("POST", "/api/instances"),
     ] {
         let (status, _) = send(&app, method, uri, None, None).await;
@@ -361,17 +401,16 @@ async fn valid_token_grants_access() {
 }
 
 #[tokio::test]
-async fn console_ws_requires_auth() {
+async fn console_upgrade_is_not_gated_by_header_middleware() {
     let app = test_app();
 
-    // Without a token the upgrade is rejected by the middleware before the
-    // WebSocket handler even looks at the request.
+    // The console WebSocket authenticates via its first message (the token is
+    // never put in the URL), so the upgrade request itself is not blocked by
+    // the header middleware. Without upgrade headers axum rejects the plain
+    // GET with 400 — the point is that it is not a 401 from auth.
     let (status, _) = send(&app, "GET", "/api/console", None, None).await;
-    assert_eq!(StatusCode::UNAUTHORIZED, status);
+    assert_ne!(StatusCode::UNAUTHORIZED, status);
 
-    // With a token the handler responds (400 without proper upgrade headers is
-    // expected from axum's WebSocketUpgrade extractor — the point is the
-    // request is no longer blocked by auth).
     let token = login(&app).await;
     let (status, _) = send(&app, "GET", "/api/console", Some(&token), None).await;
     assert_ne!(StatusCode::UNAUTHORIZED, status);
@@ -389,4 +428,66 @@ async fn replayed_token_works_but_garbage_does_not() {
     // ...and garbage still does not.
     let (status, _) = send(&app, "GET", "/api/auth/me", Some("garbage"), None).await;
     assert_eq!(StatusCode::UNAUTHORIZED, status);
+}
+
+// ---------------------------------------------------------------------------
+// Session revocation & rate limiting
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn logout_revokes_the_token_server_side() {
+    let app = test_app();
+    let token = login(&app).await;
+
+    // Valid before sign-out.
+    let (status, _) = send(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(StatusCode::OK, status);
+
+    // Sign out revokes the session.
+    let (status, body) = send(&app, "POST", "/api/auth/logout", Some(&token), None).await;
+    assert_eq!(StatusCode::OK, status);
+    assert_eq!(true, body["ok"]);
+
+    // The same token is now dead everywhere, including the console WebSocket.
+    // The same token is now dead everywhere. (The console WebSocket is not
+    // covered by the header middleware — it authenticates via its first
+    // message — so the HTTP upgrade request is not a 401 here.)
+    let (status, _) = send(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+    let (status, _) = send(&app, "GET", "/api/stats", Some(&token), None).await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // A fresh login still works (only that one session was killed).
+    let token2 = login(&app).await;
+    let (status, _) = send(&app, "GET", "/api/auth/me", Some(&token2), None).await;
+    assert_eq!(StatusCode::OK, status);
+}
+
+#[tokio::test]
+async fn login_is_rate_limited_against_brute_force() {
+    let app = test_app_with_limits(3);
+
+    // Three failed attempts are allowed...
+    for _ in 0..3 {
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "username": "admin", "password": "wrong" })),
+        )
+        .await;
+        assert_eq!(StatusCode::UNAUTHORIZED, status);
+    }
+
+    // ...the fourth is throttled with 429 even with correct credentials.
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::TOO_MANY_REQUESTS, status);
 }

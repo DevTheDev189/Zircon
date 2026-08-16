@@ -36,6 +36,16 @@ pub struct ServerConfig {
     pub java_args: String,
     pub auto_start_server: bool,
     pub curseforge_api_key: String,
+    /// When true (default), the TCP multiplexer sniffs HTTP traffic on its
+    /// ports and proxies it to the web server. Disable when a TLS reverse
+    /// proxy (Caddy/Nginx) fronts the HTTP side, so the admin panel is not
+    /// reachable in plaintext on the Minecraft ports.
+    #[serde(default = "default_http_proxy")]
+    pub http_proxy: bool,
+}
+
+fn default_http_proxy() -> bool {
+    true
 }
 
 impl Default for ServerConfig {
@@ -50,6 +60,7 @@ impl Default for ServerConfig {
             java_args: "-Xms2G -Xmx4G".to_string(),
             auto_start_server: false,
             curseforge_api_key: String::new(),
+            http_proxy: true,
         }
     }
 }
@@ -298,6 +309,9 @@ mod tests {
         assert_eq!(DEFAULT_WEB_PORT, cfg.web_port);
         assert_eq!("My Minecraft Server", cfg.server_title);
         assert_eq!("fabric", cfg.mod_loader.r#type);
+        // HTTP sniffing on the MC ports is on by default (off in reverse-proxy
+        // deployments); old config files without the field default to true.
+        assert!(cfg.http_proxy);
         service.with_config(|c| c.server_title = "Renamed".to_string());
         service.save_config().unwrap();
 

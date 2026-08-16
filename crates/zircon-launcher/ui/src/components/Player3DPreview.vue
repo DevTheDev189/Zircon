@@ -14,11 +14,10 @@
 // WebGL 3D Minecraft player skin renderer built on Three.js — the webview
 // replacement for the JavaFX/LWJGL `Player3DRenderer` (Step 5.3).
 //
-// The model is the classic dual-layer 64x64 box figure: 6 base boxes (head,
-// body, right/left arm, right/left leg) plus 6 outer overlay boxes (hat,
-// jacket, sleeves, pants) inflated by 0.25 units. Every face samples its
-// region from the standard 64x64 skin atlas with `NearestFilter` for crisp
-// pixel art. Mouse drag rotates the figure: yaw freely, pitch clamped to ±45°.
+// Two merged BufferGeometries (base + overlay) are built from a data-driven
+// face table so every triangle is wound counter-clockwise when viewed from
+// outside (correct backface culling) and every face samples the correct region
+// of the 64x64 skin atlas with the vanilla unwrap orientation.
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as THREE from 'three';
 
@@ -38,130 +37,145 @@ let lastY = 0;
 let yaw = -Math.PI / 6;
 let pitch = -Math.PI / 12;
 
-// One box: dimensions (sx, sy, sz) centered at (x, y, z). `faces` maps each
-// face to its `[u, v]` top-left corner in the 64x64 atlas. Region sizes are
-// derived from the box dimensions (front/back: sx×sy, right/left: sz×sy,
-// top/bottom: sx×sz), matching the vanilla Box unwrap.
-function createBox(sx, sy, sz, x, y, z, faces) {
-  const group = new THREE.Group();
-
-  const addPlane = (axis, dir, region, flipU, flipV) => {
-    const [u0, v0] = region;
-    const rw = axis === 'x' ? sz : sx; // side faces are sz wide; front/back/top/bottom are sx
-    const rh = axis === 'y' ? sz : sy; // top/bottom are sz tall; side faces are sy tall
-    const geo = new THREE.PlaneGeometry(1, 1);
-    const pos = geo.attributes.position;
-    const uv = geo.attributes.uv;
-    for (let i = 0; i < pos.count; i++) {
-      const lx = pos.getX(i); // plane local x in [-0.5, 0.5]
-      const ly = pos.getY(i); // plane local y in [-0.5, 0.5]
-      let wx = 0;
-      let wy = 0;
-      let wz = 0;
-      let tu = 0;
-      let tv = 0;
-      if (axis === 'x') {
-        // plane local x = world z, local y = world y
-        wx = dir * (sx / 2);
-        wz = lx * sz;
-        wy = ly * sy;
-        tu = (wz + sz / 2) / sz;
-        tv = (wy + sy / 2) / sy;
-      } else if (axis === 'y') {
-        // plane local x = world x, local y = world z
-        wy = dir * (sy / 2);
-        wx = lx * sx;
-        wz = ly * sz;
-        tu = (wx + sx / 2) / sx;
-        tv = (wz + sz / 2) / sz;
-      } else {
-        // plane local x = world x, local y = world y
-        wz = dir * (sz / 2);
-        wx = lx * sx;
-        wy = ly * sy;
-        tu = (wx + sx / 2) / sx;
-        tv = (wy + sy / 2) / sy;
-      }
-      if (flipU) tu = 1 - tu;
-      if (flipV) tv = 1 - tv;
-      pos.setXYZ(i, wx, wy, wz);
-      uv.setXY(i, (u0 + tu * rw) / 64, (v0 + tv * rh) / 64);
-    }
-    geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, material);
-    mesh.position.set(x, y, z);
-    group.add(mesh);
+// ---- Atlas layouts ---------------------------------------------------------
+// Each face rect is [u, v, w, h] (pixel top-left corner + size) in the 64x64 atlas.
+// Face sizes use the box's own dimensions (front/back sx×sy, right/left sz×sy,
+// top/bottom sx×sz), matching the vanilla box unwrap.
+function faces(base, w, h, d) {
+  const [bu, bv] = base;
+  return {
+    front: [bu + d, bv + d, w, h],
+    back: [bu + d + w + d, bv + d, w, h],
+    right: [bu, bv + d, d, h],
+    left: [bu + d + w, bv + d, d, h],
+    top: [bu + d, bv, w, d],
+    bottom: [bu + d + w, bv, w, d],
   };
-
-  // +z front, -z back, +x right, -x left, +y top, -y bottom.
-  // Orientation convention (viewed from outside the model):
-  //   front: u → +x         back: u → -x
-  //   right: u → -z         left: u → +z
-  //   top:   u → +x, v → +z  bottom: u → -x, v → -z
-  addPlane('z', 1, faces.front, false, false);
-  addPlane('z', -1, faces.back, true, false);
-  addPlane('x', 1, faces.right, true, false);
-  addPlane('x', -1, faces.left, false, false);
-  addPlane('y', 1, faces.top, false, false);
-  addPlane('y', -1, faces.bottom, true, true);
-  return group;
 }
 
-// Atlas face origins for every box, from the standard 64x64 Minecraft skin
-// layout. The hat's top/bottom sit shifted left relative to the head's, so
-// every box is written out explicitly.
-const HEAD = { front: [8, 8], back: [24, 8], right: [0, 8], left: [16, 8], top: [8, 0], bottom: [16, 0] };
-const HAT = { front: [40, 8], back: [56, 8], right: [32, 8], left: [48, 8], top: [32, 0], bottom: [40, 0] };
-const BODY = { front: [20, 20], back: [32, 20], right: [16, 20], left: [28, 20], top: [20, 16], bottom: [28, 16] };
-const JACKET = { front: [20, 36], back: [32, 36], right: [16, 36], left: [28, 36], top: [20, 32], bottom: [28, 32] };
-const R_ARM = { front: [44, 20], back: [52, 20], right: [40, 20], left: [48, 20], top: [44, 16], bottom: [48, 16] };
-const R_SLEEVE = { front: [44, 36], back: [52, 36], right: [40, 36], left: [48, 36], top: [44, 32], bottom: [48, 32] };
-const L_ARM = { front: [36, 52], back: [44, 52], right: [32, 52], left: [40, 52], top: [36, 48], bottom: [40, 48] };
-const L_SLEEVE = { front: [52, 52], back: [60, 52], right: [48, 52], left: [56, 52], top: [52, 48], bottom: [56, 48] };
-const R_LEG = { front: [4, 20], back: [12, 20], right: [0, 20], left: [8, 20], top: [4, 16], bottom: [8, 16] };
-const R_PANTS = { front: [4, 36], back: [12, 36], right: [0, 36], left: [8, 36], top: [4, 32], bottom: [8, 32] };
-const L_LEG = { front: [20, 52], back: [28, 52], right: [16, 52], left: [24, 52], top: [20, 48], bottom: [24, 48] };
-const L_PANTS = { front: [36, 52], back: [44, 52], right: [32, 52], left: [40, 52], top: [36, 48], bottom: [40, 48] };
+const HEAD = { size: [8, 8, 8], center: [0, 28, 0], atlas: faces([0, 0], 8, 8, 8) };
+const HAT = { size: [9, 9, 9], center: [0, 28, 0], atlas: faces([32, 0], 8, 8, 8) };
+const BODY = { size: [8, 12, 4], center: [0, 18, 0], atlas: faces([16, 16], 8, 12, 4) };
+const JACKET = { size: [8.5, 12.5, 4.5], center: [0, 18, 0], atlas: faces([16, 32], 8, 12, 4) };
+const R_ARM = { size: [4, 12, 4], center: [-6, 18, 0], atlas: faces([40, 16], 4, 12, 4) };
+const R_SLEEVE = { size: [4.5, 12.5, 4.5], center: [-6, 18, 0], atlas: faces([40, 32], 4, 12, 4) };
+const L_ARM = { size: [4, 12, 4], center: [6, 18, 0], atlas: faces([32, 48], 4, 12, 4) };
+const L_SLEEVE = { size: [4.5, 12.5, 4.5], center: [6, 18, 0], atlas: faces([48, 48], 4, 12, 4) };
+const R_LEG = { size: [4, 12, 4], center: [-2, 6, 0], atlas: faces([0, 16], 4, 12, 4) };
+const R_PANTS = { size: [4.5, 12.5, 4.5], center: [-2, 6, 0], atlas: faces([0, 32], 4, 12, 4) };
+const L_LEG = { size: [4, 12, 4], center: [2, 6, 0], atlas: faces([16, 48], 4, 12, 4) };
+const L_PANTS = { size: [4.5, 12.5, 4.5], center: [2, 6, 0], atlas: faces([0, 48], 4, 12, 4) };
 
-// Builds the 12-box dual-layer figure: 6 base boxes + 6 overlays inflated by
-// 0.25 units on every side.
-function buildPlayerModel() {
+const BASE_BOXES = [HEAD, BODY, R_ARM, L_ARM, R_LEG, L_LEG];
+const OVERLAY_BOXES = [HAT, JACKET, R_SLEEVE, L_SLEEVE, R_PANTS, L_PANTS];
+
+// ---- Geometry builder ------------------------------------------------------
+// Writes CCW-from-outside faces into one BufferGeometry. `rects` maps each
+// face key to its [u, v, w, h] atlas rect.
+function buildBoxesInto(builder, boxes) {
+  for (const box of boxes) {
+    const [Cx, Cy, Cz] = box.center;
+    const [sx, sy, sz] = box.size;
+    const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+    const a = box.atlas;
+
+    // Corner order per face: TL, BL, TR, BR (indices 0..3).
+    // Triangle indices: (0,1,2) and (2,1,3) — CCW when viewed from outside.
+    const faces = [
+      { key: 'front', norm: [0, 0, 1], corners: [[Cx-hx, Cy+hy, Cz+hz], [Cx-hx, Cy-hy, Cz+hz], [Cx+hx, Cy+hy, Cz+hz], [Cx+hx, Cy-hy, Cz+hz]] },
+      { key: 'back', norm: [0, 0, -1], corners: [[Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy-hy, Cz-hz], [Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy-hy, Cz-hz]] },
+      { key: 'right', norm: [-1, 0, 0], corners: [[Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy-hy, Cz-hz], [Cx-hx, Cy+hy, Cz+hz], [Cx-hx, Cy-hy, Cz+hz]] },
+      { key: 'left', norm: [1, 0, 0], corners: [[Cx+hx, Cy+hy, Cz+hz], [Cx+hx, Cy-hy, Cz+hz], [Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy-hy, Cz-hz]] },
+      { key: 'top', norm: [0, 1, 0], corners: [[Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy+hy, Cz+hz], [Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy+hy, Cz+hz]] },
+      { key: 'bottom', norm: [0, -1, 0], corners: [[Cx-hx, Cy-hy, Cz+hz], [Cx-hx, Cy-hy, Cz-hz], [Cx+hx, Cy-hy, Cz+hz], [Cx+hx, Cy-hy, Cz-hz]] },
+    ];
+
+    for (const face of faces) {
+      const r = a[face.key];
+      const w64 = 64, h64 = 64;
+      const u0 = r[0] / w64;
+      const u1 = (r[0] + r[2]) / w64;
+      const v0 = 1.0 - r[1] / h64;
+      const v1 = 1.0 - (r[1] + r[3]) / h64;
+      const baseIdx = builder.positions.length / 3;
+      const c = face.corners;
+      for (const v of c) builder.positions.push(v[0], v[1], v[2]);
+      for (let i = 0; i < 4; i++) builder.normals.push(face.norm[0], face.norm[1], face.norm[2]);
+      // TL->(u0,v0), BL->(u0,v1), TR->(u1,v0), BR->(u1,v1)
+      builder.uvs.push(u0, v0, u0, v1, u1, v0, u1, v1);
+      builder.indices.push(
+        baseIdx, baseIdx + 1, baseIdx + 2,
+        baseIdx + 2, baseIdx + 1, baseIdx + 3
+      );
+    }
+  }
+}
+
+function buildModel() {
+  const baseBuilder = { positions: [], normals: [], uvs: [], indices: [] };
+  const overlayBuilder = { positions: [], normals: [], uvs: [], indices: [] };
+  buildBoxesInto(baseBuilder, BASE_BOXES);
+  buildBoxesInto(overlayBuilder, OVERLAY_BOXES);
+
+  const toGeo = (b) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.normals, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uvs, 2));
+    geo.setIndex(b.indices);
+    return geo;
+  };
+
+  const base = new THREE.Mesh(toGeo(baseBuilder), material);
+  const overlay = new THREE.Mesh(toGeo(overlayBuilder), material);
+  overlay.renderOrder = 1; // draw overlays after base
+  base.renderOrder = 0;
   const model = new THREE.Group();
-  const boxes = [
-    // Head / Hat: 8x8x8 centered at y=24 (hat region starts at u=32).
-    createBox(8, 8, 8, 0, 24, 0, HEAD),
-    createBox(8.5, 8.5, 8.5, 0, 24, 0, HAT),
-    // Body / Jacket: 8 wide x 12 tall x 4 deep, centered at y=12.
-    createBox(8, 12, 4, 0, 12, 0, BODY),
-    createBox(8.5, 12.5, 4.5, 0, 12, 0, JACKET),
-    // Arms / Sleeves: 4x12x4 at x=±6 (player's left arm is +x).
-    createBox(4, 12, 4, -6, 12, 0, R_ARM),
-    createBox(4.5, 12.5, 4.5, -6, 12, 0, R_SLEEVE),
-    createBox(4, 12, 4, 6, 12, 0, L_ARM),
-    createBox(4.5, 12.5, 4.5, 6, 12, 0, L_SLEEVE),
-    // Legs / Pants: 4x12x4 at x=±2, from y=0 up to y=12.
-    createBox(4, 12, 4, -2, 0, 0, R_LEG),
-    createBox(4.5, 12.5, 4.5, -2, 0, 0, R_PANTS),
-    createBox(4, 12, 4, 2, 0, 0, L_LEG),
-    createBox(4.5, 12.5, 4.5, 2, 0, 0, L_PANTS),
-  ];
-  for (const box of boxes) model.add(box);
+  model.add(base, overlay);
   return model;
+}
+
+// ---- Texture / skin --------------------------------------------------------
+// Converts legacy 64x32 skins to 64x64 by mirror-copying right limbs into the
+// left limb regions, and cleans up transparent overlay areas via alphaTest.
+function processSkinTexture(image) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(image, 0, 0);
+
+  if (image.width === 64 && image.height === 32) {
+    // Right Leg -> Left Leg.
+    ctx.save();
+    ctx.translate(32, 48);
+    ctx.scale(-1, 1);
+    ctx.drawImage(canvas, 0, 16, 16, 16, -16, 0, 16, 16);
+    ctx.restore();
+    // Right Arm -> Left Arm.
+    ctx.save();
+    ctx.translate(48, 48);
+    ctx.scale(-1, 1);
+    ctx.drawImage(canvas, 40, 16, 16, 16, -16, 0, 16, 16);
+    ctx.restore();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 function applySkin(imageUri) {
   if (!imageUri) return;
   const img = new Image();
+  img.crossOrigin = 'anonymous';
   img.onload = () => {
     if (!material) return;
     if (material.map) material.map.dispose();
-    const texture = new THREE.Texture(img);
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestFilter;
-    texture.generateMipmaps = false;
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    material.map = texture;
+    material.map = processSkinTexture(img);
     material.needsUpdate = true;
     skinLoaded.value = true;
   };
@@ -184,6 +198,7 @@ function resetSkin() {
   }
 }
 
+// ---- Render loop / interaction ---------------------------------------------
 function resize() {
   if (!renderer || !container.value) return;
   const w = container.value.clientWidth;
@@ -253,7 +268,7 @@ onMounted(() => {
 
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
-  camera.position.set(0, 16, 38);
+  camera.position.set(0, 16, 46);
   camera.lookAt(0, 13, 0);
 
   // Soft key light + teal rim so the figure reads against the dark background.
@@ -274,8 +289,17 @@ onMounted(() => {
   shadow.position.y = -0.02;
   scene.add(shadow);
 
-  material = new THREE.MeshLambertMaterial({ color: 0xffffff, map: null });
-  group = buildPlayerModel();
+  material = new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    map: null,
+    transparent: true,
+    alphaTest: 0.5,
+    side: THREE.FrontSide,
+  });
+  group = buildModel();
+  // The 32-unit-tall figure is taller than the preview frustum, which clips
+  // the head; scale it to ~80% so it fits with breathing room.
+  group.scale.setScalar(0.8);
   scene.add(group);
   group.rotation.set(pitch, yaw, 0);
 

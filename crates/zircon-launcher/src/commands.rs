@@ -6,12 +6,13 @@
 //! `launch-progress`, `game-output` and `game-status` events to the frontend
 //! instead of blocking the webview.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex as StdMutex;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::process::Child;
 use tokio::sync::Mutex as AsyncMutex;
@@ -28,7 +29,7 @@ use crate::launch::runner::MinecraftRunner;
 use crate::offline::{OfflineInstance, OfflineInstanceManager};
 use crate::pack_selection::{ClientPackManager, PackSelection};
 use crate::servers;
-use crate::settings::{self, LauncherSettings, load_settings};
+use crate::settings::{self, load_settings, LauncherSettings};
 use crate::skin::{BundledSkins, MojangSkinService, SkinManager};
 use crate::sync::mod_sync::{ModSyncEngine, ProgressListener};
 use crate::sync::pack_sync::{PackProgressListener, PackSyncEngine};
@@ -49,6 +50,14 @@ pub struct RunningGame {
     child: Child,
 }
 
+/// The player's answer to the shader opt-in prompt (possibly remembered for
+/// future connections to the same server).
+#[derive(Debug, Clone, Copy)]
+pub struct ShaderChoice {
+    pub enabled: bool,
+    pub remember: bool,
+}
+
 /// Everything the Tauri commands need, managed once at startup.
 pub struct LauncherState {
     pub auth: MicrosoftAuthService,
@@ -63,6 +72,9 @@ pub struct LauncherState {
     pub http: reqwest::Client,
     pub running_game: AsyncMutex<Option<RunningGame>>,
     pub next_game_id: AtomicU64,
+    /// In-flight shader opt-in prompts awaiting the webview's answer.
+    pub shader_requests: AsyncMutex<HashMap<u64, tokio::sync::oneshot::Sender<ShaderChoice>>>,
+    pub next_shader_request_id: AtomicU64,
     pub settings: StdMutex<LauncherSettings>,
 }
 
@@ -91,6 +103,8 @@ impl LauncherState {
             http,
             running_game: AsyncMutex::new(None),
             next_game_id: AtomicU64::new(1),
+            shader_requests: AsyncMutex::new(HashMap::new()),
+            next_shader_request_id: AtomicU64::new(1),
             settings: StdMutex::new(load_settings()),
         }
     }
@@ -110,9 +124,10 @@ impl ProgressListener for UiProgressListener {
     }
 
     fn on_progress(&self, fraction: f64, detail: &str) {
-        let _ = self
-            .app
-            .emit("launch-progress", serde_json::json!({ "fraction": fraction, "detail": detail }));
+        let _ = self.app.emit(
+            "launch-progress",
+            serde_json::json!({ "fraction": fraction, "detail": detail }),
+        );
     }
 }
 
@@ -128,6 +143,12 @@ impl PackProgressListener for UiPackListener {
 
 fn emit_status(app: &AppHandle, message: impl AsRef<str>) {
     let _ = app.emit("launch-status", message.as_ref());
+}
+
+/// Notifies the frontend that the active skin changed so it can refresh the
+/// sidebar avatar.
+fn emit_skin_updated(app: &AppHandle) {
+    let _ = app.emit("skin-updated", ());
 }
 
 fn game_output_emitter(app: &AppHandle) -> std::sync::Arc<dyn Fn(String) + Send + Sync> {
@@ -206,6 +227,129 @@ pub fn save_server_list(servers_list: Vec<servers::SavedServer>) -> Result<(), S
     Ok(())
 }
 
+/// Live server-list status for one address: player counts come from the
+/// wrapper's public `/status` endpoint when the server is a Zircon wrapper
+/// (like `/bom`, no admin token needed); the Minecraft status ping supplies
+/// the latency everywhere and acts as the fallback for third-party servers.
+/// Returns `None` when the server is unreachable.
+/// Builds the HTTP base URL for a server: `https://<host>` (port 443) when
+/// HTTPS is enabled for the server, otherwise `http://<host>:<port>` (the
+/// multiplexer's HTTP sniffing). The Minecraft connection always uses
+/// `host:port` regardless.
+fn server_base_url(host: &str, port: u16, use_https: bool) -> String {
+    if use_https {
+        format!("https://{host}")
+    } else {
+        format!("http://{host}:{port}")
+    }
+}
+
+/// Fetches the online status of a server: player count + latency from a
+/// Minecraft status ping, plus the wrapper's public status when one is present.
+/// `use_https` selects the scheme for the wrapper HTTP call.
+#[tauri::command]
+pub async fn server_status(
+    state: State<'_, LauncherState>,
+    address: String,
+    use_https: bool,
+) -> Result<Option<ServerStatusInfo>, String> {
+    let (host, port) = servers::parse_server_address(&address);
+    let url_host = servers::format_host(&host);
+    let base_url = server_base_url(&url_host, port, use_https);
+
+    let (ping, wrapper) = tokio::join!(
+        crate::status::ping_status(&host, port),
+        fetch_wrapper_status(&state.http, &base_url),
+    );
+
+    let (online, max, version, running) = match (&wrapper, &ping) {
+        (Some(w), _) => (w.online, w.max, w.version.clone(), w.running),
+        (None, Ok(p)) => (p.online, p.max, p.version.clone(), None),
+        (None, Err(_)) => return Ok(None),
+    };
+    let ping_ms = match ping {
+        Ok(p) => p.ping_ms,
+        Err(_) => 0,
+    };
+
+    Ok(Some(ServerStatusInfo {
+        online,
+        max,
+        ping_ms,
+        version,
+        running,
+    }))
+}
+
+/// `GET /status` on the wrapper's public port — the client-facing status that
+/// needs no admin auth. `None` when the server is not a Zircon wrapper.
+async fn fetch_wrapper_status(http: &reqwest::Client, base_url: &str) -> Option<WrapperStatus> {
+    let response = tokio::time::timeout(
+        Duration::from_secs(2),
+        http.get(format!("{base_url}/status")).send(),
+    )
+    .await
+    .ok()?
+    .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let body = response.text().await.ok()?;
+    serde_json::from_str(&body).ok()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WrapperStatus {
+    online: u32,
+    #[serde(default)]
+    max: u32,
+    #[serde(default)]
+    version: String,
+    #[serde(default)]
+    running: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerStatusInfo {
+    pub online: u32,
+    pub max: u32,
+    pub ping_ms: u32,
+    pub version: String,
+    /// `Some(false)` means the Zircon wrapper reported its server as stopped;
+    /// `None` for third-party servers (no wrapper to ask).
+    pub running: Option<bool>,
+}
+
+/// Removes a saved server from the list and deletes its local instance folder
+/// (`~/.zircon/instances/<host>_<port>` — mods, configs, packs). Refuses while
+/// a game is connected to that server.
+#[tauri::command]
+pub async fn delete_saved_server(
+    state: State<'_, LauncherState>,
+    address: String,
+) -> Result<(), String> {
+    // Don't yank the folder out from under a running game.
+    {
+        let guard = state.running_game.lock().await;
+        if let Some(game) = guard.as_ref() {
+            let (host, port) = servers::parse_server_address(&address);
+            let label = format!("{}:{}", servers::format_host(&host), port);
+            if game.label == label {
+                return Err("Stop the game first before removing this server.".to_string());
+            }
+        }
+    }
+
+    let (host, port) = servers::parse_server_address(&address);
+    if !servers::remove_server(&address) {
+        return Err("Server not found in your list".to_string());
+    }
+    servers::delete_instance_dir(&servers::instance_game_dir(&host, port));
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Online launch flow
 // ---------------------------------------------------------------------------
@@ -213,6 +357,7 @@ pub fn save_server_list(servers_list: Vec<servers::SavedServer>) -> Result<(), S
 /// Launches the game against a saved server: BOM fetch, pack sync, classpath
 /// resolution, mod sync, pre-join ticket and process spawn. Progress is streamed
 /// over the `launch-status` / `launch-progress` events.
+/// `use_https` selects the scheme for the launcher's HTTP calls to the server.
 #[tauri::command]
 pub async fn launch_server(
     app: AppHandle,
@@ -220,10 +365,18 @@ pub async fn launch_server(
     address: String,
     name: Option<String>,
     install_recommended_packs: bool,
+    use_https: bool,
 ) -> Result<(), String> {
-    run_online_flow(&app, &state, &address, name.as_deref(), install_recommended_packs)
-        .await
-        .map_err(err_string)
+    run_online_flow(
+        &app,
+        &state,
+        &address,
+        name.as_deref(),
+        install_recommended_packs,
+        use_https,
+    )
+    .await
+    .map_err(err_string)
 }
 
 async fn run_online_flow(
@@ -232,6 +385,7 @@ async fn run_online_flow(
     address: &str,
     name: Option<&str>,
     install_recommended_packs: bool,
+    use_https: bool,
 ) -> Result<(), LauncherError> {
     if state.running_game.lock().await.is_some() {
         return Err(LauncherError::InvalidInput(
@@ -278,7 +432,9 @@ async fn run_online_flow(
 
     // --- server + game dir ---
     let (host, port) = servers::parse_server_address(address);
-    let base_url = format!("http://{host}:{port}");
+    // IPv6 literals need square brackets in URLs and quick-play targets.
+    let url_host = servers::format_host(&host);
+    let base_url = server_base_url(&url_host, port, use_https);
     emit_status(app, format!("Server: {base_url}"));
     let game_dir = servers::instance_game_dir(&host, port);
     std::fs::create_dir_all(&game_dir)?;
@@ -299,8 +455,16 @@ async fn run_online_flow(
             &bom,
             &base_url,
             &game_dir,
-            &selection.locally_added_shaderpacks.iter().cloned().collect::<Vec<_>>(),
-            &selection.locally_added_resourcepacks.iter().cloned().collect::<Vec<_>>(),
+            &selection
+                .locally_added_shaderpacks
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
+            &selection
+                .locally_added_resourcepacks
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
             Some(&pack_listener),
         )
         .await;
@@ -322,42 +486,79 @@ async fn run_online_flow(
     }
     selection.save(&game_dir);
 
-    // Server-recommended packs opt-in (mirrors the Java confirmation dialog).
-    if install_recommended_packs && bom_offers_packs(&bom) {
-        selection.shaders_enabled = true;
-        if let Some(first) = bom.shaderpacks.first() {
-            selection.active_shaderpack = Some(first.filename.clone());
+    // Shader opt-in: when the server offers shaders and the player has not
+    // remembered a choice for this server yet, ask once (the answer can be
+    // remembered for future connections). People without powerful GPUs can
+    // decline. The popup appears even when a shaderpack was previously active,
+    // so nobody gets shaders applied without being asked.
+    if !bom.shaderpacks.is_empty() {
+        if install_recommended_packs {
+            // Programmatic callers can opt in without the dialog.
+            apply_shader_choice(&mut selection, &bom, true);
+        } else if selection.remember_shaders_choice {
+            // The player answered before — reuse the remembered answer.
+            let auto_enabled = selection.shaders_auto_enabled;
+            apply_shader_choice(&mut selection, &bom, auto_enabled);
+        } else {
+            emit_status(
+                app,
+                format!("{} offers shaders — asking player...", url_host),
+            );
+            let request_id = state.next_shader_request_id.fetch_add(1, Ordering::SeqCst);
+            let (tx, rx) = tokio::sync::oneshot::channel::<ShaderChoice>();
+            state.shader_requests.lock().await.insert(request_id, tx);
+            let _ = app.emit(
+                "shader-request",
+                serde_json::json!({
+                    "requestId": request_id,
+                    "server": format!("{url_host}:{port}"),
+                    "shaderName": bom
+                        .shaderpacks
+                        .first()
+                        .map(|p| p.filename.clone())
+                        .unwrap_or_default(),
+                }),
+            );
+            // Wait for the webview's answer; a closed window or a long pause
+            // falls back to "no shaders".
+            let choice = match tokio::time::timeout(Duration::from_secs(120), rx).await {
+                Ok(Ok(choice)) => choice,
+                _ => ShaderChoice {
+                    enabled: false,
+                    remember: false,
+                },
+            };
+            if choice.remember {
+                selection.remember_shaders_choice = true;
+                selection.shaders_auto_enabled = choice.enabled;
+            }
+            apply_shader_choice(&mut selection, &bom, choice.enabled);
         }
-        selection.active_resourcepacks =
-            bom.resourcepacks.iter().map(|p| p.filename.clone()).collect();
         selection.save(&game_dir);
     }
 
     // --- classpath / Java ---
-    emit_status(app, format!("Resolving Minecraft {} runtime...", bom.minecraft_version));
+    emit_status(
+        app,
+        format!("Resolving Minecraft {} runtime...", bom.minecraft_version),
+    );
     let required_java =
         JavaRuntimeSelector::get_required_java_major_version(&bom.minecraft_version);
-    let loader = bom.mod_loader.clone().unwrap_or_else(|| {
-        ModLoaderInfo::new("vanilla", "", None)
-    });
+    let loader = bom
+        .mod_loader
+        .clone()
+        .unwrap_or_else(|| ModLoaderInfo::new("vanilla", "", None));
     let launch_data = state
         .classpath
         .resolve(&bom.minecraft_version, &loader, required_java)
         .await?;
 
     // --- mod sync ---
-    let settings = state.settings.lock().unwrap().clone();
     emit_status(app, "Checking mod hashes & synchronizing staging area...");
     let listener = UiProgressListener { app: app.clone() };
     let sync_result = state
         .sync_engine
-        .sync(
-            &base_url,
-            &game_dir,
-            settings.strict_verification,
-            settings.trust_direct_mods,
-            Some(&listener),
-        )
+        .sync(&base_url, &game_dir, Some(&listener))
         .await?;
     if sync_result.aborted {
         return Err(LauncherError::InvalidInput(
@@ -375,29 +576,69 @@ async fn run_online_flow(
     emit_status(app, "Starting Minecraft process...");
     let output = game_output_emitter(app);
     let child = MinecraftRunner
-        .launch(&launch_data, &session, &game_dir, &host, port as i32, Some(output))
+        .launch(
+            &launch_data,
+            &session,
+            &game_dir,
+            &url_host,
+            port as i32,
+            Some(output),
+        )
         .await?;
 
     let id = state.next_game_id.fetch_add(1, Ordering::SeqCst);
     *state.running_game.lock().await = Some(RunningGame {
         id,
-        label: format!("{host}:{port}"),
+        label: format!("{url_host}:{port}"),
         child,
     });
-    watch_game(app.clone(), id, format!("{host}:{port}"));
+    watch_game(app.clone(), id, format!("{url_host}:{port}"));
 
-    servers::record_played(name.unwrap_or_default(), address);
-    emit_status(app, format!("Game running — connected to {host}:{port}"));
+    servers::record_played(
+        name.filter(|n| !n.trim().is_empty()).unwrap_or(address),
+        address,
+    );
+    emit_status(
+        app,
+        format!("Game running — connected to {url_host}:{port}"),
+    );
     let _ = app.emit(
         "game-status",
-        serde_json::json!({ "running": true, "label": format!("{host}:{port}") }),
+        serde_json::json!({ "running": true, "label": format!("{url_host}:{port}") }),
     );
     Ok(())
 }
 
-/// True when the BOM advertises shaderpacks or resourcepacks.
-fn bom_offers_packs(bom: &BillOfMaterials) -> bool {
-    !bom.shaderpacks.is_empty() || !bom.resourcepacks.is_empty()
+/// Registers a pre-join ticket with the Zircon server so the TCP multiplexer
+/// Applies a shader decision to the pack selection: enabling activates the
+/// server's first shaderpack when none is chosen yet; disabling turns shaders
+/// off and clears the selection.
+fn apply_shader_choice(selection: &mut PackSelection, bom: &BillOfMaterials, enabled: bool) {
+    if enabled {
+        selection.shaders_enabled = true;
+        if selection.active_shaderpack.is_none() {
+            if let Some(first) = bom.shaderpacks.first() {
+                selection.active_shaderpack = Some(first.filename.clone());
+            }
+        }
+    } else {
+        selection.shaders_enabled = false;
+        selection.active_shaderpack = None;
+    }
+}
+
+/// Resolves an in-flight shader opt-in prompt with the player's answer.
+#[tauri::command]
+pub async fn respond_shader_choice(
+    state: State<'_, LauncherState>,
+    request_id: u64,
+    enabled: bool,
+    remember: bool,
+) -> Result<(), String> {
+    if let Some(tx) = state.shader_requests.lock().await.remove(&request_id) {
+        let _ = tx.send(ShaderChoice { enabled, remember });
+    }
+    Ok(())
 }
 
 /// Watches a running game; when it exits, clears the state slot and emits a
@@ -458,7 +699,9 @@ pub async fn stop_game(app: AppHandle, state: State<'_, LauncherState>) -> Resul
 
 /// Current game status for UI restore on app start / view switch.
 #[tauri::command]
-pub async fn get_game_status(state: State<'_, LauncherState>) -> Result<Option<GameStatus>, String> {
+pub async fn get_game_status(
+    state: State<'_, LauncherState>,
+) -> Result<Option<GameStatus>, String> {
     let guard = state.running_game.lock().await;
     Ok(guard.as_ref().map(|game| GameStatus {
         running: true,
@@ -472,7 +715,10 @@ pub struct GameStatus {
     pub label: String,
 }
 
-async fn fetch_bom(http: &reqwest::Client, base_url: &str) -> Result<BillOfMaterials, LauncherError> {
+async fn fetch_bom(
+    http: &reqwest::Client,
+    base_url: &str,
+) -> Result<BillOfMaterials, LauncherError> {
     let response = http.get(format!("{base_url}/bom")).send().await?;
     let status = response.status().as_u16();
     if !(200..300).contains(&status) {
@@ -512,7 +758,9 @@ async fn register_join_intent(
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub fn list_offline_instances(state: State<'_, LauncherState>) -> Result<Vec<OfflineInstance>, String> {
+pub fn list_offline_instances(
+    state: State<'_, LauncherState>,
+) -> Result<Vec<OfflineInstance>, String> {
     Ok(state.offline.list())
 }
 
@@ -549,7 +797,11 @@ pub fn get_offline_instance_dir(
     let Some(instance) = state.offline.load(&id) else {
         return Err("Instance not found".to_string());
     };
-    Ok(state.offline.instance_dir(&instance.id).display().to_string())
+    Ok(state
+        .offline
+        .instance_dir(&instance.id)
+        .display()
+        .to_string())
 }
 
 /// Launches an offline instance: classpath resolution, then the game process.
@@ -580,12 +832,20 @@ async fn run_offline_flow(
 
     emit_status(
         app,
-        format!("Resolving Minecraft {} runtime...", instance.minecraft_version),
+        format!(
+            "Resolving Minecraft {} runtime...",
+            instance.minecraft_version
+        ),
     );
-    let required_java = JavaRuntimeSelector::get_required_java_major_version(&instance.minecraft_version);
+    let required_java =
+        JavaRuntimeSelector::get_required_java_major_version(&instance.minecraft_version);
     let launch_data = state
         .classpath
-        .resolve(&instance.minecraft_version, &instance.mod_loader, required_java)
+        .resolve(
+            &instance.minecraft_version,
+            &instance.mod_loader,
+            required_java,
+        )
         .await?;
 
     let game_dir = state.offline.instance_dir(&instance.id);
@@ -604,10 +864,19 @@ async fn run_offline_flow(
             .unwrap_or_else(|| "Player".to_string())
     };
 
-    emit_status(app, format!("Starting offline instance '{}'...", instance.name));
+    emit_status(
+        app,
+        format!("Starting offline instance '{}'...", instance.name),
+    );
     let output = game_output_emitter(app);
     let child = MinecraftRunner
-        .launch_offline(&launch_data, &player_name, &java_args, &game_dir, Some(output))
+        .launch_offline(
+            &launch_data,
+            &player_name,
+            &java_args,
+            &game_dir,
+            Some(output),
+        )
         .await?;
 
     let id = state.next_game_id.fetch_add(1, Ordering::SeqCst);
@@ -634,16 +903,17 @@ async fn run_offline_flow(
 
 /// Replaces any `-Xmx`/`-Xms` tokens in a Java args string with the Settings
 /// slider value, keeping every other argument (extra JVM flags, GC options...).
+/// `-Xmx` takes the full slider value while `-Xms` is capped at the 2 GB
+/// launcher default, matching the fallback produced for empty args.
 fn override_heap(java_args: &str, memory_gb: u32) -> String {
-    let tokens: Vec<String> = java_args
-        .split_whitespace()
-        .map(str::to_string)
-        .collect();
+    let tokens: Vec<String> = java_args.split_whitespace().map(str::to_string).collect();
     let mut out: Vec<String> = Vec::new();
     for token in tokens {
         let lower = token.to_ascii_lowercase();
-        if lower.starts_with("-xmx") || lower.starts_with("-xms") {
+        if lower.starts_with("-xmx") {
             out.push(format!("-Xmx{memory_gb}G"));
+        } else if lower.starts_with("-xms") {
+            out.push(format!("-Xms{}G", memory_gb.min(2)));
         } else {
             out.push(token);
         }
@@ -676,7 +946,10 @@ pub fn list_offline_mods(
         .filter_map(|path| {
             let filename = path.file_name()?.to_string_lossy().into_owned();
             let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-            Some(ModFileInfo { filename, size_bytes })
+            Some(ModFileInfo {
+                filename,
+                size_bytes,
+            })
         })
         .collect();
     mods.sort_by(|a, b| a.filename.cmp(&b.filename));
@@ -731,6 +1004,7 @@ pub fn add_offline_mod(
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SkinImage {
     pub name: String,
     pub data_url: String,
@@ -751,7 +1025,7 @@ pub fn get_active_skin() -> Result<Option<SkinImage>, String> {
     Ok(Some(SkinImage {
         name: "active_skin.png".to_string(),
         data_url,
-        variant: String::new(),
+        variant: SkinManager::active_variant(),
     }))
 }
 
@@ -766,18 +1040,36 @@ pub fn get_skin_head_icon() -> Result<Option<String>, String> {
     Ok(Some(SkinManager::png_data_url(&bytes)))
 }
 
-/// Saves a PNG file (picked via the dialog) as the active skin + history.
+/// Saves a PNG file (picked via the dialog) as the active skin (pushing the
+/// previous active into history). The optional `variant` (`classic`/`slim`) is
+/// persisted alongside the PNG.
 #[tauri::command]
-pub fn save_skin(source_path: String) -> Result<(), String> {
-    SkinManager::save_skin(Path::new(&source_path)).map_err(err_string)
+pub fn save_skin(
+    app: AppHandle,
+    source_path: String,
+    variant: Option<String>,
+) -> Result<(), String> {
+    let variant = variant.unwrap_or_else(|| "classic".to_string());
+    SkinManager::save_skin(Path::new(&source_path), &variant).map_err(err_string)?;
+    emit_skin_updated(&app);
+    Ok(())
 }
 
 #[tauri::command]
-pub fn remove_skin() -> Result<(), String> {
-    SkinManager::reset_skin().map_err(err_string)
+pub fn remove_skin(app: AppHandle) -> Result<(), String> {
+    SkinManager::reset_skin().map_err(err_string)?;
+    emit_skin_updated(&app);
+    Ok(())
 }
 
-/// History skins, newest first, as data URLs.
+/// Persists the arm variant (`classic`/`slim`) for the active custom skin.
+#[tauri::command]
+pub fn set_active_skin_variant(variant: Option<String>) -> Result<(), String> {
+    let variant = variant.unwrap_or_else(|| "classic".to_string());
+    SkinManager::set_active_variant(&variant).map_err(err_string)
+}
+
+/// History skins, newest first, as data URLs (with their arm variants).
 #[tauri::command]
 pub fn get_skin_history() -> Result<Vec<SkinImage>, String> {
     let mut out = Vec::new();
@@ -787,37 +1079,46 @@ pub fn get_skin_history() -> Result<Vec<SkinImage>, String> {
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            out.push(SkinImage { name, data_url, variant: String::new() });
+            out.push(SkinImage {
+                name,
+                data_url,
+                variant: SkinManager::variant_of(&path),
+            });
         }
     }
     Ok(out)
 }
 
-/// Bundled default skins (steve/alex) as data URLs.
+/// Bundled default skins (steve/alex) as data URLs, with their arm variants.
 #[tauri::command]
 pub fn get_bundled_skins() -> Result<Vec<SkinImage>, String> {
     Ok(BundledSkins::all()
         .into_iter()
         .map(|(name, bytes)| SkinImage {
-            name,
+            name: name.clone(),
             data_url: SkinManager::png_data_url(&bytes),
-            variant: String::new(),
+            variant: BundledSkins::variant(&name),
         })
         .collect())
 }
 
-/// Activates a bundled skin by key (`bundled:<name>`), like picking it in the
-/// JavaFX gallery and saving.
+/// Activates a preset skin by key (`bundled:<name>`): the current active skin
+/// moves to history and the preset becomes active (no duplicate history entry
+/// for the preset itself). The optional `variant` (`classic`/`slim`) is what
+/// the user picked in the UI; it defaults to the preset's own variant.
 #[tauri::command]
-pub fn save_bundled_skin(key: String) -> Result<(), String> {
+pub fn save_bundled_skin(
+    app: AppHandle,
+    key: String,
+    variant: Option<String>,
+) -> Result<(), String> {
     let Some((name, bytes)) = BundledSkins::by_key(&key) else {
         return Err("Unknown bundled skin".to_string());
     };
-    let tmp = std::env::temp_dir().join(format!("zircon-bundled-{name}"));
-    std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
-    let result = SkinManager::save_skin(&tmp);
-    let _ = std::fs::remove_file(&tmp);
-    result.map_err(err_string)
+    let variant = variant.unwrap_or_else(|| BundledSkins::variant(&name));
+    SkinManager::set_active_png(&bytes, &variant, true).map_err(err_string)?;
+    emit_skin_updated(&app);
+    Ok(())
 }
 
 /// Downloads the player's current Mojang skin by UUID, stores it as the active
@@ -827,18 +1128,87 @@ pub async fn fetch_mojang_skin(
     state: State<'_, LauncherState>,
     uuid: String,
 ) -> Result<SkinImage, String> {
-    let downloaded = state.mojang_skin.download(&uuid).await.map_err(err_string)?;
+    let downloaded = state
+        .mojang_skin
+        .download(&uuid)
+        .await
+        .map_err(err_string)?;
     let tmp = std::env::temp_dir().join(format!(
         "zircon-mojang-skin-{}.png",
         uuid::Uuid::new_v4().simple()
     ));
     std::fs::write(&tmp, &downloaded.png).map_err(|e| e.to_string())?;
-    let save_result = SkinManager::save_skin(&tmp);
+    let save_result = SkinManager::save_skin(&tmp, &downloaded.variant);
     let _ = std::fs::remove_file(&tmp);
     save_result.map_err(err_string)?;
-    let short = uuid.chars().filter(|c| c.is_ascii_hexdigit()).take(8).collect::<String>();
+    let short = uuid
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .take(8)
+        .collect::<String>();
     Ok(SkinImage {
         name: format!("mojang-{short}.png"),
+        data_url: SkinManager::png_data_url(&downloaded.png),
+        variant: downloaded.variant,
+    })
+}
+
+/// Downloads the player's current Mojang skin by UUID and makes it the active
+/// skin without touching history — the boot-time refresh so the launcher skin
+/// always mirrors the player's Minecraft skin.
+#[tauri::command]
+pub async fn fetch_mojang_skin_active(
+    app: AppHandle,
+    state: State<'_, LauncherState>,
+    uuid: String,
+) -> Result<SkinImage, String> {
+    let downloaded = state
+        .mojang_skin
+        .download(&uuid)
+        .await
+        .map_err(err_string)?;
+    SkinManager::set_active_png(&downloaded.png, &downloaded.variant, false).map_err(err_string)?;
+    emit_skin_updated(&app);
+    Ok(SkinImage {
+        name: "active_skin.png".to_string(),
+        data_url: SkinManager::png_data_url(&downloaded.png),
+        variant: downloaded.variant,
+    })
+}
+
+/// Makes a history skin the active skin (the current active moves to history).
+/// The optional `variant` overrides the entry's recorded arms model.
+#[tauri::command]
+pub fn activate_history_skin(
+    app: AppHandle,
+    filename: String,
+    variant: Option<String>,
+) -> Result<(), String> {
+    SkinManager::activate_history(&filename, variant.as_deref()).map_err(err_string)?;
+    emit_skin_updated(&app);
+    Ok(())
+}
+
+/// Deletes a history skin entry (PNG + variant sidecar).
+#[tauri::command]
+pub fn delete_history_skin(filename: String) -> Result<(), String> {
+    SkinManager::delete_history(&filename).map_err(err_string)
+}
+
+/// Downloads the player's current Mojang skin for a read-only preview — used
+/// by the servers screen. Never touches the active skin or history.
+#[tauri::command]
+pub async fn fetch_mojang_skin_preview(
+    state: State<'_, LauncherState>,
+    uuid: String,
+) -> Result<SkinImage, String> {
+    let downloaded = state
+        .mojang_skin
+        .download(&uuid)
+        .await
+        .map_err(err_string)?;
+    Ok(SkinImage {
+        name: "mojang-preview.png".to_string(),
         data_url: SkinManager::png_data_url(&downloaded.png),
         variant: downloaded.variant,
     })
@@ -859,7 +1229,11 @@ pub async fn upload_skin_to_mojang(
     let variant = variant.unwrap_or_else(|| "classic".to_string());
     state
         .mojang_skin
-        .upload(&session.access_token, &SkinManager::active_skin_path(), &variant)
+        .upload(
+            &session.access_token,
+            &SkinManager::active_skin_path(),
+            &variant,
+        )
         .await
         .map_err(err_string)
 }
@@ -869,6 +1243,7 @@ pub async fn upload_skin_to_mojang(
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InstancePacks {
     pub shaderpacks: Vec<String>,
     pub resourcepacks: Vec<String>,
@@ -912,7 +1287,11 @@ pub fn list_instance_packs(game_dir: String) -> Result<InstancePacks, String> {
         active_shaderpack: selection.active_shaderpack.clone(),
         active_resourcepacks: selection.active_resourcepacks.clone(),
         shaders_enabled: selection.shaders_enabled,
-        locally_added_shaderpacks: selection.locally_added_shaderpacks.iter().cloned().collect(),
+        locally_added_shaderpacks: selection
+            .locally_added_shaderpacks
+            .iter()
+            .cloned()
+            .collect(),
         locally_added_resourcepacks: selection
             .locally_added_resourcepacks
             .iter()
@@ -932,7 +1311,9 @@ pub fn add_local_pack(
     let dir = PathBuf::from(&game_dir);
     let mut selection = PackSelection::load(&dir);
     let filename = match kind.as_str() {
-        "shader" => ClientPackManager::add_local_shaderpack(&dir, Path::new(&source_path), &mut selection),
+        "shader" => {
+            ClientPackManager::add_local_shaderpack(&dir, Path::new(&source_path), &mut selection)
+        }
         "resource" => {
             ClientPackManager::add_local_resourcepack(&dir, Path::new(&source_path), &mut selection)
         }
@@ -943,11 +1324,7 @@ pub fn add_local_pack(
 }
 
 #[tauri::command]
-pub fn remove_local_pack(
-    game_dir: String,
-    kind: String,
-    filename: String,
-) -> Result<(), String> {
+pub fn remove_local_pack(game_dir: String, kind: String, filename: String) -> Result<(), String> {
     let dir = PathBuf::from(&game_dir);
     let mut selection = PackSelection::load(&dir);
     match kind.as_str() {
@@ -960,10 +1337,7 @@ pub fn remove_local_pack(
 
 /// Selects the active shaderpack; `None`/empty disables shaders.
 #[tauri::command]
-pub fn set_active_shaderpack(
-    game_dir: String,
-    filename: Option<String>,
-) -> Result<(), String> {
+pub fn set_active_shaderpack(game_dir: String, filename: Option<String>) -> Result<(), String> {
     let dir = PathBuf::from(&game_dir);
     let mut selection = PackSelection::load(&dir);
     match filename {
@@ -988,7 +1362,11 @@ pub fn set_active_shaderpack(
 pub fn toggle_resourcepack(game_dir: String, filename: String) -> Result<bool, String> {
     let dir = PathBuf::from(&game_dir);
     let mut selection = PackSelection::load(&dir);
-    if selection.active_resourcepacks.iter().any(|n| n == &filename) {
+    if selection
+        .active_resourcepacks
+        .iter()
+        .any(|n| n == &filename)
+    {
         selection.active_resourcepacks.retain(|n| n != &filename);
         selection.save(&dir);
         return Ok(false);
@@ -1023,7 +1401,12 @@ pub async fn search_modrinth(
     };
     let hits = state
         .modrinth
-        .search_mods_with_type(&query, Some(&instance.minecraft_version), loader, Some("mod"))
+        .search_mods_with_type(
+            &query,
+            Some(&instance.minecraft_version),
+            loader,
+            Some("mod"),
+        )
         .await
         .map_err(|e| e.to_string())?;
     Ok(hits)
@@ -1042,13 +1425,19 @@ pub async fn install_modrinth_mod(
     };
     let versions = state
         .modrinth
-        .list_project_versions(&project_id, Some(&instance.minecraft_version), Some(&instance.mod_loader.r#type))
+        .list_project_versions(
+            &project_id,
+            Some(&instance.minecraft_version),
+            Some(&instance.mod_loader.r#type),
+        )
         .await
         .map_err(|e| e.to_string())?;
-    let version = versions
-        .into_iter()
-        .next()
-        .ok_or_else(|| format!("No version of this mod supports Minecraft {} + {} loader", instance.minecraft_version, instance.mod_loader.r#type))?;
+    let version = versions.into_iter().next().ok_or_else(|| {
+        format!(
+            "No version of this mod supports Minecraft {} + {} loader",
+            instance.minecraft_version, instance.mod_loader.r#type
+        )
+    })?;
     let file = version
         .primary_file()
         .ok_or_else(|| "This mod has no downloadable file".to_string())?;
@@ -1088,7 +1477,9 @@ async fn download_file(
 /// Minecraft versions known to Modrinth (release only), for the instance
 /// creation dropdown.
 #[tauri::command]
-pub async fn list_minecraft_versions(state: State<'_, LauncherState>) -> Result<Vec<String>, String> {
+pub async fn list_minecraft_versions(
+    state: State<'_, LauncherState>,
+) -> Result<Vec<String>, String> {
     state
         .modrinth
         .list_game_versions()
@@ -1137,11 +1528,12 @@ pub fn save_settings(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zircon_core::model::PackEntry;
 
     #[test]
     fn override_heap_replaces_xmx_and_xms() {
         let args = override_heap("-Xms2G -Xmx4G -XX:+UseG1GC", 8);
-        assert_eq!("-Xmx8G -Xmx8G -XX:+UseG1GC", args);
+        assert_eq!("-Xms2G -Xmx8G -XX:+UseG1GC", args);
     }
 
     #[test]
@@ -1154,5 +1546,47 @@ mod tests {
     fn override_heap_keeps_other_flags() {
         let args = override_heap("-XX:+UseZGC -Xmx2G", 10);
         assert_eq!("-XX:+UseZGC -Xmx10G", args);
+    }
+
+    #[test]
+    fn apply_shader_choice_enables_first_pack_and_disables_cleanly() {
+        let mut bom = BillOfMaterials::default();
+        bom.shaderpacks = vec![
+            PackEntry {
+                filename: "Complementary.zip".to_string(),
+                ..Default::default()
+            },
+            PackEntry {
+                filename: "BSL.zip".to_string(),
+                ..Default::default()
+            },
+        ];
+
+        // Enabling with no selection picks the server's first pack.
+        let mut selection = PackSelection::default();
+        apply_shader_choice(&mut selection, &bom, true);
+        assert!(selection.shaders_enabled);
+        assert_eq!(
+            Some("Complementary.zip".to_string()),
+            selection.active_shaderpack
+        );
+
+        // Enabling keeps an existing choice instead of overriding it.
+        let mut selection = PackSelection {
+            active_shaderpack: Some("BSL.zip".to_string()),
+            ..Default::default()
+        };
+        apply_shader_choice(&mut selection, &bom, true);
+        assert_eq!(Some("BSL.zip".to_string()), selection.active_shaderpack);
+
+        // Disabling turns shaders off and clears the selection.
+        let mut selection = PackSelection {
+            shaders_enabled: true,
+            active_shaderpack: Some("BSL.zip".to_string()),
+            ..Default::default()
+        };
+        apply_shader_choice(&mut selection, &bom, false);
+        assert!(!selection.shaders_enabled);
+        assert!(selection.active_shaderpack.is_none());
     }
 }

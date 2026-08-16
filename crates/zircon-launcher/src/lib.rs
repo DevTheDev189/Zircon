@@ -18,12 +18,22 @@ pub mod paths;
 pub mod servers;
 pub mod settings;
 pub mod skin;
+pub mod status;
 pub mod sync;
 
 /// Boots the Tauri application: registers the plugins, manages the shared
 /// launcher state and exposes every IPC command from [`commands`].
+///
+/// Logging goes to stderr; set `RUST_LOG` (e.g. `RUST_LOG=debug`) for more
+/// verbose output when running from a terminal.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::LauncherState::new())
@@ -34,7 +44,10 @@ pub fn run() {
             commands::logout,
             commands::load_saved_servers,
             commands::save_server_list,
+            commands::server_status,
+            commands::delete_saved_server,
             commands::launch_server,
+            commands::respond_shader_choice,
             commands::stop_game,
             commands::get_game_status,
             commands::list_offline_instances,
@@ -48,11 +61,16 @@ pub fn run() {
             commands::get_active_skin,
             commands::get_skin_head_icon,
             commands::save_skin,
+            commands::set_active_skin_variant,
             commands::remove_skin,
             commands::get_skin_history,
             commands::get_bundled_skins,
             commands::save_bundled_skin,
             commands::fetch_mojang_skin,
+            commands::fetch_mojang_skin_active,
+            commands::fetch_mojang_skin_preview,
+            commands::activate_history_skin,
+            commands::delete_history_skin,
             commands::upload_skin_to_mojang,
             commands::list_instance_packs,
             commands::add_local_pack,

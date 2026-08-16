@@ -35,6 +35,12 @@ pub struct PackSelection {
     pub locally_added_shaderpacks: BTreeSet<String>,
     #[serde(default)]
     pub locally_added_resourcepacks: BTreeSet<String>,
+    /// The player answered the per-server shader prompt once; don't ask again.
+    #[serde(default)]
+    pub remember_shaders_choice: bool,
+    /// The remembered shader answer (`true` = enable shaders on connect).
+    #[serde(default)]
+    pub shaders_auto_enabled: bool,
 }
 
 impl PackSelection {

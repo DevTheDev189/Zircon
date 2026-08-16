@@ -10,6 +10,7 @@ use serde::Deserialize;
 use zircon_core::model::ModLoaderInfo;
 
 use super::app::{ApiError, AppState};
+use crate::config::ServerProperties;
 use crate::web::controllers::config_helpers::instance_to_map;
 
 #[derive(Debug, Deserialize)]
@@ -41,10 +42,20 @@ pub async fn get_config(
         "publicPort": cfg.public_port,
         "mcPort": cfg.mc_port,
         "autoStartServer": cfg.auto_start_server,
-        "curseforgeApiKey": cfg.curseforge_api_key,
+        "curseforgeApiKey": mask_api_key(&cfg.curseforge_api_key),
         "serverProperties": server_properties,
     });
     Ok(Json(value))
+}
+
+/// Masks a secret for display: only the last 4 characters are revealed, so a
+/// configured CurseForge API key never leaves the server in full.
+fn mask_api_key(key: &str) -> String {
+    let key = key.trim();
+    if key.is_empty() || key.len() <= 4 {
+        return "****".to_string();
+    }
+    format!("****{}", &key[key.len() - 4..])
 }
 
 /// POST /api/config — accepts partial updates.
@@ -112,6 +123,59 @@ pub async fn start_server(
 pub async fn stop_server(State(state): State<AppState>) -> Json<serde_json::Value> {
     state.process_manager.stop().await;
     Json(serde_json::json!({ "ok": true, "running": false }))
+}
+
+/// GET /status — public client-facing status (like `/bom`): online player
+/// count, max players, version and running state for the active instance. No
+/// admin token is required, so the launcher can render player counts in its
+/// server list without authenticating.
+pub async fn client_status(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let value = match state.instances.get_active_instance() {
+        Some(instance) => {
+            let id = instance.id.clone();
+            let players = state.instances.get_online_players(&id);
+            let max = max_players_from_properties(
+                &state
+                    .instances
+                    .get_instance_dir(&id)
+                    .join("server")
+                    .join("server.properties"),
+            );
+            serde_json::json!({
+                "online": players.len(),
+                "players": players,
+                "max": max,
+                "running": state.instances.is_running(&id),
+                "version": instance.minecraft_version,
+                "name": instance.name,
+            })
+        }
+        None => {
+            let players = state.console.player_tracker().get_online_players();
+            let max = max_players_from_properties(&state.config.server_properties_file);
+            serde_json::json!({
+                "online": players.len(),
+                "players": players,
+                "max": max,
+                "running": state.process_manager.is_running(),
+                "version": state.config.get_config().minecraft_version,
+                "name": state.config.get_config().server_title,
+            })
+        }
+    };
+    Json(value)
+}
+
+/// Reads `max-players` from a `server.properties` file (0 when unavailable).
+fn max_players_from_properties(file: &std::path::Path) -> u32 {
+    match ServerProperties::load(file) {
+        Ok(props) => props
+            .as_map()
+            .get("max-players")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0),
+        Err(_) => 0,
+    }
 }
 
 /// GET /api/status — process status, online players, port wiring.

@@ -45,29 +45,48 @@ const MC_LOGIN_URL: &str = "https://api.minecraftservices.com/authentication/log
 const MC_ENTITLEMENTS_URL: &str = "https://api.minecraftservices.com/entitlements/mcstore";
 const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
 
+/// Endpoints whose responses carry bearer tokens. Their bodies are never
+/// logged or embedded in error messages, so tokens cannot leak into logs or
+/// bug reports.
+const SECRET_ENDPOINTS: [&str; 4] = [TOKEN_URL, XBL_URL, XSTS_URL, MC_LOGIN_URL];
+
 /// Microsoft OAuth 2.0 PKCE authentication against login.live.com plus the
 /// Xbox/Minecraft token chain and the persisted session cache.
+///
+/// The session (Minecraft access token + Microsoft refresh token) is stored in
+/// the operating system's keychain (DPAPI / Keychain / kernel keyring) so other
+/// local users and unrelated processes cannot read it; when the keychain is
+/// unavailable it falls back to an owner-only file, and legacy plaintext files
+/// are migrated to the keychain on first use.
 #[derive(Debug)]
 pub struct MicrosoftAuthService {
     client_id: String,
     cache_file: PathBuf,
     http: reqwest::Client,
+    /// Prefer the OS keychain over the plaintext cache file. Disabled for the
+    /// test constructor so tests stay hermetic (no real keychain access).
+    use_keyring: bool,
 }
 
 impl MicrosoftAuthService {
     /// Resolves the client id (env var → `client_id.txt` → embedded default)
     /// and uses the default cache file (`~/.mcmanager/auth_cache.json`).
     pub fn new() -> Self {
-        Self::new_with_paths(resolve_client_id(), paths::auth_cache_file())
+        Self::new_with_client_id(resolve_client_id())
     }
 
     /// Uses the given client id with the default cache file.
     pub fn new_with_client_id(client_id: String) -> Self {
-        Self::new_with_paths(client_id, paths::auth_cache_file())
+        Self::new_with_options(client_id, paths::auth_cache_file(), true)
     }
 
-    /// Full constructor for tests: explicit client id and cache file.
+    /// Full constructor for tests: explicit client id and cache file, with the
+    /// OS keychain disabled so tests never touch the real credential store.
     pub fn new_with_paths(client_id: String, cache_file: PathBuf) -> Self {
+        Self::new_with_options(client_id, cache_file, false)
+    }
+
+    fn new_with_options(client_id: String, cache_file: PathBuf, use_keyring: bool) -> Self {
         // `build()` only fails on invalid configuration; the values below are
         // static, so the unwrap is unreachable in practice.
         let http = reqwest::Client::builder()
@@ -79,6 +98,7 @@ impl MicrosoftAuthService {
             client_id,
             cache_file,
             http,
+            use_keyring,
         }
     }
 }
@@ -109,10 +129,13 @@ impl MicrosoftAuthService {
         // is sent in the authorize URL, and the verifier is sent at token exchange.
         let code_verifier = Self::generate_code_verifier();
         let code_challenge = Self::generate_code_challenge(&code_verifier);
+        // `state` binds the browser redirect back to this exact flow, so a
+        // stale callback or a malicious local process cannot feed us a code.
+        let state = Self::generate_state();
 
         let mut server = CallbackServer::start().await?;
         let redirect_uri = format!("http://localhost:{}/callback", server.port());
-        let authorize_url = self.build_authorize_url(&redirect_uri, &code_challenge);
+        let authorize_url = self.build_authorize_url(&redirect_uri, &code_challenge, &state);
 
         tracing::info!(
             "Opening browser for Microsoft login (client_id={}, redirect_uri={})",
@@ -126,7 +149,9 @@ impl MicrosoftAuthService {
             )));
         }
 
-        let code = server.await_code(Duration::from_secs(5 * 60)).await?;
+        let code = server
+            .await_code(Duration::from_secs(5 * 60), &state)
+            .await?;
         self.complete_login(&code, Some(&code_verifier), &redirect_uri)
             .await
     }
@@ -164,10 +189,7 @@ impl MicrosoftAuthService {
             .post_json(TOKEN_URL, &body, "application/x-www-form-urlencoded")
             .await?;
         let access_token = get_string(&json, "access_token").ok_or_else(|| {
-            LauncherError::Auth(format!(
-                "Token refresh failed: response missing access_token: {}",
-                truncate(&json.to_string())
-            ))
+            LauncherError::Auth("Token refresh failed: response missing access_token".to_string())
         })?;
         let refresh_token = get_string(&json, "refresh_token").unwrap_or_default();
         tracing::debug!("Token refresh OK");
@@ -211,9 +233,44 @@ impl MicrosoftAuthService {
     }
 
     /// Loads the cached session, or `None` when the cache is missing, invalid
-    /// (dummy token or non-msa session) or unreadable. Invalid files are
+    /// (dummy token or non-msa session) or unreadable. Invalid entries are
     /// deleted so a broken cache never blocks a fresh login.
+    ///
+    /// The OS keychain is authoritative when it holds an entry; otherwise the
+    /// legacy plaintext file is consulted, and a valid file entry is migrated
+    /// into the keychain.
     pub fn load_cached(&self) -> Option<SessionData> {
+        if self.use_keyring {
+            if let Ok(entry) = Self::keyring_entry() {
+                match entry.get_password() {
+                    Ok(json) => match serde_json::from_str::<SessionData>(&json) {
+                        Ok(data) if data.is_valid() => return Some(data),
+                        Ok(_) => {
+                            tracing::warn!("Ignoring invalid session in the OS keychain");
+                            let _ = entry.delete_credential();
+                            return None;
+                        }
+                        Err(e) => {
+                            tracing::warn!("Could not parse the OS keychain session: {e}");
+                            let _ = entry.delete_credential();
+                            return None;
+                        }
+                    },
+                    Err(keyring::Error::NoEntry) => { /* fall through to the file */ }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Could not read the session from the OS keychain ({e}); trying the cache file"
+                        );
+                    }
+                }
+            }
+        }
+        self.load_cache_file()
+    }
+
+    /// Loads the legacy plaintext cache file. A valid entry is migrated into
+    /// the keychain (and the file removed) when keychain storage is enabled.
+    fn load_cache_file(&self) -> Option<SessionData> {
         if !self.cache_file.is_file() {
             return None;
         }
@@ -221,6 +278,11 @@ impl MicrosoftAuthService {
             Ok(content) => match serde_json::from_str::<SessionData>(&content) {
                 Ok(data) => {
                     if data.is_valid() {
+                        if self.use_keyring {
+                            // Migrate the legacy cache into the keychain now
+                            // that it is available.
+                            let _ = self.save(&data);
+                        }
                         Some(data)
                     } else {
                         tracing::warn!(
@@ -243,22 +305,74 @@ impl MicrosoftAuthService {
         }
     }
 
-    /// Persists the session to the cache file, creating parent directories.
+    /// Persists the session: into the OS keychain when available, otherwise
+    /// into an owner-only cache file. The session holds the Minecraft access
+    /// token and the Microsoft refresh token, so a plaintext copy is avoided
+    /// whenever the platform keychain is present.
     pub fn save(&self, session: &SessionData) -> Result<(), LauncherError> {
+        let json = serde_json::to_string(session)?;
+        if self.use_keyring {
+            match Self::keyring_entry() {
+                Ok(entry) => match entry.set_password(&json) {
+                    Ok(()) => {
+                        // Keychain is authoritative — drop any legacy plaintext copy.
+                        let _ = std::fs::remove_file(&self.cache_file);
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Could not store the session in the OS keychain ({e}); falling back to a protected cache file"
+                        );
+                    }
+                },
+                Err(e) => {
+                    tracing::warn!(
+                        "Could not access the OS keychain ({e}); falling back to a protected cache file"
+                    );
+                }
+            }
+        }
+        self.write_cache_file(&json)
+    }
+
+    /// Writes the session JSON to the cache file, restricted to the current
+    /// user where the OS supports it.
+    fn write_cache_file(&self, json: &str) -> Result<(), LauncherError> {
         if let Some(parent) = self.cache_file.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(&self.cache_file, serde_json::to_string(session)?)?;
+        std::fs::write(&self.cache_file, json)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            // Owner read/write only: keeps other local users (and malware
+            // running as them) from reading the refresh token.
+            let _ =
+                std::fs::set_permissions(&self.cache_file, std::fs::Permissions::from_mode(0o600));
+        }
         Ok(())
     }
 
-    /// Deletes the cache file (no error when it does not exist).
+    /// Deletes the cached session everywhere (keychain and legacy file); no
+    /// error when nothing was stored.
     pub fn clear_cache(&self) -> Result<(), LauncherError> {
+        if self.use_keyring {
+            if let Ok(entry) = Self::keyring_entry() {
+                let _ = entry.delete_credential();
+            }
+        }
         match std::fs::remove_file(&self.cache_file) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(e.into()),
         }
+    }
+
+    /// The keychain entry holding the session JSON. The service name is
+    /// launcher-wide; a single user slot holds the one active session.
+    fn keyring_entry() -> Result<keyring::Entry, LauncherError> {
+        keyring::Entry::new("zircon-launcher", "auth-session")
+            .map_err(|e| LauncherError::Auth(format!("Could not access the OS keychain: {e}")))
     }
 
     /// Returns `true` if the account owns Minecraft (best effort — never
@@ -294,25 +408,41 @@ impl MicrosoftAuthService {
     }
 
     /// Builds the OAuth authorize URL. `code_challenge_method=S256` is fixed;
-    /// the `scope` is `XboxLive.signin offline_access` and `prompt=login`
-    /// forces a fresh interactive login.
-    pub fn build_authorize_url(&self, redirect_uri: &str, code_challenge: &str) -> String {
+    /// the `scope` is `XboxLive.signin offline_access`, `prompt=login` forces a
+    /// fresh interactive login, and `state` binds the redirect back to this
+    /// flow so the callback can reject forged or stale requests.
+    pub fn build_authorize_url(
+        &self,
+        redirect_uri: &str,
+        code_challenge: &str,
+        state: &str,
+    ) -> String {
         format!(
-            "{AUTH_URL}?client_id={}&response_type=code&redirect_uri={}&scope={}&code_challenge={}&code_challenge_method=S256&prompt=login",
+            "{AUTH_URL}?client_id={}&response_type=code&redirect_uri={}&scope={}&code_challenge={}&code_challenge_method=S256&prompt=login&state={}",
             urlencode(&self.client_id),
             urlencode(redirect_uri),
             urlencode("XboxLive.signin offline_access"),
             urlencode(code_challenge),
+            urlencode(state),
         )
     }
 
     /// 64 random chars from the RFC 7636 unreserved alphabet.
     pub fn generate_code_verifier() -> String {
+        Self::random_alphabet_chars(64)
+    }
+
+    /// 32 random chars used as the OAuth `state` (defends the callback against
+    /// forged or replayed redirects).
+    pub fn generate_state() -> String {
+        Self::random_alphabet_chars(32)
+    }
+
+    fn random_alphabet_chars(len: usize) -> String {
         const ALPHABET: &[u8] =
             b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-        let mut bytes = [0u8; 64];
-        getrandom::fill(&mut bytes)
-            .expect("failed to obtain randomness for the PKCE code verifier");
+        let mut bytes = vec![0u8; len];
+        getrandom::fill(&mut bytes).expect("failed to obtain randomness for the OAuth flow");
         bytes
             .iter()
             .map(|b| ALPHABET[(*b as usize) % ALPHABET.len()] as char)
@@ -350,10 +480,9 @@ impl MicrosoftAuthService {
             .post_json(TOKEN_URL, &body, "application/x-www-form-urlencoded")
             .await?;
         let access_token = get_string(&json, "access_token").ok_or_else(|| {
-            LauncherError::Auth(format!(
-                "OAuth token exchange failed: response missing access_token: {}",
-                truncate(&json.to_string())
-            ))
+            LauncherError::Auth(
+                "OAuth token exchange failed: response missing access_token".to_string(),
+            )
         })?;
         let refresh_token = get_string(&json, "refresh_token").unwrap_or_default();
         tracing::debug!(
@@ -406,10 +535,7 @@ impl MicrosoftAuthService {
             .and_then(|uhs| uhs.as_str())
             .map(str::to_string)
             .ok_or_else(|| {
-                LauncherError::Auth(format!(
-                    "XSTS response missing user hash (uhs): {}",
-                    truncate(&json.to_string())
-                ))
+                LauncherError::Auth("XSTS response missing user hash (uhs)".to_string())
             })?;
         tracing::debug!("XSTS authorize OK (uhs={uhs})");
         Ok(XstsResponse { token, uhs })
@@ -499,7 +625,8 @@ impl MicrosoftAuthService {
     // ------------------------------------------------------------------
 
     /// POSTs `body` with `content_type` and returns `(status, response text)`
-    /// regardless of status so callers can surface API error bodies.
+    /// regardless of status so callers can surface API error bodies. Response
+    /// bodies of the token-bearing endpoints are redacted from logs.
     async fn post(
         &self,
         url: &str,
@@ -516,7 +643,11 @@ impl MicrosoftAuthService {
             .await?;
         let status = response.status().as_u16();
         let text = response.text().await?;
-        tracing::debug!("POST {url} -> HTTP {status}: {}", truncate(&text));
+        if SECRET_ENDPOINTS.contains(&url) {
+            tracing::debug!("POST {url} -> HTTP {status} (body redacted)");
+        } else {
+            tracing::debug!("POST {url} -> HTTP {status}: {}", truncate(&text));
+        }
         Ok((status, text))
     }
 
@@ -565,11 +696,12 @@ fn get_string(json: &serde_json::Value, field: &str) -> Option<String> {
     json.get(field).and_then(|v| v.as_str()).map(str::to_string)
 }
 
-/// Extracts a required string field, mirroring the Java `require` helper.
+/// Extracts a required string field, mirroring the Java `require` helper. The
+/// response body is deliberately NOT embedded in the error: the token-bearing
+/// endpoints would leak credentials into error messages.
 fn require(json: &serde_json::Value, field: &str, step: &str) -> Result<String, LauncherError> {
-    get_string(json, field).ok_or_else(|| {
-        LauncherError::Auth(format!("{step} failed: response missing '{field}': {json}"))
-    })
+    get_string(json, field)
+        .ok_or_else(|| LauncherError::Auth(format!("{step} failed: response missing '{field}'")))
 }
 
 /// Truncates long response bodies so error messages and debug logs stay readable.
@@ -643,7 +775,11 @@ mod tests {
     #[test]
     fn build_authorize_url_contains_all_params() {
         let service = MicrosoftAuthService::new_with_client_id("abc123".to_string());
-        let url = service.build_authorize_url("http://localhost:45678/callback", "challenge-XYZ");
+        let url = service.build_authorize_url(
+            "http://localhost:45678/callback",
+            "challenge-XYZ",
+            "state-ABC",
+        );
         assert!(url.starts_with("https://login.live.com/oauth20_authorize.srf?"));
         assert!(url.contains("client_id=abc123"));
         assert!(url.contains("response_type=code"));
@@ -669,6 +805,32 @@ mod tests {
         assert_eq!(Some("challenge-XYZ"), get("code_challenge"));
         assert_eq!(Some("S256"), get("code_challenge_method"));
         assert_eq!(Some("login"), get("prompt"));
+        assert_eq!(Some("state-ABC"), get("state"));
+    }
+
+    #[test]
+    fn state_has_expected_shape() {
+        const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+        for _ in 0..8 {
+            let state = MicrosoftAuthService::generate_state();
+            assert_eq!(32, state.len());
+            assert!(state.chars().all(|c| ALPHABET.contains(c)));
+        }
+    }
+
+    #[test]
+    fn cache_save_restricts_permissions_on_unix() {
+        let (dir, cache) = temp_cache();
+        let service =
+            MicrosoftAuthService::new_with_paths("test-client".to_string(), cache.clone());
+        service.save(&valid_session()).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&cache).unwrap().permissions().mode();
+            assert_eq!(0o600, mode & 0o777, "cache must be owner-only on unix");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

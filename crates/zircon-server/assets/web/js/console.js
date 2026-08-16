@@ -5,10 +5,13 @@ window.Zircon.console = {
     connectConsole() {
         if (this.consoleWs) return;
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-        // Browsers cannot set headers on WebSocket handshakes, so the JWT is
-        // passed as a query param and re-validated server-side.
-        const token = encodeURIComponent(this.jwtToken || '');
-        this.consoleWs = new WebSocket(`${proto}://${location.host}/api/console?token=${token}`);
+        // Browsers cannot set headers on WebSocket handshakes, and a token in
+        // the URL would leak into access logs and history — so the JWT is sent
+        // as the first message and re-validated server-side.
+        this.consoleWs = new WebSocket(`${proto}://${location.host}/api/console`);
+        this.consoleWs.onopen = () => {
+            if (this.jwtToken) this.consoleWs.send('AUTH ' + this.jwtToken);
+        };
         this.consoleWs.onmessage = (ev) => {
             if (ev.data === '__CLEAR__') {
                 this.consoleLines = [];

@@ -11,10 +11,16 @@
           v-for="instance in instances"
           :key="instance.id"
           class="flex items-center gap-3 bg-bg border rounded-lg p-3 mb-2.5 cursor-pointer transition-colors"
-          :class="selected?.id === instance.id ? 'border-accent' : 'border-edge hover:border-[#3d444d]'"
+          :class="
+            selected?.id === instance.id
+              ? 'border-accent bg-[#142129] shadow-[0_0_0_1px_rgba(71,210,201,0.15)]'
+              : 'border-edge hover:border-[#3d444d] hover:bg-[#1a2129]'
+          "
           @click="selectInstance(instance)"
         >
-          <div class="w-8 h-8 rounded-md bg-[#21262d] text-accent flex items-center justify-center text-sm">
+          <div
+            class="w-8 h-8 rounded-md bg-gradient-to-br from-[#24313d] to-[#1a222b] text-accent flex items-center justify-center text-sm shrink-0 border border-edge"
+          >
             {{ instance.name.charAt(0).toUpperCase() }}
           </div>
           <div class="flex-1 min-w-0">
@@ -95,7 +101,7 @@
                 <div class="flex-1 min-w-0">
                   <div class="text-xs font-bold text-white truncate">{{ hit.title }}</div>
                   <div class="text-[10px] text-muted truncate">
-                    {{ hit.author }} · {{ fmtBytes(hit.downloads) }} downloads
+                    {{ hit.author }} · {{ fmtCount(hit.downloads) }} downloads
                   </div>
                 </div>
                 <button
@@ -167,10 +173,13 @@
     <!-- New instance modal -->
     <div
       v-if="showNewDialog"
-      class="absolute inset-0 z-40 bg-black/60 flex items-center justify-center"
+      class="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center"
       @click.self="showNewDialog = false"
     >
-      <div class="z-card w-[440px]">
+      <div class="z-card w-[440px] pt-0 overflow-hidden">
+        <div
+          class="h-[3px] bg-gradient-to-r from-accent to-[#1f8f87] -mx-4 -mt-4 mb-4"
+        ></div>
         <h3 class="text-white font-bold mb-4">New Offline Instance</h3>
         <label class="z-label">Instance name</label>
         <input v-model="newForm.name" class="z-input mb-3" placeholder="My Modded World" />
@@ -237,6 +246,14 @@ const loaderTypes = ref([]);
 const newForm = ref({ name: '', mcVersion: '1.20.4', loaderType: 'fabric', loaderVersion: '' });
 
 const allPacks = computed(() => packs.value);
+
+// Formats a raw download count like the Modrinth API returns it.
+function fmtCount(n) {
+  if (!n) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
 
 async function loadInstances() {
   instances.value = await api.listOfflineInstances();

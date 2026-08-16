@@ -6,10 +6,12 @@
 //! Port of `com.mcmanager.server.Main`.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::net::TcpListener;
 use zircon_server::auth::auth_service::AuthService;
 use zircon_server::auth::jwt;
+use zircon_server::auth::sessions::SessionRegistry;
 use zircon_server::config::ConfigService;
 use zircon_server::instance::ServerInstanceManager;
 use zircon_server::multiplexer::tcp::TcpMultiplexer;
@@ -23,6 +25,7 @@ use zircon_server::services::resolver::ModServiceResolver;
 use zircon_server::services::scheduler::BackupSchedulerService;
 use zircon_server::tickets::JoinTicketManager;
 use zircon_server::web::app::AppState;
+use zircon_server::web::rate_limit::FixedWindowLimiter;
 use zircon_server::web::router;
 
 #[tokio::main]
@@ -79,6 +82,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tickets = Arc::new(JoinTicketManager::new());
 
+    // Auth hardening: server-side session revocation + a global cap on failed
+    // login attempts (15 min window, 10 attempts).
+    let sessions = Arc::new(SessionRegistry::new());
+    let login_limiter = Arc::new(FixedWindowLimiter::new(Duration::from_secs(15 * 60), 10));
+
     let state = AppState {
         config: config.clone(),
         auth,
@@ -92,25 +100,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         resolver,
         tickets: tickets.clone(),
         curseforge_api_key: config.get_config().curseforge_api_key,
+        sessions: sessions.clone(),
+        login_limiter: login_limiter.clone(),
     };
 
     // Axum admin API (binds 127.0.0.1:<webPort>; reachable through the
-    // multiplexer's public port too).
+    // multiplexer's public port too). ConnectInfo is needed so auth handlers
+    // can key rate limits on the client address.
     let app = router(state.clone());
     let web_port = config.get_config().web_port;
     let listener = TcpListener::bind(("127.0.0.1", web_port as u16)).await?;
     tracing::info!("Admin web server listening on 127.0.0.1:{web_port}");
     let web_handle = tokio::spawn(async move {
-        axum::serve(listener, app)
-            .await
-            .expect("axum server failed");
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .expect("axum server failed");
     });
 
     // Tokio TCP multiplexer on the public port + per-instance player ports.
     let multiplexer = Arc::new(TcpMultiplexer::new(
         config.clone(),
         Some(instances.clone()),
-        tickets,
+        tickets.clone(),
     ));
     instances.set_port_binding_listener(multiplexer.clone());
     multiplexer.start()?;
@@ -120,6 +134,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tracing::warn!("Auto-start failed: {e}");
         }
     }
+
+    // Security housekeeping: periodically drop expired join tickets, sessions
+    // and rate-limiter state so abuse cannot grow memory forever.
+    let housekeeping_tickets = tickets.clone();
+    let housekeeping_sessions = sessions.clone();
+    let housekeeping_limiter = login_limiter.clone();
+    let housekeeping = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(120));
+        loop {
+            interval.tick().await;
+            housekeeping_tickets.purge_expired();
+            housekeeping_sessions.purge_expired();
+            housekeeping_limiter.purge_expired();
+        }
+    });
 
     tracing::info!(
         "Server manager ready. Public port: {}, data dir: {}",
@@ -132,6 +161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Shutting down...");
     scheduler_handle.abort();
+    housekeeping.abort();
     multiplexer.stop();
     web_handle.abort();
     for instance in instances.list_instances() {

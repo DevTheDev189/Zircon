@@ -132,7 +132,11 @@ impl TcpMultiplexer {
     fn spawn_listener(&self, port: u16, fixed_instance: Option<InstanceConfig>) -> JoinHandle<()> {
         let this = self.clone();
         tokio::spawn(async move {
-            let listener = match TcpListener::bind(("0.0.0.0", port)).await {
+            // Bind dual-stack ([::]) so IPv6-only resolution of "localhost" (::1)
+            // also reaches the multiplexer. An IPv4-only 0.0.0.0 bind makes the
+            // game fail with "Failed to connect: getsockopt" on Windows, where
+            // Java resolves localhost to ::1 first and never falls back.
+            let listener = match TcpListener::bind(("[::]", port)).await {
                 Ok(listener) => listener,
                 Err(e) => {
                     tracing::error!("Failed to bind TCP listener on port {port}: {e}");
@@ -140,23 +144,34 @@ impl TcpMultiplexer {
                 }
             };
             match &fixed_instance {
-                Some(instance) => tracing::info!(
-                    "Multiplexer listening on 0.0.0.0:{port} (HTTP -> {}:{}, MC -> instance '{}' internal {})",
-                    BACKEND_HOST,
-                    this.web_port,
-                    instance.name,
-                    instance.internal_mc_port
-                ),
+                Some(instance) => {
+                    let http_desc = if this.http_proxy_enabled() {
+                        format!("HTTP -> {}:{}", BACKEND_HOST, this.web_port)
+                    } else {
+                        "HTTP proxying disabled (TLS reverse proxy)".to_string()
+                    };
+                    tracing::info!(
+                        "Multiplexer listening on 0.0.0.0:{port} ({http_desc}, MC -> instance '{}' internal {})",
+                        instance.name,
+                        instance.internal_mc_port
+                    )
+                }
                 None => {
                     let mc_target = if this.instances.is_some() {
-                        format!("MC -> instance-by-hostname (default {}:{})", BACKEND_HOST, this.mc_port)
+                        format!(
+                            "MC -> instance-by-hostname (default {}:{})",
+                            BACKEND_HOST, this.mc_port
+                        )
                     } else {
                         format!("MC -> {}:{}", BACKEND_HOST, this.mc_port)
                     };
+                    let http_desc = if this.http_proxy_enabled() {
+                        format!("HTTP -> {}:{}", BACKEND_HOST, this.web_port)
+                    } else {
+                        "HTTP proxying disabled (TLS reverse proxy)".to_string()
+                    };
                     tracing::info!(
-                        "TCP multiplexer listening on 0.0.0.0:{port} (HTTP -> {}:{}, {mc_target})",
-                        BACKEND_HOST,
-                        this.web_port
+                        "TCP multiplexer listening on 0.0.0.0:{port} ({http_desc}, {mc_target})"
                     );
                 }
             }
@@ -168,7 +183,10 @@ impl TcpMultiplexer {
                         let fixed = fixed_instance.clone();
                         tokio::spawn(async move {
                             if let Err(e) = this.handle_connection(socket, fixed).await {
-                                tracing::debug!("Connection error on port {port}: {e}");
+                                // Visible at the default log level: a dropped game
+                                // connection is the classic "Failed to Quick Play"
+                                // cause (e.g. backend instance not listening).
+                                tracing::warn!("Connection error on port {port}: {e}");
                             }
                         });
                     }
@@ -196,7 +214,7 @@ impl TcpMultiplexer {
             }
             buf.extend_from_slice(&tmp[..n]);
 
-            if detector::is_http_method(&buf) {
+            if detector::is_http_method(&buf) && self.http_proxy_enabled() {
                 return self.proxy(client, buf, self.web_port).await;
             }
 
@@ -242,6 +260,13 @@ impl TcpMultiplexer {
                 }
             }
         }
+    }
+
+    /// Whether the multiplexer proxies HTTP traffic to the web server. Disabled
+    /// when a TLS reverse proxy fronts the HTTP side (see `config.http_proxy`),
+    /// so the admin panel is never reachable in plaintext on the MC ports.
+    fn http_proxy_enabled(&self) -> bool {
+        self.config.get_config().http_proxy
     }
 
     /// Resolves the backend MC port for a connection.
@@ -387,6 +412,71 @@ mod tests {
         let (request, _) = web_handle.await.unwrap();
         assert!(request.starts_with("GET /index.html"));
         handle.abort();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn http_proxy_can_be_disabled_for_reverse_proxy_deployments() {
+        let _guard = MUX_TEST_LOCK.lock().await;
+        let dir = temp_dir();
+        let config = config_at(&dir);
+        config.with_config(|c| c.http_proxy = false);
+        let tickets = Arc::new(JoinTicketManager::new());
+        let multiplexer = TcpMultiplexer::new(config.clone(), None, tickets);
+
+        // An HTTP-looking request must NOT reach the web port when proxying is
+        // disabled; it is treated as (invalid) Minecraft traffic and routed to
+        // the MC backend instead. No web listener is bound — a proxy attempt
+        // would fail with connection refused and surface in the test.
+        let web_port = config.get_config().web_port as u16;
+        let mc_port = config.get_config().mc_port as u16;
+        assert_ne!(web_port, mc_port);
+
+        let mc_listener = TcpListener::bind(("127.0.0.1", mc_port)).await.unwrap();
+        let mc_handle = tokio::spawn(async move {
+            let (mut socket, _) = mc_listener.accept().await.unwrap();
+            let mut buf = [0u8; 256];
+            let n = socket.read(&mut buf).await.unwrap();
+            socket.write_all(b"\x00").await.unwrap(); // nonsense reply; bytes are what matter
+            (String::from_utf8_lossy(&buf[..n]).to_string(), n)
+        });
+
+        let main_port = 25565u16;
+        let handle = multiplexer.spawn_listener(main_port, None);
+
+        let mut client = TcpStream::connect(("127.0.0.1", main_port)).await.unwrap();
+        client
+            .write_all(b"GET /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = Vec::new();
+        let _ = client.read_to_end(&mut response).await;
+
+        let (received, _) = mc_handle.await.unwrap();
+        assert!(
+            received.starts_with("GET "),
+            "HTTP bytes must be routed to the MC backend, got: {received:?}"
+        );
+        handle.abort();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The flag wiring itself — deterministic, no sockets. The end-to-end
+    /// proxy tests above exercise the full path where the platform allows it.
+    #[test]
+    fn http_proxy_flag_controls_the_routing_decision() {
+        let dir = temp_dir();
+        let config = config_at(&dir);
+        let multiplexer =
+            TcpMultiplexer::new(config.clone(), None, Arc::new(JoinTicketManager::new()));
+
+        // Default (and legacy config files without the field): proxying on.
+        assert!(multiplexer.http_proxy_enabled());
+
+        // Reverse-proxy deployments turn it off.
+        config.with_config(|c| c.http_proxy = false);
+        assert!(!multiplexer.http_proxy_enabled());
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -55,7 +55,7 @@
 | 💾 | **Saved servers** | Persistent server list (`~/.mcmanager/servers.json`), most-recently-played first, plus a curated recommendations panel. |
 | 👕 | **Skin customizer** | 64×64 PNG skins with a WebGL 3D preview (Three.js), history gallery, and Mojang fetch/upload integration. Stored at `~/.mcmanager/skins/active_skin.png`. |
 | 🎮 | **Offline instances** | Create and launch single-player instances with their own mods, shaderpacks, and texture packs. |
-| ⚙️ | **Launcher settings** | RAM slider, strict hash verification toggle, and trust-direct-mods toggle. |
+| ⚙️ | **Launcher settings** | RAM slider. Mod downloads are always hash-verified against Modrinth/CurseForge (no opt-out). |
 | ⚡ | **One-click join** | Fetches the server BOM, resolves the exact Minecraft + loader runtime (Fabric/Quilt/Forge/NeoForge), registers the pre-join ticket, and auto-connects in fullscreen. |
 | 🧩 | **Per-server isolation** | Every server gets its own game directory (`~/.zircon/instances/<host>_<port>/`) so mods and configs never mix. |
 

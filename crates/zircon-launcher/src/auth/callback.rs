@@ -28,15 +28,29 @@ impl CallbackServer {
 
     /// The local port the callback server is listening on.
     pub fn port(&self) -> u16 {
-        self.listener.local_addr().map(|addr| addr.port()).unwrap_or(0)
+        self.listener
+            .local_addr()
+            .map(|addr| addr.port())
+            .unwrap_or(0)
     }
 
-    /// Waits up to `timeout` for a single callback request, responds to the
-    /// browser with the themed status page, and returns the authorization
-    /// code. Returns [`LauncherError::Auth`] on an `error` query parameter, on
-    /// a request missing `code`, or when the timeout elapses.
-    pub async fn await_code(&mut self, timeout: Duration) -> Result<String, LauncherError> {
-        match tokio::time::timeout(timeout, self.accept_once()).await {
+    /// Waits up to `timeout` for the browser redirect that matches the OAuth
+    /// `state` this flow started with, responds to the browser with the themed
+    /// status page, and returns the authorization code.
+    ///
+    /// Requests without the matching one-time `state` (a stale callback, an
+    /// unrelated browser tab, or a malicious local process probing the port)
+    /// are answered with a failure page and ignored — the server keeps
+    /// listening for the genuine redirect until the timeout elapses.
+    ///
+    /// Returns [`LauncherError::Auth`] on an `error` query parameter, on a
+    /// state-matching request missing `code`, or when the timeout elapses.
+    pub async fn await_code(
+        &mut self,
+        timeout: Duration,
+        expected_state: &str,
+    ) -> Result<String, LauncherError> {
+        match tokio::time::timeout(timeout, self.accept_valid(expected_state)).await {
             Err(_) => Err(LauncherError::Auth(
                 "Login timed out waiting for the browser redirect".to_string(),
             )),
@@ -44,43 +58,54 @@ impl CallbackServer {
         }
     }
 
-    async fn accept_once(&mut self) -> Result<String, LauncherError> {
-        let (mut stream, _peer) = self.listener.accept().await?;
-        let head = read_request_head(&mut stream).await?;
-        let query = parse_callback(&head);
-        tracing::debug!(
-            "OAuth callback received (code: {}, error: {:?})",
-            query.code.is_some(),
-            query.error
-        );
+    /// Accepts connections until one carries the expected `state`, then returns
+    /// its outcome. Non-matching requests never consume the callback slot.
+    async fn accept_valid(&mut self, expected_state: &str) -> Result<String, LauncherError> {
+        loop {
+            let (mut stream, _peer) = self.listener.accept().await?;
+            let head = read_request_head(&mut stream).await?;
+            let query = parse_callback(&head);
+            tracing::debug!(
+                "OAuth callback received (code: {}, state_match: {}, error: {:?})",
+                query.code.is_some(),
+                query.state.as_deref() == Some(expected_state),
+                query.error
+            );
 
-        let page = callback_page(
-            query.code.is_some(),
-            query.error.as_deref(),
-            query.error_description.as_deref(),
-        );
-        let response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\
-             Content-Length: {}\r\nConnection: close\r\n\r\n{}",
-            page.len(),
-            page
-        );
-        // The response is best-effort; the login outcome depends only on the
-        // query parameters (the browser may have already closed the socket).
-        let _ = stream.write_all(response.as_bytes()).await;
+            if query.state.as_deref() != Some(expected_state) {
+                // Not our flow's redirect — respond and keep listening.
+                respond(
+                    &mut stream,
+                    false,
+                    Some("unexpected_request"),
+                    Some("This browser tab was not part of a Zircon login."),
+                )
+                .await;
+                continue;
+            }
 
-        match query.code {
-            Some(code) => Ok(code),
-            None => Err(if let Some(error) = query.error {
-                LauncherError::Auth(format!(
-                    "Microsoft login failed: {error}{}",
-                    query
-                        .error_description
-                        .map_or(String::new(), |d| format!(" — {d}"))
-                ))
-            } else {
-                LauncherError::Auth("OAuth callback missing code".to_string())
-            }),
+            let outcome = match query.code {
+                Some(code) => Ok(code),
+                None => Err(if let Some(error) = query.error.clone() {
+                    LauncherError::Auth(format!(
+                        "Microsoft login failed: {error}{}",
+                        query
+                            .error_description
+                            .clone()
+                            .map_or(String::new(), |d| format!(" — {d}"))
+                    ))
+                } else {
+                    LauncherError::Auth("OAuth callback missing code".to_string())
+                }),
+            };
+            respond(
+                &mut stream,
+                outcome.is_ok(),
+                query.error.as_deref(),
+                query.error_description.as_deref(),
+            )
+            .await;
+            return outcome;
         }
     }
 }
@@ -105,13 +130,15 @@ async fn read_request_head(stream: &mut TcpStream) -> Result<String, LauncherErr
 /// Query parameters extracted from the callback request.
 struct CallbackQuery {
     code: Option<String>,
+    state: Option<String>,
     error: Option<String>,
     error_description: Option<String>,
 }
 
-/// Parses `code`/`error`/`error_description` out of a callback HTTP request
-/// head (request line `GET /callback?code=...&error=... HTTP/1.1`), decoding
-/// percent-encoded values (`+` decodes to a space, like Java's `URLDecoder`).
+/// Parses `code`/`state`/`error`/`error_description` out of a callback HTTP
+/// request head (request line `GET /callback?code=...&state=... HTTP/1.1`),
+/// decoding percent-encoded values (`+` decodes to a space, like Java's
+/// `URLDecoder`).
 fn parse_callback(head: &str) -> CallbackQuery {
     let query = head
         .lines()
@@ -121,18 +148,40 @@ fn parse_callback(head: &str) -> CallbackQuery {
         .unwrap_or("");
     let mut out = CallbackQuery {
         code: None,
+        state: None,
         error: None,
         error_description: None,
     };
     for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
         match key.as_ref() {
             "code" => out.code = Some(value.into_owned()),
+            "state" => out.state = Some(value.into_owned()),
             "error" => out.error = Some(value.into_owned()),
             "error_description" => out.error_description = Some(value.into_owned()),
             _ => {}
         }
     }
     out
+}
+
+/// Writes the themed status page to the callback connection. Best-effort: the
+/// login outcome depends only on the query parameters, and the browser may
+/// have already closed the socket.
+async fn respond(
+    stream: &mut TcpStream,
+    success: bool,
+    error: Option<&str>,
+    error_description: Option<&str>,
+) {
+    let page = callback_page(success, error, error_description);
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\
+         Cache-Control: no-store\r\n\
+         Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+        page.len(),
+        page
+    );
+    let _ = stream.write_all(response.as_bytes()).await;
 }
 
 /// Renders the local OAuth callback page in Zircon's dark theme (matching the
@@ -204,8 +253,17 @@ mod tests {
         let head = "GET /callback?code=abc123&state=xyz HTTP/1.1\r\nHost: localhost\r\n\r\n";
         let query = parse_callback(head);
         assert_eq!(Some("abc123".to_string()), query.code);
+        assert_eq!(Some("xyz".to_string()), query.state);
         assert_eq!(None, query.error);
         assert_eq!(None, query.error_description);
+    }
+
+    #[test]
+    fn missing_state_parses_as_none() {
+        let head = "GET /callback?code=abc123 HTTP/1.1";
+        let query = parse_callback(head);
+        assert_eq!(Some("abc123".to_string()), query.code);
+        assert_eq!(None, query.state);
     }
 
     #[test]
@@ -242,5 +300,76 @@ mod tests {
             "&lt;script&gt;&amp;&quot;x&quot;&lt;/script&gt;",
             escape_html("<script>&\"x\"</script>")
         );
+    }
+
+    #[tokio::test]
+    async fn await_code_skips_wrong_state_requests() {
+        let mut server = CallbackServer::start().await.unwrap();
+        let port = server.port();
+
+        let handle = tokio::spawn(async move {
+            server
+                .await_code(Duration::from_secs(5), "right-state")
+                .await
+        });
+
+        // A request without the expected state (stale callback, malicious local
+        // probe) is answered but must NOT consume the callback slot.
+        let mut wrong = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        wrong
+            .write_all(
+                b"GET /callback?code=stolen&state=wrong-state HTTP/1.1\r\n\
+                  Host: localhost\r\nConnection: close\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        let mut buf = Vec::new();
+        let _ = wrong.read_to_end(&mut buf).await;
+        drop(wrong);
+
+        // The genuine redirect with the right state is accepted.
+        let mut right = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        right
+            .write_all(
+                b"GET /callback?code=the-code&state=right-state HTTP/1.1\r\n\
+                  Host: localhost\r\nConnection: close\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        let mut buf = Vec::new();
+        let _ = right.read_to_end(&mut buf).await;
+        drop(right);
+
+        let code = handle.await.unwrap().expect("no timeout");
+        assert_eq!("the-code", code);
+    }
+
+    #[tokio::test]
+    async fn await_code_rejects_a_state_matching_error() {
+        let mut server = CallbackServer::start().await.unwrap();
+        let port = server.port();
+
+        let handle =
+            tokio::spawn(async move { server.await_code(Duration::from_secs(5), "s").await });
+        let mut client = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        client
+            .write_all(
+                b"GET /callback?error=access_denied&state=s HTTP/1.1\r\n\
+                  Host: localhost\r\nConnection: close\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        let mut buf = Vec::new();
+        let _ = client.read_to_end(&mut buf).await;
+        drop(client);
+
+        let result = handle.await.unwrap();
+        assert!(result.unwrap_err().to_string().contains("access_denied"));
     }
 }

@@ -22,6 +22,12 @@ pub struct SavedServer {
     /// Unix epoch milliseconds of the last play (Java `System.currentTimeMillis()`).
     #[serde(default)]
     pub last_played: i64,
+    /// When true, the launcher's HTTP calls (BOM, mod downloads, join-intent,
+    /// status) go to `https://<host>` (port 443) — e.g. when the server is
+    /// fronted by a TLS reverse proxy such as Caddy. The Minecraft connection
+    /// always uses the address's `host:port` regardless.
+    #[serde(default)]
+    pub use_https: bool,
 }
 
 impl SavedServer {
@@ -30,7 +36,14 @@ impl SavedServer {
             name: name.into(),
             address: address.into(),
             last_played,
+            use_https: false,
         }
+    }
+
+    /// Builder: enables HTTPS for the launcher's HTTP calls to this server.
+    pub fn with_https(mut self, use_https: bool) -> Self {
+        self.use_https = use_https;
+        self
     }
 }
 
@@ -122,6 +135,24 @@ pub fn record_played(name: &str, address: &str) {
     save_servers(&servers);
 }
 
+/// Removes a saved server by address (case-insensitive). Returns `true` when
+/// an entry was actually removed.
+pub fn remove_server(address: &str) -> bool {
+    remove_server_from(&servers_file(), address)
+}
+
+/// Removes a saved server from an explicit file (used by tests).
+pub fn remove_server_from(file: &Path, address: &str) -> bool {
+    let mut servers = load_from(file);
+    let before = servers.len();
+    servers.retain(|s| !s.address.eq_ignore_ascii_case(address));
+    if servers.len() == before {
+        return false;
+    }
+    save_to(file, &servers);
+    true
+}
+
 fn now_millis() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
@@ -155,6 +186,18 @@ pub fn parse_server_address(input: &str) -> (String, u16) {
     }
 }
 
+/// Formats a host for URLs and quick-play: a bare IPv6 literal gets square
+/// brackets (`::1` → `[::1]`); hosts already bracketed or IPv4/hostnames pass
+/// through unchanged.
+pub fn format_host(host: &str) -> String {
+    let host = host.trim();
+    if host.contains(':') && !host.starts_with('[') {
+        format!("[{host}]")
+    } else {
+        host.to_string()
+    }
+}
+
 /// The per-server game directory for a host/port pair: `~/.zircon/instances/
 /// <safeHost>_<port>` (Java `instanceGameDir`; non-`[A-Za-z0-9._-]` chars
 /// become `_`).
@@ -170,6 +213,30 @@ pub fn instance_game_dir(host: &str, port: u16) -> PathBuf {
         })
         .collect();
     crate::paths::instances_dir().join(format!("{safe_host}_{port}"))
+}
+
+/// Recursively deletes a per-server game directory (mods, configs, packs...).
+/// Best-effort: partial failures never panic.
+pub fn delete_instance_dir(game_dir: &Path) {
+    if !game_dir.is_dir() {
+        return;
+    }
+    remove_dir_all_best_effort(game_dir);
+}
+
+/// Post-order recursive delete, mirroring the offline-instance helper.
+fn remove_dir_all_best_effort(dir: &Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                remove_dir_all_best_effort(&path);
+            } else {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+    let _ = std::fs::remove_dir(dir);
 }
 
 #[cfg(test)]
@@ -198,6 +265,29 @@ mod tests {
         }
     }
 
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new() -> Self {
+            let dir = std::env::temp_dir().join(format!(
+                "zircon-servers-dir-{}",
+                uuid::Uuid::new_v4().simple()
+            ));
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
     #[test]
     fn save_load_round_trip_sorts_by_last_played() {
         let file = TempFile::new();
@@ -214,6 +304,26 @@ mod tests {
         assert_eq!("New", loaded[0].name);
         assert_eq!("Mid", loaded[1].name);
         assert_eq!("Old", loaded[2].name);
+    }
+
+    #[test]
+    fn use_https_flag_round_trips_and_defaults_to_false() {
+        let file = TempFile::new();
+        // HTTPS-enabled server survives a save/load cycle.
+        let https = SavedServer::new("Secure", "mc.example.com", 1).with_https(true);
+        save_to(file.path(), &[https]);
+        let loaded = load_from(file.path());
+        assert!(loaded[0].use_https);
+
+        // Legacy server files (no useHttps field) load with HTTPS off.
+        let legacy = TempFile::new();
+        std::fs::write(
+            legacy.path(),
+            r#"[{"name":"Old","address":"mc.example.com","lastPlayed":1}]"#,
+        )
+        .unwrap();
+        let loaded_legacy = load_from(legacy.path());
+        assert!(!loaded_legacy[0].use_https);
     }
 
     #[test]
@@ -253,6 +363,15 @@ mod tests {
     }
 
     #[test]
+    fn format_host_brackets_ipv6_literals() {
+        assert_eq!("mc.example.com", format_host("mc.example.com"));
+        assert_eq!("127.0.0.1", format_host("127.0.0.1"));
+        assert_eq!("[::1]", format_host("::1"));
+        assert_eq!("[::1]", format_host("[::1]"));
+        assert_eq!("[2001:db8::1]", format_host("2001:db8::1"));
+    }
+
+    #[test]
     fn instance_game_dir_sanitizes_host() {
         assert!(instance_game_dir("mc.example.com", 25566)
             .to_string_lossy()
@@ -260,5 +379,41 @@ mod tests {
         assert!(instance_game_dir("1.2.3.4", 25565)
             .to_string_lossy()
             .ends_with("1.2.3.4_25565"));
+    }
+
+    #[test]
+    fn remove_server_deletes_case_insensitively() {
+        let file = TempFile::new();
+        save_to(
+            file.path(),
+            &[
+                SavedServer::new("One", "one.example.com", 100),
+                SavedServer::new("Two", "TWO.example.com", 200),
+            ],
+        );
+
+        // Removing a non-listed address is a no-op returning false.
+        assert!(!remove_server_from(file.path(), "missing.example.com"));
+
+        // Case-insensitive match removes the entry.
+        assert!(remove_server_from(file.path(), "two.example.com"));
+        let remaining = load_from(file.path());
+        assert_eq!(1, remaining.len());
+        assert_eq!("one.example.com", remaining[0].address);
+    }
+
+    #[test]
+    fn delete_instance_dir_removes_nested_files() {
+        let dir = TempDir::new();
+        let game = dir.path().join("game");
+        std::fs::create_dir_all(game.join("mods")).unwrap();
+        std::fs::write(game.join("options.txt"), b"x").unwrap();
+        std::fs::write(game.join("mods").join("a.jar"), b"jar").unwrap();
+
+        delete_instance_dir(&game);
+        assert!(!game.exists());
+
+        // Missing dir is a no-op.
+        delete_instance_dir(&game);
     }
 }

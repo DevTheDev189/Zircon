@@ -3,6 +3,9 @@
 //! The signing secret is generated once, persisted to `jwt-secret.key` in the
 //! data dir, and reused across restarts so tokens stay valid.
 //!
+//! Every token carries a random `jti` (JWT ID) so a session can be revoked
+//! server-side on sign-out or password change (see `crate::auth::revocation`).
+//!
 //! Port of `com.mcmanager.server.auth.JwtUtil`.
 
 use std::fs;
@@ -19,6 +22,10 @@ const TTL_SECONDS: i64 = 12 * 60 * 60;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
+    /// Random per-token ID so sessions can be individually revoked. `default`
+    /// keeps tokens issued before this field existed valid across upgrades.
+    #[serde(default)]
+    pub jti: String,
     pub iat: i64,
     pub exp: i64,
 }
@@ -65,6 +72,7 @@ pub fn generate_token(username: &str) -> String {
         .as_secs() as i64;
     let claims = Claims {
         sub: username.to_string(),
+        jti: uuid::Uuid::new_v4().to_string(),
         iat: now,
         exp: now + TTL_SECONDS,
     };
@@ -76,16 +84,22 @@ pub fn generate_token(username: &str) -> String {
     .expect("failed to sign JWT")
 }
 
-/// Returns the token subject (username), or `None` if the token is
-/// invalid/expired.
-pub fn validate_token(token: &str) -> Option<String> {
-    let data = decode::<Claims>(
+/// Decodes and verifies a token, returning its claims (or `None` if
+/// invalid/expired). The caller is responsible for checking revocation.
+pub fn decode_claims(token: &str) -> Option<Claims> {
+    decode::<Claims>(
         token,
         &DecodingKey::from_secret(secret()),
         &Validation::default(),
     )
-    .ok()?;
-    Some(data.claims.sub)
+    .ok()
+    .map(|data| data.claims)
+}
+
+/// Returns the token subject (username), or `None` if the token is
+/// invalid/expired.
+pub fn validate_token(token: &str) -> Option<String> {
+    decode_claims(token).map(|claims| claims.sub)
 }
 
 fn generate_secret() -> Vec<u8> {
