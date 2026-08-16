@@ -116,11 +116,11 @@ impl MicrosoftAuthService {
     pub async fn login(&self) -> Result<SessionData, LauncherError> {
         if self.client_id == DEFAULT_CLIENT_ID {
             return Err(LauncherError::Auth(format!(
-                "Microsoft client id not configured. Run the launcher with \
-                 --clientId=<AZURE_CLIENT_ID> (e.g. java -jar client-launcher-1.0.0-all.jar \
-                 --clientId=abc123) or create {} containing the id. \
-                 The Azure app must allow localhost redirect URIs \
-                 (http://localhost:<port>/callback).",
+                "Microsoft client id not configured (resolved to the \
+                 REPLACE_WITH_AZURE_CLIENT_ID placeholder). The launcher bundles a \
+                 working client id — unset MC_MANAGER_CLIENT_ID and delete {} to use \
+                 it, or set either one to a real Azure client id. The Azure app must \
+                 allow localhost redirect URIs (http://localhost:<port>/callback).",
                 paths::client_id_file().display()
             )));
         }

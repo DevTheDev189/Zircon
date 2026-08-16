@@ -111,7 +111,7 @@ sequenceDiagram
 - **Rust toolchain** (edition 2021; MSVC on Windows, `cargo` + `rustc`)
 - **Node.js 18+** (for the launcher's Vue 3 frontend)
 - A **Minecraft account** (Java Edition) — required for the client, enforced via Microsoft sign-in
-- A Microsoft **Azure app registration** with a `http://localhost:<port>/callback` redirect URI (the launcher picks a free localhost port dynamically; the embedded default client ID can be overridden)
+- **No Azure setup needed** — the launcher bundles a Microsoft client ID, so Microsoft sign-in works out of the box (power users can override it via the `MC_MANAGER_CLIENT_ID` env var or `~/.mcmanager/client_id.txt`)
 
 ### 1. Build
 
@@ -138,7 +138,7 @@ npx @tauri-apps/cli dev          # dev mode (Vite hot reload)
 cargo tauri build --no-bundle
 ```
 
-Provide your Azure client ID via the `MC_MANAGER_CLIENT_ID` env var or `~/.mcmanager/client_id.txt` (never committed). Your Azure App ID will need to be verified with Mojang first — see the form linked in the legacy branch's README.
+The launcher ships with a bundled Microsoft client ID, so sign-in needs no setup. To use your own Azure app registration instead, set `MC_MANAGER_CLIENT_ID` or write the client ID to `~/.mcmanager/client_id.txt` (never committed).
 
 Sign in with Microsoft, pick a server from your saved list, and hit **PLAY** — the
 launcher syncs the exact mods the server publishes, then drops you straight in.
