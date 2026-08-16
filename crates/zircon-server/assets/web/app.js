@@ -17,7 +17,7 @@ createApp({
             selectedInstance: null,
             activeTab: 'mods',
             showAddServerModal: false,
-            newServerForm: { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '' },
+            newServerForm: { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4 },
             showProfileModal: false,
             profileForm: { username: 'admin', currentPassword: '', newPassword: '' },
             systemStats: {},
@@ -52,7 +52,7 @@ createApp({
             playersLoaded: false,
             playerForms: { whitelist: '', op: '' },
             banForm: { name: '', reason: '' },
-            settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '', externalPort: null },
+            settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '', externalPort: null, ramAuto: false, ramGB: 4, extraJvmArgs: '' },
             serverProps: {},
             backupForm: { frequency: 'off', time: '02:00', retention: 10 },
             backupsList: [],
@@ -110,6 +110,18 @@ createApp({
             const labels = { daily: 'Every day', weekly: 'Every week', monthly: 'Every month' };
             return `${labels[freq] || freq} at ${this.backupForm.time || '--:--'}`;
         },
+        // Total system RAM (GB) reported by /api/stats; null until first fetch.
+        ramTotalGb() {
+            const bytes = this.systemStats?.current?.maxMemoryBytes;
+            if (!bytes) return null;
+            return Math.max(1, Math.floor(bytes / (1024 ** 3)));
+        },
+        // Slider ceiling: a couple GB of headroom for the OS + Java off-heap,
+        // with a sane fallback until the stats endpoint has answered.
+        ramSliderMax() {
+            const total = this.ramTotalGb;
+            return Math.max(4, Math.min(total ? total - 2 : 16, 64));
+        },
         // Recommended mods filtered to the selected instance's mod loader.
         filteredRecommendedMods() {
             if (!this.selectedInstance) return [];
@@ -131,7 +143,11 @@ createApp({
             if (tab === 'stats') this.loadStats();
             if (tab === 'players') this.loadPlayers();
             if (tab === 'backups') this.loadBackups();
-            if (tab === 'settings') this.loadServerProperties();
+            if (tab === 'settings') {
+                this.loadServerProperties();
+                // RAM slider needs the host's total memory for its ceiling.
+                this.loadStats();
+            }
             if (tab === 'shaders') this.loadShaders();
         }
     }

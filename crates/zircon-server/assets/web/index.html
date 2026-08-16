@@ -526,8 +526,27 @@
                                 <input v-model="settingsForm.loaderVersion" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
                             </div>
                             <div>
-                                <label class="block text-xs text-slate-400 mb-1">JVM Args</label>
-                                <input v-model="settingsForm.javaArgs" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                                <label class="block text-xs text-slate-400 mb-1">Memory (RAM)</label>
+                                <label class="flex items-center gap-2 text-sm text-slate-300 mb-3 cursor-pointer select-none">
+                                    <input type="checkbox" v-model="settingsForm.ramAuto" class="accent-emerald-500">
+                                    <span>Auto — size the heap to this machine</span>
+                                </label>
+                                <div v-if="!settingsForm.ramAuto" class="flex items-center gap-3">
+                                    <input type="range" min="1" :max="ramSliderMax" step="1" v-model.number="settingsForm.ramGB"
+                                           class="flex-1 accent-emerald-500">
+                                    <span class="text-sm font-bold text-emerald-400 w-14 text-right tabular-nums">{{ settingsForm.ramGB }} GB</span>
+                                </div>
+                                <p v-else class="text-xs text-slate-400 mb-2">
+                                    The JVM sizes itself to available memory automatically (25% initial, 75% max).
+                                </p>
+                                <p class="text-[10px] text-slate-500 mt-1" v-if="ramTotalGb">
+                                    {{ ramTotalGb }} GB detected on this machine — leave headroom for the OS and Java's off-heap memory.
+                                </p>
+                                <details class="mt-2">
+                                    <summary class="text-xs text-slate-400 cursor-pointer hover:text-slate-200">Advanced JVM flags</summary>
+                                    <input v-model="settingsForm.extraJvmArgs" placeholder="-XX:+UseG1GC ..."
+                                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm mt-1.5">
+                                </details>
                             </div>
                             <div>
                                 <label class="block text-xs text-slate-400 mb-1">Server Port</label>
@@ -785,6 +804,18 @@
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">Loader Version (optional)</label>
                     <input v-model="newServerForm.loaderVersion" placeholder="e.g. 0.15.11" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Memory (RAM)</label>
+                    <label class="flex items-center gap-2 text-sm text-slate-300 mb-3 cursor-pointer select-none">
+                        <input type="checkbox" v-model="newServerForm.ramAuto" class="accent-emerald-500">
+                        <span>Auto — size to this machine (recommended)</span>
+                    </label>
+                    <div v-if="!newServerForm.ramAuto" class="flex items-center gap-3">
+                        <input type="range" min="1" :max="ramSliderMax" step="1" v-model.number="newServerForm.ramGB"
+                               class="flex-1 accent-emerald-500">
+                        <span class="text-sm font-bold text-emerald-400 w-14 text-right tabular-nums">{{ newServerForm.ramGB }} GB</span>
+                    </div>
                 </div>
                 <p class="text-xs text-yellow-400/90 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-lg">
                     <strong>The mod loader type is locked after creation.</strong> Choose carefully.

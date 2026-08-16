@@ -12,12 +12,16 @@ window.Zircon.instances = {
     },
     selectInstance(inst) {
         this.selectedInstance = inst;
+        const parsed = this.parseJavaArgs(inst.javaArgs);
         this.settingsForm = {
             name: inst.name,
             mcVersion: inst.minecraftVersion,
             loaderVersion: inst.modLoader ? inst.modLoader.version : '',
             javaArgs: inst.javaArgs || '',
-            externalPort: inst.externalPort || null
+            externalPort: inst.externalPort || null,
+            ramAuto: parsed.auto,
+            ramGB: parsed.gb,
+            extraJvmArgs: parsed.extra
         };
         this.loadMods();
         this.loadServerProperties();
@@ -44,10 +48,16 @@ window.Zircon.instances = {
         try {
             await this.api('/api/instances', {
                 method: 'POST',
-                body: JSON.stringify(this.newServerForm)
+                body: JSON.stringify({
+                    name: this.newServerForm.name,
+                    mcVersion: this.newServerForm.mcVersion,
+                    loaderType: this.newServerForm.loaderType,
+                    loaderVersion: this.newServerForm.loaderVersion,
+                    javaArgs: this.buildJavaArgs(this.newServerForm)
+                })
             });
             this.showAddServerModal = false;
-            this.newServerForm = { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '' };
+            this.newServerForm = { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4 };
             await this.loadInstances();
         } catch (e) {
             alert('Create failed: ' + e.message);
@@ -135,7 +145,7 @@ window.Zircon.instances = {
                     name: this.settingsForm.name,
                     mcVersion: this.settingsForm.mcVersion,
                     loaderVersion: this.settingsForm.loaderVersion,
-                    javaArgs: this.settingsForm.javaArgs,
+                    javaArgs: this.buildJavaArgs(this.settingsForm),
                     // 0 / blank leaves the player-facing port unchanged.
                     externalPort: Number(this.settingsForm.externalPort) || 0
                 })
@@ -144,5 +154,42 @@ window.Zircon.instances = {
             await this.loadInstances();
             await this.loadMods();
         } catch (e) { alert('Update failed: ' + e.message); }
+    },
+
+    // Splits a JVM args string into {auto, gb, extra} so the RAM slider can
+    // represent it. -Xmx/-Xms map to the slider value; MaxRAMPercentage flags
+    // mean "auto"; every other flag is preserved for the advanced field.
+    parseJavaArgs(args) {
+        let auto = false;
+        let gb = 4;
+        const extra = [];
+        for (const token of (args || '').split(/\s+/)) {
+            if (!token) continue;
+            const lower = token.toLowerCase();
+            if (lower.startsWith('-xmx')) {
+                const value = parseFloat(token.slice(4));
+                // Guard against MB-unit values (e.g. -Xmx2048M) — cap at the
+                // slider ceiling so the round-trip stays sane.
+                if (Number.isFinite(value) && value > 0) gb = Math.max(1, Math.min(64, Math.round(value)));
+            } else if (lower.startsWith('-xms')) {
+                // Derived from the slider; ignored when parsing.
+            } else if (lower.includes('maxrampercentage') || lower.includes('initialrampercentage')) {
+                auto = true;
+            } else {
+                extra.push(token);
+            }
+        }
+        return { auto, gb, extra: extra.join(' ') };
+    },
+
+    // Renders slider state back into a JVM args string: a fixed heap when a
+    // GB value is picked, or percentage flags so the JVM sizes itself when
+    // "auto" is chosen. Extra flags are always preserved.
+    buildJavaArgs({ auto, gb, extra }) {
+        const heap = auto
+            ? '-XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=75.0'
+            : `-Xms${Math.min(gb, 2)}G -Xmx${gb}G`;
+        const extraTrimmed = (extra || '').trim();
+        return extraTrimmed ? `${heap} ${extraTrimmed}` : heap;
     },
 };

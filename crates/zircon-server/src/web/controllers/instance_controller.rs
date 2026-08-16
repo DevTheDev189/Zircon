@@ -55,6 +55,16 @@ pub async fn create_instance(
         loader_type.trim().to_lowercase().as_str(),
         loader_version.trim(),
     )?;
+    if let Some(args) = body
+        .java_args
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        state
+            .instances
+            .update_instance_config(&created.id, None, Some(args))?;
+    }
     Ok((
         StatusCode::CREATED,
         Json(live_instance_map(&state, &created)),
@@ -979,6 +989,9 @@ pub struct CreateRequest {
     pub mc_version: Option<String>,
     pub loader_type: Option<String>,
     pub loader_version: Option<String>,
+    /// Optional initial JVM args (e.g. the RAM slider's heap flags). When
+    /// absent/blank the instance keeps the wrapper default (-Xms2G -Xmx4G).
+    pub java_args: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
