@@ -207,10 +207,18 @@ fn callback_page(success: bool, error: Option<&str>, error_description: Option<&
         ),
         None => String::new(),
     };
+    // Only a successful login gets the Microsoft logo row.
+    let ms_row = if success {
+        "<div class='ms'><svg viewBox='0 0 23 23' xmlns='http://www.w3.org/2000/svg' aria-hidden='true'><path fill='#f35325' d='M0 0h11v11H0z'/><path fill='#81bc06' d='M12 0h11v11H12z'/><path fill='#05a6f0' d='M0 12h11v11H0z'/><path fill='#ffba08' d='M12 12h11v11H12z'/></svg><span>Authenticated with your Microsoft account</span></div>"
+            .to_string()
+    } else {
+        String::new()
+    };
     CALLBACK_PAGE_TEMPLATE
         .replace("__TITLE__", title)
         .replace("__MESSAGE__", message)
         .replace("__ERROR_HTML__", &error_html)
+        .replace("__MS_ROW__", &ms_row)
 }
 
 /// Minimal HTML escaping so Azure error text can't break out of the page markup.
@@ -222,27 +230,45 @@ fn escape_html(value: &str) -> String {
         .replace('"', "&quot;")
 }
 
-const CALLBACK_PAGE_TEMPLATE: &str = r#"<!DOCTYPE html>
+const CALLBACK_PAGE_TEMPLATE: &str = r##"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
         body { background-color: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; text-align: center; padding-top: 100px; margin: 0; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; display: inline-block; padding: 40px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .logo { background: #47d2c9; color: #022c29; border-radius: 8px; font-weight: bold; padding: 6px 12px; font-size: 20px; display: inline-block; margin-bottom: 16px; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; display: inline-block; padding: 40px 48px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .title { height: 34px; width: auto; margin: 0 auto 20px; display: block; filter: drop-shadow(0 0 12px rgba(71, 210, 201, 0.35)); }
         h2 { margin: 0 0 12px 0; color: #ffffff; }
         p { color: #8b949e; font-size: 14px; margin: 0; }
         .error { color: #f85149; margin-top: 12px; }
+        .ms { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #21262d; color: #8b949e; font-size: 12px; }
+        .ms svg { width: 16px; height: 16px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="logo">⚡ Zircon</div>
+        <svg class="title" viewBox="0 0 194.96204 60.945377" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zircon">
+            <g transform="translate(-7.8010314,-119.2247)" fill="#47d2c9">
+                <path d="m 17.401032,128.8247 v 11.06289 h 4.466394 0.149345 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 3.15898 8.46615 h 42.511617 v -7.88428 -0.58187 -4.47053 h -4.466394 -0.152445 l -3.52485,4.47053 H 34.067198 v -3.15898 l 25.864054,-16.18351 v -5.34179 -6.59495 H 21.867426 20.128514 Z"/>
+                <g transform="translate(10.888864,22.929135)">
+                    <g transform="translate(-2.2075873,11.305605)">
+                        <path d="m 57.695701,100.83351 v 1.45779 3.84886 0.23461 l 2.595708,1.80713 h 7.028511 v -2.04174 -4.29379 -1.01286 z"/>
+                        <path d="m 60.291409,110.62723 -2.595708,1.80712 v 0.58136 3.50211 6.55205 8.51215 0.12454 l 2.877344,2.62051 h 6.746875 v -2.74505 -14.61926 -2.90939 -1.03766 -2.38848 z"/>
+                    </g>
+                    <path d="m 71.545671,118.31445 v 27.31823 h 6.933765 l 3.289556,-3.04271 v -5.39088 l -0.02648,0.0243 v -12.06283 h 7.813159 v 2.87734 h 4.555465 v -0.78238 -3.36931 -2.27531 l -4.555465,-2.63498 h -7.813159 l -3.26307,2.72593 v -3.38739 z"/>
+                    <path d="m 103.54753,118.31447 -2.9962,2.01619 v 0.80236 1.0992 2.65154 12.29059 3.68717 1.7153 l 4.46639,3.05586 h 12.97957 2.94659 v -0.69714 -3.30525 -0.69713 l -2.94659,-2.2638 h -8.51266 v -13.7856 h 7.47397 3.98528 v -2.19081 -2.24858 -0.0833 l -3.98528,-2.04664 z"/>
+                    <path d="m 132.11922,118.31445 -4.72547,3.34943 v 1.68289 7.3197 7.28705 3.82987 l 6.56315,3.84929 h 12.71377 l 3.73162,-3.89932 v -0.77354 -5.7946 -5.24521 -7.61892 -0.35434 l -5.75682,-3.6323 z m 2.73777,6.5028 h 9.78848 v 1.47046 12.77683 h -9.78848 z m -0.9329,16.96614 h 0.0328 v 0.0193 z"/>
+                </g>
+                <g transform="matrix(1.0032596,0,0,0.98960683,-0.58809167,1.8003396)">
+                    <path d="m 170.05611,140.87977 -2.3151,3.47938 v 1.05161 2.8112 0.95912 19.38073 h 7.70599 v -20.33985 h 7.0776 0.79375 v 17.15038 1.02526 2.16421 h 4.66328 l 3.10885,-1.88516 v -0.27905 -2.33371 -15.80886 -3.22254 -1.59938 l -6.25078,-2.55334 z"/>
+                </g>
+            </g>
+        </svg>
         <h2>__TITLE__</h2>
-        <p>__MESSAGE__</p>__ERROR_HTML__
+        <p>__MESSAGE__</p>__ERROR_HTML____MS_ROW__
     </div>
 </body>
-</html>"#;
+</html>"##;
 
 #[cfg(test)]
 mod tests {

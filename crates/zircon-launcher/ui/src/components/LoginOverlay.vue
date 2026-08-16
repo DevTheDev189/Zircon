@@ -11,14 +11,12 @@
     </div>
 
     <div class="z-card w-[420px] text-center p-8 shadow-2xl relative">
-      <div
-        class="inline-flex items-center gap-2 bg-gradient-to-br from-accent to-[#1f8f87] text-[#032b28] font-extrabold rounded-lg px-4 py-2 text-xl mb-5 shadow-lg shadow-accent/25"
-      >
-        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-        </svg>
-        Zircon
-      </div>
+      <img
+        :src="zirconTitle"
+        alt="Zircon"
+        class="h-10 w-auto mx-auto mb-5 select-none drop-shadow-[0_0_18px_rgba(71,210,201,0.35)]"
+        draggable="false"
+      />
       <h2 class="text-white text-lg font-bold mb-2">Sign in with Microsoft</h2>
       <p class="text-muted text-sm mb-6">
         Sign in to launch and play on Zircon servers. Your Minecraft profile,
@@ -26,10 +24,16 @@
       </p>
 
       <button
-        class="z-btn-accent w-full py-2.5 text-base disabled:opacity-60"
+        class="z-btn w-full py-2.5 text-base disabled:opacity-60 flex items-center justify-center gap-2.5 bg-white text-[#1f2328] shadow-lg shadow-black/25 hover:bg-gray-50 hover:shadow-xl active:translate-y-px"
         :disabled="busy"
         @click="onLogin"
       >
+        <svg v-if="!busy" class="w-5 h-5 shrink-0" viewBox="0 0 23 23" aria-hidden="true">
+          <path fill="#f35325" d="M0 0h11v11H0z" />
+          <path fill="#81bc06" d="M12 0h11v11H12z" />
+          <path fill="#05a6f0" d="M0 12h11v11H0z" />
+          <path fill="#ffba08" d="M12 12h11v11H12z" />
+        </svg>
         <span v-if="busy">Opening browser…</span>
         <span v-else>Continue with Microsoft</span>
       </button>
@@ -47,6 +51,7 @@
 <script setup>
 import { ref } from 'vue';
 import { api } from '../lib/api';
+import zirconTitle from '../assets/zircon-title.svg';
 
 const emit = defineEmits(['logged-in']);
 
