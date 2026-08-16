@@ -1,23 +1,28 @@
-# ⚡ Zircon — Self-Hosted Minecraft Server Manager & Companion Launcher
+<p align="center">
+  <img src="svgs/zircon-title.svg" alt="Zircon" width="460">
+</p>
 
-![Rust](https://img.shields.io/badge/Rust-2021-orange?logo=rust&logoColor=white)
-![Tauri](https://img.shields.io/badge/Tauri-2-teal?logo=tauri&logoColor=white)
-![Vue](https://img.shields.io/badge/Vue-3-green?logo=vue.js&logoColor=white)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
-![Status](https://img.shields.io/badge/status-active_development-yellow)
-![License](https://img.shields.io/badge/license-MIT-green)
+<p align="center">
+  <strong>Self-hosted Minecraft server manager &amp; companion launcher</strong> — run your
+  own modded Minecraft server with a full admin dashboard, and let your players
+  join with a one-click launcher that installs the <em>exact</em> mods your server runs,
+  verified against Modrinth &amp; CurseForge on every launch.
+</p>
 
-> **Run your own modded Minecraft server with a full admin dashboard, and let your
-> players join with a one-click launcher that installs the *exact* mods your server
-> runs — verified against Modrinth & CurseForge on every launch.**
+<p align="center">
+  <img src="https://img.shields.io/badge/Rust-2021-orange?logo=rust&logoColor=white" alt="Rust 2021">
+  <img src="https://img.shields.io/badge/Tauri-2-teal?logo=tauri&logoColor=white" alt="Tauri 2">
+  <img src="https://img.shields.io/badge/Vue-3-green?logo=vue.js&logoColor=white" alt="Vue 3">
+  <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build passing">
+  <img src="https://img.shields.io/badge/status-active_development-yellow" alt="Status: active development">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
+</p>
 
 > [!NOTE]
 > This is the **Rust rewrite** of Zircon (formerly a Java 21 / JavaFX / Javalin /
 > Netty codebase). The complete Java reference implementation is preserved on the
 > [`legacy-java`](../../tree/legacy-java) branch. The migration plan lives in
 > [`RUST_AGENT_PLAN.md`](RUST_AGENT_PLAN.md).
-
----
 
 > [!IMPORTANT]
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG
@@ -28,40 +33,40 @@
 
 ---
 
-## ✨ Features
+## ✦ Features
 
-### 🖥️ Server Manager (`crates/zircon-server`)
-
-| | Feature | What it does |
-|---|---|---|
-| 🏗️ | **Multi-instance** | Run fully isolated Minecraft servers — each with its own world, loader, mods, and BOM under `server-data/instances/<id>/`. |
-| 🔌 | **Single-port multiplexer** | One public port (default `25565`) smartly routes *both* Minecraft traffic and HTTP — no firewall gymnastics. |
-| 🎟️ | **Join gate** | The TCP multiplexer parses the Minecraft handshake + login start, requires a one-time pre-join ticket, and disconnects vanilla clients with a framed "Zircon Client Required" message. |
-| 📦 | **Bill of Materials (BOM)** | The authoritative mod list your server publishes. Clients install **exactly** what the server runs. |
-| 🔍 | **Mod management** | Search & install mods straight from Modrinth and CurseForge, upload your own JARs, and get SHA-1 / fingerprint-verified entries with rich metadata (title, author, icon). |
-| 🧯 | **Version switching** | Change Minecraft / loader versions per instance and auto-re-resolve every installed mod for compatibility. |
-| 🎮 | **Player tools** | Live player tracking, whitelist, ops, bans — applied instantly on a running server, offline-safe otherwise. |
-| 🖥️ | **Live console** | Stream the server console in real time over WebSocket and run commands from the browser. |
-| 💾 | **Backups** | LZ4-compressed tar snapshots on a schedule (`daily`/`weekly`/`monthly`) with retention pruning and one-click restore. |
-| 📊 | **System stats** | CPU, RAM, and disk telemetry with a live history graph. |
-| 🔐 | **Admin auth** | BCrypt users + JWT-secured admin API with a bundled single-page dashboard and a generated first-run password. |
-
-### 🚀 Companion Launcher (`crates/zircon-launcher`)
+### Server Manager (`crates/zircon-server`)
 
 | | Feature | What it does |
 |---|---|---|
-| 👤 | **Mandatory Microsoft sign-in** | Full OAuth2 + PKCE flow (browser login via a dynamic localhost callback) with silent token refresh. There is **no offline/unauthenticated mode** for online play — you must own Minecraft. |
-| 🔄 | **Dynamic mod staging** | On every launch the client downloads mods into a staging area (`.mod_staging/`), verifies hashes against Modrinth/CurseForge, reconciles your active `mods/` folder — purging stale mods automatically. |
-| 💾 | **Saved servers** | Persistent server list (`~/.mcmanager/servers.json`), most-recently-played first, plus a curated recommendations panel. |
-| 👕 | **Skin customizer** | 64×64 PNG skins with a WebGL 3D preview (Three.js), history gallery, and Mojang fetch/upload integration. Stored at `~/.mcmanager/skins/active_skin.png`. |
-| 🎮 | **Offline instances** | Create and launch single-player instances with their own mods, shaderpacks, and texture packs. |
-| ⚙️ | **Launcher settings** | RAM slider. Mod downloads are always hash-verified against Modrinth/CurseForge (no opt-out). |
-| ⚡ | **One-click join** | Fetches the server BOM, resolves the exact Minecraft + loader runtime (Fabric/Quilt/Forge/NeoForge), registers the pre-join ticket, and auto-connects in fullscreen. |
-| 🧩 | **Per-server isolation** | Every server gets its own game directory (`~/.zircon/instances/<host>_<port>/`) so mods and configs never mix. |
+| ▣ | **Multi-instance** | Run fully isolated Minecraft servers — each with its own world, loader, mods, and BOM under `server-data/instances/<id>/`. |
+| ⇄ | **Single-port multiplexer** | One public port (default `25565`) smartly routes *both* Minecraft traffic and HTTP — no firewall gymnastics. |
+| ◈ | **Join gate** | The TCP multiplexer parses the Minecraft handshake + login start, requires a one-time pre-join ticket, and disconnects vanilla clients with a framed "Zircon Client Required" message. |
+| ▤ | **Bill of Materials (BOM)** | The authoritative mod list your server publishes. Clients install **exactly** what the server runs. |
+| ⚒ | **Mod management** | Search & install mods straight from Modrinth and CurseForge, upload your own JARs, and get SHA-1 / fingerprint-verified entries with rich metadata (title, author, icon). |
+| ⇕ | **Version switching** | Change Minecraft / loader versions per instance and auto-re-resolve every installed mod for compatibility. |
+| ♟ | **Player tools** | Live player tracking, whitelist, ops, bans — applied instantly on a running server, offline-safe otherwise. |
+| ⌨ | **Live console** | Stream the server console in real time over WebSocket and run commands from the browser. |
+| ◫ | **Backups** | LZ4-compressed tar snapshots on a schedule (`daily`/`weekly`/`monthly`) with retention pruning and one-click restore. |
+| ▮ | **System stats** | CPU, RAM, and disk telemetry with a live history graph. |
+| ⚔ | **Admin auth** | BCrypt users + JWT-secured admin API with a bundled single-page dashboard and a generated first-run password. |
+
+### Companion Launcher (`crates/zircon-launcher`)
+
+| | Feature | What it does |
+|---|---|---|
+| ☑ | **Mandatory Microsoft sign-in** | Full OAuth2 + PKCE flow (browser login via a dynamic localhost callback) with silent token refresh. There is **no offline/unauthenticated mode** for online play — you must own Minecraft. |
+| ↻ | **Dynamic mod staging** | On every launch the client downloads mods into a staging area (`.mod_staging/`), verifies hashes against Modrinth/CurseForge, reconciles your active `mods/` folder — purging stale mods automatically. |
+| ☰ | **Saved servers** | Persistent server list (`~/.mcmanager/servers.json`), most-recently-played first, plus a curated recommendations panel. |
+| ☺ | **Skin customizer** | 64×64 PNG skins with a WebGL 3D preview (Three.js), history gallery, and Mojang fetch/upload integration. Stored at `~/.mcmanager/skins/active_skin.png`. |
+| ◐ | **Offline instances** | Create and launch single-player instances with their own mods, shaderpacks, and texture packs. |
+| ⚙ | **Launcher settings** | RAM slider. Mod downloads are always hash-verified against Modrinth/CurseForge (no opt-out). |
+| ► | **One-click join** | Fetches the server BOM, resolves the exact Minecraft + loader runtime (Fabric/Quilt/Forge/NeoForge), registers the pre-join ticket, and auto-connects in fullscreen. |
+| □ | **Per-server isolation** | Every server gets its own game directory (`~/.zircon/instances/<host>_<port>/`) so mods and configs never mix. |
 
 ---
 
-## 🏗️ Architecture
+## ◆ Architecture
 
 ```mermaid
 flowchart LR
@@ -99,7 +104,7 @@ sequenceDiagram
 
 ---
 
-## 🚀 Quick Start
+## ► Quick Start
 
 ### Prerequisites
 
@@ -122,7 +127,7 @@ cargo run -p zircon-server
 
 - On first run, the server prints the **initial admin password** to the console.
 - Open the admin dashboard at **http://localhost:25564** (or through the public port at `http://<host>:25565`).
-- Create an instance, accept the EULA, start the server — done. ✅
+- Create an instance, accept the EULA, start the server — done. ✓
 
 ### 3. Run the companion launcher
 
@@ -143,7 +148,7 @@ launcher syncs the exact mods the server publishes, then drops you straight in.
 
 ---
 
-## 📂 Project Structure
+## ▦ Project Structure
 
 ```text
 zircon/
@@ -166,7 +171,7 @@ zircon/
 
 ---
 
-## 🛠️ Tech Stack
+## ⚙ Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -183,7 +188,7 @@ zircon/
 
 ---
 
-## ⚖️ Legal & EULA Compliance
+## ⚖ Legal & EULA Compliance
 
 **This project is a third-party tool and is not affiliated with Mojang Studios or
 Microsoft in any way.** It is not an official Minecraft product and has not been
@@ -206,7 +211,7 @@ The project is designed to respect the [Minecraft EULA](https://aka.ms/Minecraft
 
 ---
 
-## 📄 License
+## © License
 
 The code in this repository is licensed under the [MIT License](LICENSE).
 Minecraft itself, its assets, and its trademarks remain the property of Mojang
@@ -215,7 +220,7 @@ section above.
 
 ---
 
-## 🙏 Acknowledgments
+## ♥ Acknowledgments
 
 - [Modrinth](https://modrinth.com) & [CurseForge](https://www.curseforge.com) for their public APIs
 - [Mojang Studios](https://www.minecraft.net) for Minecraft — this project is a fan-made utility, not an official product
