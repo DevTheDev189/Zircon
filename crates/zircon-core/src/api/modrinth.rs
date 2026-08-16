@@ -107,12 +107,8 @@ impl ModrinthApiClient {
         url.push_str("&limit=25");
 
         let text = self.get(&url).await?;
-        let root: serde_json::Value = serde_json::from_str(&text)?;
-        let hits: Vec<ModrinthSearchHit> = root
-            .get("hits")
-            .and_then(|h| serde_json::from_value(h.clone()).ok())
-            .unwrap_or_default();
-        Ok(hits)
+        let response: SearchResponse = serde_json::from_str(&text)?;
+        Ok(response.hits)
     }
 
     /// Fetches the stable (release) Minecraft versions known to Modrinth,
@@ -222,11 +218,21 @@ impl ModrinthApiClient {
 
 // --------------------------------------------------------------------------
 // Response DTOs
+//
+// Modrinth's JSON uses snake_case field names (`project_id`, `icon_url`, ...),
+// so deserialization reads snake_case while serialization keeps camelCase for
+// Tauri IPC consumers.
 // --------------------------------------------------------------------------
+
+/// Response envelope of `GET /search`.
+#[derive(Debug, Deserialize)]
+struct SearchResponse {
+    hits: Vec<ModrinthSearchHit>,
+}
 
 /// Public project metadata from `GET /project/{id}`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct ModrinthProject {
     pub id: String,
     #[serde(default)]
@@ -245,7 +251,7 @@ pub struct ModrinthProject {
 
 /// A specific version/file of a Modrinth project.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct ModrinthVersion {
     pub id: String,
     pub project_id: String,
@@ -275,7 +281,7 @@ impl ModrinthVersion {
 
 /// A downloadable file within a Modrinth version.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct ModrinthFile {
     #[serde(default)]
     pub url: String,
@@ -297,7 +303,7 @@ impl ModrinthFile {
 
 /// One hit from the Modrinth search endpoint.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct ModrinthSearchHit {
     pub project_id: String,
     #[serde(default)]
@@ -318,7 +324,6 @@ pub struct ModrinthSearchHit {
 
 /// Internal shape of `GET /tag/game_version` and `GET /tag/loader` entries.
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct TagEntry {
     #[serde(default)]
     version: Option<String>,
@@ -378,6 +383,22 @@ mod tests {
         assert_eq!("%5B%22versions%3A1.20.4%22%5D", encoded);
     }
 
+    #[tokio::test]
+    #[ignore = "live network test"]
+    async fn live_list_project_versions() {
+        let client = ModrinthApiClient::new();
+        let versions = client
+            .list_project_versions("AANobbMI", Some("1.21.4"), Some("fabric"))
+            .await
+            .expect("live versions call failed");
+        eprintln!(
+            "got {} versions, first: {:?}",
+            versions.len(),
+            versions.first()
+        );
+        assert!(!versions.is_empty());
+    }
+
     #[test]
     fn primary_file_prefers_primary_flag() {
         let version = ModrinthVersion {
@@ -396,5 +417,107 @@ mod tests {
             ..Default::default()
         };
         assert_eq!("primary", version.primary_file().unwrap().url);
+    }
+
+    #[test]
+    fn parses_snake_case_search_hits() {
+        // Fixture mirrors the real `GET /v2/search` response shape.
+        let json = r#"{
+            "hits": [{
+                "project_id": "AANobbMI",
+                "project_type": "mod",
+                "slug": "sodium",
+                "author": "jellysquid3",
+                "title": "Sodium",
+                "description": "A high-performance rendering engine replacement.",
+                "categories": ["fabric"],
+                "versions": ["1.21.4", "1.21.5"],
+                "downloads": 207687903,
+                "follows": 39873,
+                "icon_url": "https://cdn.modrinth.com/data/AANobbMI/icon.png",
+                "date_created": "2021-01-03T00:53:34.185936+00:00"
+            }],
+            "offset": 0,
+            "limit": 25,
+            "total_hits": 1
+        }"#;
+        let response: SearchResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(1, response.hits.len());
+        let hit = &response.hits[0];
+        assert_eq!("AANobbMI", hit.project_id);
+        assert_eq!("sodium", hit.slug);
+        assert_eq!(
+            "https://cdn.modrinth.com/data/AANobbMI/icon.png",
+            hit.icon_url
+        );
+        assert_eq!(vec!["1.21.4", "1.21.5"], hit.versions);
+    }
+
+    #[test]
+    fn parses_snake_case_versions() {
+        // Fixture mirrors the real `GET /v2/project/{id}/version` response.
+        let json = r#"[
+            {
+                "id": "c3YkZvne",
+                "project_id": "AANobbMI",
+                "author_id": "TEZXhE2U",
+                "name": "Sodium 0.6.13 for Fabric 1.21.4",
+                "version_number": "mc1.21.4-0.6.13-fabric",
+                "game_versions": ["1.21.4"],
+                "loaders": ["fabric"],
+                "version_type": "release",
+                "status": "listed",
+                "url": "https://modrinth.com/mod/sodium/version/c3YkZvne",
+                "files": [{
+                    "id": "Ya4LV6Qd",
+                    "hashes": {"sha1": "c881d2db971207c396b5629632437f1520c0c478"},
+                    "url": "https://cdn.modrinth.com/data/AANobbMI/versions/c3YkZvne/sodium-fabric-0.6.13+mc1.21.4.jar",
+                    "filename": "sodium-fabric-0.6.13+mc1.21.4.jar",
+                    "primary": true,
+                    "size": 1306799
+                }]
+            }
+        ]"#;
+        let versions: Vec<ModrinthVersion> = serde_json::from_str(json).unwrap();
+        assert_eq!("c3YkZvne", versions[0].id);
+        assert_eq!("AANobbMI", versions[0].project_id);
+        assert_eq!("mc1.21.4-0.6.13-fabric", versions[0].version_number);
+        let file = versions[0].primary_file().unwrap();
+        assert_eq!(
+            "c881d2db971207c396b5629632437f1520c0c478",
+            file.sha1().unwrap()
+        );
+    }
+
+    #[test]
+    fn parses_snake_case_project() {
+        // Fixture mirrors the real `GET /v2/project/{id}` response.
+        let json = r#"{
+            "id": "AANobbMI",
+            "slug": "sodium",
+            "title": "Sodium",
+            "description": "A high-performance rendering engine replacement.",
+            "icon_url": "https://cdn.modrinth.com/data/AANobbMI/icon.png",
+            "downloads": 207720463
+        }"#;
+        let project: ModrinthProject = serde_json::from_str(json).unwrap();
+        assert_eq!("AANobbMI", project.id);
+        assert_eq!(
+            "https://cdn.modrinth.com/data/AANobbMI/icon.png",
+            project.icon_url
+        );
+        assert_eq!(207720463, project.downloads);
+    }
+
+    #[test]
+    fn parses_snake_case_game_version_tags() {
+        // Fixture mirrors the real `GET /v2/tag/game_version` response.
+        let json = r#"[
+            {"version": "1.21.4", "version_type": "release", "major": true},
+            {"version": "26.3-snapshot-1", "version_type": "snapshot", "major": false}
+        ]"#;
+        let tags: Vec<TagEntry> = serde_json::from_str(json).unwrap();
+        assert_eq!(Some("release".to_string()), tags[0].version_type);
+        assert_eq!(Some("snapshot".to_string()), tags[1].version_type);
     }
 }

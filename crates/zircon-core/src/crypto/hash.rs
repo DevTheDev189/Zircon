@@ -64,7 +64,9 @@ mod tests {
 
     #[tokio::test]
     async fn sha1_matches_known_digest() {
-        let dir = std::env::temp_dir().join(format!("zircon-hash-{}", std::process::id()));
+        // Unique temp dir per test: the tests run in parallel and share a
+        // process id, so a shared dir name would race on cleanup.
+        let dir = std::env::temp_dir().join(format!("zircon-hash-sha1-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("data.bin");
         let content: Vec<u8> = (0..20_000u32).map(|i| (i * 31) as u8).collect(); // larger than 8192 buffer
@@ -78,7 +80,7 @@ mod tests {
 
     #[tokio::test]
     async fn sha256_matches_known_digest() {
-        let dir = std::env::temp_dir().join(format!("zircon-hash-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("zircon-hash-sha256-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("data2.bin");
         std::fs::write(&file, b"hello world").unwrap();
@@ -92,7 +94,7 @@ mod tests {
 
     #[tokio::test]
     async fn hashes_empty_file() {
-        let dir = std::env::temp_dir().join(format!("zircon-hash-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("zircon-hash-empty-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("empty.bin");
         std::fs::write(&file, []).unwrap();

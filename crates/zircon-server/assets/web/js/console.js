@@ -5,7 +5,10 @@ window.Zircon.console = {
     connectConsole() {
         if (this.consoleWs) return;
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-        this.consoleWs = new WebSocket(`${proto}://${location.host}/api/console`);
+        // Browsers cannot set headers on WebSocket handshakes, so the JWT is
+        // passed as a query param and re-validated server-side.
+        const token = encodeURIComponent(this.jwtToken || '');
+        this.consoleWs = new WebSocket(`${proto}://${location.host}/api/console?token=${token}`);
         this.consoleWs.onmessage = (ev) => {
             if (ev.data === '__CLEAR__') {
                 this.consoleLines = [];

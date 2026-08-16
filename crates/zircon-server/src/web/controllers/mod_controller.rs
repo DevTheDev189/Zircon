@@ -33,7 +33,7 @@ pub async fn list_mods(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Json<serde_json::Value> {
-    let mods = resolve_mods(&state, &headers).list_mods();
+    let mods = resolve_mods(&state, &headers).list_mods_enriched().await;
     let hits: Vec<serde_json::Value> = mods.iter().map(views::mod_entry_to_map).collect();
     Json(serde_json::json!({ "mods": hits }))
 }
@@ -184,6 +184,7 @@ pub async fn search_mods(
 /// Query params for the Modrinth version picker.
 #[derive(Debug, Default, Deserialize)]
 pub struct VersionParams {
+    #[serde(rename = "projectId")]
     pub project_id: Option<String>,
     #[serde(rename = "mcVersion")]
     pub mc_version: Option<String>,
@@ -219,6 +220,7 @@ pub async fn modrinth_versions(
 /// Query params for the CurseForge file picker.
 #[derive(Debug, Default, Deserialize)]
 pub struct CurseForgeParams {
+    #[serde(rename = "modId")]
     pub mod_id: Option<String>,
 }
 
@@ -322,5 +324,41 @@ pub(crate) async fn take_upload(
                 .map_err(|e| ApiError::BadRequest(e.to_string()))?;
             return Ok(Some((filename, bytes.to_vec())));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The admin SPA sends camelCase query keys; these must bind to the
+    /// snake_case fields or the handlers 400 with "required" errors.
+    #[test]
+    fn version_params_bind_frontend_query_keys() {
+        let params: VersionParams =
+            serde_urlencoded::from_str("projectId=AANobbMI&mcVersion=26.2&loader=neoforge")
+                .unwrap();
+        assert_eq!(Some("AANobbMI".to_string()), params.project_id);
+        assert_eq!(Some("26.2".to_string()), params.mc_version);
+        assert_eq!(Some("neoforge".to_string()), params.loader);
+    }
+
+    #[test]
+    fn search_params_bind_frontend_query_keys() {
+        let params: SearchParams = serde_urlencoded::from_str(
+            "query=sodium&mcVersion=26.2&loader=neoforge&type=mod&origin=modrinth",
+        )
+        .unwrap();
+        assert_eq!(Some("sodium".to_string()), params.query);
+        assert_eq!(Some("26.2".to_string()), params.mc_version);
+        assert_eq!(Some("neoforge".to_string()), params.loader);
+        assert_eq!(Some("mod".to_string()), params.project_type);
+        assert_eq!(Some("modrinth".to_string()), params.origin);
+    }
+
+    #[test]
+    fn curseforge_params_bind_frontend_query_keys() {
+        let params: CurseForgeParams = serde_urlencoded::from_str("modId=12345").unwrap();
+        assert_eq!(Some("12345".to_string()), params.mod_id);
     }
 }

@@ -425,7 +425,7 @@ pub async fn get_instance_bom(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let mods = mods_for(&state, &id)?.list_mods();
+    let mods = mods_for(&state, &id)?.list_mods_enriched().await;
     let mapped: Vec<serde_json::Value> = mods.iter().map(views::mod_entry_to_map).collect();
     Ok(Json(serde_json::Value::Array(mapped)))
 }
@@ -462,7 +462,7 @@ pub async fn list_mods(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let mods = mods_for(&state, &id)?.list_mods();
+    let mods = mods_for(&state, &id)?.list_mods_enriched().await;
     let mapped: Vec<serde_json::Value> = mods.iter().map(views::mod_entry_to_map).collect();
     Ok(Json(serde_json::json!({ "mods": mapped })))
 }

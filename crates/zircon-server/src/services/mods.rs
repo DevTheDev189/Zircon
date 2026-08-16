@@ -225,7 +225,7 @@ impl ModManagementService {
             .await?;
         entry.id = Some(project_id.to_string());
         self.enrich_metadata(&mut entry).await;
-        self.bom_service.save()?;
+        self.persist_entry(&entry)?;
         Ok(entry)
     }
 
@@ -446,6 +446,84 @@ impl ModManagementService {
         self.bom_service.get_bom().mods
     }
 
+    /// Lists mods, opportunistically backfilling provider metadata (icon,
+    /// title, real Modrinth project id) for legacy entries that were persisted
+    /// before enrichment was written back to the BOM. Network round-trips only
+    /// happen for entries whose stored id is a file name, so healthy mods are
+    /// returned untouched.
+    pub async fn list_mods_enriched(&self) -> Vec<ModEntry> {
+        let mut mods = self.bom_service.get_bom().mods;
+        let mut changed = false;
+        for entry in mods.iter_mut() {
+            if self.repair_modrinth_metadata(entry).await {
+                changed = true;
+            }
+        }
+        if changed {
+            self.bom_service.with_bom(|bom| {
+                bom.mods = mods.clone();
+            });
+            let _ = self.bom_service.save();
+        }
+        mods
+    }
+
+    /// Replaces the BOM entry for `entry.filename` with this entry and
+    /// persists it, so provider metadata (id, icon, title) survives restarts.
+    fn persist_entry(&self, entry: &ModEntry) -> std::io::Result<()> {
+        self.bom_service.with_bom(|bom| {
+            bom.mods.retain(|m| m.filename != entry.filename);
+            bom.mods.push(entry.clone());
+        });
+        self.bom_service.save()
+    }
+
+    /// One-shot repair for a Modrinth entry stored in the pre-fix format
+    /// (`id` = file name, no icon): resolves the real project id via the file
+    /// SHA-1 and backfills title/description/icon. Returns whether the entry
+    /// changed. Never touches healthy entries or other origins.
+    async fn repair_modrinth_metadata(&self, entry: &mut ModEntry) -> bool {
+        if entry.origin.as_deref() != Some(ORIGIN_MODRINTH) {
+            return false;
+        }
+        // Healthy entries carry an alphanumeric provider id (Modrinth ids are
+        // base62) plus their metadata — skip without a network call.
+        if entry
+            .id
+            .as_deref()
+            .is_some_and(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric()))
+        {
+            return false;
+        }
+        if entry.icon_url.is_some() {
+            return false;
+        }
+        let Some(sha1) = entry.sha1.clone() else {
+            return false;
+        };
+        let project_id = match self.modrinth.verify_hashes(&[sha1.clone()]).await {
+            Ok(found) => found.get(&sha1).map(|v| v.project_id.clone()),
+            Err(_) => None,
+        };
+        let Some(project_id) = project_id else {
+            return false;
+        };
+        let Ok(project) = self.modrinth.get_project(&project_id).await else {
+            return false;
+        };
+        entry.id = Some(project_id);
+        if !project.title.is_empty() {
+            entry.title = Some(project.title);
+        }
+        if !project.description.is_empty() {
+            entry.description = Some(project.description);
+        }
+        if !project.icon_url.is_empty() {
+            entry.icon_url = Some(project.icon_url);
+        }
+        true
+    }
+
     /// Lists the files physically present in the mods folder.
     pub fn list_mod_files(&self) -> std::io::Result<Vec<PathBuf>> {
         let mut files = Vec::new();
@@ -630,5 +708,94 @@ mod tests {
         assert_eq!("mod.jar", sanitize_filename("mod.jar").unwrap());
         assert_eq!("noext.jar", sanitize_filename("noext").unwrap());
         assert!(sanitize_filename("a b c").unwrap().ends_with(".jar"));
+    }
+
+    #[tokio::test]
+    async fn enriched_metadata_is_persisted_to_bom() {
+        let dir = temp_dir();
+        let mods_dir = dir.join("mods");
+        let bom = Arc::new(BomService::new(
+            dir.join("bom.json"),
+            Some(zircon_core::model::BillOfMaterials::new(
+                "1.20.4", None, None,
+            )),
+        ));
+        let service = ModManagementService::new(bom, mods_dir.clone(), "");
+
+        // add_mod persists the raw entry (id = file name, no icon) — this is
+        // the pre-fix behaviour that install_modrinth_version builds on.
+        service
+            .add_mod(
+                std::io::Cursor::new(vec![1u8, 2, 3]),
+                "sodium.jar",
+                Some("modrinth"),
+            )
+            .await
+            .unwrap();
+
+        // Post-install enrichment must be written back, not left in memory.
+        let mut entry = service.list_mods()[0].clone();
+        entry.id = Some("AANobbMI".to_string());
+        entry.title = Some("Sodium".to_string());
+        entry.icon_url = Some("https://cdn.modrinth.com/data/AANobbMI/icon.png".to_string());
+        service.persist_entry(&entry).unwrap();
+
+        let reloaded = service.list_mods();
+        assert_eq!(1, reloaded.len());
+        assert_eq!(Some("AANobbMI".to_string()), reloaded[0].id);
+        assert_eq!(Some("Sodium".to_string()), reloaded[0].title);
+        assert_eq!(
+            Some("https://cdn.modrinth.com/data/AANobbMI/icon.png".to_string()),
+            reloaded[0].icon_url
+        );
+
+        // Survives a fresh load from disk (no in-memory cache involved).
+        let bom2 = Arc::new(BomService::new(dir.join("bom.json"), None));
+        let service2 = ModManagementService::new(bom2, mods_dir, "");
+        let disk = service2.list_mods();
+        assert_eq!(Some("AANobbMI".to_string()), disk[0].id);
+        assert_eq!(
+            Some("https://cdn.modrinth.com/data/AANobbMI/icon.png".to_string()),
+            disk[0].icon_url
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn repair_skips_healthy_entries_without_network() {
+        let dir = temp_dir();
+        let bom = Arc::new(BomService::new(
+            dir.join("bom.json"),
+            Some(zircon_core::model::BillOfMaterials::new(
+                "1.20.4", None, None,
+            )),
+        ));
+        let service = ModManagementService::new(bom, dir.join("mods"), "");
+
+        // Non-modrinth origins are never repaired.
+        let mut direct = ModEntry::new(
+            Some("550e8400-e29b-41d4-a716-446655440000".to_string()),
+            "x.jar",
+            None,
+            0,
+            Some(ORIGIN_DIRECT.to_string()),
+            None,
+            0,
+        );
+        assert!(!service.repair_modrinth_metadata(&mut direct).await);
+
+        // Healthy modrinth entries (alphanumeric provider id) are skipped.
+        let mut healthy = ModEntry::new(
+            Some("AANobbMI".to_string()),
+            "sodium.jar",
+            None,
+            0,
+            Some(ORIGIN_MODRINTH.to_string()),
+            None,
+            0,
+        );
+        assert!(!service.repair_modrinth_metadata(&mut healthy).await);
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }

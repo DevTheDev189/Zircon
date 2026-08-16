@@ -489,18 +489,118 @@ async fn download(url: &str, target: &Path) -> Result<(), InstallError> {
 // helpers
 // --------------------------------------------------------------------------
 
-/// Resolves the java executable: `$JAVA_HOME/bin/java(.exe)` or `java` on PATH.
+/// Resolves the java executable used to run server installers and the
+/// Minecraft server itself.
+///
+/// Preference order:
+/// 1. `MC_MANAGER_JAVA_HOME` — explicit override for this wrapper
+/// 2. the newest JDK found in the standard install locations (modern Mojang
+///    releases require Java 21+, and current NeoForge builds require 25)
+/// 3. `$JAVA_HOME` — kept as a fallback for non-standard install locations
+/// 4. `java` on PATH
 pub fn java_bin() -> String {
     let exe = if is_windows() { "java.exe" } else { "java" };
-    if let Ok(home) = std::env::var("JAVA_HOME") {
-        if !home.trim().is_empty() {
-            let candidate = Path::new(&home).join("bin").join(exe);
-            if candidate.exists() {
-                return candidate.to_string_lossy().into_owned();
+    if let Some(candidate) = java_home_bin("MC_MANAGER_JAVA_HOME", exe) {
+        return candidate;
+    }
+    if let Some(candidate) = find_newest_jdk(exe) {
+        return candidate;
+    }
+    if let Some(candidate) = java_home_bin("JAVA_HOME", exe) {
+        return candidate;
+    }
+    exe.to_string()
+}
+
+/// Returns `<env>/bin/java(.exe)` when the variable is set and the file exists.
+fn java_home_bin(env_var: &str, exe: &str) -> Option<String> {
+    let home = std::env::var(env_var).ok()?;
+    let candidate = Path::new(home.trim()).join("bin").join(exe);
+    candidate
+        .is_file()
+        .then(|| candidate.to_string_lossy().into_owned())
+}
+
+/// Scans the standard JDK install roots and returns the `bin/java` of the
+/// newest JDK found (ranked by the version numbers in the directory name).
+fn find_newest_jdk(exe: &str) -> Option<String> {
+    find_newest_jdk_in(exe, &default_jdk_roots())
+}
+
+fn find_newest_jdk_in(exe: &str, roots: &[PathBuf]) -> Option<String> {
+    let mut best: Option<(i64, i64, String)> = None;
+    for root in roots {
+        let Ok(entries) = fs::read_dir(root) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let dir_name = entry.file_name().to_string_lossy().into_owned();
+            let candidate = entry.path().join("bin").join(exe);
+            if !candidate.is_file() {
+                continue;
+            }
+            let (major, minor) = jdk_version_from_dir(&dir_name);
+            let newer = best
+                .as_ref()
+                .map(|(best_major, best_minor, _)| {
+                    major > *best_major || (major == *best_major && minor > *best_minor)
+                })
+                .unwrap_or(true);
+            if newer {
+                best = Some((major, minor, candidate.to_string_lossy().into_owned()));
             }
         }
     }
-    exe.to_string()
+    best.map(|(_, _, path)| path)
+}
+
+/// Standard directories that JDK installers drop their homes into.
+fn default_jdk_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if is_windows() {
+        for var in ["ProgramFiles", "ProgramFiles(x86)"] {
+            if let Ok(pf) = std::env::var(var) {
+                for sub in [
+                    "Java",
+                    "Eclipse Adoptium",
+                    "Microsoft",
+                    "Amazon Corretto",
+                    "Zulu",
+                ] {
+                    roots.push(PathBuf::from(&pf).join(sub));
+                }
+            }
+        }
+    } else {
+        for path in [
+            "/usr/lib/jvm",
+            "/usr/java",
+            "/opt/java",
+            "/Library/Java/JavaVirtualMachines",
+        ] {
+            roots.push(PathBuf::from(path));
+        }
+    }
+    roots
+}
+
+/// Extracts `(major, minor)` from a JDK directory name such as `jdk-21.0.4+7`
+/// or `temurin-17.0.12+7`; legacy `jdk1.8.0_202` names drop the `1` prefix.
+/// Unparseable names rank as `(0, 0)` so real JDKs always win.
+fn jdk_version_from_dir(name: &str) -> (i64, i64) {
+    let mut numbers: Vec<i64> = name
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    if numbers.first() == Some(&1) && numbers.len() >= 2 {
+        numbers.remove(0);
+    }
+    match numbers.as_slice() {
+        [major] => (*major, 0),
+        [major, minor, ..] => (*major, *minor),
+        [] => (0, 0),
+    }
 }
 
 pub fn is_windows() -> bool {
@@ -527,6 +627,30 @@ pub async fn ensure_server_installed_for_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_jdk_versions_from_directory_names() {
+        assert_eq!((25, 0), jdk_version_from_dir("jdk-25"));
+        assert_eq!((17, 0), jdk_version_from_dir("jdk-17"));
+        assert_eq!((21, 0), jdk_version_from_dir("jdk-21.0.4+7"));
+        assert_eq!((21, 0), jdk_version_from_dir("temurin-21.0.4+7"));
+        assert_eq!((8, 0), jdk_version_from_dir("jdk1.8.0_202"));
+        assert_eq!((0, 0), jdk_version_from_dir("tools"));
+    }
+
+    #[test]
+    fn newest_jdk_wins_among_candidates() {
+        let dir = crate::test_util::temp_dir("installer-jdk");
+        let root = dir.join("Java");
+        fs::create_dir_all(root.join("jdk-17/bin")).unwrap();
+        fs::create_dir_all(root.join("jdk-25/bin")).unwrap();
+        fs::write(root.join("jdk-17/bin/java.exe"), b"").unwrap();
+        fs::write(root.join("jdk-25/bin/java.exe"), b"").unwrap();
+
+        let found = find_newest_jdk_in("java.exe", &[root]).unwrap();
+        assert!(found.ends_with("jdk-25/bin/java.exe") || found.ends_with("jdk-25\\bin\\java.exe"));
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn fml_version_extraction() {
