@@ -47,10 +47,11 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "<YOUR_GENERATED_PUBLIC_KEY>",
+      "active": false,
       "endpoints": [
         "https://zirconmc.net/updates/launcher/latest.json"
-      ]
+      ],
+      "pubkey": ""
     }
   }
 }

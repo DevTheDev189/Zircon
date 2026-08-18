@@ -152,6 +152,8 @@ import OfflineView from './views/OfflineView.vue';
 import SkinsView from './views/SkinsView.vue';
 import SettingsView from './views/SettingsView.vue';
 import { api, onGameOutput, onGameStatus, onLaunchProgress, onLaunchStatus, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
+import { check as checkUpdate } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 import zirconTitle from './assets/zircon-title.svg';
 
 const navItems = [
@@ -272,7 +274,28 @@ onMounted(async () => {
   };
   window.addEventListener('zircon-status', onStatusEvent);
   unlisten.push(() => window.removeEventListener('zircon-status', onStatusEvent));
+
+  checkLauncherUpdate();
 });
+
+// Best-effort launcher self-update: silently checks Cloudflare R2 for a newer
+// signed build and relaunches once it's downloaded and installed.
+async function checkLauncherUpdate() {
+  try {
+    const update = await checkUpdate();
+    if (update?.available) {
+      statusText.value = `Downloading launcher update ${update.version}...`;
+      await update.downloadAndInstall((event) => {
+        if (event.event === 'Finished') {
+          statusText.value = 'Update downloaded. Restarting...';
+        }
+      });
+      await relaunch();
+    }
+  } catch (err) {
+    console.warn('Launcher update check failed:', err);
+  }
+}
 
 onBeforeUnmount(() => {
   for (const off of unlisten) off();

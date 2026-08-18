@@ -62,6 +62,7 @@ mod tests {
 
     #[test]
     fn accepts_allowed_cdn_domains() {
+        assert!(is_safe_cdn_url("https://zirconmc.net/updates/server/latest.json"));
         assert!(is_safe_cdn_url("https://cdn.modrinth.com/data/abc/1.0.jar"));
         assert!(is_safe_cdn_url(
             "https://edge.forgecdn.net/files/1234/5678/mod.jar"
