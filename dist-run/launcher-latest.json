@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "notes": "Zircon Launcher Release v0.1.0",
+  "pub_date": "2026-08-18T16:15:34Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRcjRMcFhJTXN5REFBdnEzQmNuQThkLzNYamJOeTdjTU5rRnduTFUrbklhNzJuQ2dKemlLVzgvMFJ4clZYeEhrTGlKdlUzclY1VGlhcHNja0IweUgzTzVtRVQyWjBBR3c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MDY5NDE2CWZpbGU6WmlyY29uXzAuMS4wX3g2NC1zZXR1cC5leGUKTHdZVFRmQXlmTndqQ2hlVVdIZzM2Y3dONkJiTDVYSGJsMXZST3VYMDdvdldrNTJuL2lFaTVCMFF3MC9wZzJHQVhmVEpmN2JxM3Z6R0dvY2hQeHN3QVE9PQo=",
+      "url": "https://zirconmc.net/updates/launcher/Zircon_0.1.0_x64-setup.exe"
+    }
+  }
+}

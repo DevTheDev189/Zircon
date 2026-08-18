@@ -341,6 +341,10 @@ only if `active: true`, so keep `active: false` until the key is in place):
 ```json
 {
   "...": "...",
+  "bundle": {
+    "...": "...",
+    "createUpdaterArtifacts": true
+  },
   "plugins": {
     "updater": {
       "active": false,
@@ -352,8 +356,14 @@ only if `active: true`, so keep `active: false` until the key is in place):
   }
 }
 ```
-Flip `active` to `true` once the pubkey is filled in (Step 1 of the post-implementation
-checklist below).
+`plugins.updater` controls the frontend's runtime update check. `bundle.createUpdaterArtifacts`
+is a *separate* key (defaults to `false`) that tells the bundler to actually produce the
+signed `.sig` files and `updater/latest.json` during `tauri build` — without it, `tauri build`
+silently skips update-artifact generation even with a valid pubkey and signing key configured,
+and no error is printed. Both are required.
+
+Flip `plugins.updater.active` to `true` once the pubkey is filled in (Step 1 of the
+post-implementation checklist below).
 
 ### Step 3.6: Add Launcher Update Check in Vue Frontend
 In `crates/zircon-launcher/ui/src/App.vue` (or wherever app initialization occurs), add:
@@ -411,7 +421,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo === [2/3] Packaging server distribution zip & updater metadata ===
+echo === [2/3] Packaging server distribution zip ^& updater metadata ===
 if not exist "dist-run\zircon-server" mkdir "dist-run\zircon-server"
 copy /Y "target\release\zircon-server.exe" "dist-run\zircon-server\zircon-server.exe"
 if not exist "dist-run\zircon-server\server-data\.keep" mkdir "dist-run\zircon-server\server-data\.keep"
@@ -445,6 +455,12 @@ echo Generating dist-run\server-latest.json (SHA256: %HASH%)...
 
 echo.
 echo === [3/3] Building launcher bundles with updater artifacts ===
+rem The Tauri CLI signs the MSI/NSIS installers (emits .sig files alongside them
+rem when bundle.createUpdaterArtifacts is true and TAURI_SIGNING_PRIVATE_KEY is
+rem set) but does NOT generate an updater/latest.json manifest itself for
+rem self-hosted feeds -- that auto-generation only happens in the GitHub Actions
+rem tauri-action flow. Build one by hand from the NSIS installer + its .sig,
+rem the same way the server manifest is built above.
 cd /d "%~dp0crates\zircon-launcher"
 call npx --yes @tauri-apps/cli build
 if errorlevel 1 (
@@ -453,6 +469,30 @@ if errorlevel 1 (
 )
 cd /d "%~dp0"
 
+set NSIS_EXE=target\release\bundle\nsis\Zircon_%VERSION%_x64-setup.exe
+if not exist "%NSIS_EXE%.sig" (
+    echo FAILED: no signature found at %NSIS_EXE%.sig -- was TAURI_SIGNING_PRIVATE_KEY set?
+    exit /b 1
+)
+set /p LAUNCHER_SIG=<"%NSIS_EXE%.sig"
+
+for /f %%i in ('powershell -NoProfile -Command "(Get-Date).ToUniversalTime().ToString(\"yyyy-MM-ddTHH:mm:ssZ\")"') do set PUBDATE=%%i
+
+echo Generating dist-run\launcher-latest.json...
+(
+  echo {
+  echo   "version": "%VERSION%",
+  echo   "notes": "Zircon Launcher Release v%VERSION%",
+  echo   "pub_date": "%PUBDATE%",
+  echo   "platforms": {
+  echo     "windows-x86_64": {
+  echo       "signature": "%LAUNCHER_SIG%",
+  echo       "url": "%DOMAIN%/updates/launcher/Zircon_%VERSION%_x64-setup.exe"
+  echo     }
+  echo   }
+  echo }
+) > dist-run\launcher-latest.json
+
 echo.
 echo ===========================================================================
 echo Build completed successfully!
@@ -460,12 +500,18 @@ echo.
 echo Artifacts to upload to Cloudflare R2:
 echo   - dist-run\server-latest.json -> https://zirconmc.net/updates/server/latest.json
 echo   - dist-run\zircon-server-windows-x86_64.zip -> https://zirconmc.net/updates/server/v%VERSION%/zircon-server-windows-x86_64.zip
-echo   - target\release\bundle\updater\latest.json -> https://zirconmc.net/updates/launcher/latest.json
-echo   - target\release\bundle\msi\*.zip / *.sig -> https://zirconmc.net/updates/launcher/
-echo   - target\release\bundle\nsis\*.zip / *.sig -> https://zirconmc.net/updates/launcher/
+echo   - dist-run\launcher-latest.json -> https://zirconmc.net/updates/launcher/latest.json
+echo   - target\release\bundle\nsis\Zircon_%VERSION%_x64-setup.exe -> https://zirconmc.net/updates/launcher/Zircon_%VERSION%_x64-setup.exe
+echo   - (optional, unsigned-feed installers) target\release\bundle\msi\*.msi -> https://zirconmc.net/updates/launcher/
 echo ===========================================================================
 endlocal
 ```
+`RemoteRelease` deserialization (`tauri-plugin-updater` v2.10.1, `src/updater.rs`) requires
+`version` and a `platforms` map with `{url, signature}` per platform key; `pub_date`, if
+present, MUST be strict RFC3339 (`OffsetDateTime::parse(..., Rfc3339)`) or the whole manifest
+fails to parse — that's why the script shells out to PowerShell's `Get-Date` rather than using
+batch's locale-dependent `%DATE% %TIME%` (fine for the server manifest, which reads its
+`releaseDate` as an untyped `String`, but not safe here).
 
 ---
 
@@ -497,16 +543,20 @@ Once the coding agent has implemented the code, committed, and pushed:
    ```bash
    npx @tauri-apps/cli signer generate -w ~/.tauri/zircon.key
    ```
-   * It will output a **Public Key**. Copy it into `crates/zircon-launcher/tauri.conf.json` under `plugins.updater.pubkey` (there is no `src-tauri/` subdirectory in this workspace — the Tauri config lives directly under `crates/zircon-launcher/`), then flip `plugins.updater.active` to `true`.
-   * Set your environment variable with the private key before building:
-     * **Windows Command Prompt**: `set TAURI_SIGNING_PRIVATE_KEY=<key_content>` (or password if set).
+   * It will output a **Public Key**. Copy it into `crates/zircon-launcher/tauri.conf.json` under `plugins.updater.pubkey` (there is no `src-tauri/` subdirectory in this workspace — the Tauri config lives directly under `crates/zircon-launcher/`), then flip `plugins.updater.active` to `true` AND add `"createUpdaterArtifacts": true` under `bundle` (see Step 3.5 above — this is a separate, easy-to-miss key; without it `tauri build` silently produces no `.sig` files, no error).
+   * Set the private key content (not the file path — this build's Tauri CLI version only honors the raw-content env var, `TAURI_SIGNING_PRIVATE_KEY_PATH` is documented by `signer generate` but not actually read by the bundler's signing step) before building:
+     * **Windows Command Prompt**: `set TAURI_SIGNING_PRIVATE_KEY=<key_content>` (contents of `~/.tauri/zircon.key`, not the `.pub` file). If the key has a password, also set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. If it was generated with `--ci` and no `-p`, it has no password — `tauri build` will still prompt for one at decrypt time, and an empty/EOF answer is accepted, which is what happens automatically in a non-interactive shell.
 
 2. **Run `build.bat`**:
-   This will build the binaries and generate the update zip files, signatures, and both `latest.json` files in `dist-run/` and `target/release/bundle/updater/`.
+   This builds the binaries, packages the server zip, and produces the signed MSI/NSIS
+   installers plus their `.sig` files. It also hand-generates `dist-run/launcher-latest.json`
+   itself (see Phase 4) since the Tauri CLI does not emit an `updater/latest.json` manifest
+   for self-hosted feeds — only `tauri-action` in GitHub Actions does that automatically.
 
 3. **Upload the Files to your R2 Bucket**:
    Upload the generated artifacts to the matching locations under your bucket's `/updates/` path:
    * `dist-run/server-latest.json` $\rightarrow$ `updates/server/latest.json`
    * `dist-run/zircon-server-windows-x86_64.zip` $\rightarrow$ `updates/server/v0.1.0/zircon-server-windows-x86_64.zip`
-   * `target/release/bundle/updater/latest.json` $\rightarrow$ `updates/launcher/latest.json`
-   * `target/release/bundle/msi/` & `nsis/` zip + `.sig` files $\rightarrow$ `updates/launcher/`
+   * `dist-run/launcher-latest.json` $\rightarrow$ `updates/launcher/latest.json`
+   * `target/release/bundle/nsis/Zircon_0.1.0_x64-setup.exe` $\rightarrow$ `updates/launcher/Zircon_0.1.0_x64-setup.exe`
+   * (optional) `target/release/bundle/msi/*.msi` $\rightarrow$ `updates/launcher/` — not referenced by `launcher-latest.json`, only useful as a direct-download alternative to the NSIS installer.

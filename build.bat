@@ -27,7 +27,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo === [2/3] Packaging server distribution zip & updater metadata ===
+echo === [2/3] Packaging server distribution zip ^& updater metadata ===
 if not exist "dist-run\zircon-server" mkdir "dist-run\zircon-server"
 copy /Y "target\release\zircon-server.exe" "dist-run\zircon-server\zircon-server.exe"
 if errorlevel 1 (
@@ -66,6 +66,12 @@ echo Generating dist-run\server-latest.json (SHA256: %HASH%)...
 
 echo.
 echo === [3/3] Building launcher bundles with updater artifacts ===
+rem The Tauri CLI signs the MSI/NSIS installers (emits .sig files alongside them
+rem when bundle.createUpdaterArtifacts is true and TAURI_SIGNING_PRIVATE_KEY is
+rem set) but does NOT generate an updater/latest.json manifest itself for
+rem self-hosted feeds -- that auto-generation only happens in the GitHub Actions
+rem tauri-action flow. Build one by hand from the NSIS installer + its .sig,
+rem the same way the server manifest is built above.
 cd /d "%~dp0crates\zircon-launcher"
 call npx --yes @tauri-apps/cli build
 if errorlevel 1 (
@@ -74,6 +80,30 @@ if errorlevel 1 (
 )
 cd /d "%~dp0"
 
+set NSIS_EXE=target\release\bundle\nsis\Zircon_%VERSION%_x64-setup.exe
+if not exist "%NSIS_EXE%.sig" (
+    echo FAILED: no signature found at %NSIS_EXE%.sig -- was TAURI_SIGNING_PRIVATE_KEY set?
+    exit /b 1
+)
+set /p LAUNCHER_SIG=<"%NSIS_EXE%.sig"
+
+for /f %%i in ('powershell -NoProfile -Command "(Get-Date).ToUniversalTime().ToString(\"yyyy-MM-ddTHH:mm:ssZ\")"') do set PUBDATE=%%i
+
+echo Generating dist-run\launcher-latest.json...
+(
+  echo {
+  echo   "version": "%VERSION%",
+  echo   "notes": "Zircon Launcher Release v%VERSION%",
+  echo   "pub_date": "%PUBDATE%",
+  echo   "platforms": {
+  echo     "windows-x86_64": {
+  echo       "signature": "%LAUNCHER_SIG%",
+  echo       "url": "%DOMAIN%/updates/launcher/Zircon_%VERSION%_x64-setup.exe"
+  echo     }
+  echo   }
+  echo }
+) > dist-run\launcher-latest.json
+
 echo.
 echo ===========================================================================
 echo Build completed successfully!
@@ -81,8 +111,8 @@ echo.
 echo Artifacts to upload to Cloudflare R2:
 echo   - dist-run\server-latest.json -^> https://zirconmc.net/updates/server/latest.json
 echo   - dist-run\zircon-server-windows-x86_64.zip -^> https://zirconmc.net/updates/server/v%VERSION%/zircon-server-windows-x86_64.zip
-echo   - target\release\bundle\updater\latest.json -^> https://zirconmc.net/updates/launcher/latest.json
-echo   - target\release\bundle\msi\*.zip / *.sig -^> https://zirconmc.net/updates/launcher/
-echo   - target\release\bundle\nsis\*.zip / *.sig -^> https://zirconmc.net/updates/launcher/
+echo   - dist-run\launcher-latest.json -^> https://zirconmc.net/updates/launcher/latest.json
+echo   - target\release\bundle\nsis\Zircon_%VERSION%_x64-setup.exe -^> https://zirconmc.net/updates/launcher/Zircon_%VERSION%_x64-setup.exe
+echo   - (optional, unsigned-feed installers) target\release\bundle\msi\*.msi -^> https://zirconmc.net/updates/launcher/
 echo ===========================================================================
 endlocal
