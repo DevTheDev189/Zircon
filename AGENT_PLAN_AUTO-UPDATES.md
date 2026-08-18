@@ -10,7 +10,7 @@ Enable auto-updating for both the Tauri v2 desktop launcher (`zircon-launcher`) 
 
 ## Phase 1: Update `zircon-core` SSRF Domain Whitelist
 
-### File: `zircon-core/src/security/ssrf.rs`
+### File: `crates/zircon-core/src/security/ssrf.rs`
 Add `zirconmc.net` to `ALLOWED_CDN_DOMAINS` so that downloads from `https://zirconmc.net` pass safety verification.
 
 ```rust
@@ -34,8 +34,8 @@ pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
 
 ## Phase 2: Server Self-Update Engine (`zircon-server`)
 
-### Step 2.1: Update `zircon-server/Cargo.toml`
-Add `self_replace` and `semver`:
+### Step 2.1: Update `crates/zircon-server/Cargo.toml`
+Add `self_replace`, `semver`, `sha2`, `hex` to the existing `[dependencies]` block (semver/sha2/hex are already workspace-level deps, so reference them with `.workspace = true`; `self_replace` is new and not in `[workspace.dependencies]`):
 ```toml
 [dependencies]
 zircon-core = { path = "../zircon-core" }
@@ -60,13 +60,13 @@ zip.workspace = true
 getrandom = "0.3"
 tokio-util = { workspace = true, features = ["io"] }
 futures-util = "0.3"
-self_replace = "1.5"
-semver = "1.0"
-sha2 = { workspace = true }
-hex = { workspace = true }
+self-replace = "1.5"
+semver.workspace = true
+sha2.workspace = true
+hex.workspace = true
 ```
 
-### Step 2.2: Create `zircon-server/src/updater.rs`
+### Step 2.2: Create `crates/zircon-server/src/updater.rs`
 Create a self-updater module that handles downloading from `https://zirconmc.net/updates/server/latest.json`, verifying SHA-256 integrity, performing an atomic binary swap with `self_replace`, and respawning the process.
 
 ```rust
@@ -217,10 +217,10 @@ impl ServerUpdater {
 }
 ```
 
-### Step 2.3: Register Module in `zircon-server/src/lib.rs`
-Add `pub mod updater;` to `zircon-server/src/lib.rs`.
+### Step 2.3: Register Module in `crates/zircon-server/src/lib.rs`
+Add `pub mod updater;` to `crates/zircon-server/src/lib.rs`.
 
-### Step 2.4: Create `zircon-server/src/web/controllers/system_controller.rs`
+### Step 2.4: Create `crates/zircon-server/src/web/controllers/system_controller.rs`
 ```rust
 //! System update and health controller.
 
@@ -272,9 +272,9 @@ pub async fn apply_update(
 }
 ```
 
-### Step 2.5: Register in `zircon-server/src/web/controllers/mod.rs` & `zircon-server/src/web/app.rs`
-1. In `zircon-server/src/web/controllers/mod.rs`, add `pub mod system_controller;`.
-2. In `zircon-server/src/web/app.rs`, add the routes to `protected_api`:
+### Step 2.5: Register in `crates/zircon-server/src/web/controllers/mod.rs` & `crates/zircon-server/src/web/app.rs`
+1. In `crates/zircon-server/src/web/controllers/mod.rs`, add `pub mod system_controller;`.
+2. In `crates/zircon-server/src/web/app.rs`, add `system_controller` to the existing `use super::controllers::{...};` import list, then add the routes to `protected_api`:
 ```rust
 use super::controllers::system_controller;
 
@@ -287,15 +287,15 @@ use super::controllers::system_controller;
 
 ## Phase 3: Launcher Auto-Update (`zircon-launcher`)
 
-### Step 3.1: Update `zircon-launcher/Cargo.toml`
-Add:
+### Step 3.1: Update `crates/zircon-launcher/Cargo.toml`
+Add to the existing `[dependencies]` block:
 ```toml
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 ```
 
-### Step 3.2: Update `zircon-launcher/src/lib.rs`
-Register the plugins:
+### Step 3.2: Update `crates/zircon-launcher/src/lib.rs`
+Register the plugins (added alongside the existing `tauri_plugin_dialog::init()` call):
 ```rust
 tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
@@ -305,20 +305,58 @@ tauri::Builder::default()
     // ...
 ```
 
-### Step 3.3: Configure `zircon-launcher/ui/package.json`
-Add the Tauri v2 updater and process packages:
+### Step 3.3: Configure `crates/zircon-launcher/ui/package.json`
+Bump `@tauri-apps/api` (currently pinned to `^2.1.1`) and add the updater/process packages:
 ```json
 "dependencies": {
   "@tauri-apps/api": "^2.11.1",
-  "@tauri-apps/plugin-dialog": "^2.0.0",
+  "@tauri-apps/plugin-dialog": "^2.0.1",
   "@tauri-apps/plugin-updater": "^2.0.0",
   "@tauri-apps/plugin-process": "^2.0.0",
+  "three": "^0.170.0",
   "vue": "^3.5.13"
 }
 ```
 
-### Step 3.4: Add Launcher Update Check in Vue Frontend
-In `zircon-launcher/ui/src/App.vue` (or wherever app initialization occurs), add:
+### Step 3.4: Grant Tauri v2 Permissions in `crates/zircon-launcher/capabilities/default.json`
+Tauri v2 denies plugin commands at runtime unless explicitly capability-granted. The
+existing file only grants `core:default` and `dialog:default`; add the updater and
+process defaults:
+```json
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the Zircon launcher main window",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:default", "updater:default", "process:default"]
+}
+```
+
+### Step 3.5: Add the Updater Config Block to `crates/zircon-launcher/tauri.conf.json`
+The file currently has no `plugins` key at all. Add one with the update endpoint and
+the pubkey generated in the post-implementation steps below (leave `pubkey` as an
+empty string placeholder — it must be filled in after `tauri signer generate` runs,
+the app will fail to start with a real endpoint configured and an invalid/empty key
+only if `active: true`, so keep `active: false` until the key is in place):
+```json
+{
+  "...": "...",
+  "plugins": {
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://zirconmc.net/updates/launcher/latest.json"
+      ],
+      "pubkey": ""
+    }
+  }
+}
+```
+Flip `active` to `true` once the pubkey is filled in (Step 1 of the post-implementation
+checklist below).
+
+### Step 3.6: Add Launcher Update Check in Vue Frontend
+In `crates/zircon-launcher/ui/src/App.vue` (or wherever app initialization occurs), add:
 ```javascript
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -407,7 +445,7 @@ echo Generating dist-run\server-latest.json (SHA256: %HASH%)...
 
 echo.
 echo === [3/3] Building launcher bundles with updater artifacts ===
-cd /d "%~dp0zircon-launcher"
+cd /d "%~dp0crates\zircon-launcher"
 call npx --yes @tauri-apps/cli build
 if errorlevel 1 (
     echo FAILED: launcher bundle build
@@ -436,7 +474,7 @@ endlocal
 1. Run `cargo check --workspace` and `cargo test --workspace` to ensure zero compilation or unit test regressions.
 2. Stage all changed and new files:
    ```bash
-   git add zircon-core/ zircon-server/ zircon-launcher/ build.bat
+   git add crates/zircon-core/ crates/zircon-server/ crates/zircon-launcher/ build.bat
    ```
 3. Commit with a descriptive message:
    ```bash
@@ -459,7 +497,7 @@ Once the coding agent has implemented the code, committed, and pushed:
    ```bash
    npx @tauri-apps/cli signer generate -w ~/.tauri/zircon.key
    ```
-   * It will output a **Public Key**. Copy it into `zircon-launcher/src-tauri/tauri.conf.json` under `plugins.updater.pubkey`.
+   * It will output a **Public Key**. Copy it into `crates/zircon-launcher/tauri.conf.json` under `plugins.updater.pubkey` (there is no `src-tauri/` subdirectory in this workspace — the Tauri config lives directly under `crates/zircon-launcher/`), then flip `plugins.updater.active` to `true`.
    * Set your environment variable with the private key before building:
      * **Windows Command Prompt**: `set TAURI_SIGNING_PRIVATE_KEY=<key_content>` (or password if set).
 

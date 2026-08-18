@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default capability for the Zircon launcher main window",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:default"]
+  "permissions": ["core:default", "dialog:default", "updater:default", "process:default"]
 }

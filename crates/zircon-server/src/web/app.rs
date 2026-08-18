@@ -30,7 +30,7 @@ use crate::tickets::JoinTicketManager;
 use super::auth::require_auth;
 use super::controllers::{
     auth_controller, backup_controller, bom_controller, console_controller, instance_controller,
-    mod_controller, pack_controller, player_controller, stats_controller,
+    mod_controller, pack_controller, player_controller, stats_controller, system_controller,
 };
 use super::rate_limit::FixedWindowLimiter;
 
@@ -180,6 +180,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/logout", post(auth_controller::logout))
         // Stats
         .route("/api/stats", get(stats_controller::stats))
+        // System self-update
+        .route("/api/system/update/check", get(system_controller::check_update))
+        .route("/api/system/update/apply", post(system_controller::apply_update))
         // Legacy single-server endpoints (serve the active instance's data)
         .route("/api/mods", get(mod_controller::list_mods))
         .route("/api/mods/upload", post(mod_controller::upload_mod))

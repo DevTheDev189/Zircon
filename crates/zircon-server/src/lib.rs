@@ -14,6 +14,7 @@ pub mod process;
 pub mod services;
 pub mod stats;
 pub mod tickets;
+pub mod updater;
 pub mod web;
 
 #[cfg(test)]

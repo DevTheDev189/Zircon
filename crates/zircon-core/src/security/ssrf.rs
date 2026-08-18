@@ -10,6 +10,7 @@
 /// Hosts the wrapper is allowed to fetch from. A URL is safe when its host
 /// equals one of these or is a strict subdomain of one.
 pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
+    "zirconmc.net",
     "cdn.modrinth.com",
     "edge.forgecdn.net",
     "media.forgecdn.net",
@@ -46,6 +47,7 @@ mod tests {
 
     #[test]
     fn accepts_allowed_cdn_domains() {
+        assert!(is_safe_cdn_url("https://zirconmc.net/updates/server/latest.json"));
         assert!(is_safe_cdn_url("https://cdn.modrinth.com/data/abc/1.0.jar"));
         assert!(is_safe_cdn_url(
             "https://edge.forgecdn.net/files/1234/5678/mod.jar"

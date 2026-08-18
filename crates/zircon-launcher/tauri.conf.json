@@ -43,5 +43,14 @@
     "longDescription": "Zircon (MCManager) launcher: Microsoft authentication, mod/pack sync, offline instances and 3D skin previews.",
     "category": "Game",
     "copyright": "Copyright (c) Zircon contributors"
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://zirconmc.net/updates/launcher/latest.json"
+      ],
+      "pubkey": ""
+    }
   }
 }
