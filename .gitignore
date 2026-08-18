@@ -38,3 +38,4 @@ crates/zircon-launcher/ui/dist/
 
 # ---------- Launcher runtime state (never commit) ----------
 ~/.mcmanager/
+~/.tauri/
