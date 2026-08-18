@@ -885,10 +885,10 @@ mod tests {
     fn load_cached_rejects_invalid_session_and_deletes() {
         let (dir, cache) = temp_cache();
         std::fs::create_dir_all(&dir).unwrap();
-        let session = SessionData {
-            access_token: "0".to_string(),
-            ..valid_session()
-        };
+        // (struct-update syntax can't move fields out of a `Drop` type, so the
+        // invalid token is set in place)
+        let mut session = valid_session();
+        session.access_token = "0".to_string();
         std::fs::write(&cache, serde_json::to_string(&session).unwrap()).unwrap();
         let service =
             MicrosoftAuthService::new_with_paths("test-client".to_string(), cache.clone());

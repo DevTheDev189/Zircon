@@ -48,6 +48,7 @@
 | ♟ | **Player tools** | Live player tracking, whitelist, ops, bans — applied instantly on a running server, offline-safe otherwise. |
 | ⌨ | **Live console** | Stream the server console in real time over WebSocket and run commands from the browser. |
 | ◫ | **Backups** | LZ4-compressed tar snapshots on a schedule (`daily`/`weekly`/`monthly`) with retention pruning and one-click restore. |
+| ☾ | **Idle shutdown** | Per-instance toggle that shuts a server down gracefully after a configurable window with no players online — the launcher wakes it automatically on the next join, so resources are only used while people are playing. |
 | ▮ | **System stats** | CPU, RAM, and disk telemetry with a live history graph. |
 | ⚔ | **Admin auth** | BCrypt users + JWT-secured admin API with a bundled single-page dashboard and a generated first-run password. |
 
@@ -62,6 +63,7 @@
 | ◐ | **Offline instances** | Create and launch single-player instances with their own mods, shaderpacks, and texture packs. |
 | ⚙ | **Launcher settings** | RAM slider. Mod downloads are always hash-verified against Modrinth/CurseForge (no opt-out). |
 | ► | **One-click join** | Fetches the server BOM, resolves the exact Minecraft + loader runtime (Fabric/Quilt/Forge/NeoForge), registers the pre-join ticket, and auto-connects in fullscreen. |
+| ⏻ | **Auto-wake asleep servers** | If a Zircon server is sleeping (idle shutdown), PLAY wakes it via the wrapper and waits for it to come online before connecting. |
 | □ | **Per-server isolation** | Every server gets its own game directory (`~/.zircon/instances/<host>_<port>/`) so mods and configs never mix. |
 
 ---

@@ -20,6 +20,14 @@ use zircon_core::security::ssrf;
 
 use super::bom::BomService;
 
+/// Windows device names that are reserved even with an extension (`CON`, `NUL`,
+/// `COM1`...). Uploading a file with one of these names would create an
+/// unreadable/undeletable entry on Windows, so they are prefixed defensively.
+const WINDOWS_RESERVED: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
 /// Strips path separators and control characters so uploads cannot escape
 /// their pack dir, and normalizes the extension to `.zip`.
 pub fn sanitize_pack_filename(filename: &str) -> Result<String, PackError> {
@@ -40,7 +48,7 @@ pub fn sanitize_pack_filename(filename: &str) -> Result<String, PackError> {
             }
         })
         .collect();
-    let base = if sanitized.trim().is_empty() {
+    let mut base = if sanitized.trim().is_empty() {
         format!(
             "pack-{}.zip",
             &uuid::Uuid::new_v4().simple().to_string()[..8]
@@ -49,16 +57,20 @@ pub fn sanitize_pack_filename(filename: &str) -> Result<String, PackError> {
         sanitized
     };
     // Normalize the extension: packs are zips, never jars.
-    let base = if base.to_lowercase().ends_with(".jar") {
-        format!("{}.zip", &base[..base.len() - 4])
-    } else {
-        base
-    };
-    if base.to_lowercase().ends_with(".zip") {
-        Ok(base)
-    } else {
-        Ok(format!("{base}.zip"))
+    if base.to_lowercase().ends_with(".jar") {
+        base = format!("{}.zip", &base[..base.len() - 4]);
     }
+    if !base.to_lowercase().ends_with(".zip") {
+        base = format!("{base}.zip");
+    }
+
+    // Windows reserved device names, regardless of extension casing.
+    let upper = base.to_ascii_uppercase();
+    let stem = upper.strip_suffix(".ZIP").unwrap_or(&upper).to_string();
+    if WINDOWS_RESERVED.contains(&stem.as_str()) {
+        base = format!("file_{base}");
+    }
+    Ok(base)
 }
 
 pub const ORIGIN_MODRINTH: &str = "modrinth";
@@ -377,6 +389,23 @@ mod tests {
         assert!(service.remove_shaderpack("CoolShaders.zip").unwrap());
         assert_eq!(0, service.list_shaderpacks().len());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn sanitize_pack_filename_prefixes_windows_reserved_names() {
+        // Reserved device names get a neutral `file_` prefix (original case is
+        // preserved, so the collision with the Windows device is broken either
+        // way).
+        assert_eq!("file_CON.zip", sanitize_pack_filename("CON.zip").unwrap());
+        assert_eq!("file_nul.zip", sanitize_pack_filename("nul").unwrap());
+        assert_eq!("file_COM3.zip", sanitize_pack_filename("COM3.zip").unwrap());
+        assert_eq!("file_LPT1.zip", sanitize_pack_filename("LPT1.zip").unwrap());
+        // Mixed/upper-case extensions are caught too (original casing is
+        // preserved).
+        assert_eq!("file_AUX.ZIP", sanitize_pack_filename("AUX.ZIP").unwrap());
+        // Ordinary names are untouched (and jars become zips).
+        assert_eq!("world.zip", sanitize_pack_filename("world.zip").unwrap());
+        assert_eq!("cool.zip", sanitize_pack_filename("cool.jar").unwrap());
     }
 
     #[tokio::test]

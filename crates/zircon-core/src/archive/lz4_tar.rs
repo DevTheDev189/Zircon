@@ -3,7 +3,9 @@
 //!
 //! Compression streams each file through the LZ4 frame format. Extraction
 //! rejects any entry that escapes the destination directory ("zip-slip" / path
-//! traversal), so archives can be restored into a live instance folder safely.
+//! traversal), refuses symlinks and hardlinks (Tar-slip), and caps both the
+//! entry count and total uncompressed size to blunt decompression bombs, so
+//! archives can be restored into a live instance folder safely.
 //!
 //! Port of `com.mcmanager.core.util.Lz4ArchiveUtil`.
 
@@ -132,9 +134,16 @@ fn append_file(
     Ok(())
 }
 
+const MAX_TOTAL_EXTRACT_BYTES: u64 = 10 * 1024 * 1024 * 1024; // 10 GB
+const MAX_FILE_ENTRIES: usize = 50_000;
+
 /// Decompresses a `.tar.lz4` archive into `destination_dir`, overwriting files
-/// that already exist. Entries that would escape the destination directory
-/// (absolute paths or `..` traversal) abort the whole extraction.
+/// that already exist. Aborts the whole extraction when any entry:
+///
+/// * is a symlink or hardlink (Tar-slip / link escape),
+/// * would escape the destination directory (absolute paths or `..`
+///   traversal), or
+/// * pushes the archive past the entry-count or total-size bomb limits.
 pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Result<()> {
     let file_in = File::open(archive_file)?;
     let lz4_in = FrameDecoder::new(file_in);
@@ -142,9 +151,33 @@ pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Resul
 
     let dest = canonicalize_or_create(destination_dir)?;
 
+    let mut entry_count = 0;
+    let mut total_uncompressed: u64 = 0;
+
     let entries = tar_in.entries()?;
     for entry in entries {
+        entry_count += 1;
+        if entry_count > MAX_FILE_ENTRIES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Archive exceeds maximum allowed entry count (decompression bomb defense)",
+            ));
+        }
+
         let mut entry = entry?;
+        let entry_type = entry.header().entry_type();
+
+        // Prevent Symlink / Hardlink directory escape attacks.
+        if entry_type.is_symlink() || entry_type.is_hard_link() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Refusing to extract symlink/hardlink entry: {}",
+                    entry.path()?.display()
+                ),
+            ));
+        }
+
         let path = entry.path()?;
         let safe_path = sanitize_entry_path(&path).ok_or_else(|| {
             io::Error::new(
@@ -162,14 +195,22 @@ pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Resul
             ));
         }
 
-        if entry.header().entry_type().is_dir() {
+        if entry_type.is_dir() {
             std::fs::create_dir_all(&target)?;
         } else {
             if let Some(parent) = target.parent() {
                 std::fs::create_dir_all(parent)?;
             }
             let mut out = File::create(&target)?;
-            io::copy(&mut entry, &mut out)?;
+            let written = io::copy(&mut entry, &mut out)?;
+            total_uncompressed += written;
+
+            if total_uncompressed > MAX_TOTAL_EXTRACT_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Archive exceeds maximum allowed uncompressed size",
+                ));
+            }
         }
     }
     Ok(())
@@ -316,6 +357,57 @@ mod tests {
         // Nothing may have been written outside the destination.
         assert!(!dir.join("evil.txt").exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rejects_symlink_and_hardlink_entries() {
+        // Untrusted archives may carry symlink (typeflag '2') or hardlink
+        // (typeflag '1') entries pointing outside the extraction root
+        // (Tar-slip). The builder never writes links, so the headers are
+        // assembled manually.
+        for (typeflag, label) in [(b'2', "symlink"), (b'1', "hardlink")] {
+            let dir = temp_dir("archive-link");
+            let archive = dir.join("evil-link.tar.lz4");
+            write_raw_tar_archive_with_entry(&archive, b"evil-link", typeflag);
+
+            let dest = dir.join("dest");
+            let err = extract_archive(&archive, &dest).unwrap_err();
+            assert!(
+                err.to_string().contains("symlink/hardlink"),
+                "unexpected error for {label}: {err}"
+            );
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
+    /// Writes a minimal single-header TAR (no data), LZ4-framed. `typeflag`
+    /// selects the entry type (e.g. `b'1'` hardlink, `b'2'` symlink).
+    fn write_raw_tar_archive_with_entry(archive: &Path, name: &[u8], typeflag: u8) {
+        let mut header = [0u8; 512];
+        header[..name.len()].copy_from_slice(name);
+        header[100..108].copy_from_slice(b"0000644\0");
+        header[108..116].copy_from_slice(b"0000000\0");
+        header[116..124].copy_from_slice(b"0000000\0");
+        // File size in octal (0 bytes of data).
+        header[124..136].copy_from_slice(b"00000000000\0");
+        header[136..148].copy_from_slice(b"00000000000\0");
+        // Checksum field left as spaces while computing, then patched in.
+        for b in &mut header[148..156] {
+            *b = b' ';
+        }
+        header[156] = typeflag;
+        header[257..263].copy_from_slice(b"ustar\0");
+        header[263..265].copy_from_slice(b"00");
+
+        let sum: u32 = header.iter().map(|&b| u32::from(b)).sum();
+        let checksum = format!("{sum:06o}\0 ");
+        header[148..156].copy_from_slice(checksum.as_bytes());
+
+        let file = File::create(archive).unwrap();
+        let mut lz4 = FrameEncoder::new(file);
+        lz4.write_all(&header).unwrap();
+        lz4.write_all(&[0u8; 1024]).unwrap(); // two zero blocks = end of archive
+        lz4.finish().unwrap();
     }
 
     /// Writes a minimal single-file TAR with a `../evil.txt` entry, LZ4-framed.

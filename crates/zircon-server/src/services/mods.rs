@@ -586,6 +586,14 @@ impl ModManagementService {
     }
 }
 
+/// Windows device names that are reserved even with an extension (`CON`, `NUL`,
+/// `COM1`...). Uploading a file with one of these names would create an
+/// unreadable/undeletable entry on Windows, so they are prefixed defensively.
+const WINDOWS_RESERVED: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
 /// Strips path separators and control characters so uploads cannot escape the
 /// mods dir.
 pub fn sanitize_filename(filename: &str) -> Result<String, ModError> {
@@ -606,16 +614,22 @@ pub fn sanitize_filename(filename: &str) -> Result<String, ModError> {
             }
         })
         .collect();
-    let base = if sanitized.trim().is_empty() {
+    let mut base = if sanitized.trim().is_empty() {
         format!("mod-{}.jar", &Uuid::new_v4().simple().to_string()[..8])
     } else {
         sanitized
     };
     if !base.to_lowercase().ends_with(".jar") {
-        Ok(format!("{base}.jar"))
-    } else {
-        Ok(base)
+        base = format!("{base}.jar");
     }
+
+    // Windows reserved device names, regardless of extension casing.
+    let upper = base.to_ascii_uppercase();
+    let stem = upper.strip_suffix(".JAR").unwrap_or(&upper).to_string();
+    if WINDOWS_RESERVED.contains(&stem.as_str()) {
+        base = format!("file_{base}");
+    }
+    Ok(base)
 }
 
 fn normalize_origin(origin: Option<&str>) -> String {
@@ -708,6 +722,22 @@ mod tests {
         assert_eq!("mod.jar", sanitize_filename("mod.jar").unwrap());
         assert_eq!("noext.jar", sanitize_filename("noext").unwrap());
         assert!(sanitize_filename("a b c").unwrap().ends_with(".jar"));
+    }
+
+    #[test]
+    fn sanitize_filename_prefixes_windows_reserved_names() {
+        // Reserved device names get a neutral `file_` prefix (original case is
+        // preserved, so the collision with the Windows device is broken either
+        // way).
+        assert_eq!("file_CON.jar", sanitize_filename("CON.jar").unwrap());
+        assert_eq!("file_nul.jar", sanitize_filename("nul.jar").unwrap());
+        assert_eq!("file_COM1.jar", sanitize_filename("COM1.jar").unwrap());
+        assert_eq!("file_LPT9.jar", sanitize_filename("LPT9.jar").unwrap());
+        // Mixed/upper-case extensions are caught too (stem check is
+        // case-insensitive; the original casing is preserved).
+        assert_eq!("file_NUL.JAR", sanitize_filename("NUL.JAR").unwrap());
+        // Ordinary names are untouched.
+        assert_eq!("my_mod.jar", sanitize_filename("my_mod.jar").unwrap());
     }
 
     #[tokio::test]

@@ -1,12 +1,14 @@
-        /* Console filter checkboxes: unchecked state matches the page background
-           (bg-slate-950) instead of the browser default white. */
-        .console-check {
+        /* Form checkboxes (console filters, settings toggles): the browser
+           default white box is removed so the unchecked state blends with
+           whatever panel it sits on (transparent background), with a slate
+           border for definition. */
+        .zircon-check {
             appearance: none;
             -webkit-appearance: none;
             width: 14px;
             height: 14px;
             flex-shrink: 0;
-            background-color: #020617; /* slate-950 */
+            background-color: transparent;
             border: 1px solid #334155; /* slate-700 */
             border-radius: 4px;
             display: inline-block;
@@ -14,11 +16,11 @@
             cursor: pointer;
             transition: background-color 0.15s, border-color 0.15s;
         }
-        .console-check:checked {
+        .zircon-check:checked {
             background-color: #47d2c9; /* brand teal */
             border-color: #47d2c9;
         }
-        .console-check:checked::after {
+        .zircon-check:checked::after {
             content: "";
             position: absolute;
             left: 4px;

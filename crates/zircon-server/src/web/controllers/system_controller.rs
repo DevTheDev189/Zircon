@@ -1,4 +1,8 @@
-//! System update and health controller.
+//! System endpoints: server self-update check & apply.
+//!
+//! Both routes are admin-only (mounted inside the JWT-protected router). The
+//! update applies in place and then relaunches the daemon, so the caller gets
+//! an immediate `ok` before the process restarts.
 
 use axum::extract::State;
 use axum::Json;
@@ -7,7 +11,8 @@ use serde_json::json;
 use crate::updater::{ServerUpdater, CURRENT_SERVER_VERSION};
 use crate::web::app::{ApiError, AppState};
 
-/// GET /api/system/update/check — Checks if a server update is available.
+/// GET /api/system/update/check — reports the running version and whether a
+/// newer release is available (with the manifest for UI display).
 pub async fn check_update() -> Result<Json<serde_json::Value>, ApiError> {
     let updater = ServerUpdater::new();
     let update = updater.check_update().await.map_err(ApiError::Internal)?;
@@ -18,7 +23,8 @@ pub async fn check_update() -> Result<Json<serde_json::Value>, ApiError> {
     })))
 }
 
-/// POST /api/system/update/apply — Downloads and replaces the server binary, then restarts.
+/// POST /api/system/update/apply — stops all instances, swaps in the verified
+/// binary and relaunches the daemon with the original arguments.
 pub async fn apply_update(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -27,22 +33,29 @@ pub async fn apply_update(
         return Err(ApiError::BadRequest("No updates available".into()));
     };
 
-    // 1. Gracefully stop all Minecraft server instances before replacing
+    state.audit.log(
+        "ADMIN",
+        "SERVER_UPDATE_APPLY",
+        &format!("Target version: {}", manifest.version),
+    );
+
+    // Gracefully stop every instance so the swap never happens mid-world-write.
     for inst in state.instances.list_instances() {
         state.instances.stop_instance(&inst.id).await;
     }
 
-    // 2. Perform binary replacement
-    updater.apply_update(&manifest).await.map_err(ApiError::Internal)?;
+    updater
+        .apply_update(&manifest)
+        .await
+        .map_err(ApiError::Internal)?;
 
-    // 3. Spawn background restart
+    // Give the HTTP response time to flush before the process exits.
     tokio::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         let _ = ServerUpdater::restart_process();
     });
 
-    Ok(Json(json!({
-        "ok": true,
-        "message": "Server updated successfully. Restarting..."
-    })))
+    Ok(Json(
+        json!({ "ok": true, "message": "Server updated. Restarting..." }),
+    ))
 }

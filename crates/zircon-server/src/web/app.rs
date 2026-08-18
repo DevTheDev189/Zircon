@@ -53,6 +53,8 @@ pub struct AppState {
     pub sessions: Arc<SessionRegistry>,
     /// Fixed-window limiter for authentication endpoints.
     pub login_limiter: Arc<FixedWindowLimiter>,
+    /// Append-only audit log for sensitive administrative actions.
+    pub audit: Arc<crate::audit::AuditLogger>,
 }
 
 /// Errors mapped to HTTP responses.
@@ -164,7 +166,8 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/instances/:id/join-intent",
             post(instance_controller::register_join_intent),
-        );
+        )
+        .route("/api/wakeup", post(config_routes::wakeup_server));
 
     // ----------------------------------------------------------------------
     // Protected admin API
@@ -178,11 +181,20 @@ pub fn router(state: AppState) -> Router {
             post(auth_controller::change_password),
         )
         .route("/api/auth/logout", post(auth_controller::logout))
+        .route("/api/auth/2fa/setup", post(auth_controller::setup_2fa))
+        .route("/api/auth/2fa/enable", post(auth_controller::enable_2fa))
+        .route("/api/auth/2fa/disable", post(auth_controller::disable_2fa))
+        // System self-update
+        .route(
+            "/api/system/update/check",
+            get(system_controller::check_update),
+        )
+        .route(
+            "/api/system/update/apply",
+            post(system_controller::apply_update),
+        )
         // Stats
         .route("/api/stats", get(stats_controller::stats))
-        // System self-update
-        .route("/api/system/update/check", get(system_controller::check_update))
-        .route("/api/system/update/apply", post(system_controller::apply_update))
         // Legacy single-server endpoints (serve the active instance's data)
         .route("/api/mods", get(mod_controller::list_mods))
         .route("/api/mods/upload", post(mod_controller::upload_mod))

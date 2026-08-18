@@ -21,6 +21,7 @@ use crate::services::mods::ModManagementService;
 use crate::services::packs::PackManagementService;
 use crate::tickets::TICKET_TTL_SECONDS;
 use crate::web::app::{ApiError, AppState};
+use crate::web::config_routes::resolve_wake_target;
 use crate::web::views;
 
 /// GET /api/instances
@@ -112,6 +113,14 @@ pub async fn update_instance(
             body.backup_time.as_deref(),
         )?;
     }
+    // Idle shutdown settings (sleep when nobody is playing).
+    if body.idle_shutdown_enabled.is_some() || body.idle_shutdown_minutes.is_some() {
+        state.instances.update_idle_shutdown_settings(
+            &id,
+            body.idle_shutdown_enabled,
+            body.idle_shutdown_minutes,
+        )?;
+    }
 
     let current = state.instances.get_instance(&id)?;
     let mc_changed = body
@@ -183,7 +192,10 @@ pub async fn stop_instance(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
-    state.instances.stop_instance(&id).await;
+    state
+        .instances
+        .stop_instance_with_reason(&id, Some(zircon_core::model::SHUTDOWN_REASON_MANUAL))
+        .await;
     Json(serde_json::json!({ "ok": true }))
 }
 
@@ -442,7 +454,9 @@ pub async fn get_instance_bom(
 
 /// POST /api/join-intent and /api/instances/{id}/join-intent — registers a
 /// short-lived join ticket for the launcher's session so the player's
-/// connection passes the Zircon join gate. Intentionally unauthenticated.
+/// connection passes the Zircon join gate, and holds the target instance's
+/// idle shutdown off while the player is on their way. Intentionally
+/// unauthenticated.
 pub async fn register_join_intent(
     State(state): State<AppState>,
     Json(body): Json<JoinIntentRequest>,
@@ -458,6 +472,45 @@ pub async fn register_join_intent(
     if let Some(uuid) = &body.uuid {
         state.tickets.register_ticket(uuid);
     }
+
+    // A player is on their way: resolve the instance the same way the
+    // multiplexer routes connections and hold off its idle shutdown until the
+    // player connects (or the intent expires). When the instance is asleep,
+    // start it as a safety net — the launcher's wakeup may have raced an idle
+    // shutdown or a status ping.
+    let public_port = state.config.get_config().public_port;
+    if let Some(cfg) = resolve_wake_target(
+        &state.instances,
+        public_port,
+        body.hostname.as_deref(),
+        body.port,
+    ) {
+        if state.instances.is_running(&cfg.id) {
+            state.instances.register_join_intent(&cfg.id);
+        } else if state.instances.wakeable(&cfg.id) {
+            state.instances.register_join_intent(&cfg.id);
+            let instances = state.instances.clone();
+            let id = cfg.id.clone();
+            let log_id = id.clone();
+            tokio::spawn(async move {
+                if let Err(e) = instances.start_instance(&id).await {
+                    tracing::error!("Join-intent wake failed for instance {id}: {e}");
+                }
+            });
+            tracing::info!(
+                "Join intent for sleeping instance '{}' ({log_id}) — waking it",
+                cfg.name
+            );
+        } else {
+            // Stopped manually (maintenance): the player cannot join. Refuse so
+            // the launcher aborts before booting Minecraft into a dead server.
+            return Err(ApiError::Conflict(format!(
+                "Server '{}' is stopped and not in idle/sleep mode — start it from the admin panel.",
+                cfg.name
+            )));
+        }
+    }
+
     Ok(Json(
         serde_json::json!({ "ok": true, "expiresInSeconds": TICKET_TTL_SECONDS }),
     ))
@@ -1006,6 +1059,11 @@ pub struct UpdateRequest {
     /// Player-facing port; 0 / absent leaves it unchanged.
     #[serde(default)]
     pub external_port: i32,
+    /// Idle shutdown: put the server to sleep when nobody is playing, and let
+    /// the launcher wake it on the next join.
+    pub idle_shutdown_enabled: Option<bool>,
+    /// Idle window in minutes (clamped to 1–60 server-side).
+    pub idle_shutdown_minutes: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1024,6 +1082,13 @@ pub struct InstallRequest {
 pub struct JoinIntentRequest {
     pub username: Option<String>,
     pub uuid: Option<String>,
+    /// The host the client will connect to; matched against instance id/name
+    /// like the multiplexer's hostname routing, so the hold can be applied to
+    /// the right instance. Optional — resolution falls back to the port, the
+    /// public port, then the active instance.
+    pub hostname: Option<String>,
+    /// The player-facing port the client will connect to.
+    pub port: Option<u16>,
 }
 
 #[derive(Debug, Deserialize)]

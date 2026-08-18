@@ -75,21 +75,22 @@
                          : 'border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/90'">
                     <div class="flex items-center justify-between gap-2">
                         <p class="font-semibold text-sm truncate">{{ inst.name }}</p>
-                        <span class="w-2 h-2 rounded-full shrink-0" :class="inst.running ? 'bg-emerald-400' : 'bg-slate-600'"></span>
+                        <span class="w-2 h-2 rounded-full shrink-0" :class="inst.running ? 'bg-emerald-400' : (inst.wakeable ? 'bg-amber-400' : 'bg-slate-600')"></span>
                     </div>
                     <div class="flex items-center gap-2 mt-1">
                         <span class="inline-block text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded uppercase font-mono truncate">
                             {{ inst.modLoader.type }} {{ inst.minecraftVersion }}
                         </span>
                         <span class="inline-flex items-center gap-1 text-[10px] font-mono"
-                              :class="inst.running ? 'text-emerald-400' : 'text-slate-500'">
-                            <span class="w-1.5 h-1.5 rounded-full" :class="inst.running ? 'bg-emerald-400' : 'bg-slate-600'"></span>
-                            {{ inst.running ? inst.playerCount + ' online' : 'offline' }}
+                              :class="inst.running ? 'text-emerald-400' : (inst.wakeable ? 'text-amber-400' : 'text-slate-500')">
+                            <span class="w-1.5 h-1.5 rounded-full" :class="inst.running ? 'bg-emerald-400' : (inst.wakeable ? 'bg-amber-400' : 'bg-slate-600')"></span>
+                            {{ inst.running ? inst.playerCount + ' online' : (inst.wakeable ? 'sleeping' : 'offline') }}
                         </span>
                     </div>
                     <p v-if="inst.running" class="text-[10px] font-mono text-emerald-400/90 mt-0.5">Port {{ inst.externalPort }}</p>
+                    <p v-else-if="inst.wakeable" class="text-[10px] text-amber-400/80 mt-0.5">Idle shutdown — wakes when a player joins</p>
                     <button v-if="!inst.running" @click.stop="startInstance(inst)"
-                            class="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold py-1.5 rounded-lg transition">Start Server</button>
+                            class="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold py-1.5 rounded-lg transition">{{ inst.wakeable ? 'Wake Server' : 'Start Server' }}</button>
                     <div v-else class="flex gap-1.5 mt-2">
                         <button @click.stop="restartInstance(inst)" title="Restart Server"
                                 class="bg-amber-600/80 hover:bg-amber-500 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition">⟳</button>
@@ -356,13 +357,13 @@
                         <div class="flex items-center gap-4">
                             <div class="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
                                 <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition">
-                                    <input type="checkbox" v-model="consoleFilters.info" class="console-check"> Info
+                                    <input type="checkbox" v-model="consoleFilters.info" class="zircon-check"> Info
                                 </label>
                                 <label class="flex items-center gap-1.5 cursor-pointer text-yellow-400 hover:text-yellow-300 transition">
-                                    <input type="checkbox" v-model="consoleFilters.warnings" class="console-check"> Warn
+                                    <input type="checkbox" v-model="consoleFilters.warnings" class="zircon-check"> Warn
                                 </label>
                                 <label class="flex items-center gap-1.5 cursor-pointer text-red-400 hover:text-red-300 transition">
-                                    <input type="checkbox" v-model="consoleFilters.errors" class="console-check"> Error
+                                    <input type="checkbox" v-model="consoleFilters.errors" class="zircon-check"> Error
                                 </label>
                             </div>
                             <button @click="clearConsole" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition">
@@ -528,7 +529,7 @@
                             <div>
                                 <label class="block text-xs text-slate-400 mb-1">Memory (RAM)</label>
                                 <label class="flex items-center gap-2 text-sm text-slate-300 mb-3 cursor-pointer select-none">
-                                    <input type="checkbox" v-model="settingsForm.ramAuto" class="accent-emerald-500">
+                                    <input type="checkbox" v-model="settingsForm.ramAuto" class="zircon-check">
                                     <span>Auto — size the heap to this machine</span>
                                 </label>
                                 <div v-if="!settingsForm.ramAuto" class="flex items-center gap-3">
@@ -553,6 +554,21 @@
                                 <input v-model.number="settingsForm.externalPort" type="number" min="1" max="65535"
                                        placeholder="e.g. 25565" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
                                 <p class="text-[10px] text-slate-500 mt-1">Player-facing port; change to free up the port for a reverse proxy.</p>
+                            </div>
+                            <div>
+                                <label class="flex items-center gap-2 text-sm text-slate-300 mb-1.5 cursor-pointer select-none">
+                                    <input type="checkbox" v-model="settingsForm.idleShutdownEnabled" class="zircon-check">
+                                    <span>Idle shutdown — sleep when nobody is playing</span>
+                                </label>
+                                <p class="text-[10px] text-slate-500 mb-2">Shuts the server down gracefully after {{ settingsForm.idleShutdownMinutes }} minutes with no players online. Players wake it automatically when they join from the launcher.</p>
+                                <div v-if="settingsForm.idleShutdownEnabled" class="flex items-center gap-2">
+                                    <label class="block text-xs text-slate-400">Idle minutes</label>
+                                    <input v-model.number="settingsForm.idleShutdownMinutes" type="number" min="1" max="60"
+                                           class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                                </div>
+                                <p v-if="selectedInstance.wakeable" class="text-[11px] text-amber-400/90 bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg mt-2">
+                                    This server is currently sleeping (idle shutdown) — it will wake automatically when a player joins.
+                                </p>
                             </div>
                             <p class="text-xs text-yellow-400/90 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-lg">
                                 <strong>Mod Loader Type ({{ selectedInstance.modLoader.type }}) is locked.</strong> Changing Minecraft or Loader version will automatically check and update mod compatibility.
@@ -808,7 +824,7 @@
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">Memory (RAM)</label>
                     <label class="flex items-center gap-2 text-sm text-slate-300 mb-3 cursor-pointer select-none">
-                        <input type="checkbox" v-model="newServerForm.ramAuto" class="accent-emerald-500">
+                        <input type="checkbox" v-model="newServerForm.ramAuto" class="zircon-check">
                         <span>Auto — size to this machine (recommended)</span>
                     </label>
                     <div v-if="!newServerForm.ramAuto" class="flex items-center gap-3">

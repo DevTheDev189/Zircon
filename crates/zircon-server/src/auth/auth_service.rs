@@ -17,8 +17,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
+use totp_rs::{Algorithm, Secret, TOTP};
 
 const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+/// Precomputed bcrypt hash of a random password. Verified against on every
+/// authentication for an unknown username so response timing does not reveal
+/// whether an account exists (username enumeration defense).
+const DUMMY_BCRYPT_HASH: &str = "$2b$12$e8I3Q4kF1eN3WzL8zO0Q.eZ3q2w7F8Y7j6K5L4M3N2O1P0Q9R8S7T";
 
 /// Serializable admin profile stored in `users.json`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -28,6 +33,10 @@ pub struct UserProfile {
     pub password_hash: String,
     #[serde(default = "default_icon")]
     pub icon: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub totp_secret: Option<String>,
+    #[serde(default)]
+    pub totp_enabled: bool,
 }
 
 fn default_icon() -> String {
@@ -47,7 +56,35 @@ impl UserProfile {
             username: username.into(),
             password_hash: password_hash.into(),
             icon,
+            totp_secret: None,
+            totp_enabled: false,
         }
+    }
+
+    /// Verifies a TOTP code against this profile's secret. Accounts without
+    /// 2FA enabled (or without a stored secret) trivially pass.
+    pub fn verify_totp(&self, code: &str) -> bool {
+        if !self.totp_enabled {
+            return true;
+        }
+        let Some(secret) = &self.totp_secret else {
+            return true;
+        };
+        let Ok(secret_bytes) = Secret::Encoded(secret.clone()).to_bytes() else {
+            return false;
+        };
+        let Ok(totp) = TOTP::new(
+            Algorithm::SHA1,
+            6,
+            1,
+            30,
+            secret_bytes,
+            Some("Zircon Server".to_string()),
+            self.username.clone(),
+        ) else {
+            return false;
+        };
+        totp.check_current(code).unwrap_or(false)
     }
 }
 
@@ -94,7 +131,10 @@ impl AuthService {
         })
     }
 
-    /// Verifies a username/password pair against the stored BCrypt hashes.
+    /// Verifies a username/password pair against the stored BCrypt hashes in
+    /// constant time: unknown usernames still pay one bcrypt verification so
+    /// an attacker cannot distinguish "wrong password" from "no such user" by
+    /// timing alone.
     pub fn authenticate(&self, username: &str, password: &str) -> bool {
         let users = self.users.lock().unwrap();
         match users.get(username) {
@@ -102,13 +142,34 @@ impl AuthService {
                 !password.is_empty()
                     && bcrypt::verify(password, &profile.password_hash).unwrap_or(false)
             }
-            None => false,
+            None => {
+                // Execute dummy bcrypt work to equalize response timing.
+                let _ = bcrypt::verify(password, DUMMY_BCRYPT_HASH);
+                false
+            }
         }
     }
 
     /// Returns the stored profile for a username, or `None` if unknown.
     pub fn get_user(&self, username: &str) -> Option<UserProfile> {
         self.users.lock().unwrap().get(username).cloned()
+    }
+
+    /// Updates the TOTP secret and enabled flag (2FA setup / enable / disable).
+    pub fn set_totp(
+        &self,
+        username: &str,
+        secret: Option<String>,
+        enabled: bool,
+    ) -> Result<(), String> {
+        let mut users = self.users.lock().unwrap();
+        let profile = users
+            .get_mut(username)
+            .ok_or_else(|| "User not found".to_string())?;
+        profile.totp_secret = secret;
+        profile.totp_enabled = enabled;
+        drop(users);
+        self.save().map_err(|e| e.to_string())
     }
 
     /// Atomically updates a profile: optionally renames the account, changes
@@ -197,7 +258,7 @@ impl AuthService {
         let users = self.users.lock().unwrap();
         let json = serde_json::to_string_pretty(&*users)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
-        fs::write(&self.users_file, json)
+        write_secret_file(&self.users_file, json.as_bytes())
     }
 }
 
@@ -230,63 +291,33 @@ fn load(file: &Path) -> std::io::Result<BTreeMap<String, UserProfile>> {
     Ok(BTreeMap::new())
 }
 
+/// Writes a sensitive file with owner-only (`0o600`) permissions on Unix.
+/// Used for `users.json`, `jwt-secret.key` and the audit log.
+pub fn write_secret_file(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, content)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
+}
+
 fn generate_random_password(length: usize) -> String {
-    use rand_like::Rng;
-    // bcrypt's rand is not exposed; use a simple OS entropy source.
-    let mut bytes = [0u8; 32];
-    getrandom(&mut bytes);
-    let mut rng = rand_like::ChaCha8Rng::from_seed(bytes);
-    (0..length)
-        .map(|_| {
+    let mut bytes = vec![0u8; length];
+    getrandom::fill(&mut bytes).expect("failed to read OS entropy");
+    bytes
+        .iter()
+        .map(|b| {
             ALPHABET
                 .chars()
-                .nth(rng.random_range(ALPHABET.len()))
+                .nth((*b as usize) % ALPHABET.len())
                 .unwrap()
         })
         .collect()
-}
-
-// ---------------------------------------------------------------------------
-// Minimal internal RNG to avoid an extra dependency: ChaCha8 from `rand_core`
-// is not available, so implement a tiny splitmix64-based PRNG seeded from the
-// OS. This is only used to generate the one-time initial admin password.
-// ---------------------------------------------------------------------------
-
-mod rand_like {
-    pub trait Rng {
-        fn random_range(&mut self, range: usize) -> usize;
-    }
-
-    pub struct ChaCha8Rng {
-        state: u64,
-    }
-
-    impl ChaCha8Rng {
-        pub fn from_seed(seed: [u8; 32]) -> Self {
-            // Fold the 32 seed bytes into a u64 (splitmix64 style mixing).
-            let mut h: u64 = 0;
-            for (i, byte) in seed.iter().enumerate() {
-                h ^= u64::from(*byte) << ((i % 8) * 8);
-            }
-            Self { state: h }
-        }
-    }
-
-    impl Rng for ChaCha8Rng {
-        fn random_range(&mut self, range: usize) -> usize {
-            // splitmix64 next
-            self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-            let mut z = self.state;
-            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-            z = z ^ (z >> 31);
-            (z as usize) % range
-        }
-    }
-}
-
-fn getrandom(bytes: &mut [u8]) {
-    getrandom::fill(bytes).expect("failed to read OS entropy");
 }
 
 #[cfg(test)]
@@ -353,6 +384,60 @@ mod tests {
         assert!(service
             .update_profile("admin", Some("other"), "oldpass123", None, None)
             .is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn totp_secret_round_trips_and_verifies_codes() {
+        let dir = temp_dir();
+        let service = AuthService::initialize(&dir).unwrap();
+        service.set_password("admin", "hunter2").unwrap();
+
+        // Accounts without 2FA pass trivially.
+        let profile = service.get_user("admin").unwrap();
+        assert!(!profile.totp_enabled);
+        assert!(profile.verify_totp("000000"));
+
+        // Generate a secret exactly like the setup endpoint does and verify a
+        // live code round-trips.
+        let secret = Secret::generate_secret();
+        let encoded = secret.to_encoded().to_string();
+        service
+            .set_totp("admin", Some(encoded.clone()), true)
+            .unwrap();
+
+        let profile = service.get_user("admin").unwrap();
+        assert!(profile.totp_enabled);
+        let totp = TOTP::new(
+            Algorithm::SHA1,
+            6,
+            1,
+            30,
+            secret.to_bytes().unwrap(),
+            Some("Zircon Server".to_string()),
+            "admin".to_string(),
+        )
+        .unwrap();
+        let code = totp.generate_current().unwrap();
+        assert!(profile.verify_totp(&code), "live code must verify");
+        assert!(!profile.verify_totp("000000"), "wrong code must fail");
+
+        // Disabling turns the gate off again.
+        service.set_totp("admin", None, false).unwrap();
+        let profile = service.get_user("admin").unwrap();
+        assert!(!profile.totp_enabled);
+        assert!(profile.verify_totp("000000"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unknown_user_authenticate_is_constant_time_shaped() {
+        let dir = temp_dir();
+        let service = AuthService::initialize(&dir).unwrap();
+        // No such user: must return false without panicking, regardless of
+        // password content (the dummy bcrypt work happens inside).
+        assert!(!service.authenticate("ghost", ""));
+        assert!(!service.authenticate("ghost", "hunter2"));
         let _ = fs::remove_dir_all(&dir);
     }
 }

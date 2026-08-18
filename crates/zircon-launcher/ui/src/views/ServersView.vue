@@ -43,6 +43,12 @@
                 </span>
                 <span class="shrink-0">{{ statusView(server.address).pingMs }}ms</span>
               </template>
+              <span
+                v-else-if="statusView(server.address).state === 'asleep'"
+                class="shrink-0 font-semibold text-[#d29922]"
+                title="Server is asleep (idle shutdown) — PLAY will wake it"
+                >asleep</span
+              >
               <span v-else class="shrink-0 text-[#8b949e]">offline</span>
             </div>
           </div>
@@ -228,7 +234,12 @@ async function refreshStatuses() {
 function statusView(address) {
   const s = statuses.value[address];
   if (s === 'checking') return { state: 'checking' };
-  if (!s || s.running === false) return { state: 'offline' };
+  if (!s) return { state: 'offline' };
+  if (s.running === false) {
+    // A Zircon server that idle-shut down is "asleep": the wrapper is up and
+    // PLAY will wake it automatically. Manual stops stay "offline".
+    return s.wakeable ? { state: 'asleep' } : { state: 'offline' };
+  }
   return { state: 'online', online: s.online, max: s.max, pingMs: s.pingMs };
 }
 

@@ -262,9 +262,9 @@ pub async fn server_status(
         fetch_wrapper_status(&state.http, &base_url),
     );
 
-    let (online, max, version, running) = match (&wrapper, &ping) {
-        (Some(w), _) => (w.online, w.max, w.version.clone(), w.running),
-        (None, Ok(p)) => (p.online, p.max, p.version.clone(), None),
+    let (online, max, version, running, wakeable) = match (&wrapper, &ping) {
+        (Some(w), _) => (w.online, w.max, w.version.clone(), w.running, w.wakeable),
+        (None, Ok(p)) => (p.online, p.max, p.version.clone(), None, false),
         (None, Err(_)) => return Ok(None),
     };
     let ping_ms = match ping {
@@ -278,6 +278,7 @@ pub async fn server_status(
         ping_ms,
         version,
         running,
+        wakeable,
     }))
 }
 
@@ -308,6 +309,11 @@ struct WrapperStatus {
     version: String,
     #[serde(default)]
     running: Option<bool>,
+    /// `true` when the server was put to sleep by the wrapper's idle shutdown
+    /// and may be woken by a wakeup call; `false` when it was stopped manually
+    /// (admin maintenance) or the wrapper does not report it.
+    #[serde(default)]
+    wakeable: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -320,6 +326,105 @@ pub struct ServerStatusInfo {
     /// `Some(false)` means the Zircon wrapper reported its server as stopped;
     /// `None` for third-party servers (no wrapper to ask).
     pub running: Option<bool>,
+    /// `true` when the server is asleep (idle shutdown) and the launcher will
+    /// wake it on the next PLAY; `false` for manual stops and third-party
+    /// servers.
+    pub wakeable: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Wakeup (idle-shutdown companion)
+// ---------------------------------------------------------------------------
+
+/// Whether the launcher should attempt a wakeup for a Zircon server: the
+/// wrapper is reachable (so a wakeup endpoint exists) and the Minecraft port
+/// is not answering yet. Kept pure so the decision is unit-testable.
+fn should_wake(wrapper_present: bool, ping_ok: bool) -> bool {
+    wrapper_present && !ping_ok
+}
+
+/// Called at the start of an online launch: if the target is a Zircon server
+/// whose Minecraft port is not answering, asks the wrapper to start the right
+/// instance via the public `/api/wakeup` endpoint (the wrapper resolves the
+/// instance by hostname/port, and refuses manual stops), then waits for the
+/// status ping before the rest of the launch flow runs. Third-party servers
+/// (no wrapper) pass straight through.
+///
+/// Returns `true` when the target is a Zircon server (wrapper reachable), so
+/// the caller can run the join-intent keep-alive that holds the instance's
+/// idle shutdown off while the launch flow prepares.
+async fn wake_if_needed(
+    http: &reqwest::Client,
+    app: &AppHandle,
+    base_url: &str,
+    host: &str,
+    port: u16,
+) -> Result<bool, LauncherError> {
+    let wrapper_present = fetch_wrapper_status(http, base_url).await.is_some();
+    let ping_ok = crate::status::ping_status(host, port).await.is_ok();
+    if !should_wake(wrapper_present, ping_ok) {
+        return Ok(wrapper_present);
+    }
+
+    // Server is down (asleep, still booting, or stopped). The wakeup endpoint
+    // resolves the instance the same way the multiplexer routes connections,
+    // returns 200 when it is (now) running, and 409 when it was stopped
+    // manually and must stay down.
+    emit_status(app, "Waking up server...");
+    let body = serde_json::json!({ "hostname": host, "port": port });
+    let response = http
+        .post(format!("{base_url}/api/wakeup"))
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(body.to_string())
+        .send()
+        .await?;
+    let status = response.status().as_u16();
+    if !(200..300).contains(&status) {
+        let text = response.text().await.unwrap_or_default();
+        let text = text.trim().trim_matches('"').to_string();
+        let message = if text.is_empty() || text == "Bad Request" {
+            format!("Wakeup failed (HTTP {status})")
+        } else {
+            format!("{text} (HTTP {status})")
+        };
+        return Err(LauncherError::InvalidInput(message));
+    }
+    wait_for_online(app, host, port).await?;
+    Ok(wrapper_present)
+}
+
+/// Polls the Minecraft status ping until the server answers or a generous
+/// timeout elapses (modded servers can take minutes to boot). Emits periodic
+/// `launch-status` updates so the webview stays informed.
+async fn wait_for_online(app: &AppHandle, host: &str, port: u16) -> Result<(), LauncherError> {
+    const ONLINE_TIMEOUT: Duration = Duration::from_secs(600);
+    const POLL_INTERVAL: Duration = Duration::from_secs(3);
+    const STATUS_EVERY: u32 = 10; // every ~30s
+
+    let deadline = std::time::Instant::now() + ONLINE_TIMEOUT;
+    let mut attempts = 0u32;
+    loop {
+        if crate::status::ping_status(host, port).await.is_ok() {
+            return Ok(());
+        }
+        attempts += 1;
+        if attempts % STATUS_EVERY == 0 {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            emit_status(
+                app,
+                format!(
+                    "Waiting for server to come online ({}s remaining)...",
+                    remaining.as_secs()
+                ),
+            );
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(LauncherError::Network(
+                "Timed out waiting for the server to come online.".to_string(),
+            ));
+        }
+        tokio::time::sleep(POLL_INTERVAL).await;
+    }
 }
 
 /// Removes a saved server from the list and deletes its local instance folder
@@ -438,6 +543,31 @@ async fn run_online_flow(
     emit_status(app, format!("Server: {base_url}"));
     let game_dir = servers::instance_game_dir(&host, port);
     std::fs::create_dir_all(&game_dir)?;
+
+    // --- wake up a sleeping Zircon instance (idle shutdown) ---
+    // The return value tells us whether a Zircon wrapper is reachable: only
+    // then can the join intent hold the server's idle shutdown off.
+    let wrapper_present = wake_if_needed(&state.http, app, &base_url, &host, port).await?;
+
+    // A player is committed to joining: keep the server awake while the rest
+    // of the flow runs (BOM, pack sync, Java/classpath, mod sync — any of
+    // which can take minutes on a heavy pack), so the server cannot fall
+    // asleep under the player between wakeup and the game connecting. The
+    // guard aborts the heartbeat on every exit path.
+    let _heartbeat = if wrapper_present {
+        Some(JoinIntentHeartbeat(Some(tauri::async_runtime::spawn(
+            join_intent_heartbeat(
+                state.http.clone(),
+                base_url.clone(),
+                host.clone(),
+                port,
+                session.username.clone(),
+                session.uuid.clone(),
+            ),
+        ))))
+    } else {
+        None
+    };
 
     // --- BOM ---
     let bom = fetch_bom(&state.http, &base_url).await?;
@@ -568,9 +698,29 @@ async fn run_online_flow(
         ));
     }
 
-    // --- pre-join intent (best-effort, like the Java) ---
+    // --- pre-join intent (final refresh before spawn) ---
+    // The last registration restarts the hold and ticket TTL, which then cover
+    // the Minecraft boot window (the heartbeat is aborted when the flow
+    // exits). A 409 means the server was stopped manually mid-launch
+    // (maintenance) — abort before booting Minecraft into a dead server
+    // instead of ghost-connecting.
     emit_status(app, "Registering pre-join intent with Zircon server...");
-    let _ = register_join_intent(&state.http, &base_url, &session.username, &session.uuid).await;
+    let intent_status = register_join_intent(
+        &state.http,
+        &base_url,
+        &session.username,
+        &session.uuid,
+        &host,
+        port,
+    )
+    .await;
+    if let Ok(409) = intent_status {
+        return Err(LauncherError::InvalidInput(
+            "The server was stopped (not in sleep mode) while launching — start it \
+             from the admin panel and try again."
+                .to_string(),
+        ));
+    }
 
     // --- spawn the game ---
     emit_status(app, "Starting Minecraft process...");
@@ -731,15 +881,33 @@ async fn fetch_bom(
     Ok(serde_json::from_str(&text)?)
 }
 
+/// How often the launcher refreshes its join intent while preparing to launch.
+/// The server holds the instance's idle shutdown off for the ticket TTL
+/// (5 minutes), so a 30s refresh keeps the hold fresh with a large margin
+/// while a long pre-spawn flow runs (pack/mod sync, Java download, shader
+/// prompt).
+const JOIN_INTENT_HEARTBEAT_SECS: u64 = 30;
+
 /// Registers a pre-join ticket with the Zircon server so the TCP multiplexer
-/// lets the client through. Best-effort like the Java (failure is only logged).
+/// lets the client through, and holds the target instance's idle shutdown off
+/// while the player is on their way. Best-effort like the Java (transport and
+/// most HTTP failures are only logged). Returns the HTTP status so callers can
+/// act on a 409 — the server was stopped manually and the launch should abort
+/// before Minecraft boots into a dead server.
 async fn register_join_intent(
     http: &reqwest::Client,
     base_url: &str,
     username: &str,
     uuid: &str,
-) -> Result<(), LauncherError> {
-    let body = serde_json::json!({ "username": username, "uuid": uuid });
+    hostname: &str,
+    port: u16,
+) -> Result<u16, LauncherError> {
+    let body = serde_json::json!({
+        "username": username,
+        "uuid": uuid,
+        "hostname": hostname,
+        "port": port,
+    });
     let response = http
         .post(format!("{base_url}/api/join-intent"))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
@@ -750,7 +918,43 @@ async fn register_join_intent(
     if !(200..300).contains(&status) {
         tracing::warn!("Pre-join intent registration failed: HTTP {status}");
     }
-    Ok(())
+    Ok(status)
+}
+
+/// Periodically re-registers the join intent (ticket + idle-shutdown hold) so
+/// the server stays awake for the whole pre-spawn flow — the first beat fires
+/// immediately, then every `JOIN_INTENT_HEARTBEAT_SECS`. Stops when the game
+/// spawns; the final registration's ticket TTL then covers the Minecraft boot
+/// window. Network failures are tolerated — the next beat retries.
+async fn join_intent_heartbeat(
+    http: reqwest::Client,
+    base_url: String,
+    hostname: String,
+    port: u16,
+    username: String,
+    uuid: String,
+) {
+    loop {
+        if let Err(e) =
+            register_join_intent(&http, &base_url, &username, &uuid, &hostname, port).await
+        {
+            tracing::warn!("Join-intent heartbeat failed: {e}");
+        }
+        tokio::time::sleep(Duration::from_secs(JOIN_INTENT_HEARTBEAT_SECS)).await;
+    }
+}
+
+/// Aborts the join-intent heartbeat when the launch flow exits, no matter the
+/// reason, so a cancelled or failed launch does not leave the server held
+/// awake by a stale intent.
+struct JoinIntentHeartbeat(Option<tauri::async_runtime::JoinHandle<()>>);
+
+impl Drop for JoinIntentHeartbeat {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take() {
+            handle.abort();
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1546,6 +1750,17 @@ mod tests {
     fn override_heap_keeps_other_flags() {
         let args = override_heap("-XX:+UseZGC -Xmx2G", 10);
         assert_eq!("-XX:+UseZGC -Xmx10G", args);
+    }
+
+    #[test]
+    fn should_wake_only_for_reachable_zircon_servers_that_are_down() {
+        // Third-party server (no wrapper) → never wake.
+        assert!(!should_wake(false, false));
+        assert!(!should_wake(false, true));
+        // Zircon server already answering → no wake needed.
+        assert!(!should_wake(true, true));
+        // Zircon server down (asleep / booting / stopped) → wake.
+        assert!(should_wake(true, false));
     }
 
     #[test]
