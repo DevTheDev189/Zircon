@@ -5,6 +5,7 @@
 //! Port of `com.mcmanager.client.auth.SessionData`.
 
 use serde::{Deserialize, Deserializer, Serialize};
+use zeroize::Zeroize;
 
 /// The current wall-clock time in milliseconds since the Unix epoch.
 pub(crate) fn now_millis() -> i64 {
@@ -17,18 +18,27 @@ pub(crate) fn now_millis() -> i64 {
 /// (`accessToken`, `refreshToken`, `username`, `uuid`, `expiresAtMillis`,
 /// `userType`). `userType` is always `"msa"` for sessions produced by
 /// Microsoft auth.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+///
+/// The access and refresh tokens are secrets: they are zeroized in memory on
+/// drop (see [`Zeroize`]) so a dumped process heap or a stale borrow cannot
+/// recover them.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Zeroize)]
+#[zeroize(drop)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionData {
     pub access_token: String,
     pub refresh_token: String,
+    #[zeroize(skip)]
     pub username: String,
+    #[zeroize(skip)]
     pub uuid: String,
+    #[zeroize(skip)]
     pub expires_at_millis: i64,
     /// Always `"msa"` — sessions are only ever produced by Microsoft auth.
     /// Deserializes to `""` when missing/null in JSON (like Gson's `null`),
     /// which [`SessionData::is_valid`] treats as `"msa"`.
     #[serde(default, deserialize_with = "de_nullable_string")]
+    #[zeroize(skip)]
     pub user_type: String,
 }
 
@@ -171,5 +181,18 @@ mod tests {
         let s: SessionData = serde_json::from_str(json).unwrap();
         assert_eq!("", s.user_type);
         assert!(s.is_valid());
+    }
+
+    #[test]
+    fn zeroize_clears_tokens_but_keeps_identity() {
+        use zeroize::Zeroize;
+        let mut s = session();
+        s.zeroize();
+        // Secrets are wiped.
+        assert!(s.access_token.is_empty());
+        assert!(s.refresh_token.is_empty());
+        // Non-secret identity fields are skipped.
+        assert_eq!("Steve", s.username);
+        assert_eq!("msa", s.user_type);
     }
 }

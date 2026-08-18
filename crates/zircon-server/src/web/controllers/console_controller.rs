@@ -29,9 +29,12 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
 
     // The first inbound message must authenticate: "AUTH <jwt>". Nothing is
     // streamed until this succeeds, so an unauthenticated connection learns
-    // nothing about the console.
-    let authenticated = match receiver.next().await {
-        Some(Ok(Message::Text(text))) => {
+    // nothing about the console. A 5-second deadline stops Slowloris-style
+    // sockets that connect and never send the auth message.
+    let first_msg = tokio::time::timeout(std::time::Duration::from_secs(5), receiver.next()).await;
+
+    let authenticated = match first_msg {
+        Ok(Some(Ok(Message::Text(text)))) => {
             validate_console_auth(parse_auth_message(&text), &state.sessions)
         }
         _ => false,
@@ -39,7 +42,7 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
     if !authenticated {
         let _ = sender
             .send(Message::Text(
-                "[wrapper] Authentication failed — connection closed.".to_string(),
+                "[wrapper] Authentication failed or timed out — connection closed.".to_string(),
             ))
             .await;
         let _ = sender.close().await;
@@ -84,6 +87,7 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
                             }
                             continue;
                         }
+                        state.audit.log("ADMIN_WS", "CONSOLE_COMMAND", text.trim());
                         match state.process_manager.send_command(text.trim()).await {
                             Ok(()) => {}
                             Err(e) => {

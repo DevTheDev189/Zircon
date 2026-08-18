@@ -16,6 +16,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
+use crate::auth::auth_service::write_secret_file;
+
 const TTL_SECONDS: i64 = 12 * 60 * 60;
 
 /// Claims carried by an admin JWT.
@@ -45,7 +47,7 @@ pub fn initialize(data_dir: &Path) -> std::io::Result<()> {
         decoded
     } else {
         let secret = generate_secret();
-        fs::write(&secret_file, base64_encode(&secret))?;
+        write_secret_file(&secret_file, base64_encode(&secret).as_bytes())?;
         tracing::info!(
             "Generated new JWT signing secret at {}",
             secret_file.display()

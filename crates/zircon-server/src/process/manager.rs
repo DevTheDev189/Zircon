@@ -186,6 +186,17 @@ impl MinecraftProcessManager {
         props.save(&props_file)?;
 
         let mut command = tokio::process::Command::new(installer::java_bin());
+        // Untrusted mod code runs inside this JVM: scrub the environment so
+        // host secrets (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, ...) can never leak
+        // into the server process. Keep only what the JVM needs to function.
+        command.env_clear();
+        command.envs(std::env::vars().filter(|(k, _)| {
+            let upper = k.to_ascii_uppercase();
+            matches!(
+                upper.as_str(),
+                "PATH" | "SYSTEMROOT" | "USERPROFILE" | "HOME" | "TMP" | "TEMP"
+            )
+        }));
         let mut launch_args: Vec<String> = self
             .context
             .java_args

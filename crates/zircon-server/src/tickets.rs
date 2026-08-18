@@ -21,6 +21,15 @@ pub const TICKET_TTL_MS: u64 = 300_000;
 /// TTL in whole seconds, exposed to clients via the join-intent endpoint.
 pub const TICKET_TTL_SECONDS: u64 = TICKET_TTL_MS / 1000;
 
+/// How long a join-intent hold keeps a server awake without the launcher
+/// refreshing it. Aligned with the ticket TTL: the launcher's last intent is
+/// registered right before the game spawns, and a player must connect before
+/// both expire (a heavily modded pack on an older device can take minutes to
+/// boot).
+pub fn join_intent_ttl() -> Duration {
+    Duration::from_millis(TICKET_TTL_MS)
+}
+
 /// Upper bound on live tickets. `/api/join-intent` is a public endpoint, so a
 /// remote attacker could otherwise grow the store without limit; past the cap,
 /// registrations are dropped until the housekeeping task purges expired ones.

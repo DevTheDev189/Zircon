@@ -21,7 +21,9 @@ window.Zircon.instances = {
             externalPort: inst.externalPort || null,
             ramAuto: parsed.auto,
             ramGB: parsed.gb,
-            extraJvmArgs: parsed.extra
+            extraJvmArgs: parsed.extra,
+            idleShutdownEnabled: !!inst.idleShutdownEnabled,
+            idleShutdownMinutes: inst.idleShutdownMinutes || 5
         };
         this.loadMods();
         this.loadServerProperties();
@@ -147,7 +149,9 @@ window.Zircon.instances = {
                     loaderVersion: this.settingsForm.loaderVersion,
                     javaArgs: this.buildJavaArgs(this.settingsForm),
                     // 0 / blank leaves the player-facing port unchanged.
-                    externalPort: Number(this.settingsForm.externalPort) || 0
+                    externalPort: Number(this.settingsForm.externalPort) || 0,
+                    idleShutdownEnabled: !!this.settingsForm.idleShutdownEnabled,
+                    idleShutdownMinutes: Number(this.settingsForm.idleShutdownMinutes) || 5
                 })
             });
             alert(`Instance updated! ${res.updatedCount || 0} mods auto-updated, ${res.incompatibleCount || 0} flagged incompatible.`);
@@ -186,9 +190,13 @@ window.Zircon.instances = {
     // GB value is picked, or percentage flags so the JVM sizes itself when
     // "auto" is chosen. Extra flags are always preserved.
     buildJavaArgs({ auto, gb, extra }) {
+        // Coerce/clamp the slider value so a missing or non-numeric value can
+        // never emit something like -XmsNaNG (which the JVM rejects at launch).
+        const gbNum = Number(gb);
+        const gbSafe = Number.isFinite(gbNum) ? Math.max(1, Math.min(64, Math.round(gbNum))) : 4;
         const heap = auto
             ? '-XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=75.0'
-            : `-Xms${Math.min(gb, 2)}G -Xmx${gb}G`;
+            : `-Xms${Math.min(gbSafe, 2)}G -Xmx${gbSafe}G`;
         const extraTrimmed = (extra || '').trim();
         return extraTrimmed ? `${heap} ${extraTrimmed}` : heap;
     },

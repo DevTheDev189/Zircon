@@ -14,6 +14,7 @@ use http_body_util::BodyExt;
 use serde_json::json;
 use tower::ServiceExt;
 
+use zircon_server::audit::AuditLogger;
 use zircon_server::auth::auth_service::AuthService;
 use zircon_server::auth::jwt;
 use zircon_server::auth::sessions::SessionRegistry;
@@ -90,6 +91,7 @@ fn test_app_with_limits(max_attempts: u32) -> Router {
     ));
     let backup = Arc::new(BackupService::new(&config.data_dir, instances.clone()));
     let tickets = Arc::new(JoinTicketManager::new());
+    let audit = Arc::new(AuditLogger::new(&config.data_dir));
 
     let state = AppState {
         config,
@@ -109,6 +111,7 @@ fn test_app_with_limits(max_attempts: u32) -> Router {
             Duration::from_secs(60),
             max_attempts,
         )),
+        audit,
     };
     router(state)
 }
@@ -163,6 +166,25 @@ async fn login(app: &Router) -> String {
     .await;
     assert_eq!(StatusCode::OK, status);
     body["token"].as_str().expect("login token").to_string()
+}
+
+/// Generates the current TOTP code for a base32 secret, mirroring the server's
+/// parameters (SHA1, 6 digits, 30s step, "Zircon Server" issuer).
+fn totp_code(secret: &str) -> String {
+    let secret_bytes = totp_rs::Secret::Encoded(secret.to_string())
+        .to_bytes()
+        .expect("valid base32 secret");
+    let totp = totp_rs::TOTP::new(
+        totp_rs::Algorithm::SHA1,
+        6,
+        1,
+        30,
+        secret_bytes,
+        Some("Zircon Server".to_string()),
+        "admin".to_string(),
+    )
+    .expect("totp build");
+    totp.generate_current().expect("totp code")
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +354,8 @@ async fn protected_routes_reject_missing_or_invalid_tokens() {
         ("POST", "/api/auth/logout"),
         ("POST", "/api/auth/change-password"),
         ("POST", "/api/instances"),
+        ("GET", "/api/system/update/check"),
+        ("POST", "/api/system/update/apply"),
     ] {
         let (status, _) = send(&app, method, uri, None, None).await;
         assert_eq!(
@@ -490,4 +514,177 @@ async fn login_is_rate_limited_against_brute_force() {
     )
     .await;
     assert_eq!(StatusCode::TOO_MANY_REQUESTS, status);
+}
+
+#[tokio::test]
+async fn two_factor_flow_gates_login_until_disabled() {
+    let app = test_app();
+    let token = login(&app).await;
+
+    // Setup returns a base32 secret + otpauth URI.
+    let (status, body) = send(&app, "POST", "/api/auth/2fa/setup", Some(&token), None).await;
+    assert_eq!(StatusCode::OK, status);
+    let secret = body["secret"].as_str().expect("totp secret").to_string();
+    assert!(
+        body["qrUrl"]
+            .as_str()
+            .unwrap_or("")
+            .starts_with("otpauth://"),
+        "qrUrl must be an otpauth URI"
+    );
+
+    // Enabling requires a live code: a wrong one is rejected.
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/2fa/enable",
+        Some(&token),
+        Some(json!({ "code": "000000" })),
+    )
+    .await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // The correct code activates 2FA.
+    let code = totp_code(&secret);
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/2fa/enable",
+        Some(&token),
+        Some(json!({ "code": code })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+
+    // me reports 2FA enabled.
+    let (status, body) = send(&app, "GET", "/api/auth/me", Some(&token), None).await;
+    assert_eq!(StatusCode::OK, status);
+    assert_eq!(true, body["totpEnabled"]);
+
+    // Login now requires the code: password alone, or a wrong code, is 401.
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({
+            "username": "admin",
+            "password": ADMIN_PASSWORD,
+            "totp_code": "000000"
+        })),
+    )
+    .await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({
+            "username": "admin",
+            "password": ADMIN_PASSWORD,
+            "totp_code": totp_code(&secret)
+        })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+
+    // Disabling turns the gate back off.
+    let (status, _) = send(&app, "POST", "/api/auth/2fa/disable", Some(&token), None).await;
+    assert_eq!(StatusCode::OK, status);
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+}
+
+#[tokio::test]
+async fn session_cookie_authenticates_and_logout_clears_it() {
+    let app = test_app();
+
+    // Login returns a session cookie with the hardening flags.
+    let request = Request::builder()
+        .method("POST")
+        .uri("/api/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({ "username": "admin", "password": ADMIN_PASSWORD }).to_string(),
+        ))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(StatusCode::OK, response.status());
+    let set_cookie = response
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("Set-Cookie on login")
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(set_cookie.contains("HttpOnly"), "cookie: {set_cookie}");
+    assert!(
+        set_cookie.contains("SameSite=Strict"),
+        "cookie: {set_cookie}"
+    );
+    assert!(set_cookie.contains("Secure"), "cookie: {set_cookie}");
+    assert!(set_cookie.contains("Path=/"), "cookie: {set_cookie}");
+    let cookie_pair = set_cookie.split(';').next().unwrap().to_string();
+    let _ = response.into_body().collect().await;
+
+    // The cookie alone (no Authorization header) unlocks protected routes.
+    let request = Request::builder()
+        .method("GET")
+        .uri("/api/auth/me")
+        .header(header::COOKIE, &cookie_pair)
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(StatusCode::OK, response.status());
+    let _ = response.into_body().collect().await;
+
+    // Logout clears the cookie (expiry marker) and revokes the session.
+    let request = Request::builder()
+        .method("POST")
+        .uri("/api/auth/logout")
+        .header(header::COOKIE, &cookie_pair)
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(StatusCode::OK, response.status());
+    let clear_cookie = response
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("Set-Cookie on logout")
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        clear_cookie.starts_with("zircon_session="),
+        "{clear_cookie}"
+    );
+    assert!(clear_cookie.contains("Max-Age=0"), "{clear_cookie}");
+    let _ = response.into_body().collect().await;
+
+    // The same session token is now dead via cookie too.
+    let request = Request::builder()
+        .method("GET")
+        .uri("/api/auth/me")
+        .header(header::COOKIE, &cookie_pair)
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(StatusCode::UNAUTHORIZED, response.status());
 }

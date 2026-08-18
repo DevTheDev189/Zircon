@@ -15,13 +15,16 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
 const JOINED: &str = " joined the game";
 const LEFT: &str = " left the game";
 const LOST: &str = " lost connection:";
+/// Vanilla's boot-complete line, e.g. `[Server thread/INFO]: Done (5.2s)! For help, type "help"`.
+const DONE_MARKER: &str = "Done (";
+const DONE_SUFFIX: &str = "For help, type";
 
 /// One entry of the persistent "players who have ever joined" log.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -42,6 +45,18 @@ pub struct PlayerTracker {
     /// players_file: nullable → no persistence (legacy single-server).
     players_file: Option<PathBuf>,
     history: Mutex<HashMap<String, PlayerHistoryEntry>>,
+    /// Set once the server has finished booting (the "Done (...)" line). The
+    /// idle-shutdown service uses it so its timer only starts once the server
+    /// is actually joinable — a fresh boot must not count as "idle".
+    ready: Mutex<bool>,
+    /// Monotonic instant of boot completion (first "Done (...)" line).
+    ready_at: Mutex<Option<Instant>>,
+    /// Monotonic instant of the most recent activity: a join/leave/lost event
+    /// or an external keep-alive (e.g. a launcher wakeup call while the server
+    /// is already running). The idle window is measured from this (or
+    /// `ready_at` if nobody has joined yet), so a session that falls entirely
+    /// between two idle-service polls still resets the timer.
+    last_activity_at: Mutex<Option<Instant>>,
 }
 
 impl PlayerTracker {
@@ -62,12 +77,22 @@ impl PlayerTracker {
             online: Mutex::new(HashSet::new()),
             players_file,
             history: Mutex::new(history),
+            ready: Mutex::new(false),
+            ready_at: Mutex::new(None),
+            last_activity_at: Mutex::new(None),
         }
     }
 
     pub fn on_line(&self, line: &str) {
         if line.is_empty() {
             return;
+        }
+        if line.contains(DONE_MARKER) && line.contains(DONE_SUFFIX) {
+            *self.ready.lock().unwrap() = true;
+            let mut ready_at = self.ready_at.lock().unwrap();
+            if ready_at.is_none() {
+                *ready_at = Some(Instant::now());
+            }
         }
         let mut name: Option<&str> = None;
         let mut remove = false;
@@ -91,6 +116,10 @@ impl PlayerTracker {
         if name.is_empty() {
             return;
         }
+
+        // Every join/leave/lost event is a moment of player activity: a leave
+        // marks the instant the idle window starts, a join resets it.
+        *self.last_activity_at.lock().unwrap() = Some(Instant::now());
 
         let mut online = self.online.lock().unwrap();
         if remove {
@@ -117,6 +146,35 @@ impl PlayerTracker {
         let mut entries: Vec<PlayerHistoryEntry> = history.values().cloned().collect();
         entries.sort_by(|a, b| b.last_joined.cmp(&a.last_joined));
         entries
+    }
+
+    /// Whether the server has printed its boot-complete "Done (...)" line.
+    /// Starts false on construction (each instance rebuilds its tracker on
+    /// start) and stays true for the lifetime of the process.
+    pub fn is_ready(&self) -> bool {
+        *self.ready.lock().unwrap()
+    }
+
+    /// The instant from which idle time should be measured: the most recent
+    /// activity (join/leave/lost event or keep-alive), or boot completion for
+    /// a server nobody has played on yet. `None` before the server has
+    /// finished booting.
+    pub fn idle_reference(&self) -> Option<Instant> {
+        let ready_at = *self.ready_at.lock().unwrap();
+        let last_activity = *self.last_activity_at.lock().unwrap();
+        match (ready_at, last_activity) {
+            (Some(ready), Some(activity)) => Some(activity.max(ready)),
+            (Some(ready), None) => Some(ready),
+            (None, activity) => activity,
+        }
+    }
+
+    /// Treats an external keep-alive (e.g. a launcher wakeup call while the
+    /// server is already running) as activity: moves the idle reference
+    /// forward so an idle shutdown is deferred — "kicking the can down the
+    /// road" without disabling the feature.
+    pub fn touch_activity(&self) {
+        *self.last_activity_at.lock().unwrap() = Some(Instant::now());
     }
 
     /// Loads a persisted ever-joined log, tolerating a missing or corrupt file.
@@ -221,6 +279,53 @@ mod tests {
         tracker.on_line("[Server thread/INFO]: Done (5.2s)! For help, type \"help\"");
         tracker.on_line("some random output");
         assert_eq!(0, tracker.online_player_count());
+    }
+
+    #[test]
+    fn ready_flag_tracks_boot_completion() {
+        let tracker = PlayerTracker::new(None);
+        assert!(!tracker.is_ready());
+        tracker.on_line("[Server thread/INFO]: Preparing level \"world\"");
+        assert!(!tracker.is_ready());
+        tracker.on_line("[Server thread/INFO]: Done (7.3s)! For help, type \"help\"");
+        assert!(tracker.is_ready());
+        // A fresh tracker (new server boot) starts unready again.
+        assert!(!PlayerTracker::new(None).is_ready());
+    }
+
+    #[test]
+    fn touch_activity_defers_the_idle_reference() {
+        let tracker = PlayerTracker::new(None);
+        tracker.on_line("[Server thread/INFO]: Done (5.2s)! For help, type \"help\"");
+        let after_boot = tracker.idle_reference().expect("boot reference");
+
+        // A keep-alive (e.g. wakeup while running) moves the reference forward,
+        // deferring any idle shutdown without disabling it.
+        tracker.touch_activity();
+        let after_keepalive = tracker.idle_reference().expect("keepalive reference");
+        assert!(after_keepalive >= after_boot);
+    }
+
+    #[test]
+    fn idle_reference_anchors_to_boot_then_player_events() {
+        let tracker = PlayerTracker::new(None);
+        // Nothing observed yet — no idle reference.
+        assert!(tracker.idle_reference().is_none());
+
+        // Boot completion becomes the reference for a server nobody joined.
+        tracker.on_line("[Server thread/INFO]: Done (5.2s)! For help, type \"help\"");
+        let after_boot = tracker.idle_reference().expect("boot reference");
+
+        // A join moves the reference forward (session started).
+        tracker.on_line("[Server thread/INFO]: Steve joined the game");
+        let after_join = tracker.idle_reference().expect("join reference");
+        assert!(after_join >= after_boot);
+
+        // A leave moves it forward again — this is the moment the idle window
+        // starts, even if no poll runs at that instant.
+        tracker.on_line("[Server thread/INFO]: Steve left the game");
+        let after_leave = tracker.idle_reference().expect("leave reference");
+        assert!(after_leave >= after_join);
     }
 
     #[test]

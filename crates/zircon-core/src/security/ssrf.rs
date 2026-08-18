@@ -5,11 +5,16 @@
 //! local (`169.254.169.254` cloud metadata), or arbitrary user-supplied
 //! hosts — is rejected before an HTTP request is made.
 //!
+//! Only strict `https://` URLs on default ports are accepted: plaintext
+//! `http://` (MITM tampering) and explicit custom ports (intranet port
+//! scanning) are rejected outright.
+//!
 //! Port of `com.mcmanager.core.util.SecurityUtil`.
 
 /// Hosts the wrapper is allowed to fetch from. A URL is safe when its host
 /// equals one of these or is a strict subdomain of one.
 pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
+    "zirconmc.net",
     "cdn.modrinth.com",
     "edge.forgecdn.net",
     "media.forgecdn.net",
@@ -23,13 +28,24 @@ pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
     "launchermeta.mojang.com",
 ];
 
-/// Returns `true` if the URL parses and its host is an allowed CDN domain or a
-/// strict subdomain of one.
+/// Returns `true` if the URL is strictly HTTPS, has no custom port, and its
+/// host is an allowed CDN domain or a strict subdomain of one.
 pub fn is_safe_cdn_url(url: &str) -> bool {
     let parsed = match url::Url::parse(url) {
         Ok(parsed) => parsed,
         Err(_) => return false,
     };
+
+    // 1. Enforce HTTPS only (no plaintext HTTP or file/ftp schemes).
+    if parsed.scheme() != "https" {
+        return false;
+    }
+
+    // 2. Disallow explicit custom ports (prevent internal network scanning).
+    if parsed.port().is_some() {
+        return false;
+    }
+
     let host = match parsed.host_str() {
         Some(host) if !host.is_empty() => host,
         _ => return false,
@@ -68,6 +84,28 @@ mod tests {
     #[test]
     fn accepts_strict_subdomains_of_allowed_domains() {
         assert!(is_safe_cdn_url("https://files.cdn.modrinth.com/x/y.jar"));
+        assert!(is_safe_cdn_url("https://updates.zirconmc.net/latest.json"));
+    }
+
+    #[test]
+    fn accepts_allowed_https_domains() {
+        assert!(is_safe_cdn_url(
+            "https://zirconmc.net/updates/server/latest.json"
+        ));
+        assert!(is_safe_cdn_url("https://cdn.modrinth.com/data/abc/1.0.jar"));
+        assert!(is_safe_cdn_url(
+            "https://edge.forgecdn.net/files/123/456/mod.jar"
+        ));
+    }
+
+    #[test]
+    fn rejects_insecure_schemes_and_ports() {
+        assert!(!is_safe_cdn_url("http://cdn.modrinth.com/data/abc/1.0.jar")); // No HTTP
+        assert!(!is_safe_cdn_url(
+            "https://cdn.modrinth.com:8443/data/abc/1.0.jar"
+        )); // No custom ports
+        assert!(!is_safe_cdn_url("file:///etc/passwd"));
+        assert!(!is_safe_cdn_url("http://169.254.169.254/latest/meta-data/"));
     }
 
     #[test]

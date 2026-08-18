@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::net::TcpListener;
+use zircon_server::audit::AuditLogger;
 use zircon_server::auth::auth_service::AuthService;
 use zircon_server::auth::jwt;
 use zircon_server::auth::sessions::SessionRegistry;
@@ -19,6 +20,7 @@ use zircon_server::process::console::ConsoleStreamHandler;
 use zircon_server::process::manager::MinecraftProcessManager;
 use zircon_server::services::backup::BackupService;
 use zircon_server::services::bom::BomService;
+use zircon_server::services::idle_shutdown::IdleShutdownService;
 use zircon_server::services::mods::ModManagementService;
 use zircon_server::services::packs::PackManagementService;
 use zircon_server::services::resolver::ModServiceResolver;
@@ -80,12 +82,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scheduler = BackupSchedulerService::new(instances.clone(), backup.clone());
     let scheduler_handle = scheduler.start();
 
+    // Idle shutdown: gracefully sleep instances nobody is playing on.
+    let idle_shutdown = IdleShutdownService::new(instances.clone());
+    let idle_shutdown_handle = idle_shutdown.start();
+
     let tickets = Arc::new(JoinTicketManager::new());
 
     // Auth hardening: server-side session revocation + a global cap on failed
-    // login attempts (15 min window, 10 attempts).
+    // login attempts (15 min window, 10 attempts) + an append-only audit log.
     let sessions = Arc::new(SessionRegistry::new());
     let login_limiter = Arc::new(FixedWindowLimiter::new(Duration::from_secs(15 * 60), 10));
+    let audit = Arc::new(AuditLogger::new(&config.data_dir));
 
     let state = AppState {
         config: config.clone(),
@@ -102,6 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         curseforge_api_key: config.get_config().curseforge_api_key,
         sessions: sessions.clone(),
         login_limiter: login_limiter.clone(),
+        audit,
     };
 
     // Axum admin API (binds 127.0.0.1:<webPort>; reachable through the
@@ -161,6 +169,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Shutting down...");
     scheduler_handle.abort();
+    idle_shutdown_handle.abort();
     housekeeping.abort();
     multiplexer.stop();
     web_handle.abort();

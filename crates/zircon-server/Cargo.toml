@@ -10,12 +10,16 @@ zircon-core = { path = "../zircon-core" }
 
 tokio = { workspace = true, features = ["full"] }
 axum = { workspace = true }
+axum-extra = { version = "0.9", features = ["cookie"] }
 tower-http = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
 reqwest = { workspace = true }
 bcrypt.workspace = true
 jsonwebtoken.workspace = true
+totp-rs = { version = "5.5", features = ["gen_secret", "otpauth"] }
+self-replace = "1.5"
+semver = "1.0"
 sysinfo.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
@@ -28,9 +32,12 @@ zip.workspace = true
 getrandom = "0.3"
 tokio-util = { workspace = true, features = ["io"] }
 futures-util = "0.3"
+sha2.workspace = true
+hex.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 serde_urlencoded = "0.7"
+totp-rs = { version = "5.5", features = ["gen_secret", "otpauth"] }

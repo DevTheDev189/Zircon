@@ -14,7 +14,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use crate::error::LauncherError;
-use crate::launch::java::JavaRuntimeSelector;
+use crate::launch::java::{java_executable, JavaRuntimeResolver, JavaRuntimeSelector};
 use crate::launch::profile;
 use crate::model::version::LibrarySpec;
 
@@ -303,7 +303,16 @@ async fn install_loader(
         install_dir.display()
     );
     let required_java = JavaRuntimeSelector::get_required_java_major_version(mc_version);
-    let java = JavaRuntimeSelector::get_java_executable_path(required_java);
+    // The installer is itself a Java process, so it cannot bootstrap its own
+    // runtime. Provision Java up front — system Java, else the cached runtime,
+    // else a one-time Adoptium download — exactly like the game launch does.
+    // Falling back to a bare `java` on PATH would fail on machines with no
+    // Java installed, blocking Forge/NeoForge users before they ever reach the
+    // provisioning step.
+    let java_home = JavaRuntimeResolver::new(cache_dir.to_path_buf())
+        .resolve(required_java)
+        .await?;
+    let java = java_executable(&java_home);
     run_installer(
         &java,
         &installer_jar,

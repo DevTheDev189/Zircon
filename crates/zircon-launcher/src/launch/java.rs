@@ -29,6 +29,18 @@ impl JavaRuntimeSelector {
     /// Required Java major version per Minecraft version.
     pub fn get_required_java_major_version(minecraft_version: &str) -> i32 {
         let parts: Vec<&str> = minecraft_version.split('.').collect();
+        if parts.is_empty() || parts[0].is_empty() {
+            return 17;
+        }
+        // Non-"1.x" version schemes (e.g. "26.2") are modern by construction;
+        // the 1.x-era mappings below would otherwise read them as ancient
+        // ("26.2" would parse minor=2 -> Java 8). Snapshot ids like "25w06a"
+        // don't parse as a number and fall through to the old logic.
+        if let Ok(major) = parts[0].parse::<i32>() {
+            if major != 1 {
+                return 21;
+            }
+        }
         if parts.len() < 2 {
             return 17;
         }
@@ -379,6 +391,8 @@ mod tests {
             ("1.20.4", 17),
             ("1.20.5", 21),
             ("1.21.1", 21),
+            // Non-1.x schemes (e.g. the "26.2" branding) are modern.
+            ("26.2", 21),
             ("25w06a", 17),
             ("", 17),
         ];

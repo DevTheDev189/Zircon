@@ -7,10 +7,11 @@ use axum::extract::State;
 use axum::Json;
 
 use serde::Deserialize;
-use zircon_core::model::ModLoaderInfo;
+use zircon_core::model::{InstanceConfig, ModLoaderInfo};
 
 use super::app::{ApiError, AppState};
 use crate::config::ServerProperties;
+use crate::instance::ServerInstanceManager;
 use crate::web::controllers::config_helpers::instance_to_map;
 
 #[derive(Debug, Deserialize)]
@@ -133,6 +134,7 @@ pub async fn client_status(State(state): State<AppState>) -> Json<serde_json::Va
     let value = match state.instances.get_active_instance() {
         Some(instance) => {
             let id = instance.id.clone();
+            let running = state.instances.is_running(&id);
             let players = state.instances.get_online_players(&id);
             let max = max_players_from_properties(
                 &state
@@ -145,7 +147,9 @@ pub async fn client_status(State(state): State<AppState>) -> Json<serde_json::Va
                 "online": players.len(),
                 "players": players,
                 "max": max,
-                "running": state.instances.is_running(&id),
+                "running": running,
+                "wakeable": !running && state.instances.wakeable(&id),
+                "instanceId": id,
                 "version": instance.minecraft_version,
                 "name": instance.name,
             })
@@ -158,6 +162,7 @@ pub async fn client_status(State(state): State<AppState>) -> Json<serde_json::Va
                 "players": players,
                 "max": max,
                 "running": state.process_manager.is_running(),
+                "wakeable": false,
                 "version": state.config.get_config().minecraft_version,
                 "name": state.config.get_config().server_title,
             })
@@ -198,4 +203,151 @@ pub async fn get_status(State(state): State<AppState>) -> Json<serde_json::Value
         }),
     };
     Json(value)
+}
+
+// ---------------------------------------------------------------------------
+// Wakeup (idle-shutdown companion)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WakeupRequest {
+    /// The host the client will connect to; matched against instance id/name
+    /// exactly like the TCP multiplexer's hostname routing.
+    pub hostname: Option<String>,
+    /// The player-facing port the client will connect to.
+    pub port: Option<u16>,
+}
+
+/// POST /api/wakeup — public (no admin token, like `/api/join-intent`), so the
+/// launcher can bring a sleeping instance back up before connecting. Resolves
+/// the target the same way the multiplexer routes a Minecraft connection
+/// (hostname → player-facing port → active instance) and starts it in the
+/// background; the launcher then polls the status ping until it is online.
+/// Refuses instances that were stopped manually (not by the idle service).
+pub async fn wakeup_server(
+    State(state): State<AppState>,
+    Json(body): Json<WakeupRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let public_port = state.config.get_config().public_port;
+    let Some(cfg) = resolve_wake_target(
+        &state.instances,
+        public_port,
+        body.hostname.as_deref(),
+        body.port,
+    ) else {
+        return Err(ApiError::NotFound(
+            "No server instance available to wake — start it from the admin panel.".to_string(),
+        ));
+    };
+
+    if state.instances.is_running(&cfg.id) {
+        // Already up — the launcher can reach this state when its status ping
+        // failed transiently (e.g. while the server was still booting). Treat
+        // the wakeup as a keep-alive: restart the idle window so the server
+        // does not shut down under a player who is about to connect.
+        state.instances.defer_idle_shutdown(&cfg.id);
+        return Ok(Json(
+            serde_json::json!({ "ok": true, "alreadyRunning": true, "instanceId": cfg.id }),
+        ));
+    }
+    if !state.instances.wakeable(&cfg.id) {
+        return Err(ApiError::Conflict(format!(
+            "Server '{}' is stopped and not in idle/sleep mode — start it from the admin panel.",
+            cfg.name
+        )));
+    }
+
+    // Start in the background so the request returns immediately; the launcher
+    // polls the Minecraft status ping until the server is online.
+    let instances = state.instances.clone();
+    let id = cfg.id.clone();
+    let log_id = id.clone();
+    tokio::spawn(async move {
+        if let Err(e) = instances.start_instance(&id).await {
+            tracing::error!("Wakeup start failed for instance {id}: {e}");
+        }
+    });
+    tracing::info!(
+        "Wakeup request: starting instance '{}' ({log_id})",
+        cfg.name
+    );
+    Ok(Json(
+        serde_json::json!({ "ok": true, "instanceId": cfg.id }),
+    ))
+}
+
+/// Resolves which instance a wakeup targets, mirroring the TCP multiplexer's
+/// routing: handshake hostname, then the player-facing port, then the instance
+/// owning the main public port, then the active instance. Shared with the
+/// join-intent endpoint so both signals resolve the same instance.
+pub(crate) fn resolve_wake_target(
+    instances: &ServerInstanceManager,
+    public_port: i32,
+    hostname: Option<&str>,
+    port: Option<u16>,
+) -> Option<InstanceConfig> {
+    if let Some(host) = hostname.map(str::trim).filter(|h| !h.is_empty()) {
+        if let Some(cfg) = instances.find_by_hostname(host) {
+            return Some(cfg);
+        }
+    }
+    if let Some(port) = port {
+        if let Some(cfg) = instances.find_by_external_port(i32::from(port)) {
+            return Some(cfg);
+        }
+    }
+    if let Some(cfg) = instances.find_by_external_port(public_port) {
+        return Some(cfg);
+    }
+    instances.get_active_instance()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    fn temp_dir() -> std::path::PathBuf {
+        crate::test_util::temp_dir("wakeup")
+    }
+
+    #[test]
+    fn wake_target_resolves_hostname_then_port_then_active() {
+        let dir = temp_dir();
+        let console = Arc::new(crate::process::console::ConsoleStreamHandler::new());
+        let manager = ServerInstanceManager::new(&dir, console).unwrap();
+
+        // First-created instance becomes active; its external port is the main
+        // public port the multiplexer owns.
+        let primary = manager
+            .create_instance("Primary", "1.20.4", "vanilla", "")
+            .unwrap();
+        let secondary = manager
+            .create_instance("Secondary", "1.20.4", "vanilla", "")
+            .unwrap();
+
+        // Hostname matches instance name (case-insensitive, normalized).
+        let hit = resolve_wake_target(&manager, primary.external_mc_port, Some("SECONDARY"), None);
+        assert_eq!(Some(secondary.id.clone()), hit.map(|c| c.id));
+
+        // Dedicated player-facing port wins over hostname-less requests.
+        let hit = resolve_wake_target(
+            &manager,
+            primary.external_mc_port,
+            None,
+            Some(secondary.external_mc_port as u16),
+        );
+        assert_eq!(Some(secondary.id.clone()), hit.map(|c| c.id));
+
+        // Unknown host + unknown port falls back to the instance owning the
+        // public port.
+        let hit = resolve_wake_target(&manager, primary.external_mc_port, Some("nope"), Some(1));
+        assert_eq!(Some(primary.id.clone()), hit.map(|c| c.id));
+
+        // Empty hostname is treated as absent.
+        let hit = resolve_wake_target(&manager, primary.external_mc_port, Some("  "), None);
+        assert_eq!(Some(primary.id), hit.map(|c| c.id));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

@@ -52,7 +52,7 @@ createApp({
             playersLoaded: false,
             playerForms: { whitelist: '', op: '' },
             banForm: { name: '', reason: '' },
-            settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '', externalPort: null, ramAuto: false, ramGB: 4, extraJvmArgs: '' },
+            settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '', externalPort: null, ramAuto: false, ramGB: 4, extraJvmArgs: '', idleShutdownEnabled: false, idleShutdownMinutes: 5 },
             serverProps: {},
             backupForm: { frequency: 'off', time: '02:00', retention: 10 },
             backupsList: [],

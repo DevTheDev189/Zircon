@@ -131,6 +131,22 @@ impl MinecraftRunner {
         server_ip: Option<&str>,
         server_port: Option<i32>,
     ) -> Result<Vec<String>, LauncherError> {
+        // Validate server_ip syntax before building launch args: garbage hosts
+        // would otherwise be passed to the game (and could inject flags or
+        // URLs into the command line). Accepts domains, IP literals and
+        // bracketed IPv6 (as produced by `servers::format_host`).
+        if let Some(host) = server_ip {
+            if !host.is_empty() {
+                // `url::Host::parse` alone accepts `--username`-style strings
+                // (it treats them as domains), which would let a hostile
+                // address inject JVM/game flags — reject any leading dash.
+                if host.starts_with('-') || url::Host::parse(host).is_err() {
+                    return Err(LauncherError::InvalidInput(format!(
+                        "Invalid server address: {host}"
+                    )));
+                }
+            }
+        }
         match session {
             Some(session) => build_online_command(data, session, game_dir, server_ip, server_port),
             None => match username {
@@ -429,6 +445,17 @@ fn spawn_game(
     output: Option<Arc<dyn Fn(String) + Send + Sync>>,
 ) -> Result<Child, LauncherError> {
     let mut cmd = Command::new(&command[0]);
+    // Untrusted mod code runs inside this JVM: scrub the environment so host
+    // secrets (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, ...) can never leak into the
+    // game process. Keep only what the JVM needs to function.
+    cmd.env_clear();
+    cmd.envs(std::env::vars().filter(|(k, _)| {
+        let upper = k.to_ascii_uppercase();
+        matches!(
+            upper.as_str(),
+            "PATH" | "SYSTEMROOT" | "USERPROFILE" | "HOME" | "TMP" | "TEMP"
+        )
+    }));
     cmd.args(&command[1..])
         .current_dir(game_dir)
         .stdout(Stdio::piped())
@@ -759,5 +786,61 @@ mod tests {
         assert_eq!(arg_value(&command, "--userType"), "legacy");
         // The substituted quick-play pair is dropped entirely.
         assert!(!command.iter().any(|a| a == "--quickPlayMultiplayer"));
+    }
+
+    #[test]
+    fn invalid_server_address_is_rejected_fail_closed() {
+        let data = launch_data();
+        let game_dir = Path::new("/game");
+        let session = session("msa", "tok123");
+
+        // Legitimate hosts parse fine: domains, IPv4, bracketed IPv6.
+        for host in ["mc.example.com", "localhost", "127.0.0.1", "[::1]"] {
+            let command = MinecraftRunner::build_launch_command(
+                &data,
+                Some(&session),
+                None,
+                None,
+                game_dir,
+                Some(host),
+                Some(25565),
+            )
+            .unwrap_or_else(|e| panic!("host {host} must be accepted: {e}"));
+            assert_eq!(arg_value(&command, "--server"), host);
+        }
+
+        // Garbage that could inject args or malformed URLs is refused.
+        for host in [
+            "not a host",
+            "--username",
+            "http://evil.example.com",
+            "a b c",
+        ] {
+            let result = MinecraftRunner::build_launch_command(
+                &data,
+                Some(&session),
+                None,
+                None,
+                game_dir,
+                Some(host),
+                Some(25565),
+            );
+            assert!(
+                matches!(result, Err(LauncherError::InvalidInput(_))),
+                "host {host:?} must be rejected, got {result:?}"
+            );
+        }
+
+        // Empty-but-present host is treated as "no host" (online fallback).
+        assert!(MinecraftRunner::build_launch_command(
+            &data,
+            Some(&session),
+            None,
+            None,
+            game_dir,
+            Some(""),
+            Some(25565),
+        )
+        .is_ok());
     }
 }

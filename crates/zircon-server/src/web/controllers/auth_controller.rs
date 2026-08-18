@@ -1,5 +1,5 @@
-//! Admin auth endpoints: login, logout, profile query, change password, profile
-//! update.
+//! Admin auth endpoints with TOTP 2FA, HttpOnly session cookies, per-user rate
+//! limiting and audit logging.
 //!
 //! Port of the auth routes in `com.mcmanager.server.web.JavalinApp`.
 
@@ -7,8 +7,9 @@ use std::net::SocketAddr;
 
 use axum::extract::{ConnectInfo, State};
 use axum::Json;
-
+use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use serde::Deserialize;
+use totp_rs::{Algorithm, Secret, TOTP};
 
 use crate::web::app::{issue_token, ApiError, AppState};
 use crate::web::auth::CurrentUser;
@@ -17,6 +18,8 @@ use crate::web::auth::CurrentUser;
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
+    #[serde(default)]
+    pub totp_code: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -37,15 +40,25 @@ pub struct ProfileUpdateRequest {
     pub icon: Option<String>,
 }
 
-/// Key for the login rate limiter. Remote clients reach the web server through
-/// the loopback multiplexer, so they share the `127.0.0.1` bucket — the limiter
-/// is effectively a global cap, which is the intended brute-force defense.
-/// Direct connections use their real peer IP.
-fn limiter_key(client: &Option<ConnectInfo<SocketAddr>>) -> String {
-    client
-        .as_ref()
-        .map(|c| c.0.ip().to_string())
-        .unwrap_or_else(|| "unknown".to_string())
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TotpEnableRequest {
+    pub code: String,
+}
+
+/// Rate-limit key. When a username is supplied the bucket is per-account (so a
+/// brute-forcer can't exhaust other users' budgets); otherwise it falls back to
+/// the peer IP so unknown-username probes are still throttled.
+fn limiter_key(username: &str, client: &Option<ConnectInfo<SocketAddr>>) -> String {
+    let u = username.trim().to_lowercase();
+    if !u.is_empty() {
+        format!("user:{u}")
+    } else {
+        client
+            .as_ref()
+            .map(|c| format!("ip:{}", c.0.ip()))
+            .unwrap_or_else(|| "ip:unknown".to_string())
+    }
 }
 
 fn rate_limited(state: &AppState, key: &str) -> Result<(), ApiError> {
@@ -57,76 +70,85 @@ fn rate_limited(state: &AppState, key: &str) -> Result<(), ApiError> {
     }
 }
 
+/// Builds the HttpOnly, SameSite=Strict, Secure session cookie carrying `token`.
+fn session_cookie(token: String) -> Cookie<'static> {
+    let mut cookie = Cookie::new("zircon_session", token);
+    cookie.set_http_only(true);
+    cookie.set_same_site(SameSite::Strict);
+    cookie.set_secure(true);
+    cookie.set_path("/");
+    cookie
+}
+
 /// POST /api/auth/login
 pub async fn login(
     State(state): State<AppState>,
+    jar: CookieJar,
     client: Option<ConnectInfo<SocketAddr>>,
     Json(body): Json<LoginRequest>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    let key = limiter_key(&client);
+) -> Result<(CookieJar, Json<serde_json::Value>), ApiError> {
+    let key = limiter_key(&body.username, &client);
     rate_limited(&state, &key)?;
+
     if !state.auth.authenticate(&body.username, &body.password) {
+        state
+            .audit
+            .log(&body.username, "LOGIN_FAILED", "Invalid credentials");
         return Err(ApiError::Unauthorized(
             "Invalid username or password".to_string(),
         ));
     }
+
+    let user = state
+        .auth
+        .get_user(&body.username)
+        .ok_or_else(|| ApiError::Unauthorized("User record not found".to_string()))?;
+
+    // TOTP 2FA: when enabled, a valid code is mandatory even with the right
+    // password.
+    if user.totp_enabled {
+        let code = body.totp_code.as_deref().unwrap_or("");
+        if !user.verify_totp(code) {
+            state
+                .audit
+                .log(&body.username, "LOGIN_FAILED", "Invalid TOTP code");
+            return Err(ApiError::Unauthorized(
+                "Invalid TOTP two-factor code".to_string(),
+            ));
+        }
+    }
+
     state.login_limiter.reset(&key);
     let token = issue_token(&state, &body.username);
-    Ok(Json(
-        serde_json::json!({ "token": token, "username": body.username }),
+    state.audit.log(
+        &body.username,
+        "LOGIN_SUCCESS",
+        "Authenticated successfully",
+    );
+
+    let updated_jar = jar.add(session_cookie(token.clone()));
+    Ok((
+        updated_jar,
+        Json(serde_json::json!({ "token": token, "username": body.username })),
     ))
 }
 
-/// POST /api/auth/logout — revokes the presented token server-side so the
-/// session dies immediately instead of lingering until its 12h expiry.
+/// POST /api/auth/logout — revokes the presented session server-side and clears
+/// the session cookie so the browser doesn't keep replaying a dead token.
 pub async fn logout(
     State(state): State<AppState>,
+    jar: CookieJar,
     user: CurrentUser,
-) -> Result<Json<serde_json::Value>, ApiError> {
+) -> Result<(CookieJar, Json<serde_json::Value>), ApiError> {
     state.sessions.revoke(&user.jti, &user.username, user.exp);
-    tracing::info!("Revoked session for user {}", user.username);
-    Ok(Json(serde_json::json!({ "ok": true })))
+    state
+        .audit
+        .log(&user.username, "LOGOUT", "Session terminated");
+    let updated_jar = jar.remove(Cookie::from("zircon_session"));
+    Ok((updated_jar, Json(serde_json::json!({ "ok": true }))))
 }
 
-/// POST /api/auth/change-password — admin-only; a successful change revokes
-/// every existing session and returns a fresh token for the caller.
-pub async fn change_password(
-    State(state): State<AppState>,
-    client: Option<ConnectInfo<SocketAddr>>,
-    Json(body): Json<ChangePasswordRequest>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    if body.username.is_empty() || body.current_password.is_empty() || body.new_password.is_empty()
-    {
-        return Err(ApiError::BadRequest(
-            "username, currentPassword and newPassword are required".to_string(),
-        ));
-    }
-    let key = limiter_key(&client);
-    rate_limited(&state, &key)?;
-    match state
-        .auth
-        .change_password(&body.username, &body.current_password, &body.new_password)
-    {
-        Ok(true) => {
-            state.login_limiter.reset(&key);
-            // Kill every outstanding session (including this one — the caller
-            // adopts the fresh token minted below). Stolen tokens die now.
-            let revoked = state.sessions.revoke_user(&body.username);
-            tracing::info!(
-                "Password changed for {}; revoked {revoked} session(s)",
-                body.username
-            );
-            let token = issue_token(&state, &body.username);
-            Ok(Json(serde_json::json!({ "ok": true, "token": token })))
-        }
-        Ok(false) => Err(ApiError::Unauthorized(
-            "Invalid username or current password".to_string(),
-        )),
-        Err(e) => Err(ApiError::BadRequest(e)),
-    }
-}
-
-/// GET /api/auth/me — current user profile (username + icon for the admin header).
+/// GET /api/auth/me — current user profile (username + icon + 2FA state).
 pub async fn me(
     State(state): State<AppState>,
     user: CurrentUser,
@@ -135,9 +157,154 @@ pub async fn me(
         .auth
         .get_user(&user.username)
         .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
+    Ok(Json(serde_json::json!({
+        "username": profile.username,
+        "icon": profile.icon,
+        "totpEnabled": profile.totp_enabled
+    })))
+}
+
+/// POST /api/auth/2fa/setup — generates a new TOTP secret + QR URI. The secret
+/// is stored but not yet enforced until `enable` confirms a live code.
+pub async fn setup_2fa(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let secret = Secret::generate_secret();
+    let secret_encoded = secret.to_encoded().to_string();
+    let totp = TOTP::new(
+        Algorithm::SHA1,
+        6,
+        1,
+        30,
+        secret.to_bytes().unwrap(),
+        Some("Zircon Server".to_string()),
+        user.username.clone(),
+    )
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let url = totp.get_url();
+    state
+        .auth
+        .set_totp(&user.username, Some(secret_encoded.clone()), false)
+        .map_err(ApiError::Internal)?;
+
+    Ok(Json(serde_json::json!({
+        "secret": secret_encoded,
+        "qrUrl": url
+    })))
+}
+
+/// POST /api/auth/2fa/enable — verifies a code against the pending secret and
+/// only then activates 2FA for the account.
+pub async fn enable_2fa(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(body): Json<TotpEnableRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let profile = state
+        .auth
+        .get_user(&user.username)
+        .ok_or_else(|| ApiError::NotFound("User not found".to_string()))?;
+
+    let Some(secret) = &profile.totp_secret else {
+        return Err(ApiError::BadRequest(
+            "2FA not initialized. Run setup first.".to_string(),
+        ));
+    };
+
+    let Ok(secret_bytes) = Secret::Encoded(secret.clone()).to_bytes() else {
+        return Err(ApiError::Internal("Invalid secret format".to_string()));
+    };
+
+    let Ok(totp) = TOTP::new(
+        Algorithm::SHA1,
+        6,
+        1,
+        30,
+        secret_bytes,
+        Some("Zircon Server".to_string()),
+        user.username.clone(),
+    ) else {
+        return Err(ApiError::Internal("Failed to build TOTP".to_string()));
+    };
+
+    if !totp.check_current(&body.code).unwrap_or(false) {
+        return Err(ApiError::Unauthorized(
+            "Invalid confirmation code".to_string(),
+        ));
+    }
+
+    state
+        .auth
+        .set_totp(&user.username, Some(secret.clone()), true)
+        .map_err(ApiError::Internal)?;
+    state.audit.log(
+        &user.username,
+        "2FA_ENABLED",
+        "Two-factor authentication activated",
+    );
+
+    Ok(Json(serde_json::json!({ "ok": true, "totpEnabled": true })))
+}
+
+/// POST /api/auth/2fa/disable
+pub async fn disable_2fa(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state
+        .auth
+        .set_totp(&user.username, None, false)
+        .map_err(ApiError::Internal)?;
+    state.audit.log(
+        &user.username,
+        "2FA_DISABLED",
+        "Two-factor authentication disabled",
+    );
     Ok(Json(
-        serde_json::json!({ "username": profile.username, "icon": profile.icon }),
+        serde_json::json!({ "ok": true, "totpEnabled": false }),
     ))
+}
+
+/// POST /api/auth/change-password — a successful change revokes every existing
+/// session (including the caller's) and mints a fresh token + cookie.
+pub async fn change_password(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    client: Option<ConnectInfo<SocketAddr>>,
+    Json(body): Json<ChangePasswordRequest>,
+) -> Result<(CookieJar, Json<serde_json::Value>), ApiError> {
+    if body.username.is_empty() || body.current_password.is_empty() || body.new_password.is_empty()
+    {
+        return Err(ApiError::BadRequest("All fields are required".to_string()));
+    }
+    let key = limiter_key(&body.username, &client);
+    rate_limited(&state, &key)?;
+
+    match state
+        .auth
+        .change_password(&body.username, &body.current_password, &body.new_password)
+    {
+        Ok(true) => {
+            state.login_limiter.reset(&key);
+            state.sessions.revoke_user(&body.username);
+            state.audit.log(
+                &body.username,
+                "PASSWORD_CHANGED",
+                "Password successfully changed; sessions revoked",
+            );
+            let token = issue_token(&state, &body.username);
+            Ok((
+                jar.add(session_cookie(token.clone())),
+                Json(serde_json::json!({ "ok": true, "token": token })),
+            ))
+        }
+        Ok(false) => Err(ApiError::Unauthorized(
+            "Invalid current password".to_string(),
+        )),
+        Err(e) => Err(ApiError::BadRequest(e)),
+    }
 }
 
 /// POST /api/auth/profile — atomic profile update (rename / change password /
@@ -145,11 +312,12 @@ pub async fn me(
 /// token (returned so the UI keeps working).
 pub async fn profile(
     State(state): State<AppState>,
+    jar: CookieJar,
     Json(body): Json<ProfileUpdateRequest>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+) -> Result<(CookieJar, Json<serde_json::Value>), ApiError> {
     if body.current_username.is_empty() || body.current_password.is_empty() {
         return Err(ApiError::BadRequest(
-            "currentUsername and currentPassword are required".to_string(),
+            "Current credentials required".to_string(),
         ));
     }
     match state.auth.update_profile(
@@ -160,22 +328,28 @@ pub async fn profile(
         body.icon.as_deref(),
     ) {
         Ok(true) => {
+            let mut jar = jar;
             let mut response = serde_json::json!({ "ok": true });
-            let password_changed = body.new_password.as_deref().is_some_and(|p| !p.is_empty());
-            if password_changed {
-                // The account may have been renamed; derive the final username
-                // the same way AuthService does.
-                let target = body
-                    .new_username
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|n| !n.is_empty())
-                    .unwrap_or(&body.current_username);
-                let revoked = state.sessions.revoke_user(target);
-                tracing::info!("Password changed for {target}; revoked {revoked} session(s)");
-                response["token"] = serde_json::json!(issue_token(&state, target));
+            let target = body
+                .new_username
+                .as_deref()
+                .map(str::trim)
+                .filter(|n| !n.is_empty())
+                .unwrap_or(&body.current_username);
+
+            state.audit.log(
+                &body.current_username,
+                "PROFILE_UPDATED",
+                &format!("Target: {target}"),
+            );
+
+            if body.new_password.as_deref().is_some_and(|p| !p.is_empty()) {
+                state.sessions.revoke_user(target);
+                let token = issue_token(&state, target);
+                jar = jar.add(session_cookie(token.clone()));
+                response["token"] = serde_json::json!(token);
             }
-            Ok(Json(response))
+            Ok((jar, Json(response)))
         }
         Ok(false) => Err(ApiError::Unauthorized("Invalid credentials".to_string())),
         Err(e) => Err(ApiError::BadRequest(e)),

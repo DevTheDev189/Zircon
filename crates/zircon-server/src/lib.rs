@@ -5,6 +5,7 @@
 //! join-ticket gate, manages LZ4 backups, and exposes the Axum admin REST +
 //! WebSocket API.
 
+pub mod audit;
 pub mod auth;
 pub mod config;
 pub mod installer;
@@ -14,6 +15,7 @@ pub mod process;
 pub mod services;
 pub mod stats;
 pub mod tickets;
+pub mod updater;
 pub mod web;
 
 #[cfg(test)]
