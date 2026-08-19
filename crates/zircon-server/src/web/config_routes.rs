@@ -9,7 +9,7 @@ use axum::Json;
 use serde::Deserialize;
 use zircon_core::model::{InstanceConfig, ModLoaderInfo};
 
-use super::app::{ApiError, AppState};
+use super::app::{ApiError, AppState, RealIp};
 use crate::config::ServerProperties;
 use crate::instance::ServerInstanceManager;
 use crate::web::controllers::config_helpers::instance_to_map;
@@ -225,10 +225,23 @@ pub struct WakeupRequest {
 /// (hostname → player-facing port → active instance) and starts it in the
 /// background; the launcher then polls the status ping until it is online.
 /// Refuses instances that were stopped manually (not by the idle service).
+///
+/// Rate-limited per real client IP (same limiter as join intents) and
+/// deduplicated per instance so a single attacker cannot thrash sleeping
+/// instances into resource exhaustion, and concurrent duplicate wakeups for
+/// the same instance collapse into one start attempt.
 pub async fn wakeup_server(
     State(state): State<AppState>,
+    ip: RealIp,
     Json(body): Json<WakeupRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Rate limit wakeup requests identically to join intents.
+    if let Err(retry_after) = state.join_intent_limiter.check(&ip.0.to_string()) {
+        return Err(ApiError::TooManyRequests(format!(
+            "Too many wakeup attempts. Retry in {retry_after}s."
+        )));
+    }
+
     let public_port = state.config.get_config().public_port;
     let Some(cfg) = resolve_wake_target(
         &state.instances,
@@ -258,20 +271,25 @@ pub async fn wakeup_server(
         )));
     }
 
-    // Start in the background so the request returns immediately; the launcher
-    // polls the Minecraft status ping until the server is online.
-    let instances = state.instances.clone();
-    let id = cfg.id.clone();
-    let log_id = id.clone();
-    tokio::spawn(async move {
-        if let Err(e) = instances.start_instance(&id).await {
-            tracing::error!("Wakeup start failed for instance {id}: {e}");
-        }
-    });
-    tracing::info!(
-        "Wakeup request: starting instance '{}' ({log_id})",
-        cfg.name
-    );
+    // Atomically start if not already waking: a duplicate concurrent wakeup
+    // for the same instance is discarded (mark_waking returns false).
+    if state.instances.mark_waking(&cfg.id) {
+        let instances = state.instances.clone();
+        let id = cfg.id.clone();
+        let log_id = id.clone();
+        tokio::spawn(async move {
+            let result = instances.start_instance(&id).await;
+            instances.unmark_waking(&id);
+            if let Err(e) = result {
+                tracing::error!("Wakeup start failed for instance {id}: {e}");
+            }
+        });
+        tracing::info!(
+            "Wakeup request: starting instance '{}' ({log_id})",
+            cfg.name
+        );
+    }
+
     Ok(Json(
         serde_json::json!({ "ok": true, "instanceId": cfg.id }),
     ))

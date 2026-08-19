@@ -1,9 +1,14 @@
 // Zircon admin SPA - Authentication and profile management.
+
+// localStorage key for the persisted admin JWT, so a reload (or browser
+// restart) stays logged in for the token lifetime (12h TTL server-side).
+// Module-scope const: Vue 3 only exposes *functions* from the `methods`
+// option on the component proxy, so a `this.TOKEN_STORAGE_KEY` property there
+// would always be undefined and the session could never be restored.
+const TOKEN_STORAGE_KEY = 'zircon.adminToken';
+
 window.Zircon = window.Zircon || {};
 window.Zircon.auth = {
-    // localStorage key for the persisted admin JWT, so a reload (or browser
-    // restart) stays logged in for the token lifetime (12h TTL server-side).
-    TOKEN_STORAGE_KEY: 'zircon.adminToken',
     async login() {
         const res = await fetch('/api/auth/login', {
             method: 'POST',
@@ -16,7 +21,7 @@ window.Zircon.auth = {
             this.currentUser.username = data.username;
             this.authenticated = true;
             this.sessionRestoring = false;
-            try { localStorage.setItem(this.TOKEN_STORAGE_KEY, this.jwtToken); } catch (e) { /* storage unavailable */ }
+            try { localStorage.setItem(TOKEN_STORAGE_KEY, this.jwtToken); } catch (e) { /* storage unavailable */ }
             await this.loadAuthMe();
             this.loadInstances();
             this.startPolling();
@@ -29,7 +34,7 @@ window.Zircon.auth = {
     // expired or revoked tokens fall back to the login screen cleanly.
     async restoreSession() {
         let token = null;
-        try { token = localStorage.getItem(this.TOKEN_STORAGE_KEY); } catch (e) { /* storage unavailable */ }
+        try { token = localStorage.getItem(TOKEN_STORAGE_KEY); } catch (e) { /* storage unavailable */ }
         if (!token) { this.sessionRestoring = false; return; }
 
         this.jwtToken = token;
@@ -66,7 +71,7 @@ window.Zircon.auth = {
         this.jwtToken = '';
         this.selectedInstance = null;
         this.showProfileModal = false;
-        try { localStorage.removeItem(this.TOKEN_STORAGE_KEY); } catch (e) { /* storage unavailable */ }
+        try { localStorage.removeItem(TOKEN_STORAGE_KEY); } catch (e) { /* storage unavailable */ }
         if (this.pollTimer) clearInterval(this.pollTimer);
         if (this.consoleWs) this.consoleWs.close();
         // Best-effort server-side revocation so the token dies immediately, not
@@ -96,7 +101,7 @@ window.Zircon.auth = {
                 // Password changed server-side: other sessions were revoked and
                 // this one was re-issued — adopt and persist the fresh token.
                 this.jwtToken = data.token;
-                try { localStorage.setItem(this.TOKEN_STORAGE_KEY, data.token); } catch (e) { /* storage unavailable */ }
+                try { localStorage.setItem(TOKEN_STORAGE_KEY, data.token); } catch (e) { /* storage unavailable */ }
             }
             this.profileForm.currentPassword = '';
             this.profileForm.newPassword = '';

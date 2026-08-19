@@ -2,8 +2,13 @@ const { createApp } = Vue;
 
 // Zircon admin SPA entry. State lives in data(); the methods are merged
 // in from the feature modules in js/ so every method keeps sharing the
-// same `this` as before the split.
+// same `this` as before the split. The view comes from `render`, a
+// pre-compiled version of the old in-DOM #app template (see
+// scripts/build-web-ui.js), so the page needs only Vue's runtime build —
+// no template compilation at runtime, which keeps `unsafe-eval` out of
+// the Content-Security-Policy.
 createApp({
+    render: ZirconRender,
     data() {
         return {
             authenticated: false,

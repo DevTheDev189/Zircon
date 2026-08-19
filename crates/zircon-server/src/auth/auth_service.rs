@@ -291,19 +291,185 @@ fn load(file: &Path) -> std::io::Result<BTreeMap<String, UserProfile>> {
     Ok(BTreeMap::new())
 }
 
-/// Writes a sensitive file with owner-only (`0o600`) permissions on Unix.
-/// Used for `users.json`, `jwt-secret.key` and the audit log.
+/// Writes a sensitive file and hardens it against other local users. Used for
+/// `users.json`, `jwt-secret.key` and the audit log: on Unix the file is
+/// chmod'ed `0o600`; on Windows a protected DACL grants SYSTEM, local
+/// Administrators and the current user full access and denies everyone else
+/// (including inheritance from the data dir).
 pub fn write_secret_file(path: &Path, content: &[u8]) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
     fs::write(path, content)?;
+    harden_secret_file(path)
+}
+
+/// Applies the platform's secret-file hardening to an existing file. Extracted
+/// from `write_secret_file` so append-style writers (the audit log) can harden
+/// without rewriting content.
+pub fn harden_secret_file(path: &Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+        return fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+    }
+    #[cfg(windows)]
+    {
+        restrict_dacl_windows(path)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = path;
+        Ok(())
+    }
+}
+
+/// Replaces the DACL of `path` with a protected ACL granting full access to
+/// SYSTEM (`SY`), built-in Administrators (`BA`) and the current user (whose
+/// SID is resolved at runtime — SDDL cannot express "current user" by name),
+/// and denying everyone else. `PROTECTED_DACL` removes inheritable ACEs from
+/// the data dir, so a loose parent directory cannot widen the exposure.
+#[cfg(windows)]
+fn restrict_dacl_windows(path: &Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Authorization::{
+        ConvertStringSecurityDescriptorToSecurityDescriptorW, SetNamedSecurityInfoW,
+        SDDL_REVISION_1, SE_FILE_OBJECT,
+    };
+    use windows_sys::Win32::Security::{
+        GetSecurityDescriptorDacl, DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION,
+        PSECURITY_DESCRIPTOR,
+    };
+
+    let user_sid = current_user_sid()?;
+    let sddl = format!("D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;{user_sid})");
+
+    // Build a self-relative security descriptor from the SDDL string.
+    let mut descriptor: PSECURITY_DESCRIPTOR = core::ptr::null_mut();
+    let sddl_wide: Vec<u16> = sddl.encode_utf16().chain(core::iter::once(0)).collect();
+    let ok = unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl_wide.as_ptr(),
+            SDDL_REVISION_1,
+            &mut descriptor,
+            core::ptr::null_mut(),
+        )
+    };
+    if ok == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    // Pull the DACL out of the descriptor (SetNamedSecurityInfoW takes the ACL
+    // pointer directly) and apply it to the file.
+    let mut dacl_present: windows_sys::Win32::Foundation::BOOL = 0;
+    let mut dacl: *mut windows_sys::Win32::Security::ACL = core::ptr::null_mut();
+    let mut dacl_defaulted: windows_sys::Win32::Foundation::BOOL = 0;
+    let ok = unsafe {
+        GetSecurityDescriptorDacl(
+            descriptor,
+            &mut dacl_present,
+            &mut dacl,
+            &mut dacl_defaulted,
+        )
+    };
+    if ok == 0 {
+        let err = std::io::Error::last_os_error();
+        unsafe { LocalFree(descriptor) };
+        return Err(err);
+    }
+
+    let path_wide: Vec<u16> = path
+        .as_os_str()
+        .encode_wide()
+        .chain(core::iter::once(0))
+        .collect();
+    let result = unsafe {
+        SetNamedSecurityInfoW(
+            path_wide.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            dacl,
+            core::ptr::null_mut(),
+        )
+    };
+    // The descriptor was copied by SetNamedSecurityInfoW; free our copy.
+    unsafe { LocalFree(descriptor) };
+
+    if result != 0 {
+        return Err(std::io::Error::from_raw_os_error(result as i32));
     }
     Ok(())
+}
+
+/// Resolves the current user's SID string (e.g. `S-1-5-21-...-1001`) via the
+/// process token, for use inside an SDDL string.
+#[cfg(windows)]
+fn current_user_sid() -> std::io::Result<String> {
+    use windows_sys::Win32::Foundation::{
+        CloseHandle, GetLastError, LocalFree, ERROR_INSUFFICIENT_BUFFER, HANDLE,
+    };
+    use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
+    use windows_sys::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY};
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    let mut token: HANDLE = 0;
+    let process = unsafe { GetCurrentProcess() };
+    if unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) } == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    // First call sizes the buffer; it must fail with ERROR_INSUFFICIENT_BUFFER.
+    let mut needed: u32 = 0;
+    unsafe { GetTokenInformation(token, TokenUser, core::ptr::null_mut(), 0, &mut needed) };
+    let err = unsafe { GetLastError() };
+    if err != ERROR_INSUFFICIENT_BUFFER {
+        unsafe { CloseHandle(token) };
+        return Err(std::io::Error::from_raw_os_error(err as i32));
+    }
+
+    let mut buffer = vec![0u8; needed as usize];
+    if unsafe {
+        GetTokenInformation(
+            token,
+            TokenUser,
+            buffer.as_mut_ptr() as *mut _,
+            needed,
+            &mut needed,
+        )
+    } == 0
+    {
+        let err = unsafe { GetLastError() };
+        unsafe { CloseHandle(token) };
+        return Err(std::io::Error::from_raw_os_error(err as i32));
+    }
+
+    let token_user =
+        unsafe { &*(buffer.as_ptr() as *const windows_sys::Win32::Security::TOKEN_USER) };
+    let sid = token_user.User.Sid;
+
+    let mut sid_string: windows_sys::core::PWSTR = core::ptr::null_mut();
+    if unsafe { ConvertSidToStringSidW(sid, &mut sid_string) } == 0 {
+        let err = unsafe { GetLastError() };
+        unsafe { CloseHandle(token) };
+        return Err(std::io::Error::from_raw_os_error(err as i32));
+    }
+
+    // Read the null-terminated wide string into a Rust String.
+    let mut wide = Vec::new();
+    let mut cursor = sid_string;
+    unsafe {
+        while *cursor != 0 {
+            wide.push(*cursor);
+            cursor = cursor.add(1);
+        }
+    }
+    unsafe { LocalFree(sid_string as *mut core::ffi::c_void) };
+    unsafe { CloseHandle(token) };
+
+    Ok(String::from_utf16_lossy(&wide))
 }
 
 fn generate_random_password(length: usize) -> String {
@@ -341,6 +507,58 @@ mod tests {
         assert!(service.authenticate("admin", "correct horse battery staple"));
         assert!(!service.authenticate("admin", "wrong"));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn secret_file_hardening_applies_on_windows() {
+        #[cfg(windows)]
+        {
+            let dir = temp_dir();
+            let file = dir.join("users.json");
+            write_secret_file(&file, b"{\"admin\":\"hash\"}").unwrap();
+            assert!(file.is_file());
+            // Round-trips: an existing hardened file stays writable by us.
+            harden_secret_file(&file).unwrap();
+            std::fs::write(&file, b"updated").unwrap();
+            assert_eq!("updated", std::fs::read_to_string(&file).unwrap());
+
+            // End-to-end DACL check: only SYSTEM, built-in Administrators and
+            // the current user hold access; the inherited "Everyone"/"Users"
+            // ACEs from the temp dir must be gone.
+            let output = std::process::Command::new("icacls")
+                .arg(file.to_string_lossy().as_ref())
+                .output()
+                .expect("icacls must be available on Windows");
+            let text = String::from_utf8_lossy(&output.stdout).to_lowercase();
+            assert!(text.contains("system"), "SYSTEM must hold access: {text}");
+            assert!(
+                text.contains("administrators"),
+                "Administrators must hold access: {text}"
+            );
+            assert!(
+                !text.contains("everyone"),
+                "Everyone must be denied: {text}"
+            );
+            // An inherited "Users"/"Authenticated Users" ACE would render as
+            // `<account>\users:(f)`; the temp path also contains "users", so
+            // match the ACE form specifically.
+            assert!(!text.contains("users:(f)"), "Users must be denied: {text}");
+            let _ = fs::remove_dir_all(&dir);
+        }
+    }
+
+    #[test]
+    fn secret_file_is_owner_only_on_unix() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let dir = temp_dir();
+            let file = dir.join("users.json");
+            write_secret_file(&file, b"secret").unwrap();
+            let mode = std::fs::metadata(&file).unwrap().permissions().mode() & 0o777;
+            assert_eq!(0o600, mode, "secret file must be owner-only");
+            let _ = fs::remove_dir_all(&dir);
+        }
     }
 
     #[test]

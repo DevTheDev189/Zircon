@@ -90,6 +90,7 @@ fn test_app_with_limits(max_attempts: u32, max_join_intents: u32) -> Router {
         mods.clone(),
         packs.clone(),
         "",
+        None,
     ));
     let backup = Arc::new(BackupService::new(&config.data_dir, instances.clone()));
     let tickets = Arc::new(JoinTicketManager::new());
@@ -108,6 +109,7 @@ fn test_app_with_limits(max_attempts: u32, max_join_intents: u32) -> Router {
         resolver,
         tickets,
         curseforge_api_key: String::new(),
+        signing_key: None,
         sessions: Arc::new(SessionRegistry::new()),
         login_limiter: Arc::new(FixedWindowLimiter::new(
             Duration::from_secs(60),
@@ -532,6 +534,94 @@ async fn console_upgrade_is_not_gated_by_header_middleware() {
     let token = login(&app).await;
     let (status, _) = send(&app, "GET", "/api/console", Some(&token), None).await;
     assert_ne!(StatusCode::UNAUTHORIZED, status);
+}
+
+/// Performs a raw WebSocket upgrade handshake against `port` and returns the
+/// HTTP response status code. Runs over a real TCP connection so axum's
+/// upgrade machinery (hyper `OnUpgrade`) is fully exercised — `tower::oneshot`
+/// cannot upgrade, and would reject the handshake with 426 before the handler
+/// even runs.
+async fn ws_upgrade_status(port: u16, origin: Option<&str>) -> StatusCode {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port))
+        .await
+        .expect("connect to test server");
+    let mut request = format!(
+        "GET /api/console HTTP/1.1\r\n\
+         Host: 127.0.0.1:{port}\r\n\
+         Connection: Upgrade\r\n\
+         Upgrade: websocket\r\n\
+         Sec-WebSocket-Version: 13\r\n\
+         Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+    );
+    if let Some(origin) = origin {
+        request.push_str(&format!("Origin: {origin}\r\n"));
+    }
+    request.push_str("\r\n");
+
+    stream
+        .write_all(request.as_bytes())
+        .await
+        .expect("write request");
+
+    // Read until the end of the response head.
+    let mut buf = [0u8; 4096];
+    let mut head = Vec::new();
+    loop {
+        let n = stream.read(&mut buf).await.expect("read response");
+        if n == 0 {
+            break;
+        }
+        head.extend_from_slice(&buf[..n]);
+        if head.windows(4).any(|w| w == b"\r\n\r\n") {
+            break;
+        }
+    }
+
+    let head = String::from_utf8_lossy(&head);
+    let status_line = head.lines().next().unwrap_or_default();
+    let code: u16 = status_line
+        .split_whitespace()
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .expect("parse status code from response head");
+    StatusCode::from_u16(code).expect("valid status code")
+}
+
+#[tokio::test]
+async fn console_websocket_rejects_cross_site_origins() {
+    let app = test_app();
+
+    // Serve the real router on an ephemeral port.
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind test server");
+    let addr = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .expect("test web server failed");
+    });
+
+    // A valid upgrade handshake from an attacker's page must be rejected with
+    // 401 before the socket is ever upgraded (CSWSH defense).
+    let status = ws_upgrade_status(addr.port(), Some("https://evil.example.com")).await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // The admin UI's own loopback origin (default web port) upgrades cleanly.
+    let status = ws_upgrade_status(addr.port(), Some("http://127.0.0.1:25564")).await;
+    assert_eq!(StatusCode::SWITCHING_PROTOCOLS, status);
+
+    // Non-browser clients that omit Origin entirely are still allowed through
+    // (they authenticate with their first message).
+    let status = ws_upgrade_status(addr.port(), None).await;
+    assert_eq!(StatusCode::SWITCHING_PROTOCOLS, status);
+
+    server.abort();
 }
 
 #[tokio::test]

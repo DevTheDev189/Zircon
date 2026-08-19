@@ -12,6 +12,7 @@
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
 
@@ -20,11 +21,62 @@ use crate::auth::jwt;
 use crate::auth::sessions::SessionRegistry;
 use crate::process::console::ConsoleStreamHandler;
 use crate::process::manager::MinecraftProcessManager;
-use crate::web::app::AppState;
+use crate::web::app::{ApiError, AppState};
 
 /// WebSocket upgrade route `/api/console`.
-pub async fn console_ws(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_console_socket(socket, state))
+///
+/// CSWSH defense: the `Origin` header is validated during the HTTP upgrade
+/// handshake. Browsers always send `Origin` on WebSocket connects, so a page
+/// on an attacker-controlled site can never hijack the console — its origin is
+/// rejected with 401 before the socket is upgraded. Clients that omit the
+/// header entirely (the Tauri shell, other non-browser tooling) are unaffected:
+/// they still authenticate with their first message.
+pub async fn console_ws(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, ApiError> {
+    // Validate the Origin header during the HTTP upgrade handshake. When it is
+    // present and not trusted, fail closed and audit the attempt (under
+    // ANONYMOUS — no session exists yet).
+    if let Some(origin_header) = headers.get("origin").and_then(|o| o.to_str().ok()) {
+        let config = state.config.get_config();
+        let is_allowed = is_allowed_origin(origin_header, config.web_port, config.public_port);
+        if !is_allowed {
+            state.audit.log(
+                "ANONYMOUS",
+                "CSWSH_BLOCKED",
+                &format!("Blocked unauthorized WebSocket upgrade from origin: {origin_header}"),
+            );
+            return Err(ApiError::Unauthorized(
+                "Cross-Origin WebSocket request denied".into(),
+            ));
+        }
+    }
+
+    Ok(ws.on_upgrade(move |socket| handle_console_socket(socket, state)))
+}
+
+/// Whether a WebSocket handshake `Origin` is trusted: the admin UI served on
+/// the web/public ports and the embedded Tauri frontend schemes. Origins are
+/// compared exactly after trimming and lowercasing, so cross-site origins and
+/// lookalike hosts (e.g. `127.0.0.1:25564.evil.com`) are rejected.
+fn is_allowed_origin(origin: &str, web_port: i32, public_port: i32) -> bool {
+    let clean = origin.trim().to_lowercase();
+    let allowed = [
+        format!("http://127.0.0.1:{web_port}"),
+        format!("http://localhost:{web_port}"),
+        format!("https://127.0.0.1:{web_port}"),
+        format!("https://localhost:{web_port}"),
+        format!("http://127.0.0.1:{public_port}"),
+        format!("http://localhost:{public_port}"),
+        // Embedded Tauri frontend schemes (Windows/Linux: `tauri://localhost`,
+        // macOS: `http://tauri.localhost`).
+        "tauri://localhost".to_string(),
+        "http://tauri.localhost".to_string(),
+    ];
+
+    allowed.iter().any(|a| a == &clean)
 }
 
 async fn handle_console_socket(socket: WebSocket, state: AppState) {
@@ -223,6 +275,81 @@ mod tests {
 
     fn temp_dir() -> std::path::PathBuf {
         crate::test_util::temp_dir("console")
+    }
+
+    #[test]
+    fn origin_validation_accepts_admin_and_tauri_origins() {
+        let (web, public) = (25564, 25565);
+        // Admin UI on the web port (http/https, loopback hosts).
+        assert!(is_allowed_origin(
+            &format!("http://127.0.0.1:{web}"),
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            &format!("http://localhost:{web}"),
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            &format!("https://127.0.0.1:{web}"),
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            &format!("https://localhost:{web}"),
+            web,
+            public
+        ));
+        // Origins proxied via the public port.
+        assert!(is_allowed_origin(
+            &format!("http://127.0.0.1:{public}"),
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            &format!("http://localhost:{public}"),
+            web,
+            public
+        ));
+        // Embedded Tauri frontend schemes.
+        assert!(is_allowed_origin("tauri://localhost", web, public));
+        assert!(is_allowed_origin("http://tauri.localhost", web, public));
+        // Case and surrounding whitespace are normalized.
+        assert!(is_allowed_origin(
+            &format!("  HTTP://LOCALHOST:{web}  "),
+            web,
+            public
+        ));
+    }
+
+    #[test]
+    fn origin_validation_rejects_cross_site_and_lookalikes() {
+        let (web, public) = (25564, 25565);
+        // Attacker pages and unrelated ports.
+        assert!(!is_allowed_origin("https://evil.example.com", web, public));
+        assert!(!is_allowed_origin("http://127.0.0.1:9999", web, public));
+        assert!(!is_allowed_origin("http://127.0.0.1:25566", web, public));
+        // Privacy-mode "null" origin, empty, and malformed values.
+        assert!(!is_allowed_origin("null", web, public));
+        assert!(!is_allowed_origin("", web, public));
+        assert!(!is_allowed_origin("not a url", web, public));
+        // Exact-match only: paths and lookalike hosts must never pass.
+        assert!(!is_allowed_origin(
+            "http://127.0.0.1:25564.evil.com",
+            web,
+            public
+        ));
+        assert!(!is_allowed_origin(
+            "http://localhost:25564.evil.com",
+            web,
+            public
+        ));
+        assert!(!is_allowed_origin(
+            "http://127.0.0.1:25564/console",
+            web,
+            public
+        ));
     }
 
     #[test]

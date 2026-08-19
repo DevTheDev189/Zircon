@@ -34,6 +34,15 @@ const BACKEND_HOST: &str = "127.0.0.1";
 /// is dropped (Slowloris socket-starvation defense).
 const PROTOCOL_DETECTION_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Global cap on concurrently accepted TCP connections across all listeners
+/// (public port + per-instance ports). Prevents a connection flood from
+/// exhausting file descriptors (`EMFILE`) on the wrapper.
+const MAX_GLOBAL_TCP_CONNS: usize = 1000;
+/// Per-source-IP cap on concurrently accepted connections. Kept well below the
+/// global cap so a single client (or a spoofed-IP flood) cannot crowd out
+/// every other player or fill the global budget alone.
+const MAX_CONNS_PER_IP: usize = 25;
+
 /// The Tokio TCP multiplexer.
 #[derive(Clone)]
 pub struct TcpMultiplexer {
@@ -43,6 +52,11 @@ pub struct TcpMultiplexer {
     web_port: u16,
     mc_port: u16,
     bindings: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
+    /// Global connection budget: an owned permit is held for every accepted
+    /// connection and released when its task ends.
+    global_limiter: Arc<tokio::sync::Semaphore>,
+    /// Currently accepted connections per source IP, for the per-IP quota.
+    ip_conns: Arc<dashmap::DashMap<std::net::IpAddr, usize>>,
 }
 
 impl TcpMultiplexer {
@@ -59,6 +73,8 @@ impl TcpMultiplexer {
             web_port: cfg.web_port as u16,
             mc_port: cfg.mc_port as u16,
             bindings: Arc::new(Mutex::new(HashMap::new())),
+            global_limiter: Arc::new(tokio::sync::Semaphore::new(MAX_GLOBAL_TCP_CONNS)),
+            ip_conns: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -213,9 +229,57 @@ impl TcpMultiplexer {
                 };
                 match accepted {
                     Ok((socket, _)) => {
+                        // Socket-exhaustion defense: cap concurrently accepted
+                        // connections per source IP and globally so a flood
+                        // cannot exhaust file descriptors (EMFILE) or crowd out
+                        // every other player.
+                        let peer_ip = socket
+                            .peer_addr()
+                            .map(|addr| addr.ip())
+                            .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
                         let this = this.clone();
+                        let ip_conns = this.ip_conns.clone();
+
+                        // Per-IP quota, checked before the global budget so one
+                        // client cannot drain the global pool on its own.
+                        {
+                            let mut count = ip_conns.entry(peer_ip).or_insert(0);
+                            if *count >= MAX_CONNS_PER_IP {
+                                tracing::warn!(
+                                    "TCP connection limit exceeded for {peer_ip}; closing socket"
+                                );
+                                drop(socket);
+                                continue;
+                            }
+                            *count += 1;
+                        }
+
+                        // Global quota: an owned permit is held for the whole
+                        // lifetime of the connection and released when its task
+                        // ends (the permit is moved into the task below).
+                        let Ok(permit) = this.global_limiter.clone().try_acquire_owned() else {
+                            tracing::warn!(
+                                "Global TCP connection capacity reached; dropping connection"
+                            );
+                            drop(socket);
+                            // Revert the per-IP increment via the RAII guard.
+                            drop(IpConnGuard {
+                                ip: peer_ip,
+                                ip_conns,
+                            });
+                            continue;
+                        };
+
                         let fixed = fixed_instance.clone();
                         tokio::spawn(async move {
+                            // The guard keeps the global permit and the per-IP
+                            // counter slot for the connection's lifetime; both
+                            // are released automatically when the task ends.
+                            let _permit = permit;
+                            let _ip_guard = IpConnGuard {
+                                ip: peer_ip,
+                                ip_conns,
+                            };
                             if let Err(e) = this.handle_connection(socket, fixed).await {
                                 // Visible at the default log level: a dropped game
                                 // connection is the classic "Failed to Quick Play"
@@ -426,6 +490,28 @@ impl TcpMultiplexer {
     }
 }
 
+/// RAII guard that holds a per-IP connection slot: decrements (and cleans up)
+/// the multiplexer's `ip_conns` counter when dropped, so the quota can never
+/// leak — whether the connection task ends normally, the accept loop rejects
+/// an over-budget socket, or a task panics.
+struct IpConnGuard {
+    ip: std::net::IpAddr,
+    ip_conns: Arc<dashmap::DashMap<std::net::IpAddr, usize>>,
+}
+
+impl Drop for IpConnGuard {
+    fn drop(&mut self) {
+        if let Some(mut count) = self.ip_conns.get_mut(&self.ip) {
+            if *count <= 1 {
+                drop(count);
+                self.ip_conns.remove(&self.ip);
+            } else {
+                *count -= 1;
+            }
+        }
+    }
+}
+
 /// Cap on how much of an HTTP request head the multiplexer will buffer to
 /// inject the real client IP (well beyond any realistic request head).
 const MAX_HTTP_HEAD_BYTES: usize = 16 * 1024;
@@ -435,11 +521,19 @@ const MAX_HTTP_HEAD_BYTES: usize = 16 * 1024;
 ///
 /// * completes the request head by reading from `client` until `\r\n\r\n`
 ///   (bounded), then
-/// * injects `X-Zircon-Real-IP: <client ip>` — the web server binds
-///   loopback-only, so only this trusted proxy can set that header — and
+/// * strips any attacker-supplied `X-Zircon-Real-IP` and `Connection` headers
+///   (case-insensitively), then
+/// * injects the multiplexer's own `X-Zircon-Real-IP: <client ip>` — the web
+///   server binds loopback-only, so only this trusted proxy may set that
+///   header — and
 /// * forces `Connection: close` so every proxied request is the first (and
 ///   only) request on its connection and therefore always carries the header
 ///   (no keep-alive reuse that could bypass the rate limiter's IP keying).
+///
+/// Without the strip step, a remote client could send its own
+/// `X-Zircon-Real-IP` header; because it appears before the injected header,
+/// the web layer's single-header lookup would trust the spoofed value and
+/// the attacker could bypass per-IP rate limits and poison audit trails.
 ///
 /// Falls back to the buffered bytes unchanged when the head cannot be
 /// completed within the cap, so a stalled or oversized request is still
@@ -461,13 +555,30 @@ async fn prepare_http_forward(
         return buf;
     };
 
-    // The head ends with `\r\n`; splice the new headers in before the blank
-    // line (`\r\n\r\n`), which starts at `head_end`.
-    let injected = format!("X-Zircon-Real-IP: {client_ip}\r\nConnection: close\r\n");
-    let mut out = Vec::with_capacity(buf.len() + injected.len());
-    out.extend_from_slice(&buf[..head_end]);
-    out.extend_from_slice(injected.as_bytes());
-    out.extend_from_slice(&buf[head_end..]);
+    let head_str = String::from_utf8_lossy(&buf[..head_end]);
+    let mut sanitized_lines = Vec::new();
+
+    for (i, line) in head_str.lines().enumerate() {
+        if i == 0 {
+            // Preserve the request line, e.g. "GET /index.html HTTP/1.1".
+            sanitized_lines.push(line.to_string());
+            continue;
+        }
+        let lower = line.to_ascii_lowercase();
+        // Drop attacker-injected real-IP or connection overrides.
+        if lower.starts_with("x-zircon-real-ip:") || lower.starts_with("connection:") {
+            continue;
+        }
+        sanitized_lines.push(line.to_string());
+    }
+
+    // Append our verified headers.
+    sanitized_lines.push(format!("X-Zircon-Real-IP: {client_ip}"));
+    sanitized_lines.push("Connection: close".to_string());
+
+    let mut out = sanitized_lines.join("\r\n").into_bytes();
+    out.extend_from_slice(b"\r\n\r\n");
+    out.extend_from_slice(&buf[head_end + 4..]); // Append any body bytes already buffered
     out
 }
 
@@ -588,6 +699,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn strips_spoofed_x_zircon_real_ip_and_connection_headers() {
+        // The head is already complete in the buffer, so `prepare_http_forward`
+        // never reads from the socket — a connected-but-silent pair suffices.
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut client = TcpStream::connect(addr).await.unwrap();
+
+        // An attacker prefaces the request with forged trusted headers in
+        // varying cases (headers are case-insensitive per RFC 9110).
+        let spoofed = b"GET /index.html HTTP/1.1\r\n\
+            Host: localhost\r\n\
+            X-Zircon-Real-IP: 203.0.113.66\r\n\
+            x-zircon-real-ip: 198.51.100.7\r\n\
+            Connection: keep-alive\r\n\
+            cOnNeCtIoN: keep-alive\r\n\
+            User-Agent: minecraft\r\n\
+            \r\n\
+            body-bytes"
+            .to_vec();
+
+        let rewritten = prepare_http_forward(
+            spoofed,
+            &mut client,
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1)),
+        )
+        .await;
+        let text = String::from_utf8_lossy(&rewritten);
+
+        assert!(text.starts_with("GET /index.html HTTP/1.1\r\n"));
+        // The trusted header appears exactly once, carrying the socket's real
+        // IP; the spoofed values are gone.
+        assert_eq!(
+            1,
+            text.matches("X-Zircon-Real-IP").count(),
+            "spoofed real-IP header must be stripped: {text:?}"
+        );
+        assert!(text.contains("X-Zircon-Real-IP: 192.0.2.1\r\n"));
+        assert!(!text.contains("203.0.113.66"));
+        assert!(!text.contains("198.51.100.7"));
+        // Attacker keep-alive overrides are stripped; the proxy injects exactly
+        // one `Connection: close`.
+        assert_eq!(
+            1,
+            text.matches("Connection").count(),
+            "spoofed connection headers must be stripped: {text:?}"
+        );
+        assert!(text.contains("Connection: close\r\n"));
+        // Legitimate headers and any already-buffered body bytes are preserved.
+        assert!(text.contains("Host: localhost\r\n"));
+        assert!(text.contains("User-Agent: minecraft\r\n"));
+        assert!(text.ends_with("body-bytes"));
+    }
+
+    #[tokio::test]
     async fn http_proxy_can_be_disabled_for_reverse_proxy_deployments() {
         let _guard = MUX_TEST_LOCK.lock().await;
         let dir = temp_dir();
@@ -629,6 +794,51 @@ mod tests {
             received.starts_with("GET "),
             "HTTP bytes must be routed to the MC backend, got: {received:?}"
         );
+        handle.abort();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn per_ip_connection_quota_drops_excess_connections() {
+        let _guard = MUX_TEST_LOCK.lock().await;
+        let dir = temp_dir();
+        let config = config_at(&dir);
+        let multiplexer =
+            TcpMultiplexer::new(config.clone(), None, Arc::new(JoinTicketManager::new()));
+        let main_port = config.get_config().public_port as u16;
+        let handle = multiplexer.spawn_listener(main_port, None);
+
+        // Fill the per-IP quota with idle sockets: they send nothing, so the
+        // connection handlers stay alive in protocol detection and keep their
+        // quota slots.
+        let mut held = Vec::new();
+        for _ in 0..MAX_CONNS_PER_IP {
+            held.push(TcpStream::connect(("127.0.0.1", main_port)).await.unwrap());
+        }
+
+        // Give the accept loop time to accept and count every held socket.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // The next connection from the same IP is dropped immediately (the
+        // server closes it without writing anything).
+        let mut excess = TcpStream::connect(("127.0.0.1", main_port)).await.unwrap();
+        let mut byte = [0u8; 1];
+        let read = tokio::time::timeout(Duration::from_secs(2), excess.read(&mut byte)).await;
+        let read = read.expect("excess connection must be dropped promptly");
+        assert!(
+            matches!(read, Ok(0) | Err(_)),
+            "over-quota connection should be closed by the server, got {read:?}"
+        );
+
+        // Dropping the held sockets releases their slots: the per-IP counter
+        // drains and the map entry is cleaned up rather than left at zero.
+        drop(held);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(
+            multiplexer.ip_conns.is_empty(),
+            "counters must drain on close"
+        );
+
         handle.abort();
         let _ = std::fs::remove_dir_all(&dir);
     }

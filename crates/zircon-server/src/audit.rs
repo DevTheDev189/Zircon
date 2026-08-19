@@ -2,9 +2,10 @@
 //!
 //! Every sensitive action (login, password change, console command, 2FA
 //! changes) is appended to `audit.log` in the data dir. The file is kept
-//! owner-only (`0o600`) on Unix so other local users cannot read or tamper
-//! with the trail. Entries are written under a mutex so concurrent handlers
-//! never interleave partial lines.
+//! owner-only (`0o600`) on Unix and restricted to SYSTEM/Administrators/current
+//! user on Windows, so other local users cannot read or tamper with the trail.
+//! Entries are written under a mutex so concurrent handlers never interleave
+//! partial lines.
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -12,6 +13,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use chrono::Utc;
+
+use crate::auth::auth_service::harden_secret_file;
 
 /// Writes timestamped audit entries to `<data_dir>/audit.log`.
 pub struct AuditLogger {
@@ -39,13 +42,11 @@ impl AuditLogger {
             .append(true)
             .open(&self.log_file)
         {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(
-                    &self.log_file,
-                    std::fs::Permissions::from_mode(0o600),
-                );
+            // The file may pre-exist from before hardening existed; re-apply
+            // the platform's secret-file hardening on every write so an
+            // unwatched local user can never read or tamper with the trail.
+            if let Err(e) = harden_secret_file(&self.log_file) {
+                tracing::warn!("Could not harden audit log permissions: {e}");
             }
             let _ = file.write_all(entry.as_bytes());
         }

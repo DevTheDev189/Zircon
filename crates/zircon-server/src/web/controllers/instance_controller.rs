@@ -883,14 +883,17 @@ fn server_dir(state: &AppState, id: &str) -> std::path::PathBuf {
 fn mods_for(state: &AppState, id: &str) -> Result<ModManagementService, ApiError> {
     let cfg = state.instances.get_instance(id)?;
     let instance_dir = state.instances.get_instance_dir(id);
-    let bom = Arc::new(BomService::new(
-        instance_dir.join("bom.json"),
-        Some(BillOfMaterials::new(
-            cfg.minecraft_version.clone(),
-            cfg.mod_loader.clone(),
-            Some(cfg.name.clone()),
-        )),
-    ));
+    let bom = Arc::new(
+        BomService::new(
+            instance_dir.join("bom.json"),
+            Some(BillOfMaterials::new(
+                cfg.minecraft_version.clone(),
+                cfg.mod_loader.clone(),
+                Some(cfg.name.clone()),
+            )),
+        )
+        .with_signing_key(state.signing_key.clone()),
+    );
     Ok(ModManagementService::new(
         bom,
         instance_dir.join("mods"),
@@ -902,14 +905,17 @@ fn mods_for(state: &AppState, id: &str) -> Result<ModManagementService, ApiError
 fn packs_for(state: &AppState, id: &str) -> Result<PackManagementService, ApiError> {
     let cfg = state.instances.get_instance(id)?;
     let instance_dir = state.instances.get_instance_dir(id);
-    let bom = Arc::new(BomService::new(
-        instance_dir.join("bom.json"),
-        Some(BillOfMaterials::new(
-            cfg.minecraft_version.clone(),
-            cfg.mod_loader.clone(),
-            Some(cfg.name.clone()),
-        )),
-    ));
+    let bom = Arc::new(
+        BomService::new(
+            instance_dir.join("bom.json"),
+            Some(BillOfMaterials::new(
+                cfg.minecraft_version.clone(),
+                cfg.mod_loader.clone(),
+                Some(cfg.name.clone()),
+            )),
+        )
+        .with_signing_key(state.signing_key.clone()),
+    );
     Ok(PackManagementService::new(
         bom,
         instance_dir.join("shaderpacks"),
