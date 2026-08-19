@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::Body;
+use axum::extract::ConnectInfo;
 use axum::http::{header, Request, StatusCode};
 use axum::Router;
 use http_body_util::BodyExt;
@@ -49,11 +50,12 @@ fn temp_dir(prefix: &str) -> std::path::PathBuf {
 /// Builds a fully wired router over a throwaway temp data dir. The initial
 /// admin account is created with a known password.
 fn test_app() -> Router {
-    test_app_with_limits(10)
+    test_app_with_limits(10, 30)
 }
 
-/// Like `test_app` but with a configurable login rate-limit window cap.
-fn test_app_with_limits(max_attempts: u32) -> Router {
+/// Like `test_app` but with configurable rate-limit window caps (login
+/// attempts per IP+user, join-intent registrations per IP).
+fn test_app_with_limits(max_attempts: u32, max_join_intents: u32) -> Router {
     let dir = temp_dir("web-auth");
     let config = Arc::new(
         ConfigService::load_with_data_dir(Some(dir.display().to_string())).expect("config load"),
@@ -111,6 +113,10 @@ fn test_app_with_limits(max_attempts: u32) -> Router {
             Duration::from_secs(60),
             max_attempts,
         )),
+        join_intent_limiter: Arc::new(FixedWindowLimiter::new(
+            Duration::from_secs(60),
+            max_join_intents,
+        )),
         audit,
     };
     router(state)
@@ -138,6 +144,94 @@ async fn send(
         }
         None => builder.body(Body::empty()).expect("request"),
     };
+    let response = app.clone().oneshot(request).await.expect("router response");
+    let status = response.status();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("collect body")
+        .to_bytes();
+    let json = if bytes.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null)
+    };
+    (status, json)
+}
+
+/// Like `send` but pins the peer address via `ConnectInfo` so rate-limit
+/// keying can be exercised per source IP.
+async fn send_from(
+    app: &Router,
+    ip: &str,
+    method: &str,
+    uri: &str,
+    token: Option<&str>,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(token) = token {
+        builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+    }
+    let request = match body {
+        Some(value) => {
+            builder = builder.header(header::CONTENT_TYPE, "application/json");
+            builder
+                .body(Body::from(value.to_string()))
+                .expect("request body")
+        }
+        None => builder.body(Body::empty()).expect("request"),
+    };
+    let mut request = request;
+    let addr: std::net::SocketAddr = format!("{ip}:12345").parse().expect("socket addr");
+    request.extensions_mut().insert(ConnectInfo(addr));
+    let response = app.clone().oneshot(request).await.expect("router response");
+    let status = response.status();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("collect body")
+        .to_bytes();
+    let json = if bytes.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null)
+    };
+    (status, json)
+}
+
+/// Like `send` but simulates the TCP multiplexer path: the direct peer is
+/// loopback and the real client IP arrives via the trusted `X-Zircon-Real-IP`
+/// header (the web server honors that header only from loopback peers).
+async fn send_via_proxy(
+    app: &Router,
+    real_ip: &str,
+    method: &str,
+    uri: &str,
+    token: Option<&str>,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
+    let mut builder = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("X-Zircon-Real-IP", real_ip);
+    if let Some(token) = token {
+        builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+    }
+    let request = match body {
+        Some(value) => {
+            builder = builder.header(header::CONTENT_TYPE, "application/json");
+            builder
+                .body(Body::from(value.to_string()))
+                .expect("request body")
+        }
+        None => builder.body(Body::empty()).expect("request"),
+    };
+    let mut request = request;
+    let addr: std::net::SocketAddr = "127.0.0.1:12345".parse().expect("loopback addr");
+    request.extensions_mut().insert(ConnectInfo(addr));
     let response = app.clone().oneshot(request).await.expect("router response");
     let status = response.status();
     let bytes = response
@@ -489,7 +583,7 @@ async fn logout_revokes_the_token_server_side() {
 
 #[tokio::test]
 async fn login_is_rate_limited_against_brute_force() {
-    let app = test_app_with_limits(3);
+    let app = test_app_with_limits(3, 30);
 
     // Three failed attempts are allowed...
     for _ in 0..3 {
@@ -514,6 +608,231 @@ async fn login_is_rate_limited_against_brute_force() {
     )
     .await;
     assert_eq!(StatusCode::TOO_MANY_REQUESTS, status);
+}
+
+#[tokio::test]
+async fn attacker_ip_cannot_lock_out_admin_from_another_ip() {
+    let app = test_app_with_limits(3, 30);
+    let attacker = "203.0.113.7";
+    let admin_ip = "198.51.100.9";
+
+    // The attacker exhausts the limit for the `admin` username from their IP.
+    for _ in 0..3 {
+        let (status, _) = send_from(
+            &app,
+            attacker,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "username": "admin", "password": "wrong" })),
+        )
+        .await;
+        assert_eq!(StatusCode::UNAUTHORIZED, status);
+    }
+    let (status, _) = send_from(
+        &app,
+        attacker,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::TOO_MANY_REQUESTS, status);
+
+    // The administrator from a different IP is unaffected: the limiter is
+    // keyed on IP+username, so an account-lockout DoS is impossible.
+    let (status, _) = send_from(
+        &app,
+        admin_ip,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+}
+
+#[tokio::test]
+async fn login_rate_limit_uses_real_ip_forwarded_from_loopback() {
+    let app = test_app_with_limits(3, 30);
+
+    // Through the TCP multiplexer the direct peer is loopback; the real client
+    // IP arrives in the trusted X-Real-IP header. An attacker exhausting the
+    // `admin` bucket from their real IP must not lock out the admin from
+    // another real IP (the loopback-collapse lockout DoS).
+    for _ in 0..3 {
+        let (status, _) = send_via_proxy(
+            &app,
+            "203.0.113.7",
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "username": "admin", "password": "wrong" })),
+        )
+        .await;
+        assert_eq!(StatusCode::UNAUTHORIZED, status);
+    }
+    let (status, _) = send_via_proxy(
+        &app,
+        "203.0.113.7",
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::TOO_MANY_REQUESTS, status);
+
+    let (status, _) = send_via_proxy(
+        &app,
+        "198.51.100.9",
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+}
+
+#[tokio::test]
+async fn join_intent_is_rate_limited_per_real_ip() {
+    let app = test_app_with_limits(10, 5);
+
+    // Five registrations from one source are allowed...
+    for _ in 0..5 {
+        let (status, _) = send_from(
+            &app,
+            "203.0.113.9",
+            "POST",
+            "/api/join-intent",
+            None,
+            Some(json!({ "username": "player" })),
+        )
+        .await;
+        assert_eq!(StatusCode::OK, status);
+    }
+    // ...the sixth is throttled, so a single attacker cannot fill the ticket
+    // store with distinct usernames to block legitimate joins.
+    let (status, _) = send_from(
+        &app,
+        "203.0.113.9",
+        "POST",
+        "/api/join-intent",
+        None,
+        Some(json!({ "username": "another-player" })),
+    )
+    .await;
+    assert_eq!(StatusCode::TOO_MANY_REQUESTS, status);
+
+    // A different source is unaffected.
+    let (status, _) = send_from(
+        &app,
+        "198.51.100.9",
+        "POST",
+        "/api/join-intent",
+        None,
+        Some(json!({ "username": "player" })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+}
+
+#[tokio::test]
+async fn account_operations_are_bound_to_the_authenticated_user() {
+    let app = test_app();
+    let token = login(&app).await;
+
+    // Profile updates must target the JWT subject: a mismatched username is
+    // rejected before any credential check.
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/profile",
+        Some(&token),
+        Some(json!({
+            "currentUsername": "other-admin",
+            "currentPassword": ADMIN_PASSWORD,
+        })),
+    )
+    .await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // Password changes likewise.
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/change-password",
+        Some(&token),
+        Some(json!({
+            "username": "other-admin",
+            "currentPassword": ADMIN_PASSWORD,
+            "newPassword": "brand-new-password-123",
+        })),
+    )
+    .await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // The bound username still works end-to-end (positive control).
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/auth/change-password",
+        Some(&token),
+        Some(json!({
+            "username": "admin",
+            "currentPassword": ADMIN_PASSWORD,
+            "newPassword": "brand-new-password-123",
+        })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+}
+
+#[tokio::test]
+async fn usernames_with_newlines_are_rejected_with_400() {
+    let app = test_app();
+    let token = login(&app).await;
+
+    // Newline injection into a console command is blocked at the boundary:
+    // the username must match Minecraft grammar, so it can never smuggle a
+    // second command (e.g. `whitelist add Steve\nop Steve`).
+    for payload in [
+        json!({ "name": "Steve\nop Steve" }),
+        json!({ "name": "Steve\rop Steve" }),
+        json!({ "name": "averylongusernameexceeds16" }),
+        json!({ "name": "" }),
+    ] {
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/players/whitelist",
+            Some(&token),
+            Some(payload),
+        )
+        .await;
+        assert_eq!(StatusCode::BAD_REQUEST, status);
+    }
+
+    // Ban reasons are sanitized, not rejected: newlines become spaces so the
+    // reason text can never terminate the command line.
+    let (status, body) = send(
+        &app,
+        "POST",
+        "/api/players/bans",
+        Some(&token),
+        Some(json!({ "name": "Steve", "reason": "spam\nop Steve" })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+    let command = body["command"].as_str().unwrap_or_default();
+    assert!(
+        !command.contains('\n') && !command.contains('\r'),
+        "sanitized command must not contain raw newlines: {command:?}"
+    );
+    assert!(command.starts_with("ban Steve"));
 }
 
 #[tokio::test]

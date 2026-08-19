@@ -395,6 +395,18 @@ async fn run_installer(
         install_dir.display()
     );
     let mut command = tokio::process::Command::new(java);
+    // Scrub environment variables before spawning the installer: it downloads
+    // and executes untrusted artifacts, so host secrets (AWS_ACCESS_KEY_ID,
+    // GITHUB_TOKEN, ...) must never leak into it. Keep only what the JVM needs
+    // to function — the same baseline as `MinecraftRunner::spawn_game`.
+    command.env_clear();
+    command.envs(std::env::vars().filter(|(k, _)| {
+        let upper = k.to_ascii_uppercase();
+        matches!(
+            upper.as_str(),
+            "PATH" | "SYSTEMROOT" | "USERPROFILE" | "HOME" | "TMP" | "TEMP"
+        )
+    }));
     command
         .arg("-jar")
         .arg(installer_jar)

@@ -87,46 +87,66 @@ impl PlayerTracker {
         if line.is_empty() {
             return;
         }
-        if line.contains(DONE_MARKER) && line.contains(DONE_SUFFIX) {
+
+        // Only parse lines from the official Minecraft Server thread. Chat
+        // lines arrive on that thread too, so they are further filtered below.
+        let content = if let Some(idx) = line.find("[Server thread/INFO]: ") {
+            &line[idx + 22..]
+        } else if let Some(idx) = line.find("[Server thread/INFO] [minecraft/MinecraftServer]: ") {
+            &line[idx + 50..]
+        } else {
+            return;
+        };
+
+        // Ignore in-game player chat messages (`<Steve> ...`) and bracket-led
+        // lines (e.g. `/tellraw` output, advancement titles) — they must never
+        // fake a join/leave event or the boot marker.
+        if content.starts_with('<') || content.starts_with('[') {
+            return;
+        }
+
+        // Boot completion detection
+        if content.starts_with(DONE_MARKER) && content.contains(DONE_SUFFIX) {
             *self.ready.lock().unwrap() = true;
             let mut ready_at = self.ready_at.lock().unwrap();
             if ready_at.is_none() {
                 *ready_at = Some(Instant::now());
             }
-        }
-        let mut name: Option<&str> = None;
-        let mut remove = false;
-
-        if let Some(idx) = line.find(JOINED) {
-            name = Some(&line[..idx]);
-        } else if let Some(idx) = line.find(LEFT) {
-            name = Some(&line[..idx]);
-            remove = true;
-        } else if let Some(idx) = line.find(LOST) {
-            name = Some(&line[..idx]);
-            remove = true;
-        }
-
-        let Some(mut name) = name else { return };
-        // Strip the vanilla prefix like "[Server thread/INFO]: ".
-        if let Some(bracket) = name.rfind("]: ") {
-            name = &name[bracket + 3..];
-        }
-        let name = name.trim();
-        if name.is_empty() {
             return;
         }
 
-        // Every join/leave/lost event is a moment of player activity: a leave
-        // marks the instant the idle window starts, a join resets it.
-        *self.last_activity_at.lock().unwrap() = Some(Instant::now());
+        let mut name: Option<&str> = None;
+        let mut remove = false;
 
-        let mut online = self.online.lock().unwrap();
-        if remove {
-            online.remove(name);
-        } else {
-            online.insert(name.to_string());
-            self.record_join(name);
+        if let Some(idx) = content.find(JOINED) {
+            name = Some(&content[..idx]);
+        } else if let Some(idx) = content.find(LEFT) {
+            name = Some(&content[..idx]);
+            remove = true;
+        } else if let Some(idx) = content.find(LOST) {
+            name = Some(&content[..idx]);
+            remove = true;
+        }
+
+        if let Some(raw_name) = name {
+            let player = raw_name.trim();
+            // Validate strictly against Minecraft username format so log
+            // spoofing can never register an arbitrary string.
+            if (1..=16).contains(&player.len())
+                && player
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+            {
+                // Every join/leave/lost event is a moment of player activity.
+                *self.last_activity_at.lock().unwrap() = Some(Instant::now());
+                let mut online = self.online.lock().unwrap();
+                if remove {
+                    online.remove(player);
+                } else {
+                    online.insert(player.to_string());
+                    self.record_join(player);
+                }
+            }
         }
     }
 
@@ -333,9 +353,9 @@ mod tests {
         let dir = temp_dir();
         let players_file = dir.join("players.json");
         let tracker = PlayerTracker::new(Some(players_file.clone()));
-        tracker.on_line("Steve joined the game");
-        tracker.on_line("Steve joined the game");
-        tracker.on_line("Alex joined the game");
+        tracker.on_line("[Server thread/INFO]: Steve joined the game");
+        tracker.on_line("[Server thread/INFO]: Steve joined the game");
+        tracker.on_line("[Server thread/INFO]: Alex joined the game");
 
         let history = PlayerTracker::load_history(&players_file);
         assert_eq!(2, history.len());
@@ -346,5 +366,48 @@ mod tests {
         // Most recently active first.
         assert!(history[0].name == "Alex" || history[0].name == "Steve");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn chat_lines_cannot_fake_ready_or_join_events() {
+        let tracker = PlayerTracker::new(None);
+        // A chat message embedding the boot marker must not flip `ready`.
+        tracker.on_line("<Attacker> [Server thread/INFO]: Done (1s)");
+        assert!(!tracker.is_ready());
+        assert_eq!(0, tracker.online_player_count());
+
+        // A chat message whose content starts with '<' is ignored entirely,
+        // even when it contains a fake join marker.
+        tracker.on_line("[Server thread/INFO]: <Attacker> Steve joined the game");
+        assert_eq!(0, tracker.online_player_count());
+
+        // Bracket-led lines (e.g. /tellraw output) are ignored too.
+        tracker.on_line("[Server thread/INFO]: [{\"text\":\"Alex joined the game\"}]");
+        assert_eq!(0, tracker.online_player_count());
+        assert!(!tracker.is_ready());
+    }
+
+    #[test]
+    fn non_server_thread_lines_are_ignored() {
+        let tracker = PlayerTracker::new(None);
+        tracker.on_line("[User Authenticator #1/INFO]: Steve joined the game");
+        tracker.on_line("[Netty Server IO #3/INFO]: Alex left the game");
+        assert_eq!(0, tracker.online_player_count());
+        assert!(!tracker.is_ready());
+    }
+
+    #[test]
+    fn invalid_usernames_are_rejected() {
+        let tracker = PlayerTracker::new(None);
+        // Too long for a Minecraft username.
+        tracker.on_line("[Server thread/INFO]: VeryLongUsernameExceeds16 joined the game");
+        // Contains spaces — not a valid username.
+        tracker.on_line("[Server thread/INFO]: bad name with spaces joined the game");
+        assert_eq!(0, tracker.online_player_count());
+
+        // A legitimately formatted name still tracks normally.
+        tracker.on_line("[Server thread/INFO]: Notch joined the game");
+        assert_eq!(1, tracker.online_player_count());
+        assert!(tracker.get_online_players().contains(&"Notch".to_string()));
     }
 }

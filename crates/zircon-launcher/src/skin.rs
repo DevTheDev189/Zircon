@@ -355,6 +355,15 @@ impl MojangSkinService {
             .ok_or_else(|| {
                 LauncherError::NotFound("Mojang skin record has no download URL".to_string())
             })?;
+
+        // Validate that the skin texture URL originates strictly from Mojang's
+        // texture CDN — never an arbitrary host from a (possibly tampered)
+        // session profile.
+        if !skin_url.starts_with("https://textures.minecraft.net/") {
+            return Err(LauncherError::InvalidInput(format!(
+                "Invalid texture domain in skin URL: {skin_url}"
+            )));
+        }
         let variant = skin
             .get("metadata")
             .and_then(|m| m.get("model"))

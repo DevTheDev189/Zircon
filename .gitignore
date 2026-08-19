@@ -28,6 +28,12 @@ client_id.txt
 *.key
 *.pem
 
+# ---------- Local dev-only build scripts (never commit) ----------
+/deven-build.bat
+
+# ---------- Website (managed outside the repo, staged to cloudflare-upload) ----------
+/website/
+
 # ---------- Rust ----------
 target/
 **/target/
@@ -38,3 +44,4 @@ crates/zircon-launcher/ui/dist/
 
 # ---------- Launcher runtime state (never commit) ----------
 ~/.mcmanager/
+~/.tauri/

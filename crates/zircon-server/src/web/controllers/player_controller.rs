@@ -7,7 +7,9 @@
 use axum::extract::{Path, State};
 use axum::Json;
 
-use super::config_helpers::{command_result, PlayerActionRequest};
+use super::config_helpers::{
+    command_result, sanitize_command_param, validate_minecraft_username, PlayerActionRequest,
+};
 use crate::web::app::{ApiError, AppState};
 
 fn read_json_list(dir: &std::path::Path, file_name: &str) -> Vec<serde_json::Value> {
@@ -31,19 +33,20 @@ pub async fn add_whitelist(
     State(state): State<AppState>,
     Json(body): Json<PlayerActionRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let name = body
+    let raw_name = body
         .name
         .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
-    let result = send_result(&state, &format!("whitelist add {name}")).await;
-    Ok(result)
+    let name = validate_minecraft_username(&raw_name)?;
+    Ok(send_result(&state, &format!("whitelist add {name}")).await)
 }
 
 /// DELETE /api/players/whitelist/{name} — whitelist remove.
 pub async fn remove_whitelist(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Json<serde_json::Value> {
-    send_result(&state, &format!("whitelist remove {name}")).await
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
+    Ok(send_result(&state, &format!("whitelist remove {name}")).await)
 }
 
 /// GET /api/players/bans — contents of banned-players.json.
@@ -57,23 +60,26 @@ pub async fn add_ban(
     State(state): State<AppState>,
     Json(body): Json<PlayerActionRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let name = body
+    let raw_name = body
         .name
         .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
-    let reason = body
-        .reason
-        .filter(|r| !r.trim().is_empty())
-        .map(|r| format!(" {r}"))
-        .unwrap_or_default();
-    Ok(send_result(&state, &format!("ban {name}{reason}")).await)
+    let name = validate_minecraft_username(&raw_name)?;
+    let reason_clean = sanitize_command_param(body.reason.as_deref());
+    let reason_arg = if reason_clean.is_empty() {
+        String::new()
+    } else {
+        format!(" {reason_clean}")
+    };
+    Ok(send_result(&state, &format!("ban {name}{reason_arg}")).await)
 }
 
 /// DELETE /api/players/bans/{name} — pardon.
 pub async fn remove_ban(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Json<serde_json::Value> {
-    send_result(&state, &format!("pardon {name}")).await
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
+    Ok(send_result(&state, &format!("pardon {name}")).await)
 }
 
 /// GET /api/players/ops — contents of ops.json.
@@ -87,9 +93,10 @@ pub async fn add_op(
     State(state): State<AppState>,
     Json(body): Json<PlayerActionRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let name = body
+    let raw_name = body
         .name
         .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let name = validate_minecraft_username(&raw_name)?;
     Ok(send_result(&state, &format!("op {name}")).await)
 }
 
@@ -97,8 +104,9 @@ pub async fn add_op(
 pub async fn remove_op(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Json<serde_json::Value> {
-    send_result(&state, &format!("deop {name}")).await
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
+    Ok(send_result(&state, &format!("deop {name}")).await)
 }
 
 /// POST /api/players/kick {"name":"X","reason":"..."} — kick.
@@ -106,15 +114,17 @@ pub async fn kick(
     State(state): State<AppState>,
     Json(body): Json<PlayerActionRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let name = body
+    let raw_name = body
         .name
         .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
-    let reason = body
-        .reason
-        .filter(|r| !r.trim().is_empty())
-        .map(|r| format!(" {r}"))
-        .unwrap_or_default();
-    Ok(send_result(&state, &format!("kick {name}{reason}")).await)
+    let name = validate_minecraft_username(&raw_name)?;
+    let reason_clean = sanitize_command_param(body.reason.as_deref());
+    let reason_arg = if reason_clean.is_empty() {
+        String::new()
+    } else {
+        format!(" {reason_clean}")
+    };
+    Ok(send_result(&state, &format!("kick {name}{reason_arg}")).await)
 }
 
 /// POST /api/players/command {"command":"say hi"} — arbitrary server command.

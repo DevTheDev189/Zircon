@@ -3,15 +3,15 @@
 //!
 //! Port of the auth routes in `com.mcmanager.server.web.JavalinApp`.
 
-use std::net::SocketAddr;
+use std::net::IpAddr;
 
-use axum::extract::{ConnectInfo, State};
+use axum::extract::State;
 use axum::Json;
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use serde::Deserialize;
 use totp_rs::{Algorithm, Secret, TOTP};
 
-use crate::web::app::{issue_token, ApiError, AppState};
+use crate::web::app::{issue_token, ApiError, AppState, RealIp};
 use crate::web::auth::CurrentUser;
 
 #[derive(Debug, Deserialize)]
@@ -46,18 +46,17 @@ pub struct TotpEnableRequest {
     pub code: String,
 }
 
-/// Rate-limit key. When a username is supplied the bucket is per-account (so a
-/// brute-forcer can't exhaust other users' budgets); otherwise it falls back to
-/// the peer IP so unknown-username probes are still throttled.
-fn limiter_key(username: &str, client: &Option<ConnectInfo<SocketAddr>>) -> String {
+/// Rate-limit key. Buckets are per `real client IP + username`. The real IP is
+/// forwarded by the TCP multiplexer (`X-Real-IP`; trusted only from loopback),
+/// so a brute-forcer spraying failed attempts against `admin` from one address
+/// can only lock out that address — never the administrator's own. Unknown-
+/// username probes still get an IP-scoped bucket.
+fn limiter_key(username: &str, ip: IpAddr) -> String {
     let u = username.trim().to_lowercase();
     if !u.is_empty() {
-        format!("user:{u}")
+        format!("ip:{ip}:user:{u}")
     } else {
-        client
-            .as_ref()
-            .map(|c| format!("ip:{}", c.0.ip()))
-            .unwrap_or_else(|| "ip:unknown".to_string())
+        format!("ip:{ip}:user:unknown")
     }
 }
 
@@ -84,10 +83,10 @@ fn session_cookie(token: String) -> Cookie<'static> {
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
-    client: Option<ConnectInfo<SocketAddr>>,
+    ip: RealIp,
     Json(body): Json<LoginRequest>,
 ) -> Result<(CookieJar, Json<serde_json::Value>), ApiError> {
-    let key = limiter_key(&body.username, &client);
+    let key = limiter_key(&body.username, ip.0);
     rate_limited(&state, &key)?;
 
     if !state.auth.authenticate(&body.username, &body.password) {
@@ -268,33 +267,40 @@ pub async fn disable_2fa(
 }
 
 /// POST /api/auth/change-password — a successful change revokes every existing
-/// session (including the caller's) and mints a fresh token + cookie.
+/// session (including the caller's) and mints a fresh token + cookie. The
+/// target account is taken from the authenticated JWT subject, never from the
+/// request body, so an authenticated user cannot act on another account.
 pub async fn change_password(
     State(state): State<AppState>,
     jar: CookieJar,
-    client: Option<ConnectInfo<SocketAddr>>,
+    user: CurrentUser,
+    ip: RealIp,
     Json(body): Json<ChangePasswordRequest>,
 ) -> Result<(CookieJar, Json<serde_json::Value>), ApiError> {
-    if body.username.is_empty() || body.current_password.is_empty() || body.new_password.is_empty()
-    {
+    if body.username.trim() != user.username {
+        return Err(ApiError::Unauthorized(
+            "Cannot change credentials for another user account.".to_string(),
+        ));
+    }
+    if body.current_password.is_empty() || body.new_password.is_empty() {
         return Err(ApiError::BadRequest("All fields are required".to_string()));
     }
-    let key = limiter_key(&body.username, &client);
+    let key = limiter_key(&user.username, ip.0);
     rate_limited(&state, &key)?;
 
     match state
         .auth
-        .change_password(&body.username, &body.current_password, &body.new_password)
+        .change_password(&user.username, &body.current_password, &body.new_password)
     {
         Ok(true) => {
             state.login_limiter.reset(&key);
-            state.sessions.revoke_user(&body.username);
+            state.sessions.revoke_user(&user.username);
             state.audit.log(
-                &body.username,
+                &user.username,
                 "PASSWORD_CHANGED",
-                "Password successfully changed; sessions revoked",
+                "Password successfully changed; all existing sessions revoked",
             );
-            let token = issue_token(&state, &body.username);
+            let token = issue_token(&state, &user.username);
             Ok((
                 jar.add(session_cookie(token.clone())),
                 Json(serde_json::json!({ "ok": true, "token": token })),
@@ -308,20 +314,28 @@ pub async fn change_password(
 }
 
 /// POST /api/auth/profile — atomic profile update (rename / change password /
-/// change icon). Changing the password revokes every session and mints a fresh
-/// token (returned so the UI keeps working).
+/// change icon). The target account is bound to the authenticated JWT subject:
+/// the body's `currentUsername` must match, so one admin cannot modify another
+/// admin's account. Changing the password revokes every session and mints a
+/// fresh token (returned so the UI keeps working).
 pub async fn profile(
     State(state): State<AppState>,
     jar: CookieJar,
+    user: CurrentUser,
     Json(body): Json<ProfileUpdateRequest>,
 ) -> Result<(CookieJar, Json<serde_json::Value>), ApiError> {
-    if body.current_username.is_empty() || body.current_password.is_empty() {
+    if body.current_username.trim() != user.username {
+        return Err(ApiError::Unauthorized(
+            "Cannot modify profile data for another user account.".to_string(),
+        ));
+    }
+    if body.current_password.is_empty() {
         return Err(ApiError::BadRequest(
-            "Current credentials required".to_string(),
+            "Current password is required".to_string(),
         ));
     }
     match state.auth.update_profile(
-        &body.current_username,
+        &user.username,
         body.new_username.as_deref(),
         &body.current_password,
         body.new_password.as_deref(),
@@ -335,12 +349,12 @@ pub async fn profile(
                 .as_deref()
                 .map(str::trim)
                 .filter(|n| !n.is_empty())
-                .unwrap_or(&body.current_username);
+                .unwrap_or(&user.username);
 
             state.audit.log(
-                &body.current_username,
+                &user.username,
                 "PROFILE_UPDATED",
-                &format!("Target: {target}"),
+                &format!("Target profile updated: {target}"),
             );
 
             if body.new_password.as_deref().is_some_and(|p| !p.is_empty()) {

@@ -7,7 +7,7 @@
     "frontendDist": "ui/dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm ci && npm run build"
   },
   "app": {
     "windows": [
@@ -51,7 +51,7 @@
       "endpoints": [
         "https://zirconmc.net/updates/launcher/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMzMkNCMjA1N0JBRTAyQgpSV1FyNExwWElNc3lER1NDb05RZUNHN3Nvd0FvZmFwZllKRFI5RjhRSEFjYXFHTmduMXVBdUVpcQo="
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY2QjFBMEU3QzM0MDY4REEKUldUYWFFREQ1NkN4WnZUUkJ4bFowUlBLaXc0Q0V5eExDY2x0dGd1MllPeVFWelFmTE1WeVpqYkEK"
     }
   }
 }

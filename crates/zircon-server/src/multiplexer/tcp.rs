@@ -397,7 +397,9 @@ impl TcpMultiplexer {
     }
 
     /// Transparent bidirectional proxy: forwards the buffered initial bytes,
-    /// then pipes traffic both ways until either side disconnects.
+    /// then pipes traffic both ways until either side disconnects. When the
+    /// target is the admin web server, the real client IP is injected into the
+    /// request head so the web layer can key rate limits on it.
     async fn proxy(&self, client: TcpStream, initial: Vec<u8>, port: u16) -> io::Result<()> {
         // Annotate the connect failure with the backend target so the accept
         // loop's warning says *which* backend refused — e.g. the web server
@@ -411,11 +413,62 @@ impl TcpMultiplexer {
                     format!("connect to backend {BACKEND_HOST}:{port}: {e}"),
                 )
             })?;
-        backend.write_all(&initial).await?;
         let mut client = client;
+        let mut to_write = initial;
+        if port == self.web_port {
+            if let Ok(peer) = client.peer_addr() {
+                to_write = prepare_http_forward(to_write, &mut client, peer.ip()).await;
+            }
+        }
+        backend.write_all(&to_write).await?;
         tokio::io::copy_bidirectional(&mut client, &mut backend).await?;
         Ok(())
     }
+}
+
+/// Cap on how much of an HTTP request head the multiplexer will buffer to
+/// inject the real client IP (well beyond any realistic request head).
+const MAX_HTTP_HEAD_BYTES: usize = 16 * 1024;
+
+/// Rewrites the head of an HTTP request being proxied to the loopback web
+/// server so the web layer sees the real client address:
+///
+/// * completes the request head by reading from `client` until `\r\n\r\n`
+///   (bounded), then
+/// * injects `X-Zircon-Real-IP: <client ip>` — the web server binds
+///   loopback-only, so only this trusted proxy can set that header — and
+/// * forces `Connection: close` so every proxied request is the first (and
+///   only) request on its connection and therefore always carries the header
+///   (no keep-alive reuse that could bypass the rate limiter's IP keying).
+///
+/// Falls back to the buffered bytes unchanged when the head cannot be
+/// completed within the cap, so a stalled or oversized request is still
+/// forwarded (unmodified) rather than dropped.
+async fn prepare_http_forward(
+    mut buf: Vec<u8>,
+    client: &mut TcpStream,
+    client_ip: std::net::IpAddr,
+) -> Vec<u8> {
+    while !buf.windows(4).any(|w| w == b"\r\n\r\n") && buf.len() < MAX_HTTP_HEAD_BYTES {
+        let mut tmp = [0u8; 2048];
+        let n = match client.read(&mut tmp).await {
+            Ok(n) if n > 0 => n,
+            _ => break, // EOF or read error: forward what we have
+        };
+        buf.extend_from_slice(&tmp[..n]);
+    }
+    let Some(head_end) = buf.windows(4).position(|w| w == b"\r\n\r\n") else {
+        return buf;
+    };
+
+    // The head ends with `\r\n`; splice the new headers in before the blank
+    // line (`\r\n\r\n`), which starts at `head_end`.
+    let injected = format!("X-Zircon-Real-IP: {client_ip}\r\nConnection: close\r\n");
+    let mut out = Vec::with_capacity(buf.len() + injected.len());
+    out.extend_from_slice(&buf[..head_end]);
+    out.extend_from_slice(injected.as_bytes());
+    out.extend_from_slice(&buf[head_end..]);
+    out
 }
 
 impl PortBindingListener for TcpMultiplexer {
@@ -519,6 +572,17 @@ mod tests {
 
         let (request, _) = web_handle.await.unwrap();
         assert!(request.starts_with("GET /index.html"));
+        // The real client IP is forwarded (the test client connects from
+        // loopback) and keep-alive is disabled so every proxied request
+        // carries the header.
+        assert!(
+            request.contains("X-Zircon-Real-IP: 127.0.0.1"),
+            "proxied request must carry the real client IP: {request:?}"
+        );
+        assert!(
+            request.contains("Connection: close"),
+            "proxied request must disable keep-alive: {request:?}"
+        );
         handle.abort();
         let _ = std::fs::remove_dir_all(&dir);
     }

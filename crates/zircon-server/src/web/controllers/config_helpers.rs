@@ -5,7 +5,39 @@ use axum::Json;
 use serde::Deserialize;
 use zircon_core::model::InstanceConfig;
 
+use crate::web::app::ApiError;
 use crate::web::views::instance_to_map as view_instance_to_map;
+
+/// Validates that a player name conforms strictly to Minecraft username grammar:
+/// 1 to 16 characters, ASCII alphanumeric or underscore only. Rejects newlines
+/// and any other injection payload outright (they cannot appear in a real
+/// username).
+pub fn validate_minecraft_username(name: &str) -> Result<String, ApiError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty()
+        || trimmed.len() > 16
+        || !trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err(ApiError::BadRequest(
+            "Invalid player username. Must be 1-16 characters and contain only letters, numbers, and underscores."
+                .to_string(),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
+/// Strips all carriage returns and line feeds from arbitrary string parameters
+/// (e.g. ban/kick reasons) so a hostile value can never inject a second
+/// console command.
+pub fn sanitize_command_param(param: Option<&str>) -> String {
+    param
+        .unwrap_or("")
+        .replace(['\r', '\n'], " ")
+        .trim()
+        .to_string()
+}
 
 /// Live view of an instance for the admin UI.
 pub fn instance_to_map(

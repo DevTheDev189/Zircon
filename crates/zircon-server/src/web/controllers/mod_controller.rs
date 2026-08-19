@@ -272,18 +272,32 @@ pub async fn install_mod(
                 .await?
         }
         "curseforge" => {
-            let (Some(download_url), Some(filename)) = (&body.download_url, &body.filename) else {
+            if let (Some(mod_id_str), Some(file_id_str)) = (&body.project_id, &body.version_id) {
+                if let (Ok(mod_id), Ok(file_id)) =
+                    (mod_id_str.parse::<i64>(), file_id_str.parse::<i64>())
+                {
+                    mods.install_curseforge_file(mod_id, file_id).await?
+                } else {
+                    return Err(ApiError::BadRequest(
+                        "modId and fileId must be numeric".into(),
+                    ));
+                }
+            } else if let (Some(download_url), Some(filename)) =
+                (&body.download_url, &body.filename)
+            {
+                let mut entry = mods
+                    .install_from_url(download_url, filename, "curseforge")
+                    .await?;
+                if let Some(file_id) = &body.file_id {
+                    entry.id = Some(file_id.to_string());
+                }
+                entry
+            } else {
                 return Err(ApiError::BadRequest(
-                    "downloadUrl and filename are required for curseforge".to_string(),
+                    "CurseForge install requires (projectId, versionId) or (downloadUrl, filename)"
+                        .into(),
                 ));
-            };
-            let mut entry = mods
-                .install_from_url(download_url, filename, "curseforge")
-                .await?;
-            if let Some(file_id) = &body.file_id {
-                entry.id = Some(file_id.to_string());
             }
-            entry
         }
         _ => {
             return Err(ApiError::BadRequest(

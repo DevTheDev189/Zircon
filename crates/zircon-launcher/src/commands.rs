@@ -13,6 +13,7 @@ use std::sync::Mutex as StdMutex;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use sha1::{Digest, Sha1};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::process::Child;
 use tokio::sync::Mutex as AsyncMutex;
@@ -232,13 +233,19 @@ pub fn save_server_list(servers_list: Vec<servers::SavedServer>) -> Result<(), S
 /// (like `/bom`, no admin token needed); the Minecraft status ping supplies
 /// the latency everywhere and acts as the fallback for third-party servers.
 /// Returns `None` when the server is unreachable.
-/// Builds the HTTP base URL for a server: `https://<host>` (port 443) when
-/// HTTPS is enabled for the server, otherwise `http://<host>:<port>` (the
-/// multiplexer's HTTP sniffing). The Minecraft connection always uses
-/// `host:port` regardless.
+///
+/// Builds the HTTP base URL for a server. HTTPS is enforced whenever it is
+/// enabled or the target port is the standard TLS port 443; loopback hosts
+/// may fall back to plaintext HTTP (local dev/test servers without TLS). The
+/// Minecraft connection always uses `host:port` regardless.
 fn server_base_url(host: &str, port: u16, use_https: bool) -> String {
-    if use_https {
-        format!("https://{host}")
+    let is_local = servers::is_loopback_host(host);
+    if use_https || (!is_local && port == 443) {
+        if port == 443 {
+            format!("https://{host}")
+        } else {
+            format!("https://{host}:{port}")
+        }
     } else {
         format!("http://{host}:{port}")
     }
@@ -1650,18 +1657,34 @@ pub async fn install_modrinth_mod(
     } else {
         file.filename.clone()
     };
-    let dest = state.offline.mods_dir(&instance).join(&filename);
-    download_file(&state.http, &file.url, &dest)
+
+    // Prevent directory traversal from remote filenames.
+    let safe_filename = std::path::Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid file name".to_string())?;
+
+    let dest = state.offline.mods_dir(&instance).join(safe_filename);
+    download_file(&state.http, &file.url, &dest, file.sha1())
         .await
         .map_err(err_string)?;
-    Ok(filename)
+    Ok(safe_filename.to_string())
 }
 
 async fn download_file(
     http: &reqwest::Client,
     url: &str,
     dest: &Path,
+    expected_sha1: Option<&str>,
 ) -> Result<(), LauncherError> {
+    // The URL comes from a remote source (Modrinth API); only CDN-allowlisted
+    // hosts may be fetched, so a malicious entry can never turn this into an
+    // SSRF against localhost or the cloud metadata endpoint.
+    if !zircon_core::security::ssrf::is_safe_cdn_url(url) {
+        return Err(LauncherError::InvalidInput(format!(
+            "Download URL rejected by CDN security policy: {url}"
+        )));
+    }
     if let Some(parent) = dest.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
@@ -1674,6 +1697,20 @@ async fn download_file(
         });
     }
     let bytes = response.bytes().await?;
+
+    // Cryptographic integrity verification against the provider-issued hash:
+    // a corrupted, truncated, or intercepted download must never be installed.
+    if let Some(expected) = expected_sha1 {
+        let mut hasher = Sha1::new();
+        hasher.update(&bytes);
+        let actual = hex::encode(hasher.finalize());
+        if !expected.eq_ignore_ascii_case(&actual) {
+            return Err(LauncherError::InvalidInput(format!(
+                "Integrity check failed for {url}. Expected SHA-1 {expected}, got {actual}"
+            )));
+        }
+    }
+
     tokio::fs::write(dest, bytes).await?;
     Ok(())
 }

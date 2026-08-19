@@ -13,14 +13,17 @@ use serde::Deserialize;
 use tokio::time::Duration;
 use zircon_core::model::{BillOfMaterials, InstanceConfig};
 
-use super::config_helpers::{command_result, read_player_json, PlayerActionRequest};
+use super::config_helpers::{
+    command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
+    PlayerActionRequest,
+};
 use super::vanilla_player_files;
 use crate::instance::ModSyncSummary;
 use crate::services::bom::BomService;
 use crate::services::mods::ModManagementService;
 use crate::services::packs::PackManagementService;
 use crate::tickets::TICKET_TTL_SECONDS;
-use crate::web::app::{ApiError, AppState};
+use crate::web::app::{ApiError, AppState, RealIp};
 use crate::web::config_routes::resolve_wake_target;
 use crate::web::views;
 
@@ -342,9 +345,10 @@ pub async fn add_whitelist(
     Path(id): Path<String>,
     Json(body): Json<PlayerActionRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let name = body
+    let raw_name = body
         .name
         .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let name = validate_minecraft_username(&raw_name)?;
     state.instances.get_instance(&id)?;
     Ok(send_instance_command(&state, &id, &format!("whitelist add {name}")).await)
 }
@@ -354,6 +358,7 @@ pub async fn remove_whitelist(
     State(state): State<AppState>,
     Path((id, name)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
     state.instances.get_instance(&id)?;
     Ok(send_instance_command(&state, &id, &format!("whitelist remove {name}")).await)
 }
@@ -375,9 +380,10 @@ pub async fn add_op(
     Path(id): Path<String>,
     Json(body): Json<PlayerActionRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let name = body
+    let raw_name = body
         .name
         .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let name = validate_minecraft_username(&raw_name)?;
     state.instances.get_instance(&id)?;
     Ok(send_instance_command(&state, &id, &format!("op {name}")).await)
 }
@@ -387,6 +393,7 @@ pub async fn remove_op(
     State(state): State<AppState>,
     Path((id, name)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
     state.instances.get_instance(&id)?;
     Ok(send_instance_command(&state, &id, &format!("deop {name}")).await)
 }
@@ -408,19 +415,31 @@ pub async fn add_ban(
     Path(id): Path<String>,
     Json(body): Json<PlayerActionRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let name = body
+    let raw_name = body
         .name
         .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let name = validate_minecraft_username(&raw_name)?;
+    let reason_clean = sanitize_command_param(body.reason.as_deref());
+
     state.instances.get_instance(&id)?;
     if state.instances.is_running(&id) {
-        let reason = body
-            .reason
-            .filter(|r| !r.trim().is_empty())
-            .map(|r| format!(" {}", r.trim()))
-            .unwrap_or_default();
-        Ok(send_instance_command(&state, &id, &format!("ban {}{reason}", name.trim())).await)
+        let reason_arg = if reason_clean.is_empty() {
+            String::new()
+        } else {
+            format!(" {reason_clean}")
+        };
+        Ok(send_instance_command(&state, &id, &format!("ban {name}{reason_arg}")).await)
     } else {
-        add_ban_offline(&state, &id, name.trim(), body.reason.as_deref())?;
+        add_ban_offline(
+            &state,
+            &id,
+            &name,
+            if reason_clean.is_empty() {
+                None
+            } else {
+                Some(&reason_clean)
+            },
+        )?;
         Ok(Json(serde_json::json!({ "ok": true, "offline": true })))
     }
 }
@@ -430,6 +449,7 @@ pub async fn remove_ban(
     State(state): State<AppState>,
     Path((id, name)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
     state.instances.get_instance(&id)?;
     if state.instances.is_running(&id) {
         Ok(send_instance_command(&state, &id, &format!("pardon {name}")).await)
@@ -456,11 +476,18 @@ pub async fn get_instance_bom(
 /// short-lived join ticket for the launcher's session so the player's
 /// connection passes the Zircon join gate, and holds the target instance's
 /// idle shutdown off while the player is on their way. Intentionally
-/// unauthenticated.
+/// unauthenticated, but rate-limited per real client IP so a single attacker
+/// cannot fill the ticket store and block legitimate joins.
 pub async fn register_join_intent(
     State(state): State<AppState>,
+    ip: RealIp,
     Json(body): Json<JoinIntentRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    if let Err(retry_after) = state.join_intent_limiter.check(&ip.0.to_string()) {
+        return Err(ApiError::TooManyRequests(format!(
+            "Too many join-intent registrations from this address. Retry in {retry_after}s."
+        )));
+    }
     if body.username.is_none() && body.uuid.is_none() {
         return Err(ApiError::BadRequest(
             "username or uuid is required".to_string(),
@@ -699,18 +726,32 @@ pub async fn install_mod(
                 .await?
         }
         "curseforge" => {
-            let (Some(download_url), Some(filename)) = (&body.download_url, &body.filename) else {
+            if let (Some(mod_id_str), Some(file_id_str)) = (&body.project_id, &body.version_id) {
+                if let (Ok(mod_id), Ok(file_id)) =
+                    (mod_id_str.parse::<i64>(), file_id_str.parse::<i64>())
+                {
+                    mods.install_curseforge_file(mod_id, file_id).await?
+                } else {
+                    return Err(ApiError::BadRequest(
+                        "modId and fileId must be numeric".into(),
+                    ));
+                }
+            } else if let (Some(download_url), Some(filename)) =
+                (&body.download_url, &body.filename)
+            {
+                let mut entry = mods
+                    .install_from_url(download_url, filename, "curseforge")
+                    .await?;
+                if let Some(file_id) = &body.file_id {
+                    entry.id = Some(file_id.to_string());
+                }
+                entry
+            } else {
                 return Err(ApiError::BadRequest(
-                    "downloadUrl and filename are required for curseforge".to_string(),
+                    "CurseForge install requires (projectId, versionId) or (downloadUrl, filename)"
+                        .into(),
                 ));
-            };
-            let mut entry = mods
-                .install_from_url(download_url, filename, "curseforge")
-                .await?;
-            if let Some(file_id) = &body.file_id {
-                entry.id = Some(file_id.to_string());
             }
-            entry
         }
         _ => {
             return Err(ApiError::BadRequest(

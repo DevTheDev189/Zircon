@@ -195,6 +195,35 @@ pub struct CurseForgeFile {
     pub file_fingerprint: u64,
     #[serde(default)]
     pub length: u64,
+    #[serde(default)]
+    pub hashes: Vec<CurseForgeFileHash>,
+}
+
+/// A hash entry in CurseForge's file metadata.
+/// Algo enum in CurseForge v1: 1 = SHA-1, 2 = MD5.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CurseForgeFileHash {
+    pub value: String,
+    pub algo: i32,
+}
+
+impl CurseForgeFile {
+    /// Returns the SHA-1 hash (algo == 1) if present in the metadata.
+    pub fn sha1(&self) -> Option<&str> {
+        self.hashes
+            .iter()
+            .find(|h| h.algo == 1)
+            .map(|h| h.value.as_str())
+    }
+
+    /// Returns the MD5 hash (algo == 2) if present in the metadata.
+    pub fn md5(&self) -> Option<&str> {
+        self.hashes
+            .iter()
+            .find(|h| h.algo == 2)
+            .map(|h| h.value.as_str())
+    }
 }
 
 fn form_encode(value: &str) -> String {
@@ -253,5 +282,27 @@ mod tests {
         assert_eq!("X", file.display_name);
         assert_eq!("x.jar", file.file_name);
         assert_eq!("https://edge.forgecdn.net/x.jar", file.download_url);
+    }
+
+    #[test]
+    fn parses_file_hashes_and_extracts_sha1() {
+        let json = r#"{
+            "id": 12345,
+            "displayName": "JEI 15.2.0.27",
+            "fileName": "jei-1.20.4-15.2.0.27.jar",
+            "downloadUrl": "https://edge.forgecdn.net/files/123/456/jei.jar",
+            "fileFingerprint": 2252075348,
+            "length": 1024,
+            "hashes": [
+                { "value": "a1b2c3d4e5f60718293041526374859607182930", "algo": 1 },
+                { "value": "0123456789abcdef0123456789abcdef", "algo": 2 }
+            ]
+        }"#;
+        let file: CurseForgeFile = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            Some("a1b2c3d4e5f60718293041526374859607182930"),
+            file.sha1()
+        );
+        assert_eq!(Some("0123456789abcdef0123456789abcdef"), file.md5());
     }
 }
