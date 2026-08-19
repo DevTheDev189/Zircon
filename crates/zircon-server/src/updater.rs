@@ -155,9 +155,24 @@ impl ServerUpdater {
         file.read_to_end(&mut new_bin_bytes)
             .map_err(|e| e.to_string())?;
 
-        let temp_bin_path =
-            std::env::temp_dir().join(format!("zircon_update_{}", manifest.version));
+        let temp_bin_name = format!(
+            "zircon_update_{}_{}",
+            manifest.version,
+            uuid::Uuid::new_v4()
+        );
+        let temp_bin_path = std::env::temp_dir().join(temp_bin_name);
+
         std::fs::write(&temp_bin_path, &new_bin_bytes).map_err(|e| e.to_string())?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            // Make the staged binary owner-executable before the swap so it
+            // can run immediately after self-replace (the ZIP does not carry
+            // permission bits).
+            std::fs::set_permissions(&temp_bin_path, std::fs::Permissions::from_mode(0o755))
+                .map_err(|e| format!("Failed to set executable permissions: {e}"))?;
+        }
 
         self_replace::self_replace(&temp_bin_path)
             .map_err(|e| format!("Failed to swap executable: {e}"))?;

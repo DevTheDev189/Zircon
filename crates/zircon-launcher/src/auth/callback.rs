@@ -16,14 +16,24 @@ use crate::error::LauncherError;
 #[derive(Debug)]
 pub struct CallbackServer {
     listener: TcpListener,
+    /// Read deadline for each inbound connection's request head.
+    read_timeout: Duration,
 }
+
+/// Maximum time a single inbound connection may take to deliver its request
+/// head before it is dropped. Stops hung local sockets (Slowloris-style port
+/// probes, a wedged browser tab) from blocking the genuine redirect.
+const REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl CallbackServer {
     /// Binds a listener on `127.0.0.1` with an OS-assigned free port (port 0
     /// → no more 8080 collisions between concurrent launchers).
     pub async fn start() -> Result<Self, LauncherError> {
         let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
-        Ok(CallbackServer { listener })
+        Ok(CallbackServer {
+            listener,
+            read_timeout: REQUEST_READ_TIMEOUT,
+        })
     }
 
     /// The local port the callback server is listening on.
@@ -63,7 +73,17 @@ impl CallbackServer {
     async fn accept_valid(&mut self, expected_state: &str) -> Result<String, LauncherError> {
         loop {
             let (mut stream, _peer) = self.listener.accept().await?;
-            let head = read_request_head(&mut stream).await?;
+
+            // Wrap read_request_head in a timeout to prevent hung local sockets
+            // from stalling the login redirect: a connection that never sends
+            // its request head is dropped and the loop keeps listening.
+            let head = match tokio::time::timeout(self.read_timeout, read_request_head(&mut stream))
+                .await
+            {
+                Ok(Ok(head)) => head,
+                _ => continue,
+            };
+
             let query = parse_callback(&head);
             tracing::debug!(
                 "OAuth callback received (code: {}, state_match: {}, error: {:?})",
@@ -397,5 +417,45 @@ mod tests {
 
         let result = handle.await.unwrap();
         assert!(result.unwrap_err().to_string().contains("access_denied"));
+    }
+
+    #[tokio::test]
+    async fn stalled_connection_is_dropped_and_does_not_block_the_redirect() {
+        let mut server = CallbackServer::start().await.unwrap();
+        // Shrink the read deadline so the test runs in milliseconds instead of
+        // the production 5 seconds.
+        server.read_timeout = Duration::from_millis(200);
+        let port = server.port();
+
+        let handle =
+            tokio::spawn(async move { server.await_code(Duration::from_secs(5), "s").await });
+
+        // A local port probe connects and never sends a byte. Before the
+        // timeout fix this stalled `accept_valid` until the outer await_code
+        // deadline — a single hung socket could block a legitimate login.
+        let stalled = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        // Wait for the server to hit the read deadline and return to accept().
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        drop(stalled);
+
+        // The genuine redirect is still accepted afterwards.
+        let mut client = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        client
+            .write_all(
+                b"GET /callback?code=real-code&state=s HTTP/1.1\r\n\
+                  Host: localhost\r\nConnection: close\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        let mut buf = Vec::new();
+        let _ = client.read_to_end(&mut buf).await;
+        drop(client);
+
+        let code = handle.await.unwrap().expect("no timeout");
+        assert_eq!("real-code", code);
     }
 }

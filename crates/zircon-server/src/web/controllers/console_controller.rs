@@ -15,8 +15,11 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
 
+use crate::auth::auth_service::AuthService;
 use crate::auth::jwt;
 use crate::auth::sessions::SessionRegistry;
+use crate::process::console::ConsoleStreamHandler;
+use crate::process::manager::MinecraftProcessManager;
 use crate::web::app::AppState;
 
 /// WebSocket upgrade route `/api/console`.
@@ -33,13 +36,14 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
     // sockets that connect and never send the auth message.
     let first_msg = tokio::time::timeout(std::time::Duration::from_secs(5), receiver.next()).await;
 
-    let authenticated = match first_msg {
+    let username = match first_msg {
         Ok(Some(Ok(Message::Text(text)))) => {
-            validate_console_auth(parse_auth_message(&text), &state.sessions)
+            authenticate_console_user(parse_auth_message(&text), &state.sessions, &state.auth)
         }
-        _ => false,
+        _ => None,
     };
-    if !authenticated {
+
+    let Some(user) = username else {
         let _ = sender
             .send(Message::Text(
                 "[wrapper] Authentication failed or timed out — connection closed.".to_string(),
@@ -47,8 +51,14 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
             .await;
         let _ = sender.close().await;
         return;
-    }
+    };
 
+    // Every console action is now attributable to the authenticated admin.
+    state.audit.log(
+        &user,
+        "WS_CONSOLE_CONNECT",
+        "WebSocket console session established",
+    );
     let mut broadcast_rx = state.console.subscribe();
 
     // Replay recent history so the UI is not blank on connect (last 500 lines).
@@ -76,33 +86,97 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
-            // Inbound: client messages → server stdin commands.
+            // Inbound: client messages → audit trail + server stdin commands.
             msg = receiver.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        if text.trim() == "__CLEAR__" {
-                            state.console.clear_history();
-                            if sender.send(Message::Text("__CLEAR__".to_string())).await.is_err() {
-                                break;
-                            }
-                            continue;
-                        }
-                        state.audit.log("ADMIN_WS", "CONSOLE_COMMAND", text.trim());
-                        match state.process_manager.send_command(text.trim()).await {
-                            Ok(()) => {}
-                            Err(e) => {
-                                if sender.send(Message::Text(format!("[wrapper] {e}"))).await.is_err() {
+                        match apply_inbound_message(
+                            &state.audit,
+                            &state.console,
+                            &state.process_manager,
+                            &user,
+                            &text,
+                        )
+                        .await
+                        {
+                            InboundResult::Ok => {}
+                            InboundResult::Notify(message) => {
+                                if sender.send(Message::Text(message)).await.is_err() {
                                     break;
                                 }
                             }
                         }
                     }
-                    Some(Ok(Message::Close(_))) | None => break,
+                    Some(Ok(Message::Close(_))) | None => {
+                        state.audit.log(
+                            &user,
+                            "WS_CONSOLE_DISCONNECT",
+                            "WebSocket console disconnected",
+                        );
+                        break;
+                    }
                     Some(Err(_)) => break,
-                    _ => {}
+                    _ => break,
                 }
             }
         }
+    }
+}
+
+/// Outcome of applying one inbound console message.
+#[derive(Debug, PartialEq, Eq)]
+enum InboundResult {
+    /// Message handled; the connection stays open.
+    Ok,
+    /// The client must be sent this reply, then the connection stays open.
+    Notify(String),
+}
+
+/// One inbound console message, classified before any side effect runs so the
+/// audit trail can record it under the authenticated username.
+#[derive(Debug, PartialEq, Eq)]
+enum InboundAction {
+    Clear,
+    Command(String),
+    Nothing,
+}
+
+fn classify_inbound(text: &str) -> InboundAction {
+    let trimmed = text.trim();
+    if trimmed == "__CLEAR__" {
+        InboundAction::Clear
+    } else if trimmed.is_empty() {
+        InboundAction::Nothing
+    } else {
+        InboundAction::Command(trimmed.to_string())
+    }
+}
+
+/// Applies one inbound console message: audit-logs it under `user`, then
+/// performs the side effect. `__CLEAR__` is echoed back to the client so every
+/// connected session clears its view; a failed command is reported back.
+/// Separated from the socket loop so the audit/identity binding is testable.
+async fn apply_inbound_message(
+    audit: &crate::audit::AuditLogger,
+    console: &ConsoleStreamHandler,
+    process_manager: &MinecraftProcessManager,
+    user: &str,
+    text: &str,
+) -> InboundResult {
+    match classify_inbound(text) {
+        InboundAction::Clear => {
+            audit.log(user, "CONSOLE_CLEAR", "Console history cleared");
+            console.clear_history();
+            InboundResult::Notify("__CLEAR__".to_string())
+        }
+        InboundAction::Command(command) => {
+            audit.log(user, "CONSOLE_COMMAND", &command);
+            match process_manager.send_command(&command).await {
+                Ok(()) => InboundResult::Ok,
+                Err(e) => InboundResult::Notify(format!("[wrapper] {e}")),
+            }
+        }
+        InboundAction::Nothing => InboundResult::Ok,
     }
 }
 
@@ -115,23 +189,37 @@ fn parse_auth_message(message: &str) -> Option<&str> {
         .filter(|t| !t.is_empty())
 }
 
-/// Validates a console-auth token: it must decode and must not be revoked.
-/// Separated from the handler so the security decision is unit-testable.
-fn validate_console_auth(token: Option<&str>, sessions: &SessionRegistry) -> bool {
-    let Some(token) = token else {
-        return false;
-    };
-    let Some(claims) = jwt::decode_claims(token) else {
-        return false;
-    };
-    !sessions.is_revoked(&claims.jti)
+/// Authenticates a console session from its first message: the token must
+/// decode to a JWT whose subject is a real user and whose `jti` is not
+/// revoked. Returns the authenticated username so every action can be bound
+/// to it in the audit trail.
+fn authenticate_console_user(
+    token: Option<&str>,
+    sessions: &SessionRegistry,
+    auth: &AuthService,
+) -> Option<String> {
+    let token = token?;
+    let claims = jwt::decode_claims(token)?;
+    if sessions.is_revoked(&claims.jti) {
+        return None;
+    }
+    if auth.get_user(&claims.sub).is_none() {
+        return None;
+    }
+    Some(claims.sub)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::audit::AuditLogger;
+    use crate::auth::auth_service::AuthService;
     use crate::auth::jwt;
     use crate::auth::sessions::SessionRegistry;
+    use crate::config::ConfigService;
+    use crate::process::console::ConsoleStreamHandler;
+    use crate::process::manager::MinecraftProcessManager;
+    use std::sync::Arc;
 
     fn temp_dir() -> std::path::PathBuf {
         crate::test_util::temp_dir("console")
@@ -149,23 +237,92 @@ mod tests {
     }
 
     #[test]
+    fn classifies_inbound_messages() {
+        assert_eq!(InboundAction::Clear, classify_inbound("__CLEAR__"));
+        assert_eq!(InboundAction::Clear, classify_inbound("  __CLEAR__  "));
+        assert_eq!(
+            InboundAction::Command("say hello".to_string()),
+            classify_inbound("say hello")
+        );
+        assert_eq!(InboundAction::Nothing, classify_inbound(""));
+        assert_eq!(InboundAction::Nothing, classify_inbound("   "));
+    }
+
+    #[test]
     fn rejects_garbage_but_accepts_fresh_tokens() {
         let dir = temp_dir();
         jwt::initialize(&dir).unwrap();
+        let auth = AuthService::initialize(&dir).unwrap();
         let sessions = SessionRegistry::new();
 
-        assert!(!validate_console_auth(None, &sessions));
-        assert!(!validate_console_auth(Some(""), &sessions));
-        assert!(!validate_console_auth(Some("garbage"), &sessions));
+        assert!(authenticate_console_user(None, &sessions, &auth).is_none());
+        assert!(authenticate_console_user(Some(""), &sessions, &auth).is_none());
+        assert!(authenticate_console_user(Some("garbage"), &sessions, &auth).is_none());
 
-        // A freshly issued token is accepted, then revoked → rejected.
+        // A freshly issued token for a real user is accepted and the username
+        // is recovered for the audit trail...
         let token = jwt::generate_token("admin");
         let claims = jwt::decode_claims(&token).unwrap();
         sessions.register(&claims.jti, "admin", claims.exp);
-        assert!(validate_console_auth(Some(&token), &sessions));
+        assert_eq!(
+            Some("admin".to_string()),
+            authenticate_console_user(Some(&token), &sessions, &auth)
+        );
 
+        // ...revoking it kills the session...
         sessions.revoke(&claims.jti, "admin", claims.exp);
-        assert!(!validate_console_auth(Some(&token), &sessions));
+        assert!(authenticate_console_user(Some(&token), &sessions, &auth).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rejects_tokens_for_unknown_users() {
+        let dir = temp_dir();
+        jwt::initialize(&dir).unwrap();
+        let auth = AuthService::initialize(&dir).unwrap();
+        let sessions = SessionRegistry::new();
+
+        // A cryptographically valid token for a user that no longer exists
+        // must not authenticate (deleted-account edge case).
+        let token = jwt::generate_token("ghost");
+        let claims = jwt::decode_claims(&token).unwrap();
+        sessions.register(&claims.jti, "ghost", claims.exp);
+        assert!(authenticate_console_user(Some(&token), &sessions, &auth).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn clear_and_command_actions_are_audited_with_the_username() {
+        let dir = temp_dir();
+        let config =
+            Arc::new(ConfigService::load_with_data_dir(Some(dir.display().to_string())).unwrap());
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let process_manager = MinecraftProcessManager::legacy(config, console.clone());
+        let audit = AuditLogger::new(&dir);
+
+        // `__CLEAR__` is audited under the authenticated username and echoed.
+        let result =
+            apply_inbound_message(&audit, &console, &process_manager, "alice", "__CLEAR__").await;
+        assert_eq!(InboundResult::Notify("__CLEAR__".to_string()), result);
+        assert!(console.recent_history(10).is_empty());
+
+        // A command is audited before it is executed (the server is not
+        // running here, so it is reported back — the audit entry still lands).
+        let result =
+            apply_inbound_message(&audit, &console, &process_manager, "alice", "say hello").await;
+        assert!(matches!(result, InboundResult::Notify(_)));
+
+        // Empty payloads are ignored without touching the audit trail.
+        let result = apply_inbound_message(&audit, &console, &process_manager, "alice", "  ").await;
+        assert_eq!(InboundResult::Ok, result);
+
+        let content = std::fs::read_to_string(dir.join("audit.log")).unwrap();
+        assert!(content.contains("[USER:alice] [CONSOLE_CLEAR] Console history cleared"));
+        assert!(content.contains("[USER:alice] [CONSOLE_COMMAND] say hello"));
+        assert!(
+            !content.contains("[USER:ADMIN_WS]"),
+            "audit entries must carry the real username, not a placeholder"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

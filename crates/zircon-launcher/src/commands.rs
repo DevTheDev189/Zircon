@@ -1662,6 +1662,14 @@ async fn download_file(
     url: &str,
     dest: &Path,
 ) -> Result<(), LauncherError> {
+    // The URL comes from a remote source (Modrinth API); only CDN-allowlisted
+    // hosts may be fetched, so a malicious entry can never turn this into an
+    // SSRF against localhost or the cloud metadata endpoint.
+    if !zircon_core::security::ssrf::is_safe_cdn_url(url) {
+        return Err(LauncherError::InvalidInput(format!(
+            "Download URL rejected by CDN security policy: {url}"
+        )));
+    }
     if let Some(parent) = dest.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }

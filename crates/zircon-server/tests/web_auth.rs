@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::Body;
+use axum::extract::ConnectInfo;
 use axum::http::{header, Request, StatusCode};
 use axum::Router;
 use http_body_util::BodyExt;
@@ -138,6 +139,48 @@ async fn send(
         }
         None => builder.body(Body::empty()).expect("request"),
     };
+    let response = app.clone().oneshot(request).await.expect("router response");
+    let status = response.status();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("collect body")
+        .to_bytes();
+    let json = if bytes.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null)
+    };
+    (status, json)
+}
+
+/// Like `send` but pins the peer address via `ConnectInfo` so rate-limit
+/// keying can be exercised per source IP.
+async fn send_from(
+    app: &Router,
+    ip: &str,
+    method: &str,
+    uri: &str,
+    token: Option<&str>,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(token) = token {
+        builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+    }
+    let request = match body {
+        Some(value) => {
+            builder = builder.header(header::CONTENT_TYPE, "application/json");
+            builder
+                .body(Body::from(value.to_string()))
+                .expect("request body")
+        }
+        None => builder.body(Body::empty()).expect("request"),
+    };
+    let mut request = request;
+    let addr: std::net::SocketAddr = format!("{ip}:12345").parse().expect("socket addr");
+    request.extensions_mut().insert(ConnectInfo(addr));
     let response = app.clone().oneshot(request).await.expect("router response");
     let status = response.status();
     let bytes = response
@@ -514,6 +557,94 @@ async fn login_is_rate_limited_against_brute_force() {
     )
     .await;
     assert_eq!(StatusCode::TOO_MANY_REQUESTS, status);
+}
+
+#[tokio::test]
+async fn attacker_ip_cannot_lock_out_admin_from_another_ip() {
+    let app = test_app_with_limits(3);
+    let attacker = "203.0.113.7";
+    let admin_ip = "198.51.100.9";
+
+    // The attacker exhausts the limit for the `admin` username from their IP.
+    for _ in 0..3 {
+        let (status, _) = send_from(
+            &app,
+            attacker,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "username": "admin", "password": "wrong" })),
+        )
+        .await;
+        assert_eq!(StatusCode::UNAUTHORIZED, status);
+    }
+    let (status, _) = send_from(
+        &app,
+        attacker,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::TOO_MANY_REQUESTS, status);
+
+    // The administrator from a different IP is unaffected: the limiter is
+    // keyed on IP+username, so an account-lockout DoS is impossible.
+    let (status, _) = send_from(
+        &app,
+        admin_ip,
+        "POST",
+        "/api/auth/login",
+        None,
+        Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+}
+
+#[tokio::test]
+async fn usernames_with_newlines_are_rejected_with_400() {
+    let app = test_app();
+    let token = login(&app).await;
+
+    // Newline injection into a console command is blocked at the boundary:
+    // the username must match Minecraft grammar, so it can never smuggle a
+    // second command (e.g. `whitelist add Steve\nop Steve`).
+    for payload in [
+        json!({ "name": "Steve\nop Steve" }),
+        json!({ "name": "Steve\rop Steve" }),
+        json!({ "name": "averylongusernameexceeds16" }),
+        json!({ "name": "" }),
+    ] {
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/players/whitelist",
+            Some(&token),
+            Some(payload),
+        )
+        .await;
+        assert_eq!(StatusCode::BAD_REQUEST, status);
+    }
+
+    // Ban reasons are sanitized, not rejected: newlines become spaces so the
+    // reason text can never terminate the command line.
+    let (status, body) = send(
+        &app,
+        "POST",
+        "/api/players/bans",
+        Some(&token),
+        Some(json!({ "name": "Steve", "reason": "spam\nop Steve" })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+    let command = body["command"].as_str().unwrap_or_default();
+    assert!(
+        !command.contains('\n') && !command.contains('\r'),
+        "sanitized command must not contain raw newlines: {command:?}"
+    );
+    assert!(command.starts_with("ban Steve"));
 }
 
 #[tokio::test]

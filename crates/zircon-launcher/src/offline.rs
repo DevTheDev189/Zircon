@@ -95,9 +95,9 @@ impl OfflineInstanceManager {
     }
 
     /// The instance's root directory (`<base_dir>/<sanitized id>`); does not
-    /// create it. Non-`[A-Za-z0-9._-]` characters are replaced with `_`, exactly
-    /// like the Java `instanceDir`; an empty id maps to `"instance"` (the
-    /// Java's null-id fallback).
+    /// create it. Non-`[A-Za-z0-9_-]` characters (path separators and dots
+    /// included) are dropped so an id can never escape the instances root; an
+    /// empty result maps to `"instance"` (the Java's null-id fallback).
     pub fn instance_dir(&self, id: &str) -> PathBuf {
         self.base_dir.join(sanitize_id(id))
     }
@@ -252,23 +252,21 @@ impl OfflineInstanceManager {
     }
 }
 
-/// Sanitizes an instance id into a safe directory name: `[A-Za-z0-9._-]`
-/// characters pass through, everything else becomes `_` (Java
-/// `id.replaceAll("[^A-Za-z0-9._-]", "_")`). An empty id maps to `"instance"`,
-/// the Java null-id fallback.
+/// Sanitizes an instance id into a safe single directory name.
+/// Explicitly rejects path separators and dots: any character outside
+/// `[A-Za-z0-9_-]` is dropped, so `..` (and any other traversal payload)
+/// collapses to the `"instance"` fallback instead of resolving to a parent
+/// directory.
 fn sanitize_id(id: &str) -> String {
-    if id.is_empty() {
-        return "instance".to_string();
+    let sanitized: String = id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+        .collect();
+    if sanitized.is_empty() {
+        "instance".to_string()
+    } else {
+        sanitized
     }
-    id.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
 }
 
 fn is_jar_name(path: &Path) -> bool {
@@ -429,5 +427,51 @@ mod tests {
 
         let instance = OfflineInstance::default();
         assert!(manager.save(&instance).is_err());
+    }
+
+    #[test]
+    fn sanitize_id_blocks_directory_traversal() {
+        assert_eq!("instance", sanitize_id(".."));
+        assert_eq!("instance", sanitize_id("../.."));
+        assert_eq!("instance", sanitize_id("."));
+        assert_eq!("my_instance", sanitize_id("../my_instance/.."));
+        // Normal ids still pass through untouched.
+        assert_eq!("a1b2c3d4", sanitize_id("a1b2c3d4"));
+        assert_eq!("my-instance_1", sanitize_id("my-instance_1"));
+    }
+
+    #[test]
+    fn malicious_id_cannot_delete_outside_the_instances_root() {
+        let root = TempDir::new("offline-traversal");
+        let base = root.path().join("offline_instances");
+        let manager = OfflineInstanceManager::new(base.clone());
+
+        // Simulate a deployed instances root (created lazily on first save in
+        // production) with a real instance inside it.
+        std::fs::create_dir_all(&base).unwrap();
+        let real = manager
+            .create("Real", "1.20.4", "fabric", "0.15.11")
+            .unwrap();
+        std::fs::write(manager.mods_dir(&real).join("sodium.jar"), b"mod").unwrap();
+
+        // A sentry file at the *parent* of the instances root. Before the
+        // sanitize fix, an id of ".." resolved `delete` to this directory and
+        // recursively wiped it (the `~/.mcmanager` disaster class).
+        let sentry = root.path().join("sentry.txt");
+        std::fs::write(&sentry, b"keep").unwrap();
+
+        let evil = OfflineInstance {
+            id: "..".to_string(),
+            ..OfflineInstance::default()
+        };
+        manager.delete(&evil);
+        let _ = manager.delete_mod(&evil, "x.jar");
+
+        assert!(
+            sentry.is_file(),
+            "delete must never escape the instances root"
+        );
+        assert!(base.is_dir());
+        assert!(manager.mods_dir(&real).join("sodium.jar").is_file());
     }
 }

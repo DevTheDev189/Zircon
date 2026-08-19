@@ -25,6 +25,11 @@ pub const FABRIC_ENTRY: &str = "fabric.mod.json";
 pub const NEOFORGE_ENTRY: &str = "META-INF/neoforge.mods.toml";
 pub const FORGE_ENTRY: &str = "META-INF/mods.toml";
 
+/// Cap on how many bytes of an embedded metadata file we will decompress.
+/// Prevents an uncompressed ZIP bomb from exhausting memory when inspecting
+/// untrusted mod jars.
+const MAX_METADATA_BYTES: u64 = 2 * 1024 * 1024; // 2 MB limit
+
 /// Errors raised while extracting mod metadata from a JAR.
 #[derive(Debug)]
 pub enum MetadataError {
@@ -82,19 +87,28 @@ pub fn extract(jar_file: &Path) -> Result<ModMetadata, MetadataError> {
 
     if let Ok(mut entry) = zip.by_name(FABRIC_ENTRY) {
         let mut content = String::new();
-        entry.read_to_string(&mut content)?;
+        entry
+            .by_ref()
+            .take(MAX_METADATA_BYTES)
+            .read_to_string(&mut content)?;
         return parse_fabric_metadata(&content);
     }
 
     if let Ok(mut entry) = zip.by_name(NEOFORGE_ENTRY) {
         let mut content = String::new();
-        entry.read_to_string(&mut content)?;
+        entry
+            .by_ref()
+            .take(MAX_METADATA_BYTES)
+            .read_to_string(&mut content)?;
         return parse_toml_metadata(&content, ModLoaderType::NeoForge);
     }
 
     if let Ok(mut entry) = zip.by_name(FORGE_ENTRY) {
         let mut content = String::new();
-        entry.read_to_string(&mut content)?;
+        entry
+            .by_ref()
+            .take(MAX_METADATA_BYTES)
+            .read_to_string(&mut content)?;
         return parse_toml_metadata(&content, ModLoaderType::Forge);
     }
 
@@ -244,9 +258,9 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    struct ZipEntry(&'static str, &'static str);
+    struct ZipEntry<'a>(&'static str, &'a str);
 
-    fn make_jar(name: &str, entries: &[ZipEntry]) -> PathBuf {
+    fn make_jar(name: &str, entries: &[ZipEntry<'_>]) -> PathBuf {
         // Unique per-jar directory so parallel tests never collide.
         let dir =
             std::env::temp_dir().join(format!("zircon-metadata-{name}-{}", std::process::id()));
@@ -440,6 +454,24 @@ version="2.0.0"
         );
         let err = extract(&jar).unwrap_err();
         assert!(err.to_string().contains("missing required field 'id'"));
+        let _ = std::fs::remove_dir_all(jar.parent().unwrap());
+    }
+
+    #[test]
+    fn caps_metadata_read_at_2mb_preventing_zip_bomb() {
+        // A fabric.mod.json far larger than the 2 MB cap. Without the cap this
+        // JSON parses fine; with the cap the read is truncated mid-string so
+        // parsing fails, proving the extractor never decompresses the whole
+        // entry (the uncompressed ZIP bomb scenario).
+        let padding = "a".repeat(MAX_METADATA_BYTES as usize + 1);
+        let meta = format!(r#"{{"id": "bomb", "padding": "{padding}"}}"#);
+        let jar = make_jar("zip-bomb.jar", &[ZipEntry("fabric.mod.json", &meta)]);
+
+        let err = extract(&jar).unwrap_err();
+        assert!(
+            matches!(err, MetadataError::Invalid(_)),
+            "oversized metadata should fail as truncated/invalid, got {err:?}"
+        );
         let _ = std::fs::remove_dir_all(jar.parent().unwrap());
     }
 }

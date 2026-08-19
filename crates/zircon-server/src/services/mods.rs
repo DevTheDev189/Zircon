@@ -229,6 +229,56 @@ impl ModManagementService {
         Ok(entry)
     }
 
+    /// Installs a CurseForge file by ID, resolving its official download URL
+    /// and SHA-1 hash so clients can verify the artifact against a 160-bit
+    /// digest instead of the weaker MurmurHash3 fingerprint.
+    pub async fn install_curseforge_file(
+        &self,
+        mod_id: i64,
+        file_id: i64,
+    ) -> Result<ModEntry, ModError> {
+        if !self.has_curse_forge_key() {
+            return Err(ModError::Invalid(
+                "CurseForge API key not configured on server".to_string(),
+            ));
+        }
+
+        let files = self
+            .curse_forge
+            .list_mod_files(mod_id)
+            .await
+            .map_err(|e| ModError::Api(e.to_string()))?;
+
+        let file = files.into_iter().find(|f| f.id == file_id).ok_or_else(|| {
+            ModError::Invalid(format!("File {file_id} not found for mod {mod_id}"))
+        })?;
+
+        if file.download_url.is_empty() {
+            return Err(ModError::Invalid(
+                "CurseForge file has no direct download URL".to_string(),
+            ));
+        }
+
+        // Extract the pinned metadata before moving fields into the entry.
+        let sha1 = file.sha1().map(str::to_string);
+        let title = file.display_name;
+        let fingerprint = file.file_fingerprint;
+
+        let mut entry = self
+            .install_from_url(&file.download_url, &file.file_name, ORIGIN_CURSEFORGE)
+            .await?;
+
+        entry.id = Some(file_id.to_string());
+        entry.title = Some(title);
+        if let Some(sha1) = sha1 {
+            entry.sha1 = Some(sha1);
+        }
+        entry.murmur3 = fingerprint;
+
+        self.persist_entry(&entry)?;
+        Ok(entry)
+    }
+
     /// Downloads a Modrinth modpack (`.mrpack`) and installs every mod listed
     /// under `files` in its `modrinth.index.json` into this instance's mods
     /// folder. Overrides (config/resource files) are not applied.

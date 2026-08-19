@@ -46,18 +46,20 @@ pub struct TotpEnableRequest {
     pub code: String,
 }
 
-/// Rate-limit key. When a username is supplied the bucket is per-account (so a
-/// brute-forcer can't exhaust other users' budgets); otherwise it falls back to
-/// the peer IP so unknown-username probes are still throttled.
+/// Rate-limit key. Buckets are per `IP + username` so a brute-forcer spraying
+/// failed attempts against `admin` from one address can only lock out that
+/// address — never the administrator's own IP. Unknown-username probes still
+/// get an IP-scoped bucket.
 fn limiter_key(username: &str, client: &Option<ConnectInfo<SocketAddr>>) -> String {
+    let ip = client
+        .as_ref()
+        .map(|c| c.0.ip().to_string())
+        .unwrap_or_else(|| "127.0.0.1".to_string());
     let u = username.trim().to_lowercase();
     if !u.is_empty() {
-        format!("user:{u}")
+        format!("ip:{ip}:user:{u}")
     } else {
-        client
-            .as_ref()
-            .map(|c| format!("ip:{}", c.0.ip()))
-            .unwrap_or_else(|| "ip:unknown".to_string())
+        format!("ip:{ip}:user:unknown")
     }
 }
 
