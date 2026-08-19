@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "releaseDate": "Tue 08/18/2026 11:11:06.21",
+  "notes": "Zircon Server Release v0.1.0",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://zirconmc.net/updates/server/v0.1.0/zircon-server-windows-x86_64.zip",
+      "sha256": "530b91f0da546c1a70846695fa177335752f3e1b4af96d5d94c04164e7e2508d",
+      "binName": "zircon-server.exe"
+    }
+  }
+}
