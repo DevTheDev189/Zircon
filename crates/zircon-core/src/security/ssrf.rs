@@ -26,6 +26,8 @@ pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
     "piston-data.mojang.com",
     "launcher.mojang.com",
     "launchermeta.mojang.com",
+    // Adoptium JDK metadata API (Phase 2: supply-chain-verified Java toolchain).
+    "api.adoptium.net",
 ];
 
 /// Returns `true` if the URL is strictly HTTPS, has no custom port, and its
@@ -62,7 +64,9 @@ mod tests {
 
     #[test]
     fn accepts_allowed_cdn_domains() {
-        assert!(is_safe_cdn_url("https://zirconmc.net/updates/server/latest.json"));
+        assert!(is_safe_cdn_url(
+            "https://zirconmc.net/updates/server/latest.json"
+        ));
         assert!(is_safe_cdn_url("https://cdn.modrinth.com/data/abc/1.0.jar"));
         assert!(is_safe_cdn_url(
             "https://edge.forgecdn.net/files/1234/5678/mod.jar"
@@ -79,6 +83,10 @@ mod tests {
         ));
         assert!(is_safe_cdn_url(
             "https://launcher.mojang.com/v1/objects/0123456789abcdef/server.jar"
+        ));
+        // Adoptium's JDK metadata API (checksum + download link resolution).
+        assert!(is_safe_cdn_url(
+            "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=windows&vendor=eclipse"
         ));
     }
 

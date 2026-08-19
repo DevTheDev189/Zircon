@@ -25,6 +25,59 @@ pub const FABRIC_ENTRY: &str = "fabric.mod.json";
 pub const NEOFORGE_ENTRY: &str = "META-INF/neoforge.mods.toml";
 pub const FORGE_ENTRY: &str = "META-INF/mods.toml";
 
+/// Max plausible ratio of total uncompressed bytes to total compressed bytes
+/// for a mod JAR. Legitimate jars (class files, JSON/TOML, small binary
+/// assets) sit far below this; anything exceeding it is treated as a
+/// decompression bomb (a tiny download that would explode into gigabytes if
+/// extracted).
+pub const MAX_JAR_COMPRESSION_RATIO: u64 = 50;
+
+/// Structural sanity check on a mod JAR before it is executed:
+///
+/// 1. the file must open as a valid ZIP archive (corrupt or truncated jars
+///    are rejected instead of silently failing at game boot),
+/// 2. the entries' declared total uncompressed size must not exceed
+///    `MAX_JAR_COMPRESSION_RATIO` × total compressed size (zip-bomb guard), and
+/// 3. the jar must declare mod metadata — `fabric.mod.json`, or
+///    `META-INF/neoforge.mods.toml`, or `META-INF/mods.toml` — so only files
+///    the loader can actually consume ever reach the mods folder.
+///
+/// Only central-directory headers are read; nothing is decompressed, so this
+/// is cheap and cannot itself be memory-bombed.
+pub fn validate_mod_jar_structure(jar_file: &Path) -> Result<(), String> {
+    let file = File::open(jar_file).map_err(|e| format!("cannot open JAR: {e}"))?;
+    let mut zip =
+        zip::ZipArchive::new(file).map_err(|e| format!("not a valid ZIP archive: {e}"))?;
+
+    let mut total_uncompressed: u64 = 0;
+    let mut total_compressed: u64 = 0;
+    let mut has_metadata = false;
+    for i in 0..zip.len() {
+        let entry = zip
+            .by_index(i)
+            .map_err(|e| format!("corrupt ZIP entry: {e}"))?;
+        total_uncompressed = total_uncompressed.saturating_add(entry.size());
+        total_compressed = total_compressed.saturating_add(entry.compressed_size());
+        match entry.name() {
+            FABRIC_ENTRY | NEOFORGE_ENTRY | FORGE_ENTRY => has_metadata = true,
+            _ => {}
+        }
+    }
+
+    if !has_metadata {
+        return Err(format!(
+            "no mod metadata found (expected {FABRIC_ENTRY}, {NEOFORGE_ENTRY} or {FORGE_ENTRY})"
+        ));
+    }
+    if total_compressed > 0 && total_uncompressed > MAX_JAR_COMPRESSION_RATIO * total_compressed {
+        return Err(format!(
+            "implausible compression ratio: {total_uncompressed} uncompressed bytes vs \
+             {total_compressed} compressed (possible decompression bomb)"
+        ));
+    }
+    Ok(())
+}
+
 /// Cap on how many bytes of an embedded metadata file we will decompress.
 /// Prevents an uncompressed ZIP bomb from exhausting memory when inspecting
 /// untrusted mod jars.
@@ -473,5 +526,116 @@ version="2.0.0"
             "oversized metadata should fail as truncated/invalid, got {err:?}"
         );
         let _ = std::fs::remove_dir_all(jar.parent().unwrap());
+    }
+
+    // ------------------------------------------------------------------
+    // validate_mod_jar_structure
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn structure_accepts_valid_fabric_and_forge_jars() {
+        let fabric = make_jar(
+            "struct-fabric.jar",
+            &[
+                ZipEntry("fabric.mod.json", r#"{"id": "ok"}"#),
+                ZipEntry("com/example/Mod.class", "class bytes"),
+            ],
+        );
+        assert!(validate_mod_jar_structure(&fabric).is_ok());
+        let _ = std::fs::remove_dir_all(fabric.parent().unwrap());
+
+        let forge = make_jar(
+            "struct-forge.jar",
+            &[
+                ZipEntry("META-INF/mods.toml", "[[mods]]\nmodId=\"ok\"\n"),
+                ZipEntry("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n"),
+            ],
+        );
+        assert!(validate_mod_jar_structure(&forge).is_ok());
+        let _ = std::fs::remove_dir_all(forge.parent().unwrap());
+
+        let neoforge = make_jar(
+            "struct-neoforge.jar",
+            &[ZipEntry(
+                "META-INF/neoforge.mods.toml",
+                "[[mods]]\nmodId=\"ok\"\n",
+            )],
+        );
+        assert!(validate_mod_jar_structure(&neoforge).is_ok());
+        let _ = std::fs::remove_dir_all(neoforge.parent().unwrap());
+    }
+
+    #[test]
+    fn structure_rejects_jar_without_mod_metadata() {
+        // A jar that only ships a manifest is not a mod the loader can use.
+        let jar = make_jar(
+            "struct-no-meta.jar",
+            &[ZipEntry("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n")],
+        );
+        let err = validate_mod_jar_structure(&jar).unwrap_err();
+        assert!(err.contains("no mod metadata"), "unhelpful error: {err}");
+        let _ = std::fs::remove_dir_all(jar.parent().unwrap());
+    }
+
+    #[test]
+    fn structure_rejects_non_zip_files() {
+        let dir = std::env::temp_dir().join(format!("zircon-struct-notzip-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("fake.jar");
+        std::fs::write(&file, b"this is definitely not a zip archive").unwrap();
+
+        let err = validate_mod_jar_structure(&file).unwrap_err();
+        assert!(
+            err.contains("not a valid ZIP archive"),
+            "unhelpful error: {err}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn structure_rejects_implausible_compression_ratio() {
+        // A single entry claiming to be 100 MB uncompressed while only 1 MB is
+        // actually stored in the zip (deflated). The header check sees the
+        // declared sizes and must reject before anything is extracted.
+        let dir = std::env::temp_dir().join(format!("zircon-struct-bomb-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("bomb.jar");
+        {
+            let f = File::create(&file).unwrap();
+            let mut zip = zip::ZipWriter::new(f);
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zip.start_file("fabric.mod.json", options).unwrap();
+            std::io::Write::write_all(&mut zip, b"{\"id\": \"bomb\"}").unwrap();
+            zip.finish().unwrap();
+        }
+        // Patch the central directory's uncompressed size for the single entry
+        // to a huge value (100 MB) so the declared ratio exceeds the cap.
+        patch_uncompressed_size(&file, 100 * 1024 * 1024);
+
+        let err = validate_mod_jar_structure(&file).unwrap_err();
+        assert!(err.contains("compression ratio"), "unhelpful error: {err}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Rewrites the uncompressed-size field (bytes 24..28) of the single
+    /// central-directory entry in a zip file. Enough for tests: the entry
+    /// header layout is fixed and the CRC stays unchecked by the header pass.
+    fn patch_uncompressed_size(file: &std::path::Path, size: u32) {
+        let bytes = std::fs::read(file).unwrap();
+        // Find the EOCD and walk back to the central directory start.
+        let eocd = bytes.windows(4).rposition(|w| w == b"PK\x05\x06").unwrap();
+        let cd_size = u32::from_le_bytes(bytes[eocd + 12..eocd + 16].try_into().unwrap());
+        let cd_offset = u32::from_le_bytes(bytes[eocd + 16..eocd + 20].try_into().unwrap());
+        let cd_start = cd_offset as usize;
+        // First entry header: signature(4) version(2+2) flags(2) method(2)
+        // time(2) date(2) crc(4) compSize(4) uncompSize(4) -> offset + 24.
+        let signature = &bytes[cd_start..cd_start + 4];
+        assert_eq!(signature, b"PK\x01\x02", "expected a central directory");
+        let mut patched = bytes.clone();
+        patched[cd_start + 24..cd_start + 28].copy_from_slice(&size.to_le_bytes());
+        std::fs::write(file, patched).unwrap();
+        let _ = cd_size;
     }
 }

@@ -28,6 +28,17 @@ pub struct BillOfMaterials {
     pub resourcepacks: Vec<PackEntry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server_title: Option<String>,
+
+    // --- Cryptographic Attestation Fields ---
+    // Set by the server on every disk write (Ed25519): `server_public_key` is
+    // the hex-encoded public key the launcher pins on first use (TOFU) and
+    // `signature` covers the canonical digest of the content above. Both are
+    // stripped from the digest itself, so adding/refreshing them never changes
+    // what was signed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_public_key: Option<String>,
 }
 
 fn default_schema_version() -> i32 {
@@ -48,6 +59,8 @@ impl BillOfMaterials {
             shaderpacks: Vec::new(),
             resourcepacks: Vec::new(),
             server_title,
+            signature: None,
+            server_public_key: None,
         }
     }
 
