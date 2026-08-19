@@ -140,6 +140,39 @@
         </div>
       </div>
     </div>
+
+    <!-- Host-key rotation dialog (TOFU): the server presents a different
+         Ed25519 key than the one pinned on first contact. -->
+    <div
+      v-if="keyPrompt"
+      class="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center"
+      @click.self="respondKeyPrompt(false)"
+    >
+      <div class="z-card w-[460px] pt-0 overflow-hidden">
+        <div class="h-[3px] bg-gradient-to-r from-[#f85149] to-[#b62324] -mx-4 -mt-4 mb-4"></div>
+        <h3 class="text-white font-bold mb-1">Server identity changed!</h3>
+        <p class="text-muted text-sm mb-3">
+          <span class="text-[#f85149] font-semibold">{{ keyPrompt.serverAddress }}</span>
+          is presenting a <span class="text-white font-semibold">new security key</span>.
+          This happens after a server reinstall — or when the server was
+          replaced or is being intercepted by an attacker.
+        </p>
+        <div class="bg-bg border border-edge rounded-lg p-3 mb-4 font-mono text-[11px] leading-relaxed break-all">
+          <div class="text-muted mb-0.5">Previous key:</div>
+          <div class="text-text">{{ keyPrompt.oldFingerprint }}</div>
+          <div class="text-muted mt-2 mb-0.5">New key:</div>
+          <div class="text-[#f85149]">{{ keyPrompt.newFingerprint }}</div>
+        </div>
+        <p class="text-muted text-xs mb-4">
+          Only trust the new key if you know the server was legitimately
+          reinstalled. Rejecting cancels the launch.
+        </p>
+        <div class="flex justify-end gap-2">
+          <button class="z-btn-ghost" @click="respondKeyPrompt(false)">Reject</button>
+          <button class="z-btn-danger" @click="respondKeyPrompt(true)">Trust New Key</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -151,7 +184,7 @@ import ServersView from './views/ServersView.vue';
 import OfflineView from './views/OfflineView.vue';
 import SkinsView from './views/SkinsView.vue';
 import SettingsView from './views/SettingsView.vue';
-import { api, onGameOutput, onGameStatus, onLaunchProgress, onLaunchStatus, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
+import { api, onGameOutput, onGameStatus, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import zirconTitle from './assets/zircon-title.svg';
@@ -214,6 +247,7 @@ const gameStatus = ref(null);
 const gameOutputBuffer = ref([]);
 const shaderPrompt = ref(null);
 const shaderRemember = ref(false);
+const keyPrompt = ref(null);
 
 let unlisten = [];
 
@@ -265,6 +299,9 @@ onMounted(async () => {
     onShaderRequest((payload) => {
       shaderPrompt.value = payload;
       shaderRemember.value = false;
+    }),
+    onServerKeyMismatch((payload) => {
+      keyPrompt.value = payload;
     })
   );
 
@@ -355,6 +392,20 @@ async function respondShaders(enabled) {
     await api.respondShaderChoice(prompt.requestId, enabled, shaderRemember.value);
   } catch {
     // The launch flow falls back to "no shaders" if it never hears back.
+  }
+}
+
+// Sends the player's host-key decision back to the pending launch flow.
+// Accepting re-pins the new key; rejecting (or a closed window) aborts the
+// launch — the Rust side never auto-accepts a key change.
+async function respondKeyPrompt(accepted) {
+  const prompt = keyPrompt.value;
+  if (!prompt) return;
+  keyPrompt.value = null;
+  try {
+    await api.respondKeyPrompt(prompt.requestId, accepted);
+  } catch {
+    // The launch flow times out and aborts if it never hears back.
   }
 }
 

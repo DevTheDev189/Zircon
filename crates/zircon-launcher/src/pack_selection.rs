@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 use crate::error::LauncherError;
+use crate::paths::sanitize_filename_strict;
 
 const FILE_NAME: &str = "pack-selection.json";
 
@@ -140,30 +141,35 @@ impl ClientPackManager {
     }
 
     /// Deletes a shaderpack from disk and its selection entries; clearing the
-    /// active selection when it was the active pack.
+    /// active selection when it was the active pack. The filename is strictly
+    /// validated so a caller cannot escape `gameDir/shaderpacks`.
     pub fn remove_shaderpack(
         game_dir: &Path,
         filename: &str,
         selection: &mut PackSelection,
     ) -> Result<(), LauncherError> {
-        delete_if_exists(&game_dir.join("shaderpacks").join(filename));
-        selection.locally_added_shaderpacks.remove(filename);
-        if selection.active_shaderpack.as_deref() == Some(filename) {
+        let name = sanitize_filename_strict(filename)?;
+        delete_if_exists(&game_dir.join("shaderpacks").join(&name));
+        selection.locally_added_shaderpacks.remove(&name);
+        if selection.active_shaderpack.as_deref() == Some(name.as_str()) {
             selection.active_shaderpack = None;
         }
         selection.save(game_dir);
         Ok(())
     }
 
-    /// Deletes a resourcepack from disk and all of its selection entries.
+    /// Deletes a resourcepack from disk and all of its selection entries. The
+    /// filename is strictly validated so a caller cannot escape
+    /// `gameDir/resourcepacks`.
     pub fn remove_resourcepack(
         game_dir: &Path,
         filename: &str,
         selection: &mut PackSelection,
     ) -> Result<(), LauncherError> {
-        delete_if_exists(&game_dir.join("resourcepacks").join(filename));
-        selection.locally_added_resourcepacks.remove(filename);
-        selection.active_resourcepacks.retain(|n| n != filename);
+        let name = sanitize_filename_strict(filename)?;
+        delete_if_exists(&game_dir.join("resourcepacks").join(&name));
+        selection.locally_added_resourcepacks.remove(&name);
+        selection.active_resourcepacks.retain(|n| n != &name);
         selection.save(game_dir);
         Ok(())
     }
@@ -330,6 +336,41 @@ mod tests {
         assert!(!game.join("shaderpacks").join("s.zip").exists());
         assert!(selection.active_shaderpack.is_none());
         assert!(!selection.is_locally_added_shaderpack("s.zip"));
+    }
+
+    #[test]
+    fn remove_pack_rejects_traversal_filenames() {
+        let dir = TempDir::new();
+        let game = dir.path().join("game-traversal");
+        std::fs::create_dir_all(game.join("shaderpacks")).unwrap();
+        std::fs::create_dir_all(game.join("resourcepacks")).unwrap();
+
+        // A sentry file outside the pack dirs that must survive.
+        let sentry = dir.path().join("sentry.txt");
+        std::fs::write(&sentry, b"keep").unwrap();
+
+        let mut selection = PackSelection::default();
+        for evil in [
+            "../../sentry.txt",
+            "..\\sentry.txt",
+            "/abs.zip",
+            ".hidden.zip",
+        ] {
+            let shader = ClientPackManager::remove_shaderpack(&game, evil, &mut selection);
+            assert!(
+                matches!(shader, Err(LauncherError::InvalidInput(_))),
+                "shaderpack traversal {evil:?} must be rejected, got {shader:?}"
+            );
+            let resource = ClientPackManager::remove_resourcepack(&game, evil, &mut selection);
+            assert!(
+                matches!(resource, Err(LauncherError::InvalidInput(_))),
+                "resourcepack traversal {evil:?} must be rejected, got {resource:?}"
+            );
+        }
+        assert!(
+            sentry.is_file(),
+            "pack deletion must never escape the pack dirs"
+        );
     }
 
     #[test]

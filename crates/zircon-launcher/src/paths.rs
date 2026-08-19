@@ -5,6 +5,8 @@
 
 use std::path::PathBuf;
 
+use crate::error::LauncherError;
+
 /// The current user's home directory (`USERPROFILE` on Windows, `HOME` on
 /// Unix), falling back to the current directory when neither is set.
 pub fn home_dir() -> PathBuf {
@@ -82,4 +84,23 @@ pub fn skin_presets_dir() -> PathBuf {
 /// (mirrors the Java launcher's `INSTANCES_ROOT`).
 pub fn instances_dir() -> PathBuf {
     home_dir().join(".zircon").join("instances")
+}
+
+/// Strictly validates a user-supplied filename used in a delete operation.
+///
+/// The name must be a plain basename: non-empty, no path separators (both `/`
+/// and `\`), and no leading dot (which also rejects `.` and `..`). Anything
+/// else would let the caller delete files outside the intended directory, so
+/// it fails closed with [`LauncherError::InvalidInput`].
+pub fn sanitize_filename_strict(filename: &str) -> Result<String, LauncherError> {
+    if filename.is_empty()
+        || filename.contains('/')
+        || filename.contains('\\')
+        || filename.starts_with('.')
+    {
+        return Err(LauncherError::InvalidInput(
+            "Illegal file path traversal attempt".to_string(),
+        ));
+    }
+    Ok(filename.to_string())
 }

@@ -25,6 +25,7 @@ use tracing::{info, warn};
 
 use zircon_core::api::modrinth::ModrinthApiClient;
 use zircon_core::api::ApiError;
+use zircon_core::metadata::extractor::validate_mod_jar_structure;
 use zircon_core::model::{BillOfMaterials, ModEntry, PackEntry};
 
 use crate::error::LauncherError;
@@ -237,6 +238,32 @@ impl ModSyncEngine {
             .unwrap_or(server_base_url)
             .to_string();
 
+        emit_status(listener, &format!("Fetching mod list from {base}..."));
+        let bom_json = self.get(&format!("{base}/bom")).await?;
+        let bom: BillOfMaterials = serde_json::from_str(&bom_json)?;
+        self.sync_with_bom(&bom, &base, game_dir, listener).await
+    }
+
+    /// Like [`sync`](Self::sync), but synchronizes against a caller-supplied
+    /// BOM instead of fetching its own copy.
+    ///
+    /// The online launch flow calls this with the BOM it already fetched and
+    /// cryptographically verified (TOFU-pinned signature), so the mods that get
+    /// downloaded are exactly the ones from the trusted list — a second fetch
+    /// could otherwise race with a compromised server and return a different,
+    /// unverified list between verification and download.
+    pub async fn sync_with_bom(
+        &self,
+        bom: &BillOfMaterials,
+        server_base_url: &str,
+        game_dir: &Path,
+        listener: Option<&dyn ProgressListener>,
+    ) -> Result<SyncResult, LauncherError> {
+        let base = server_base_url
+            .strip_suffix('/')
+            .unwrap_or(server_base_url)
+            .to_string();
+
         let mut result = SyncResult::default();
         let mods_dir = game_dir.join("mods");
         std::fs::create_dir_all(&mods_dir)?;
@@ -245,13 +272,9 @@ impl ModSyncEngine {
         let staging_dir = game_dir.join(".mod_staging");
         std::fs::create_dir_all(&staging_dir)?;
 
-        // --- Step 1: fetch the BOM ---
-        emit_status(listener, &format!("Fetching mod list from {base}..."));
-        let bom_json = self.get(&format!("{base}/bom")).await?;
-        let bom: BillOfMaterials = serde_json::from_str(&bom_json)?;
         let mc_version = bom.minecraft_version.clone();
         let mods = bom.mods.clone();
-        result.bom = Some(bom);
+        result.bom = Some(bom.clone());
         info!("BOM: {} mods for MC {}", mods.len(), mc_version);
 
         // --- Step 2: verify hashes against Modrinth's public database ---
@@ -320,10 +343,42 @@ impl ModSyncEngine {
             return Ok(result);
         }
 
+        // --- Step 3.5: structural sanity of every wanted mod JAR ---
+        // Hash checks prove the bytes match what the provider published, but a
+        // compromised provider/BOM could still ship a malformed or zip-bomb
+        // JAR. Every staged JAR (including ones kept from a previous sync)
+        // must open as a valid ZIP with plausible compression and mod metadata
+        // before it may move into the active mods/ folder.
+        let mut structurally_invalid: Vec<String> = Vec::new();
+        for mod_entry in &mods {
+            let staged_target = staging_dir.join(&mod_entry.filename);
+            if !staged_target.is_file() {
+                continue;
+            }
+            if let Err(e) = validate_mod_jar_structure(&staged_target) {
+                tracing::warn!(
+                    "Mod failed structural validation: {} ({e})",
+                    mod_entry.filename
+                );
+                structurally_invalid.push(mod_entry.filename.clone());
+            }
+        }
+        if !structurally_invalid.is_empty() {
+            result.aborted = true;
+            result.abort_reason = Some(format!(
+                "The following mods failed structural validation (not a valid ZIP, \
+                 implausible compression ratio, or missing mod metadata): {}. \
+                 Refusing to install them.",
+                structurally_invalid.join(", ")
+            ));
+            return Ok(result);
+        }
+
         // --- Step 4: dynamically reconcile the active instance mods/ directory ---
+        // Staged mods are copied into mods/ via a hidden temp file, re-hashed on
+        // the destination block, and atomically renamed into place (TOCTOU-free).
         emit_status(listener, "Synchronizing active instance mods folder...");
-        let wanted: Vec<String> = mods.iter().map(|m| m.filename.clone()).collect();
-        let (removed, kept) = reconcile(&mods_dir, &staging_dir, &wanted)?;
+        let (removed, kept) = reconcile_atomic(&mods_dir, &staging_dir, &mods)?;
         result.removed = removed;
         result.kept = kept;
 
@@ -353,12 +408,17 @@ impl ModSyncEngine {
 /// (removed) setting was enabled — both fail-open behaviors are gone.
 async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
     // Gather every pinned SHA-1 across all mod origins for one batch lookup.
+    // Trimming here keeps the lookup keys identical to the comparison in
+    // `is_mod_verified`, so a padded hash cannot slip past verification.
     let mut all_sha1s: Vec<String> = Vec::new();
     for mod_entry in mods {
-        if let Some(sha1) = &mod_entry.sha1 {
-            if !sha1.trim().is_empty() {
-                all_sha1s.push(sha1.clone());
-            }
+        if let Some(sha1) = mod_entry
+            .sha1
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            all_sha1s.push(sha1.to_string());
         }
     }
 
@@ -400,9 +460,11 @@ async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
 ///
 /// * **Modrinth** — the public hash API must confirm the SHA-1 (fail-closed:
 ///   an unreachable API leaves Modrinth mods unverified).
-/// * **CurseForge** — the server pinned the official SHA-1 into the BOM at
-///   install time, so a present (non-empty) SHA-1 verifies the mod; a
-///   Modrinth cross-match is a bonus but not required.
+/// * **CurseForge** — the public hash database must confirm the SHA-1 as
+///   well. A server-supplied SHA-1 alone is never trusted: a compromised or
+///   malicious wrapper could pin any hash it likes, so the client verifies
+///   every claim against an authoritative source (Modrinth's cross-index
+///   covers CurseForge files).
 /// * **anything else** (`direct`/unknown) — never trusted.
 ///
 /// Pure so the security decision is unit-testable without network access.
@@ -411,11 +473,11 @@ fn is_mod_verified(
     sha1: Option<&str>,
     verified_sha1s: &HashSet<String>,
 ) -> bool {
-    match (origin, sha1) {
-        (Some("modrinth"), Some(sha1)) => verified_sha1s.contains(sha1),
-        (Some("curseforge"), Some(sha1)) => {
-            verified_sha1s.contains(sha1) || !sha1.trim().is_empty()
-        }
+    let Some(sha1) = sha1.map(str::trim).filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    match origin {
+        Some("modrinth") | Some("curseforge") => verified_sha1s.contains(sha1),
         _ => false,
     }
 }
@@ -436,18 +498,30 @@ fn map_api_error(error: ApiError) -> LauncherError {
 ///
 /// Returns `(removed, kept)`: `removed` lists the `.jar` files deleted from
 /// `mods_dir` because the server no longer lists them; `kept` lists the wanted
-/// files present in `mods_dir` after the copy phase. Wanted staged files are
-/// left in staging (they feed the "already verified" check on the next sync),
-/// mirroring the Java.
+/// Reconciles the active instance `mods/` directory against the BOM, staging
+/// the transfer so verification happens on the **final destination block**:
+/// each staged mod is copied to a hidden temporary file inside `mods/`, its
+/// SHA-1 is recomputed on that on-disk copy, and only then is it atomically
+/// renamed over the final name. This closes the TOCTOU window of the old
+/// "hash the staging file, then copy it" flow — a local background process
+/// can no longer swap a file between the check and the install.
+///
+/// Also removes JARs in `mods/` that are no longer in the BOM and prunes
+/// stale files from the staging area. Wanted staged files are left in staging
+/// (they feed the "already verified" check on the next sync), mirroring the
+/// Java.
+///
+/// Fails closed: a mismatch between the on-disk copy and the BOM's pinned
+/// SHA-1 aborts the reconcile before the mod is installed.
 ///
 /// Port of the Java "dynamically reconcile the active instance mods/ directory"
-/// step of `ModSyncEngine.sync`.
-pub(crate) fn reconcile(
+/// step of `ModSyncEngine.sync`, hardened against TOCTOU.
+pub(crate) fn reconcile_atomic(
     mods_dir: &Path,
     staging_dir: &Path,
-    wanted: &[String],
-) -> std::io::Result<(Vec<String>, Vec<String>)> {
-    let wanted_set: HashSet<&str> = wanted.iter().map(|s| s.as_str()).collect();
+    bom_mods: &[ModEntry],
+) -> Result<(Vec<String>, Vec<String>), LauncherError> {
+    let wanted_set: HashSet<&str> = bom_mods.iter().map(|m| m.filename.as_str()).collect();
     let mut removed = Vec::new();
     let mut kept = Vec::new();
 
@@ -469,22 +543,47 @@ pub(crate) fn reconcile(
         }
     }
 
-    // Copy verified mods from staging into the active instance mods/.
-    for name in wanted {
-        let staged_file = staging_dir.join(name);
-        let active_target = mods_dir.join(name);
-        if staged_file.is_file() {
-            std::fs::copy(&staged_file, &active_target)?;
-        } else {
-            warn!("Staged file missing for mod: {}", name);
-        }
-    }
+    // Transfer wanted mods from staging into the active mods/ with
+    // verification-on-write: copy to a hidden temp file inside mods/, hash
+    // that on-disk copy, and atomically rename it over the final name. The
+    // hash is computed on the exact bytes that end up in mods/, so nothing can
+    // slip in between the check and the install.
+    for mod_entry in bom_mods {
+        let filename = &mod_entry.filename;
+        let staged_file = staging_dir.join(filename);
+        let active_target = mods_dir.join(filename);
+        let temp_target = mods_dir.join(format!(".{filename}.tmp"));
 
-    // Wanted files present in mods/ after reconciliation = the kept mods.
-    for name in wanted {
-        if mods_dir.join(name).is_file() {
-            kept.push(name.clone());
+        if !staged_file.is_file() {
+            warn!("Staged file missing for mod: {}", filename);
+            continue;
         }
+
+        // Copy directly into the active mods directory as a hidden temp file.
+        std::fs::copy(&staged_file, &temp_target)?;
+
+        // Hash the destination disk block — not the staging copy.
+        let Ok(actual_sha1) = HashVerifier::sha1_file(&temp_target) else {
+            let _ = std::fs::remove_file(&temp_target);
+            return Err(LauncherError::InvalidInput(format!(
+                "Failed to read destination file: {filename}"
+            )));
+        };
+
+        if let Some(expected_sha1) = &mod_entry.sha1 {
+            if !expected_sha1.eq_ignore_ascii_case(&actual_sha1) {
+                let _ = std::fs::remove_file(&temp_target);
+                return Err(LauncherError::InvalidInput(format!(
+                    "TOCTOU violation detected: hash mismatch on final target block for {filename}"
+                )));
+            }
+        }
+
+        // Atomic rename overwrites the final destination. Both paths live in
+        // `mods_dir`, so the rename cannot cross filesystems and is atomic on
+        // every supported platform.
+        std::fs::rename(&temp_target, &active_target)?;
+        kept.push(filename.clone());
     }
 
     Ok((removed, kept))
@@ -560,19 +659,32 @@ fn url_encode(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 
-/// Rejects a server-supplied filename that could escape the instance directory.
+/// Rejects a server-supplied filename that could escape the instance directory
+/// or smuggle data into config files.
+///
 /// The BOM comes from an untrusted server, so a filename is only accepted when
-/// it is a plain basename: no path separators, no `..`, no leading dot, non-
-/// empty. Anything else aborts the sync before any file is written.
+/// it is a plain basename built from safe characters only: no path separators,
+/// no `..`, no leading dot, no quotes, no control codes, no whitespace, and
+/// nothing outside `[A-Za-z0-9._-+]`. Anything else aborts the sync before any
+/// file is written or any entry reaches `options.txt` / `iris.properties`.
 pub(crate) fn validate_entry_filename(filename: &str) -> Result<(), String> {
-    if filename.is_empty()
+    if filename.is_empty() {
+        return Err("Filename cannot be empty".to_string());
+    }
+    if filename.starts_with('.')
         || filename.contains('/')
         || filename.contains('\\')
         || filename.contains("..")
-        || filename.starts_with('.')
-        || filename == ".."
     {
-        return Err(format!("invalid filename in server BOM: {filename:?}"));
+        return Err(format!("Path traversal in filename: {filename:?}"));
+    }
+    // Reject quotes, newlines, control characters, whitespace and any other
+    // character that could inject into config files or the filesystem.
+    let is_valid = filename
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' || c == '+');
+    if !is_valid {
+        return Err(format!("Disallowed characters in filename: {filename:?}"));
     }
     Ok(())
 }
@@ -745,8 +857,9 @@ mod tests {
     fn validate_entry_filename_rejects_traversal_and_dotfiles() {
         // Legitimate basenames pass.
         assert!(validate_entry_filename("sodium-0.5.8.jar").is_ok());
-        assert!(validate_entry_filename("a b.jar").is_ok());
         assert!(validate_entry_filename("mod-1.0-rc1.jar").is_ok());
+        assert!(validate_entry_filename("sodium-fabric-0.5.8+mc1.20.4.jar").is_ok());
+        assert!(validate_entry_filename("1.20.1-Forge-47.2.0.jar").is_ok());
 
         // Anything a hostile server could use to escape the instance directory.
         for bad in [
@@ -758,10 +871,32 @@ mod tests {
             "..",
             ".hidden.jar",
             "",
+            "a..b.jar",
         ] {
             assert!(
                 validate_entry_filename(bad).is_err(),
                 "should reject {bad:?}"
+            );
+        }
+
+        // Injection payloads: quotes, newlines, control codes and whitespace
+        // must not reach options.txt / iris.properties or the filesystem.
+        for bad in [
+            "evil\".jar",
+            "evil'.jar",
+            "evil\n.jar",
+            "evil\u{0}.jar",
+            "evil\u{1f}.jar",
+            "a b.jar",
+            "a\tb.jar",
+            "a$b.jar",
+            "a:b.jar",
+            "a?b.jar",
+            "a*b.jar",
+        ] {
+            assert!(
+                validate_entry_filename(bad).is_err(),
+                "should reject injection filename {bad:?}"
             );
         }
     }
@@ -820,65 +955,131 @@ mod tests {
         // Modrinth: no pinned hash -> NOT verified.
         assert!(!is_mod_verified(Some("modrinth"), None, &confirmed));
 
-        // CurseForge: SHA-1 pinned in the BOM -> verified. The server pinned
-        // the official hash at install time, so the client needs no CurseForge
-        // API key; a Modrinth cross-match is a bonus but not required.
+        // CurseForge: SHA-1 confirmed by the public hash database -> verified.
+        // The provider cross-index covers CurseForge files, so the client never
+        // trusts a server-pinned hash alone.
         assert!(is_mod_verified(
             Some("curseforge"),
             Some("good-sha1"),
             &confirmed
         ));
-        assert!(is_mod_verified(
+        // CurseForge: SHA-1 NOT confirmed by any authoritative source -> NOT
+        // verified (fail-closed). A compromised wrapper can pin any hash, so a
+        // server claim alone is never enough.
+        assert!(!is_mod_verified(
             Some("curseforge"),
             Some("not-on-modrinth-sha1"),
             &confirmed
         ));
-        // CurseForge: empty or missing SHA-1 -> NOT verified (SHA-1 mandatory;
-        // the 32-bit fingerprint alone can be spoofed via a preimage collision).
+        // CurseForge: empty, whitespace-padded or missing SHA-1 -> NOT verified
+        // (SHA-1 mandatory; the 32-bit fingerprint alone can be spoofed via a
+        // preimage collision).
         assert!(!is_mod_verified(Some("curseforge"), Some(""), &confirmed));
+        assert!(!is_mod_verified(
+            Some("curseforge"),
+            Some("   "),
+            &confirmed
+        ));
         assert!(!is_mod_verified(Some("curseforge"), None, &confirmed));
 
-        // Direct / unknown origin is never trusted.
+        // Direct / unknown origin is never trusted, even with a confirmed hash.
         assert!(!is_mod_verified(
             Some("direct"),
             Some("good-sha1"),
             &confirmed
         ));
+        assert!(!is_mod_verified(None, Some("good-sha1"), &confirmed));
         assert!(!is_mod_verified(None, None, &confirmed));
     }
 
     // ------------------------------------------------------------------
-    // reconcile
+    // reconcile_atomic (TOCTOU-free transfer)
     // ------------------------------------------------------------------
 
     #[test]
-    fn reconcile_removes_stale_copies_staged_and_prunes_staging() {
-        let dir = TempDir::new("reconcile");
+    fn reconcile_atomic_removes_stale_transfers_verified_and_prunes_staging() {
+        let dir = TempDir::new("reconcile-atomic");
         let mods_dir = dir.path().join("mods");
         let staging_dir = dir.path().join(".mod_staging");
         std::fs::create_dir_all(&mods_dir).unwrap();
         std::fs::create_dir_all(&staging_dir).unwrap();
 
-        // A stale mod in the instance, a BOM mod staged, and a stale staged file.
+        // A stale mod in the instance, a BOM mod staged (with a matching
+        // pinned SHA-1), and a stale staged file.
         std::fs::write(mods_dir.join("c.jar"), b"stale").unwrap();
-        std::fs::write(staging_dir.join("a.jar"), b"bom content").unwrap();
+        let content = b"bom content";
+        std::fs::write(staging_dir.join("a.jar"), content).unwrap();
+        let a_sha1 = HashVerifier::sha1_file(&staging_dir.join("a.jar")).unwrap();
         std::fs::write(staging_dir.join("stale-staged.jar"), b"old").unwrap();
 
-        let wanted = vec!["a.jar".to_string(), "b.jar".to_string()];
-        let (removed, kept) = reconcile(&mods_dir, &staging_dir, &wanted).unwrap();
+        let bom_mods = vec![
+            ModEntry::new(
+                None,
+                "a.jar",
+                Some(a_sha1),
+                0,
+                Some("direct".to_string()),
+                None,
+                0,
+            ),
+            // Never staged → skipped, not kept.
+            ModEntry::new(
+                None,
+                "b.jar",
+                Some("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef".to_string()),
+                0,
+                Some("direct".to_string()),
+                None,
+                0,
+            ),
+        ];
+
+        let (removed, kept) = reconcile_atomic(&mods_dir, &staging_dir, &bom_mods).unwrap();
 
         assert_eq!(vec!["c.jar".to_string()], removed);
-        // The staged a.jar was copied into mods/ with its content.
+        // The staged a.jar was transferred into mods/ with its content, via an
+        // atomic rename — no leftover temp file.
         assert_eq!(
-            b"bom content".to_vec(),
+            content.to_vec(),
             std::fs::read(mods_dir.join("a.jar")).unwrap()
         );
+        assert!(!mods_dir.join(".a.jar.tmp").exists());
         // The stale staged file was pruned; wanted staged files are kept
         // (they feed the "already verified" check on the next sync).
         assert!(!staging_dir.join("stale-staged.jar").exists());
         assert!(staging_dir.join("a.jar").is_file());
-        // kept = wanted files present in mods/ after reconciliation (b.jar was
-        // never staged, so it cannot be kept).
+        // kept = mods actually installed by the transfer.
         assert_eq!(vec!["a.jar".to_string()], kept);
+    }
+
+    #[test]
+    fn reconcile_atomic_detects_toctou_hash_mismatch_on_write() {
+        let dir = TempDir::new("reconcile-toctou");
+        let mods_dir = dir.path().join("mods");
+        let staging_dir = dir.path().join(".mod_staging");
+        std::fs::create_dir_all(&mods_dir).unwrap();
+        std::fs::create_dir_all(&staging_dir).unwrap();
+
+        // A staged mod whose content does NOT match the BOM's pinned SHA-1 —
+        // exactly what a swap between the staging check and the install would
+        // look like on the destination block.
+        std::fs::write(staging_dir.join("evil.jar"), b"swapped by local process").unwrap();
+        let bom_mods = vec![ModEntry::new(
+            None,
+            "evil.jar",
+            Some("0000000000000000000000000000000000000000".to_string()),
+            0,
+            Some("direct".to_string()),
+            None,
+            0,
+        )];
+
+        let err = reconcile_atomic(&mods_dir, &staging_dir, &bom_mods).unwrap_err();
+        assert!(matches!(err, LauncherError::InvalidInput(_)), "{err:?}");
+        assert!(err.to_string().contains("TOCTOU"), "unhelpful error: {err}");
+
+        // Nothing was installed and no temp file is left behind.
+        assert!(!mods_dir.join("evil.jar").exists());
+        assert!(!mods_dir.join(".evil.jar.tmp").exists());
     }
 }

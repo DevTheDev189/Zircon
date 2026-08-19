@@ -21,6 +21,8 @@ export const api = {
     invoke('launch_server', { address, name, installRecommendedPacks, useHttps }),
   respondShaderChoice: (requestId, enabled, remember) =>
     invoke('respond_shader_choice', { requestId, enabled, remember }),
+  respondKeyPrompt: (requestId, accepted) =>
+    invoke('respond_key_prompt', { requestId, accepted }),
   stopGame: () => invoke('stop_game'),
   getGameStatus: () => invoke('get_game_status'),
 
@@ -89,6 +91,11 @@ export const onSkinUpdated = (cb) => listen('skin-updated', () => cb());
 // the player's choice has not been remembered yet. Respond via
 // `respondShaderChoice` to continue the launch.
 export const onShaderRequest = (cb) => listen('shader-request', (e) => cb(e.payload));
+
+// Emitted by Rust during a server launch when the server presents a different
+// Ed25519 key than the one pinned on first contact (reinstall or takeover).
+// Respond via `respondKeyPrompt` to accept or reject the rotation.
+export const onServerKeyMismatch = (cb) => listen('server-key-mismatch', (e) => cb(e.payload));
 
 // Native file dialogs (WebView2 file inputs only expose a fake path).
 export async function pickFile(filters) {

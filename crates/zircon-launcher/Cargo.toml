@@ -57,3 +57,5 @@ keyring = { version = "3", default-features = false, features = ["linux-native"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
+# Deterministic key construction in TOFU attestation tests.
+ed25519-dalek = { version = "2.1", default-features = false, features = ["std"] }

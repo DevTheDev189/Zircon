@@ -1,12 +1,15 @@
 //! Java runtime provisioning for the launch pipeline: maps Minecraft versions
 //! to the Java major version they require, locates a `java` executable, and
 //! ensures a compatible runtime is available — reusing a system Java when it
-//! qualifies, otherwise a cached Temurin JDK or a fresh download from Adoptium.
+//! qualifies, otherwise a cached Temurin JDK or a fresh download from Adoptium
+//! whose SHA-256 is verified against Adoptium's metadata API before extraction.
 //!
 //! Port of `com.mcmanager.client.launch.JavaRuntimeResolver` and
 //! `com.mcmanager.client.launch.JavaRuntimeSelector`.
 
 use std::path::{Path, PathBuf};
+
+use sha2::{Digest, Sha256};
 
 use crate::error::LauncherError;
 use crate::paths;
@@ -112,12 +115,65 @@ pub struct JavaRuntimeResolver {
     http: reqwest::Client,
 }
 
+/// Shape of the Adoptium v3 assets API response: a release whose binary
+/// package carries the canonical download link and its SHA-256 checksum.
+/// Unknown fields in the real response are ignored by serde.
+#[derive(serde::Deserialize)]
+struct AdoptiumPackage {
+    checksum: String,
+    link: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AdoptiumBinary {
+    package: AdoptiumPackage,
+}
+
+#[derive(serde::Deserialize)]
+struct AdoptiumRelease {
+    binary: AdoptiumBinary,
+}
+
 impl JavaRuntimeResolver {
     pub fn new(cache_dir: PathBuf) -> Self {
         Self {
             cache_dir,
             http: reqwest::Client::new(),
         }
+    }
+
+    /// Queries the Adoptium v3 assets API for the verified download URL and
+    /// SHA-256 checksum of the latest Temurin JDK for `major`.
+    ///
+    /// The metadata request itself is subject to the SSRF guard: only the
+    /// allowlisted `api.adoptium.net` host may be queried, so a corrupted
+    /// configuration can never redirect the probe at an internal host. The
+    /// returned checksum is what later gates the actual archive download.
+    async fn fetch_adoptium_release(&self, major: i32) -> Result<(String, String), LauncherError> {
+        let api_url = adoptium_metadata_url(major);
+
+        if !zircon_core::security::ssrf::is_safe_cdn_url(&api_url) {
+            return Err(LauncherError::InvalidInput(
+                "Adoptium API URL rejected by SSRF guard".into(),
+            ));
+        }
+
+        let resp = self.http.get(&api_url).send().await?;
+        if !resp.status().is_success() {
+            return Err(LauncherError::Http {
+                status: resp.status().as_u16(),
+                url: api_url,
+            });
+        }
+
+        let releases: Vec<AdoptiumRelease> = resp.json().await?;
+        let first = releases.into_iter().next().ok_or_else(|| {
+            LauncherError::NotFound(format!(
+                "No Adoptium release metadata found for Java {major}"
+            ))
+        })?;
+
+        Ok((first.binary.package.link, first.binary.package.checksum))
     }
 
     /// Returns a Java home whose major version is `>= required_major`.
@@ -150,17 +206,34 @@ impl JavaRuntimeResolver {
         let archive = self
             .cache_dir
             .join(format!("jdk-{required_major}.{archive_ext}"));
-        self.download(&adoptium_url(required_major), &archive)
-            .await?;
+
+        // Resolve the canonical download URL and its SHA-256 from Adoptium's
+        // metadata API *before* fetching anything.
+        let (download_url, expected_sha256) = self.fetch_adoptium_release(required_major).await?;
+
+        tracing::info!("Downloading Java {required_major} from {download_url}...");
+        self.download(&download_url, &archive).await?;
+
+        // Cryptographic integrity check: the archive must match the SHA-256
+        // published by Adoptium's metadata API. A poisoned or corrupted
+        // download is deleted and the launch aborts before anything is
+        // extracted or executed.
+        if let Err(e) = verify_sha256(&archive, &expected_sha256).await {
+            let _ = tokio::fs::remove_file(&archive).await;
+            return Err(e);
+        }
+        tracing::info!("Java {required_major} archive SHA-256 verified successfully.");
+
         self.extract(&archive, &jdk_dir)?;
 
         if java_exe.is_file() {
             return Ok(jdk_dir);
         }
-        // Adoptium archives contain a single top-level folder; look one level down.
+        // Adoptium archives contain a single top-level folder; look one level
+        // down for the java executable.
         if let Ok(entries) = std::fs::read_dir(&jdk_dir) {
             for entry in entries.flatten() {
-                if entry.path().is_dir() {
+                if entry.path().is_dir() && java_executable(&entry.path()).is_file() {
                     return Ok(entry.path());
                 }
             }
@@ -354,8 +427,9 @@ fn find_on_path(name: &str) -> Option<PathBuf> {
     None
 }
 
-/// The Adoptium Temurin JDK download URL for the current platform.
-fn adoptium_url(major: i32) -> String {
+/// The Adoptium v3 assets metadata API URL for the latest Temurin JDK release
+/// of `major`. The response carries the canonical download link and SHA-256.
+fn adoptium_metadata_url(major: i32) -> String {
     let os = if cfg!(target_os = "windows") {
         "windows"
     } else if cfg!(target_os = "macos") {
@@ -369,8 +443,24 @@ fn adoptium_url(major: i32) -> String {
         "x64"
     };
     format!(
-        "https://api.adoptium.net/v3/binary/latest/{major}/ga/{os}/{arch}/jdk/hotspot/normal/eclipse"
+        "https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture={arch}&image_type=jdk&os={os}&vendor=eclipse"
     )
+}
+
+/// Verifies that `archive` matches the expected SHA-256 (hex, case-insensitive).
+/// Returns a descriptive `Err` on any discrepancy; callers delete the archive
+/// and abort the launch.
+async fn verify_sha256(archive: &Path, expected_sha256: &str) -> Result<(), LauncherError> {
+    let archive_bytes = tokio::fs::read(archive).await?;
+    let actual_sha256 = hex::encode(Sha256::digest(&archive_bytes));
+
+    if expected_sha256.eq_ignore_ascii_case(&actual_sha256) {
+        Ok(())
+    } else {
+        Err(LauncherError::InvalidInput(format!(
+            "Java runtime checksum mismatch! Expected SHA-256 {expected_sha256}, got {actual_sha256}"
+        )))
+    }
 }
 
 fn safe_parse(value: &str) -> i32 {
@@ -431,5 +521,72 @@ mod tests {
         );
         assert_eq!(None, parse_java_version_output("not a java runtime"));
         assert_eq!(None, parse_java_version_output(""));
+    }
+
+    /// The Adoptium metadata API shape we depend on: `[{ binary: { package:
+    /// { checksum, link } } }]`. A wrong shape here silently breaks supply-chain
+    /// verification, so the parse contract is pinned by a test.
+    #[test]
+    fn parses_adoptium_metadata_response() {
+        let body = r#"[
+            {
+                "release_name": "jdk-21.0.5+11",
+                "binary": {
+                    "os": "windows",
+                    "architecture": "x64",
+                    "package": {
+                        "checksum": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+                        "link": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip",
+                        "name": "OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip",
+                        "size": 190000000
+                    }
+                }
+            }
+        ]"#;
+        let releases: Vec<AdoptiumRelease> = serde_json::from_str(body).unwrap();
+        let first = releases.into_iter().next().expect("one release");
+        assert!(first.binary.package.link.contains("github.com/adoptium"));
+        assert_eq!(64, first.binary.package.checksum.len());
+        assert!(first
+            .binary
+            .package
+            .checksum
+            .chars()
+            .all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn adoptium_metadata_url_passes_ssrf_guard() {
+        let url = adoptium_metadata_url(21);
+        assert!(
+            url.starts_with("https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=")
+        );
+        assert!(
+            zircon_core::security::ssrf::is_safe_cdn_url(&url),
+            "metadata URL must pass the CDN SSRF guard: {url}"
+        );
+    }
+
+    #[tokio::test]
+    async fn sha256_verification_rejects_corrupted_archive() {
+        let dir =
+            std::env::temp_dir().join(format!("zircon-java-sha256-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let archive = dir.join("fake-jdk.zip");
+        let contents = b"not a real JDK archive";
+        std::fs::write(&archive, contents).unwrap();
+
+        let good = hex::encode(Sha256::digest(contents));
+        let bad = hex::encode(Sha256::digest(b"something else entirely"));
+
+        // Matching checksum (any case) passes.
+        assert!(verify_sha256(&archive, &good).await.is_ok());
+        assert!(verify_sha256(&archive, &good.to_uppercase()).await.is_ok());
+
+        // Mismatch fails with a descriptive InvalidInput error.
+        let err = verify_sha256(&archive, &bad).await.unwrap_err();
+        assert!(matches!(err, LauncherError::InvalidInput(_)), "{err:?}");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

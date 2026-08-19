@@ -28,6 +28,12 @@ pub struct SavedServer {
     /// always uses the address's `host:port` regardless.
     #[serde(default)]
     pub use_https: bool,
+    /// Hex-encoded Ed25519 public key pinned from the server's signed BOM on
+    /// first contact (TOFU). `None` until an attested BOM has been seen; once
+    /// set, the launcher refuses to launch if the server presents a different
+    /// key or stops signing its BOM.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pinned_public_key: Option<String>,
 }
 
 impl SavedServer {
@@ -45,6 +51,7 @@ impl SavedServer {
             address: addr,
             last_played,
             use_https: !is_local, // HTTPS by default for remote hosts
+            pinned_public_key: None,
         }
     }
 
@@ -159,6 +166,53 @@ pub fn remove_server_from(file: &Path, address: &str) -> bool {
     }
     save_to(file, &servers);
     true
+}
+
+/// The TOFU-pinned Ed25519 public key for a server address, if one was pinned
+/// from a previously attested BOM. Case-insensitive like `record_played`.
+pub fn pinned_public_key(address: &str) -> Option<String> {
+    pinned_public_key_from(&servers_file(), address)
+}
+
+/// File-based variant of [`pinned_public_key`] (used by tests).
+pub fn pinned_public_key_from(file: &Path, address: &str) -> Option<String> {
+    load_from(file)
+        .into_iter()
+        .find(|s| s.address.eq_ignore_ascii_case(address))
+        .and_then(|s| s.pinned_public_key)
+}
+
+/// Pins (or replaces) the TOFU Ed25519 public key for a server address,
+/// creating the entry when the server has not been played yet. Writing only
+/// happens when the pin actually changes. Best-effort like `save_servers`.
+pub fn pin_public_key(address: &str, public_key: &str) {
+    pin_public_key_to(&servers_file(), address, public_key);
+}
+
+/// File-based variant of [`pin_public_key`] (used by tests).
+pub fn pin_public_key_to(file: &Path, address: &str, public_key: &str) {
+    let address = address.trim();
+    if address.is_empty() {
+        return;
+    }
+    let mut servers = load_from(file);
+    match servers
+        .iter_mut()
+        .find(|s| s.address.eq_ignore_ascii_case(address))
+    {
+        Some(entry) => {
+            if entry.pinned_public_key.as_deref() != Some(public_key) {
+                entry.pinned_public_key = Some(public_key.to_string());
+                save_to(file, &servers);
+            }
+        }
+        None => {
+            let mut server = SavedServer::new(address.to_string(), address, now_millis());
+            server.pinned_public_key = Some(public_key.to_string());
+            servers.push(server);
+            save_to(file, &servers);
+        }
+    }
 }
 
 fn now_millis() -> i64 {
@@ -453,6 +507,67 @@ mod tests {
         let remaining = load_from(file.path());
         assert_eq!(1, remaining.len());
         assert_eq!("one.example.com", remaining[0].address);
+    }
+
+    #[test]
+    fn pin_public_key_tofu_and_mismatch_replacement() {
+        let file = TempFile::new();
+        assert!(pinned_public_key_from(file.path(), "mc.example.com").is_none());
+
+        // First contact: pin the key (entry is created even though the server
+        // was never played).
+        pin_public_key_to(file.path(), "mc.example.com", "key-a");
+        assert_eq!(
+            Some("key-a".to_string()),
+            pinned_public_key_from(file.path(), "mc.example.com")
+        );
+        // Case-insensitive lookup (like record_played).
+        assert_eq!(
+            Some("key-a".to_string()),
+            pinned_public_key_from(file.path(), "MC.EXAMPLE.COM")
+        );
+
+        // Re-pinning the same key is a no-op (no extra writes).
+        pin_public_key_to(file.path(), "mc.example.com", "key-a");
+        assert_eq!(
+            Some("key-a".to_string()),
+            pinned_public_key_from(file.path(), "mc.example.com")
+        );
+
+        // Re-pinning a different key replaces it — used when the admin
+        // deliberately re-keys the server and the launcher flow decides to
+        // trust the new key.
+        pin_public_key_to(file.path(), "mc.example.com", "key-b");
+        assert_eq!(
+            Some("key-b".to_string()),
+            pinned_public_key_from(file.path(), "mc.example.com")
+        );
+
+        // Empty addresses are ignored.
+        pin_public_key_to(file.path(), "   ", "key-c");
+        assert_eq!(1, load_from(file.path()).len());
+    }
+
+    #[test]
+    fn pinned_public_key_round_trips_and_legacy_files_default_to_none() {
+        let file = TempFile::new();
+        let mut server = SavedServer::new("Secure", "mc.example.com", 1);
+        server.pinned_public_key = Some("deadbeef".to_string());
+        save_to(file.path(), &[server]);
+
+        let loaded = load_from(file.path());
+        assert_eq!(Some("deadbeef".to_string()), loaded[0].pinned_public_key);
+
+        // Legacy server files (no pinnedPublicKey field) load with no pin.
+        let legacy = TempFile::new();
+        std::fs::write(
+            legacy.path(),
+            r#"[{"name":"Old","address":"mc.example.com","lastPlayed":1,"useHttps":true}]"#,
+        )
+        .unwrap();
+        let loaded_legacy = load_from(legacy.path());
+        assert_eq!(1, loaded_legacy.len());
+        assert!(loaded_legacy[0].pinned_public_key.is_none());
     }
 
     #[test]

@@ -14,11 +14,13 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
+use sha2::Sha256;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::process::Child;
 use tokio::sync::Mutex as AsyncMutex;
 
 use zircon_core::api::modrinth::{ModrinthApiClient, ModrinthSearchHit};
+use zircon_core::crypto::signing;
 use zircon_core::model::{BillOfMaterials, ModLoaderInfo};
 
 use crate::auth::msa::MicrosoftAuthService;
@@ -76,6 +78,10 @@ pub struct LauncherState {
     /// In-flight shader opt-in prompts awaiting the webview's answer.
     pub shader_requests: AsyncMutex<HashMap<u64, tokio::sync::oneshot::Sender<ShaderChoice>>>,
     pub next_shader_request_id: AtomicU64,
+    /// In-flight host-key rotation prompts awaiting the webview's decision
+    /// (TOFU key lifecycle; see [`KeyMismatchPrompt`]).
+    pub key_prompts: AsyncMutex<HashMap<u64, tokio::sync::oneshot::Sender<bool>>>,
+    pub next_key_prompt_id: AtomicU64,
     pub settings: StdMutex<LauncherSettings>,
 }
 
@@ -106,6 +112,8 @@ impl LauncherState {
             next_game_id: AtomicU64::new(1),
             shader_requests: AsyncMutex::new(HashMap::new()),
             next_shader_request_id: AtomicU64::new(1),
+            key_prompts: AsyncMutex::new(HashMap::new()),
+            next_key_prompt_id: AtomicU64::new(1),
             settings: StdMutex::new(load_settings()),
         }
     }
@@ -234,20 +242,31 @@ pub fn save_server_list(servers_list: Vec<servers::SavedServer>) -> Result<(), S
 /// the latency everywhere and acts as the fallback for third-party servers.
 /// Returns `None` when the server is unreachable.
 ///
-/// Builds the HTTP base URL for a server. HTTPS is enforced whenever it is
-/// enabled or the target port is the standard TLS port 443; loopback hosts
-/// may fall back to plaintext HTTP (local dev/test servers without TLS). The
-/// Minecraft connection always uses `host:port` regardless.
-fn server_base_url(host: &str, port: u16, use_https: bool) -> String {
+/// Builds the HTTP base URL for a server, refusing plaintext HTTP to remote
+/// hosts: BOM/mod/pack downloads and join-intent registrations over an
+/// unauthenticated remote network could be tampered with by an on-path
+/// attacker, so they must travel over TLS. Loopback hosts (local dev/test
+/// servers) may fall back to plaintext HTTP, as may port 443 (the standard TLS
+/// port implies HTTPS even when the saved flag is off). The Minecraft
+/// connection always uses `host:port` regardless.
+fn server_base_url(host: &str, port: u16, use_https: bool) -> Result<String, LauncherError> {
     let is_local = servers::is_loopback_host(host);
+    if !is_local && !use_https && port != 443 {
+        return Err(LauncherError::InvalidInput(
+            "Plaintext HTTP connections to remote servers are forbidden for security. \
+             Ensure HTTPS is enabled on your server or reverse proxy."
+                .to_string(),
+        ));
+    }
+
     if use_https || (!is_local && port == 443) {
         if port == 443 {
-            format!("https://{host}")
+            Ok(format!("https://{host}"))
         } else {
-            format!("https://{host}:{port}")
+            Ok(format!("https://{host}:{port}"))
         }
     } else {
-        format!("http://{host}:{port}")
+        Ok(format!("http://{host}:{port}"))
     }
 }
 
@@ -262,7 +281,7 @@ pub async fn server_status(
 ) -> Result<Option<ServerStatusInfo>, String> {
     let (host, port) = servers::parse_server_address(&address);
     let url_host = servers::format_host(&host);
-    let base_url = server_base_url(&url_host, port, use_https);
+    let base_url = server_base_url(&url_host, port, use_https).map_err(err_string)?;
 
     let (ping, wrapper) = tokio::join!(
         crate::status::ping_status(&host, port),
@@ -546,7 +565,7 @@ async fn run_online_flow(
     let (host, port) = servers::parse_server_address(address);
     // IPv6 literals need square brackets in URLs and quick-play targets.
     let url_host = servers::format_host(&host);
-    let base_url = server_base_url(&url_host, port, use_https);
+    let base_url = server_base_url(&url_host, port, use_https)?;
     emit_status(app, format!("Server: {base_url}"));
     let game_dir = servers::instance_game_dir(&host, port);
     std::fs::create_dir_all(&game_dir)?;
@@ -578,6 +597,69 @@ async fn run_online_flow(
 
     // --- BOM ---
     let bom = fetch_bom(&state.http, &base_url).await?;
+
+    // --- BOM trust (TOFU pinning + Ed25519 attestation) ---
+    // Nothing is downloaded or launched until the mod list itself is trusted:
+    // pin the server public key on first contact, verify the Ed25519
+    // signature, and — when the server presents a *different* key than the one
+    // pinned — ask the player before accepting the rotation instead of
+    // crashing or silently trusting it.
+    let pinned = servers::pinned_public_key(address);
+    match evaluate_bom_trust(&bom, pinned.as_deref())? {
+        BomTrustOutcome::NoAttestation => {
+            emit_status(
+                app,
+                "Server does not sign its BOM — continuing with per-file hash \
+                 verification only.",
+            );
+        }
+        BomTrustOutcome::Verified(key) => {
+            if pinned.as_deref() != Some(key.as_str()) {
+                servers::pin_public_key(address, &key);
+                emit_status(app, "Trusted server public key on first use (TOFU).");
+            }
+        }
+        BomTrustOutcome::KeyMismatch {
+            received,
+            pinned: old,
+        } => {
+            // Server reinstall or possible takeover: show the fingerprint
+            // delta and require explicit player approval. A timeout or any
+            // rejection aborts the launch — never auto-accept a key change.
+            let request_id = state.next_key_prompt_id.fetch_add(1, Ordering::SeqCst);
+            let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
+            state.key_prompts.lock().await.insert(request_id, tx);
+
+            let _ = app.emit(
+                "server-key-mismatch",
+                KeyMismatchPrompt {
+                    request_id,
+                    server_address: address.to_string(),
+                    old_fingerprint: compute_key_fingerprint(&old),
+                    new_fingerprint: compute_key_fingerprint(&received),
+                },
+            );
+
+            let accepted = match tokio::time::timeout(Duration::from_secs(60), rx).await {
+                Ok(Ok(true)) => true,
+                _ => false,
+            };
+
+            if !accepted {
+                return Err(LauncherError::Security(
+                    "Host key verification failed: server identity changed and was \
+                     rejected."
+                        .to_string(),
+                ));
+            }
+
+            // The player explicitly trusted the rotation.
+            servers::pin_public_key(address, &received);
+            emit_status(app, "New server identity approved by the player.");
+            tracing::warn!("Player approved key rotation for {address} to {received}");
+        }
+    }
+
     if let Some(title) = bom.server_title.as_deref().filter(|t| !t.trim().is_empty()) {
         servers::record_played(title.trim(), address);
     }
@@ -695,7 +777,7 @@ async fn run_online_flow(
     let listener = UiProgressListener { app: app.clone() };
     let sync_result = state
         .sync_engine
-        .sync(&base_url, &game_dir, Some(&listener))
+        .sync_with_bom(&bom, &base_url, &game_dir, Some(&listener))
         .await?;
     if sync_result.aborted {
         return Err(LauncherError::InvalidInput(
@@ -798,6 +880,21 @@ pub async fn respond_shader_choice(
     Ok(())
 }
 
+/// Resolves an in-flight host-key rotation prompt with the player's decision.
+/// `accepted = true` re-pins the new key and lets the launch continue;
+/// `false` (or a dropped/expired prompt) aborts the launch.
+#[tauri::command]
+pub async fn respond_key_prompt(
+    state: State<'_, LauncherState>,
+    request_id: u64,
+    accepted: bool,
+) -> Result<(), String> {
+    if let Some(tx) = state.key_prompts.lock().await.remove(&request_id) {
+        let _ = tx.send(accepted);
+    }
+    Ok(())
+}
+
 /// Watches a running game; when it exits, clears the state slot and emits a
 /// `game-status` event. Polls `try_wait` so the child stays killable via
 /// `stop_game` while it runs.
@@ -886,6 +983,112 @@ async fn fetch_bom(
     }
     let text = response.text().await?;
     Ok(serde_json::from_str(&text)?)
+}
+
+/// Outcome of evaluating a fetched BOM against the launcher's trust state.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BomTrustOutcome {
+    /// The BOM carries no attestation (unsigned server — third-party or legacy
+    /// wrapper). The launcher continues, relying on the always-strict per-file
+    /// hash verification of the mod sync.
+    NoAttestation,
+    /// The BOM's Ed25519 signature verified against `key` (hex public key).
+    /// `key` must be persisted as the server's TOFU pin.
+    Verified(String),
+    /// The BOM is signed, but with a **different** key than the one pinned for
+    /// this server on first contact (reinstall, or a possible takeover). The
+    /// caller must show the SHA-256 fingerprint delta and obtain explicit
+    /// player approval before re-pinning — never auto-accept.
+    KeyMismatch {
+        /// The newly presented key (hex public key).
+        received: String,
+        /// The previously pinned key (hex public key).
+        pinned: String,
+    },
+}
+
+/// Shown to the player when a server presents a different Ed25519 key than
+/// the one pinned on first contact. Emitted as `server-key-mismatch`; the
+/// player's answer goes back through [`respond_key_prompt`].
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyMismatchPrompt {
+    pub request_id: u64,
+    pub server_address: String,
+    pub old_fingerprint: String,
+    pub new_fingerprint: String,
+}
+
+/// SHA-256 fingerprint of a hex-encoded Ed25519 public key, SSH-style
+/// (`SHA256:<hex-of-digest>`). The digest of the raw key bytes is what the
+/// player compares when a server key changes — two fingerprints are far easier
+/// to eyeball than 64 raw hex bytes.
+pub fn compute_key_fingerprint(pubkey_hex: &str) -> String {
+    let bytes = hex::decode(pubkey_hex).unwrap_or_default();
+    let hash = Sha256::digest(&bytes);
+    format!("SHA256:{}", hex::encode(hash))
+}
+
+/// Evaluates the trust state of a fetched BOM against the currently pinned
+/// key (TOFU): pins on first attested contact, surfaces key rotation for
+/// interactive approval, rejects unsigned downgrades, and verifies the Ed25519
+/// signature before any mod download or launch happens. Pure (no I/O) so the
+/// decision is unit-testable; persistence of the pin is left to the caller.
+/// Public so the security test suite can drive it end to end.
+///
+/// Fails closed:
+/// * BOM signed with a key different from the pinned one → `KeyMismatch` (the
+///   caller prompts the player; rejecting the rotation aborts the launch).
+/// * BOM unsigned after a key was pinned → abort (attestation downgrade).
+/// * BOM with a signature but no public key, or a signature that does not
+///   verify → abort.
+///
+/// The only pass-through is a BOM with **no** attestation fields at all for a
+/// server that never presented a key — that is a server that does not run the
+/// Zircon wrapper, and the per-file hash checks still gate every download.
+pub fn evaluate_bom_trust(
+    bom: &BillOfMaterials,
+    pinned: Option<&str>,
+) -> Result<BomTrustOutcome, LauncherError> {
+    let Some(received_key) = bom.server_public_key.as_deref() else {
+        if bom.signature.is_some() {
+            return Err(LauncherError::Security(
+                "Server BOM carries a signature but no public key — refusing to launch."
+                    .to_string(),
+            ));
+        }
+        if pinned.is_some() {
+            return Err(LauncherError::Security(
+                "Server stopped signing its BOM after previously presenting a \
+                 signing key — refusing to launch (possible downgrade attack)."
+                    .to_string(),
+            ));
+        }
+        tracing::warn!(
+            "Server does not sign its BOM (no attestation); continuing with \
+             per-file hash verification only."
+        );
+        return Ok(BomTrustOutcome::NoAttestation);
+    };
+
+    let trusted_key = pinned.unwrap_or(received_key);
+    if trusted_key != received_key {
+        // Key rotation: the server presents a different key than the one
+        // pinned on first contact. Surface both keys so the caller can show
+        // the fingerprint delta and let the player decide.
+        return Ok(BomTrustOutcome::KeyMismatch {
+            received: received_key.to_string(),
+            pinned: trusted_key.to_string(),
+        });
+    }
+    if !signing::verify_bom_signature(bom, trusted_key) {
+        return Err(LauncherError::Security(
+            "BOM signature verification failed — the server's mod list is not \
+             authentic. Refusing to launch."
+                .to_string(),
+        ));
+    }
+    Ok(BomTrustOutcome::Verified(trusted_key.to_string()))
 }
 
 /// How often the launcher refreshes its join intent while preparing to launch.
@@ -1769,7 +1972,17 @@ pub fn save_settings(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::SigningKey;
     use zircon_core::model::PackEntry;
+
+    /// Builds a BOM signed with a deterministic key (seed).
+    fn attested_bom(seed: u8) -> BillOfMaterials {
+        let key = SigningKey::from_bytes(&[seed; 32]);
+        let mut bom = BillOfMaterials::new("1.20.4", None, Some("Attested".to_string()));
+        bom.server_public_key = Some(hex::encode(key.verifying_key().to_bytes()));
+        bom.signature = Some(signing::sign_bom(&bom, &key).expect("test signing failed"));
+        bom
+    }
 
     #[test]
     fn override_heap_replaces_xmx_and_xms() {
@@ -1798,6 +2011,54 @@ mod tests {
         assert!(!should_wake(true, true));
         // Zircon server down (asleep / booting / stopped) → wake.
         assert!(should_wake(true, false));
+    }
+
+    #[test]
+    fn server_base_url_refuses_plaintext_to_remote_hosts() {
+        // Remote host without HTTPS → refused outright (the launch flow and
+        // status refresh both surface the error).
+        let err = server_base_url("play.myserver.com", 25565, false).unwrap_err();
+        assert!(matches!(err, LauncherError::InvalidInput(_)));
+        assert!(
+            err.to_string().contains("forbidden"),
+            "unhelpful error: {err}"
+        );
+
+        // Remote on the standard TLS port is implicitly HTTPS.
+        assert_eq!(
+            "https://play.myserver.com",
+            server_base_url("play.myserver.com", 443, false).unwrap()
+        );
+
+        // Explicit HTTPS flag wins on any port.
+        assert_eq!(
+            "https://play.myserver.com:25565",
+            server_base_url("play.myserver.com", 25565, true).unwrap()
+        );
+        assert_eq!(
+            "https://play.myserver.com:8443",
+            server_base_url("play.myserver.com", 8443, true).unwrap()
+        );
+
+        // Loopback hosts keep plaintext HTTP for local dev/test servers.
+        assert_eq!(
+            "http://localhost:25565",
+            server_base_url("localhost", 25565, false).unwrap()
+        );
+        assert_eq!(
+            "http://127.0.0.1:25566",
+            server_base_url("127.0.0.1", 25566, false).unwrap()
+        );
+        assert_eq!(
+            "http://[::1]:25567",
+            server_base_url("[::1]", 25567, false).unwrap()
+        );
+
+        // Loopback may also use HTTPS when the flag is set.
+        assert_eq!(
+            "https://localhost:25565",
+            server_base_url("localhost", 25565, true).unwrap()
+        );
     }
 
     #[test]
@@ -1840,5 +2101,116 @@ mod tests {
         apply_shader_choice(&mut selection, &bom, false);
         assert!(!selection.shaders_enabled);
         assert!(selection.active_shaderpack.is_none());
+    }
+
+    // ------------------------------------------------------------------
+    // BOM trust (TOFU pinning / Ed25519 attestation)
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn tofu_pins_key_on_first_attested_contact() {
+        let bom = attested_bom(7);
+        let key = bom.server_public_key.as_deref().unwrap().to_string();
+
+        // No pin yet → Verified with the received key, ready to be persisted.
+        assert_eq!(
+            BomTrustOutcome::Verified(key.clone()),
+            evaluate_bom_trust(&bom, None).unwrap()
+        );
+        // Same key already pinned → still Verified (no re-pin needed).
+        assert_eq!(
+            BomTrustOutcome::Verified(key.clone()),
+            evaluate_bom_trust(&bom, Some(&key)).unwrap()
+        );
+    }
+
+    #[test]
+    fn key_rotation_surfaces_mismatch_for_interactive_approval() {
+        let bom = attested_bom(7);
+        let received_key = bom.server_public_key.as_deref().unwrap().to_string();
+        let other_pinned_key = hex::encode(
+            SigningKey::from_bytes(&[8u8; 32])
+                .verifying_key()
+                .to_bytes(),
+        );
+
+        // Key rotation no longer hard-fails: both keys are surfaced so the
+        // caller can show the fingerprint delta and ask the player before
+        // accepting the rotation.
+        assert_eq!(
+            BomTrustOutcome::KeyMismatch {
+                received: received_key,
+                pinned: other_pinned_key.clone(),
+            },
+            evaluate_bom_trust(&bom, Some(&other_pinned_key)).unwrap()
+        );
+    }
+
+    #[test]
+    fn key_fingerprints_are_stable_sha256_of_key_bytes() {
+        let key = hex::encode(
+            SigningKey::from_bytes(&[9u8; 32])
+                .verifying_key()
+                .to_bytes(),
+        );
+        let fp = compute_key_fingerprint(&key);
+        assert!(fp.starts_with("SHA256:"), "unexpected fingerprint: {fp}");
+        // 32-byte key → SHA-256 digest → 64 hex chars after the prefix.
+        assert_eq!("SHA256:".len() + 64, fp.len());
+
+        // Deterministic: same key → same fingerprint, regardless of input case.
+        assert_eq!(fp, compute_key_fingerprint(&key.to_uppercase()));
+
+        // Garbage input fails closed (digest of empty bytes), never panics.
+        assert_eq!(
+            compute_key_fingerprint("not-hex!"),
+            compute_key_fingerprint("")
+        );
+    }
+
+    #[test]
+    fn tampered_bom_aborts_launch() {
+        let mut bom = attested_bom(7);
+        let key = bom.server_public_key.clone().unwrap();
+        // Change a mod AFTER signing: the signature no longer covers it.
+        bom.mods.push(zircon_core::model::ModEntry::new(
+            Some("injected".to_string()),
+            "injected.jar",
+            Some("deadbeef".to_string()),
+            0,
+            Some("direct".to_string()),
+            None,
+            0,
+        ));
+        let err = evaluate_bom_trust(&bom, Some(&key)).unwrap_err();
+        assert!(matches!(err, LauncherError::Security(_)));
+    }
+
+    #[test]
+    fn unsigned_bom_with_pin_is_a_downgrade_attack() {
+        let unsigned = BillOfMaterials::new("1.20.4", None, None);
+        let err = evaluate_bom_trust(&unsigned, Some("previously-pinned-key")).unwrap_err();
+        assert!(
+            matches!(err, LauncherError::Security(_)),
+            "unsigned BOM after pinning must abort"
+        );
+    }
+
+    #[test]
+    fn unsigned_bom_without_pin_passes_through() {
+        let unsigned = BillOfMaterials::new("1.20.4", None, None);
+        assert_eq!(
+            BomTrustOutcome::NoAttestation,
+            evaluate_bom_trust(&unsigned, None).unwrap()
+        );
+    }
+
+    #[test]
+    fn signature_without_key_aborts() {
+        // Signature present but no public key to pin/verify against.
+        let mut bom = BillOfMaterials::new("1.20.4", None, None);
+        bom.signature = Some("deadbeef".to_string());
+        let err = evaluate_bom_trust(&bom, None).unwrap_err();
+        assert!(matches!(err, LauncherError::Security(_)));
     }
 }

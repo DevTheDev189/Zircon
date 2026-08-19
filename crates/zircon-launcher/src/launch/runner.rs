@@ -23,6 +23,8 @@ use super::options::{OptionsFileUtil, PackOptionsWriter};
 use super::profile::substitute;
 use crate::auth::session::SessionData;
 use crate::error::LauncherError;
+use crate::sync::mod_sync::HashVerifier;
+use zircon_core::metadata::extractor::validate_mod_jar_structure;
 
 /// Launches the Minecraft client as a child process.
 ///
@@ -47,6 +49,7 @@ impl MinecraftRunner {
         server_port: i32,
         output: Option<Arc<dyn Fn(String) + Send + Sync>>,
     ) -> Result<Child, LauncherError> {
+        validate_mods_dir(game_dir)?;
         let command = Self::build_launch_command(
             data,
             Some(session),
@@ -84,6 +87,7 @@ impl MinecraftRunner {
         game_dir: &Path,
         output: Option<Arc<dyn Fn(String) + Send + Sync>>,
     ) -> Result<Child, LauncherError> {
+        validate_mods_dir(game_dir)?;
         let player = if username.trim().is_empty() {
             "Player"
         } else {
@@ -157,6 +161,46 @@ impl MinecraftRunner {
             },
         }
     }
+}
+
+/// Re-validates every `.jar` in the instance `mods/` folder right before the
+/// game spawns. The mod sync validates staged downloads, but a file could be
+/// swapped after the sync (local tampering), come from an offline instance's
+/// locally-managed mods, or predate the structural checks — nothing malformed
+/// may reach the loader. See [`validate_mod_jar_structure`] for what is
+/// checked.
+fn validate_mods_dir(game_dir: &Path) -> Result<(), LauncherError> {
+    let mods_dir = game_dir.join("mods");
+    if !mods_dir.is_dir() {
+        return Ok(());
+    }
+    let mut invalid: Vec<String> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&mods_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !HashVerifier::is_mod_jar(&name) {
+                continue;
+            }
+            if let Err(e) = validate_mod_jar_structure(&path) {
+                tracing::warn!("Pre-launch JAR check failed for {name}: {e}");
+                invalid.push(name);
+            }
+        }
+    }
+    if !invalid.is_empty() {
+        return Err(LauncherError::InvalidInput(format!(
+            "Refusing to launch: the following mods failed structural validation \
+             (not a valid ZIP, implausible compression ratio, or missing mod \
+             metadata): {}. Re-sync with the server or remove them from the \
+             mods folder.",
+            invalid.join(", ")
+        )));
+    }
+    Ok(())
 }
 
 /// Builds the online launch command. Mirrors the Java `launch` argument
@@ -842,5 +886,55 @@ mod tests {
             Some(25565),
         )
         .is_ok());
+    }
+
+    /// Builds a structurally valid mod JAR (fabric metadata) at `path`.
+    fn make_valid_jar(path: &Path) {
+        let f = std::fs::File::create(path).unwrap();
+        let mut zip = zip::ZipWriter::new(f);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file("fabric.mod.json", options).unwrap();
+        std::io::Write::write_all(&mut zip, b"{\"id\": \"ok\"}").unwrap();
+        zip.start_file("com/example/Mod.class", options).unwrap();
+        std::io::Write::write_all(&mut zip, b"class bytes").unwrap();
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn validate_mods_dir_rejects_bad_jars_before_launch() {
+        let dir = std::env::temp_dir().join(format!(
+            "zircon-runner-mods-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(dir.join("mods")).unwrap();
+
+        // A clean mods/ folder passes.
+        assert!(validate_mods_dir(&dir).is_ok());
+
+        // A structurally valid mod passes.
+        let good = dir.join("mods").join("good.jar");
+        make_valid_jar(&good);
+        assert!(validate_mods_dir(&dir).is_ok());
+
+        // A jar without mod metadata is refused.
+        let bad = dir.join("mods").join("bad.jar");
+        let f = std::fs::File::create(&bad).unwrap();
+        let mut zip = zip::ZipWriter::new(f);
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file("META-INF/MANIFEST.MF", options).unwrap();
+        std::io::Write::write_all(&mut zip, b"Manifest-Version: 1.0\n").unwrap();
+        zip.finish().unwrap();
+        let err = validate_mods_dir(&dir).unwrap_err();
+        assert!(matches!(err, LauncherError::InvalidInput(_)));
+        assert!(err.to_string().contains("bad.jar"));
+
+        // Non-jar files are ignored.
+        std::fs::write(dir.join("mods").join("readme.txt"), b"hi").unwrap();
+        std::fs::remove_file(&bad).unwrap();
+        assert!(validate_mods_dir(&dir).is_ok());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
