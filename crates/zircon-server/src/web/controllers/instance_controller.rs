@@ -23,7 +23,7 @@ use crate::services::bom::BomService;
 use crate::services::mods::ModManagementService;
 use crate::services::packs::PackManagementService;
 use crate::tickets::TICKET_TTL_SECONDS;
-use crate::web::app::{ApiError, AppState};
+use crate::web::app::{ApiError, AppState, RealIp};
 use crate::web::config_routes::resolve_wake_target;
 use crate::web::views;
 
@@ -476,11 +476,18 @@ pub async fn get_instance_bom(
 /// short-lived join ticket for the launcher's session so the player's
 /// connection passes the Zircon join gate, and holds the target instance's
 /// idle shutdown off while the player is on their way. Intentionally
-/// unauthenticated.
+/// unauthenticated, but rate-limited per real client IP so a single attacker
+/// cannot fill the ticket store and block legitimate joins.
 pub async fn register_join_intent(
     State(state): State<AppState>,
+    ip: RealIp,
     Json(body): Json<JoinIntentRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    if let Err(retry_after) = state.join_intent_limiter.check(&ip.0.to_string()) {
+        return Err(ApiError::TooManyRequests(format!(
+            "Too many join-intent registrations from this address. Retry in {retry_after}s."
+        )));
+    }
     if body.username.is_none() && body.uuid.is_none() {
         return Err(ApiError::BadRequest(
             "username or uuid is required".to_string(),

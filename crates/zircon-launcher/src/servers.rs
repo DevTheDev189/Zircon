@@ -31,12 +31,20 @@ pub struct SavedServer {
 }
 
 impl SavedServer {
+    /// Creates a server entry. HTTPS is enabled by default for remote hosts
+    /// (an on-path attacker could otherwise tamper with BOM/mod downloads over
+    /// plaintext HTTP); loopback addresses keep HTTP for local dev/test
+    /// servers without TLS. Use [`with_https`](Self::with_https) to override.
     pub fn new(name: impl Into<String>, address: impl Into<String>, last_played: i64) -> Self {
+        let addr = address.into();
+        let (host, _) = parse_server_address(&addr);
+        let is_local = is_loopback_host(&host);
+
         Self {
             name: name.into(),
-            address: address.into(),
+            address: addr,
             last_played,
-            use_https: false,
+            use_https: !is_local, // HTTPS by default for remote hosts
         }
     }
 
@@ -155,6 +163,17 @@ pub fn remove_server_from(file: &Path, address: &str) -> bool {
 
 fn now_millis() -> i64 {
     chrono::Utc::now().timestamp_millis()
+}
+
+/// True when `host` is a loopback address (`localhost`, `127.0.0.0/8`, `::1`),
+/// with optional IPv6 square brackets. Remote hosts must use HTTPS for the
+/// launcher's HTTP calls; only loopback may fall back to plaintext HTTP.
+pub fn is_loopback_host(host: &str) -> bool {
+    let clean = host.trim().trim_start_matches('[').trim_end_matches(']');
+    clean.eq_ignore_ascii_case("localhost")
+        || clean == "127.0.0.1"
+        || clean == "::1"
+        || clean.starts_with("127.")
 }
 
 /// Parses `host[:port]` (IPv4, IPv6 `[::1]:25565`, or bare host) into a
@@ -324,6 +343,40 @@ mod tests {
         .unwrap();
         let loaded_legacy = load_from(legacy.path());
         assert!(!loaded_legacy[0].use_https);
+    }
+
+    #[test]
+    fn new_servers_default_to_https_unless_loopback() {
+        // Remote hosts default to HTTPS so BOM/mod downloads are never sent
+        // over plaintext HTTP to an on-path attacker.
+        assert!(SavedServer::new("Remote", "play.myserver.com", 1).use_https);
+        assert!(SavedServer::new("Remote Port", "play.myserver.com:25565", 1).use_https);
+        assert!(SavedServer::new("IPv4", "203.0.113.10", 1).use_https);
+        assert!(SavedServer::new("IPv6", "[2001:db8::1]", 1).use_https);
+
+        // Loopback keeps plaintext HTTP for local dev/test servers.
+        assert!(!SavedServer::new("Local", "localhost", 1).use_https);
+        assert!(!SavedServer::new("Local Host", "localhost:25565", 1).use_https);
+        assert!(!SavedServer::new("Loopback v4", "127.0.0.1", 1).use_https);
+        assert!(!SavedServer::new("Loopback v6", "[::1]:25567", 1).use_https);
+    }
+
+    #[test]
+    fn is_loopback_host_detects_local_addresses() {
+        assert!(is_loopback_host("localhost"));
+        assert!(is_loopback_host("LOCALHOST"));
+        assert!(is_loopback_host("127.0.0.1"));
+        assert!(is_loopback_host("127.0.0.1"));
+        assert!(is_loopback_host("127.25.0.1"));
+        assert!(is_loopback_host("::1"));
+        assert!(is_loopback_host("[::1]"));
+        assert!(is_loopback_host(" [::1] "));
+
+        assert!(!is_loopback_host("mc.example.com"));
+        assert!(!is_loopback_host("192.168.1.10"));
+        assert!(!is_loopback_host("::ffff:127.0.0.1"));
+        assert!(!is_loopback_host("127example.com")); // hostname, not an IP
+        assert!(!is_loopback_host(""));
     }
 
     #[test]

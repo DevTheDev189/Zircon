@@ -6,13 +6,15 @@
 use std::fmt;
 use std::sync::Arc;
 
-use axum::extract::{DefaultBodyLimit, Request};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, FromRequestParts, Request};
 use axum::http::{header, StatusCode};
 use axum::middleware;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::Router;
 use tower_http::trace::TraceLayer;
+
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use crate::auth::jwt;
 use crate::auth::sessions::SessionRegistry;
@@ -53,8 +55,51 @@ pub struct AppState {
     pub sessions: Arc<SessionRegistry>,
     /// Fixed-window limiter for authentication endpoints.
     pub login_limiter: Arc<FixedWindowLimiter>,
+    /// Fixed-window limiter for the public join-intent endpoint, keyed by real
+    /// client IP so a single attacker cannot fill the ticket store and block
+    /// legitimate player joins.
+    pub join_intent_limiter: Arc<FixedWindowLimiter>,
     /// Append-only audit log for sensitive administrative actions.
     pub audit: Arc<crate::audit::AuditLogger>,
+}
+
+/// The client IP for rate limiting and other per-source decisions.
+///
+/// Every remote connection reaches the admin web server through the TCP
+/// multiplexer, which terminates on loopback — so the direct peer address is
+/// `127.0.0.1` even for internet clients. The multiplexer injects the real
+/// client IP via the `X-Zircon-Real-IP` header; because the web server binds
+/// loopback-only, only that trusted proxy can set the header, so it is honored
+/// **only** when the direct peer is loopback. Any other caller (a LAN client
+/// that reached the panel directly) is keyed by its real peer address, and a
+/// request with no peer information falls back to `127.0.0.1`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RealIp(pub IpAddr);
+
+#[axum::async_trait]
+impl<S> FromRequestParts<S> for RealIp {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let direct = parts
+            .extensions
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|c| c.0.ip());
+        let ip = match direct {
+            Some(peer) if peer.is_loopback() => parts
+                .headers
+                .get("x-zircon-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.trim().parse().ok())
+                .unwrap_or(peer),
+            Some(peer) => peer,
+            None => IpAddr::V4(Ipv4Addr::LOCALHOST),
+        };
+        Ok(RealIp(ip))
+    }
 }
 
 /// Errors mapped to HTTP responses.
@@ -549,3 +594,70 @@ pub fn issue_token(state: &AppState, username: &str) -> String {
 }
 
 use super::config_routes;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::Request;
+
+    async fn real_ip(peer: Option<IpAddr>, header: Option<&str>) -> IpAddr {
+        let mut request = Request::builder()
+            .uri("/")
+            .body(Body::empty())
+            .expect("request");
+        if let Some(header) = header {
+            request
+                .headers_mut()
+                .insert("x-zircon-real-ip", header.parse().expect("header value"));
+        }
+        if let Some(ip) = peer {
+            request
+                .extensions_mut()
+                .insert(ConnectInfo(SocketAddr::new(ip, 12345)));
+        }
+        let (mut parts, _) = request.into_parts();
+        RealIp::from_request_parts(&mut parts, &())
+            .await
+            .expect("infallible")
+            .0
+    }
+
+    #[tokio::test]
+    async fn trusts_x_real_ip_only_from_loopback_peers() {
+        // The multiplexer path: loopback peer + real IP header -> header wins.
+        let via_proxy = "203.0.113.7".parse::<IpAddr>().unwrap();
+        assert_eq!(
+            via_proxy,
+            real_ip(Some("127.0.0.1".parse().unwrap()), Some("203.0.113.7")).await
+        );
+        assert_eq!(
+            via_proxy,
+            real_ip(Some("::1".parse().unwrap()), Some("203.0.113.7")).await
+        );
+
+        // A non-loopback peer (direct LAN client) is keyed by its real address;
+        // a spoofed header is ignored.
+        let lan = "192.168.1.50".parse::<IpAddr>().unwrap();
+        assert_eq!(lan, real_ip(Some(lan), Some("203.0.113.7")).await);
+
+        // Loopback peer without a header falls back to the peer address.
+        assert_eq!(
+            "127.0.0.1".parse::<IpAddr>().unwrap(),
+            real_ip(Some("127.0.0.1".parse().unwrap()), None).await
+        );
+
+        // A malformed header is ignored.
+        assert_eq!(
+            "127.0.0.1".parse::<IpAddr>().unwrap(),
+            real_ip(Some("127.0.0.1".parse().unwrap()), Some("not-an-ip")).await
+        );
+
+        // No peer information at all (e.g. unit-test oneshot requests) falls
+        // back to loopback.
+        assert_eq!(
+            "127.0.0.1".parse::<IpAddr>().unwrap(),
+            real_ip(None, None).await
+        );
+    }
+}

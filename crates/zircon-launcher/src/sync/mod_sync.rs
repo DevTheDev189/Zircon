@@ -14,19 +14,17 @@
 //!
 //! Port of `com.mcmanager.client.sync.ModSyncEngine` / `HashVerifier`.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::io::Read as _;
 use std::path::Path;
 
 use futures_util::StreamExt;
 use sha1::{Digest, Sha1};
 use tokio::io::AsyncWriteExt;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
-use zircon_core::api::curseforge::{CurseForgeApiClient, CurseForgeFile};
 use zircon_core::api::modrinth::ModrinthApiClient;
 use zircon_core::api::ApiError;
-use zircon_core::crypto::murmur3::curse_forge_fingerprint_of_file;
 use zircon_core::model::{BillOfMaterials, ModEntry, PackEntry};
 
 use crate::error::LauncherError;
@@ -80,41 +78,35 @@ impl HashVerifier {
 
     /// Checks that `file` matches the hashes of `entry`.
     ///
-    /// Port of the Java `HashVerifier.matches` fallback logic, in order:
-    /// a missing file never matches; a pinned (non-blank) SHA-1 is compared
-    /// case-insensitively; otherwise a non-zero CurseForge fingerprint is
-    /// compared; with nothing pinned the file is treated as *unknown* and does
-    /// NOT match — the caller decides (strict mode aborts, otherwise the file
-    /// is simply re-downloaded). I/O errors while hashing are treated as a
-    /// mismatch.
+    /// Port of the Java `HashVerifier.matches` — hardened: the pinned SHA-1 is
+    /// mandatory. A missing file never matches; an entry without a pinned
+    /// (non-blank) SHA-1 never matches, because the 32-bit MurmurHash3
+    /// fingerprint alone is not collision-resistant enough to verify a file;
+    /// a pinned SHA-1 is compared case-insensitively. I/O errors while hashing
+    /// are treated as a mismatch.
     pub fn matches(file: &Path, entry: &ModEntry) -> bool {
-        matches_inner(file, entry.sha1.as_deref(), entry.murmur3)
+        matches_inner(file, entry.sha1.as_deref())
     }
 
     /// Same check as [`matches`](Self::matches), for a [`PackEntry`].
     pub fn matches_pack(file: &Path, entry: &PackEntry) -> bool {
-        matches_inner(file, entry.sha1.as_deref(), entry.murmur3)
+        matches_inner(file, entry.sha1.as_deref())
     }
 }
 
-fn matches_inner(file: &Path, sha1: Option<&str>, murmur3: u64) -> bool {
+fn matches_inner(file: &Path, sha1: Option<&str>) -> bool {
     if !file.is_file() {
         return false;
     }
-    if let Some(sha1) = sha1.filter(|s| !s.trim().is_empty()) {
-        let Ok(actual) = HashVerifier::sha1_file(file) else {
-            return false;
-        };
-        return sha1.eq_ignore_ascii_case(&actual);
-    }
-    if murmur3 != 0 {
-        let Ok(fingerprint) = curse_forge_fingerprint_of_file(file) else {
-            return false;
-        };
-        return murmur3 == fingerprint;
-    }
-    // No hash pinned: treat as "unknown", caller decides (strict mode aborts).
-    false
+    // SHA-1 is mandatory: a file whose entry pins no cryptographic digest
+    // never matches (the caller decides — strict mode aborts).
+    let Some(sha1) = sha1.filter(|s| !s.trim().is_empty()) else {
+        return false;
+    };
+    let Ok(actual) = HashVerifier::sha1_file(file) else {
+        return false;
+    };
+    sha1.eq_ignore_ascii_case(&actual)
 }
 
 // ---------------------------------------------------------------------------
@@ -262,10 +254,9 @@ impl ModSyncEngine {
         result.bom = Some(bom);
         info!("BOM: {} mods for MC {}", mods.len(), mc_version);
 
-        // --- Step 2: verify hashes against Modrinth / CurseForge ---
+        // --- Step 2: verify hashes against Modrinth's public database ---
         emit_status(listener, "Verifying mod hashes...");
-        let curseforge_key = self.resolve_curseforge_key(&base).await;
-        verify_against_providers(&mods, curseforge_key, &mut result).await;
+        verify_against_providers(&mods, &mut result).await;
         if result.aborted {
             return Ok(result);
         }
@@ -348,92 +339,35 @@ impl ModSyncEngine {
         );
         Ok(result)
     }
-
-    // ------------------------------------------------------------------
-    // Provider verification
-    // ------------------------------------------------------------------
-
-    /// Prefers the CurseForge key configured on the server (via `/api/config`)
-    /// and falls back to the `MCMANAGER_CURSEFORGE_API_KEY` environment
-    /// variable (the Rust analog of the Java `mcmanager.curseforgeApiKey`
-    /// system property), so testers don't need to configure anything on the
-    /// client. Any failure reading the server config is best-effort — logged
-    /// at debug level, never fatal.
-    async fn resolve_curseforge_key(&self, base_url: &str) -> Option<String> {
-        let config_url = format!("{base_url}/api/config");
-        let config_json = match self.get(&config_url).await {
-            Ok(body) => body,
-            Err(e) => {
-                debug!("Could not read CurseForge key from server config: {}", e);
-                return None;
-            }
-        };
-        let config: serde_json::Value = match serde_json::from_str(&config_json) {
-            Ok(value) => value,
-            Err(e) => {
-                debug!("Could not parse server config: {}", e);
-                return None;
-            }
-        };
-        if let Some(key) = config.get("curseforgeApiKey").and_then(|k| k.as_str()) {
-            if !key.trim().is_empty() {
-                return Some(key.to_string());
-            }
-        }
-        std::env::var("MCMANAGER_CURSEFORGE_API_KEY")
-            .ok()
-            .filter(|key| !key.trim().is_empty())
-    }
 }
 
-/// Batch-verifies mod hashes against Modrinth (SHA-1) and CurseForge (SHA-1
-/// when available, fingerprint otherwise). Verification is **fail-closed**: a
-/// mod counts as verified only when its provider explicitly confirmed the
-/// pinned hash. A provider being unreachable, a missing API key, a mod with no
-/// pinned hash, or a mod with no provider (`direct`) all leave the mod
-/// unverified, which aborts the sync.
+/// Batch-verifies mod hashes against Modrinth's public hash API — no server
+/// secrets needed. Modrinth mods must be confirmed by the API (fail-closed
+/// when it is unreachable); CurseForge mods are verified by the SHA-1 the
+/// server pinned into the BOM at install time from CurseForge's official
+/// hash, so the client never needs a CurseForge API key and the 32-bit
+/// fingerprint is never trusted.
 ///
 /// Port of the Java `verifyAgainstProviders`, hardened: the Java treated
 /// "provider unreachable" as verified and trusted `direct` mods when the
-/// (removed) setting was enabled — both fail-open behaviors are gone. For
-/// CurseForge, a BOM SHA-1 is now compared against the official SHA-1 served
-/// by the API (160-bit verification) instead of trusting the 32-bit
-/// fingerprint alone.
-async fn verify_against_providers(
-    mods: &[ModEntry],
-    curseforge_api_key: Option<String>,
-    result: &mut SyncResult,
-) {
-    let mut modrinth_sha1s: Vec<String> = Vec::new();
-    let mut curseforge_fps: Vec<u64> = Vec::new();
-
+/// (removed) setting was enabled — both fail-open behaviors are gone.
+async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
+    // Gather every pinned SHA-1 across all mod origins for one batch lookup.
+    let mut all_sha1s: Vec<String> = Vec::new();
     for mod_entry in mods {
-        if mod_entry.origin.as_deref() == Some("modrinth") {
-            if let Some(sha1) = &mod_entry.sha1 {
-                modrinth_sha1s.push(sha1.clone());
-            }
-        } else if mod_entry.origin.as_deref() == Some("curseforge") {
-            if mod_entry.murmur3 != 0 {
-                curseforge_fps.push(mod_entry.murmur3);
+        if let Some(sha1) = &mod_entry.sha1 {
+            if !sha1.trim().is_empty() {
+                all_sha1s.push(sha1.clone());
             }
         }
     }
 
-    let mut verified_modrinth_sha1: HashSet<String> = HashSet::new();
-    let mut verified_curseforge_files: HashMap<u64, CurseForgeFile> = HashMap::new();
-
-    // "checked" means the provider responded; empty input lists count as
-    // checked. A provider that does not respond leaves its mods unverified
-    // (fail-closed) rather than trusting them.
-    let mut modrinth_checked = modrinth_sha1s.is_empty();
-    let mut curseforge_checked = curseforge_fps.is_empty();
-
-    if !modrinth_sha1s.is_empty() {
+    let mut verified_sha1s: HashSet<String> = HashSet::new();
+    if !all_sha1s.is_empty() {
         let modrinth = ModrinthApiClient::new();
-        match modrinth.verify_hashes(&modrinth_sha1s).await {
+        match modrinth.verify_hashes(&all_sha1s).await {
             Ok(found) => {
-                verified_modrinth_sha1.extend(found.into_keys());
-                modrinth_checked = true;
+                verified_sha1s.extend(found.into_keys());
             }
             Err(e) => warn!(
                 "Modrinth hash verification unavailable: {} — Modrinth mods will block launch",
@@ -442,41 +376,11 @@ async fn verify_against_providers(
         }
     }
 
-    if !curseforge_fps.is_empty() {
-        match curseforge_api_key.as_deref().map(str::trim) {
-            None | Some("") => {
-                info!("No CurseForge API key configured — CurseForge mods will block launch (nothing can be verified without it)");
-            }
-            Some(key) => {
-                let curseforge = CurseForgeApiClient::new(key);
-                match curseforge.verify_fingerprints(&curseforge_fps).await {
-                    Ok(files) => {
-                        for file in files {
-                            verified_curseforge_files.insert(file.file_fingerprint, file);
-                        }
-                        curseforge_checked = true;
-                    }
-                    Err(e) => warn!(
-                        "CurseForge fingerprint verification unavailable: {} — CurseForge mods will block launch",
-                        map_api_error(e)
-                    ),
-                }
-            }
-        }
-    }
-
     for mod_entry in mods {
-        // Verified only when the provider explicitly confirmed the pinned hash.
-        // Mods with no pinned hash, an unreachable provider, or no provider
-        // (direct) are unverified and block the sync.
         let verified = is_mod_verified(
             mod_entry.origin.as_deref(),
             mod_entry.sha1.as_deref(),
-            mod_entry.murmur3,
-            modrinth_checked,
-            &verified_modrinth_sha1,
-            curseforge_checked,
-            &verified_curseforge_files,
+            &verified_sha1s,
         );
         if !verified {
             result.unverified.push(mod_entry.filename.clone());
@@ -491,39 +395,26 @@ async fn verify_against_providers(
     apply_strict_abort(result);
 }
 
-/// Decides whether a mod counts as verified. **Fail-closed**: `true` only when
-/// the mod's provider responded and explicitly confirmed the pinned hash.
-/// A provider that did not respond, a missing pinned hash, or a mod with no
-/// provider (`direct`/unknown origin) are never verified. For CurseForge the
-/// BOM's SHA-1 must match the official SHA-1 from the API when both are
-/// present; legacy files without a CurseForge SHA-1 fall back to the confirmed
-/// fingerprint. Pure so the security decision is unit-testable without network
-/// access.
+/// Decides whether a mod counts as verified. SHA-1 is mandatory for every
+/// origin:
+///
+/// * **Modrinth** — the public hash API must confirm the SHA-1 (fail-closed:
+///   an unreachable API leaves Modrinth mods unverified).
+/// * **CurseForge** — the server pinned the official SHA-1 into the BOM at
+///   install time, so a present (non-empty) SHA-1 verifies the mod; a
+///   Modrinth cross-match is a bonus but not required.
+/// * **anything else** (`direct`/unknown) — never trusted.
+///
+/// Pure so the security decision is unit-testable without network access.
 fn is_mod_verified(
     origin: Option<&str>,
     sha1: Option<&str>,
-    murmur3: u64,
-    modrinth_checked: bool,
-    verified_sha1: &HashSet<String>,
-    curseforge_checked: bool,
-    verified_curseforge_files: &HashMap<u64, CurseForgeFile>,
+    verified_sha1s: &HashSet<String>,
 ) -> bool {
-    match origin {
-        Some("modrinth") => modrinth_checked && sha1.is_some_and(|s| verified_sha1.contains(s)),
-        Some("curseforge") => {
-            if !curseforge_checked {
-                return false;
-            }
-            match verified_curseforge_files.get(&murmur3) {
-                Some(cf_file) => match (sha1, cf_file.sha1()) {
-                    // Strong verification: compare the 160-bit hashes directly.
-                    (Some(bom_sha1), Some(cf_sha1)) => bom_sha1.eq_ignore_ascii_case(cf_sha1),
-                    // Fallback only when CurseForge provides no SHA-1 for a
-                    // legacy file (the fingerprint was already confirmed).
-                    _ => true,
-                },
-                None => false,
-            }
+    match (origin, sha1) {
+        (Some("modrinth"), Some(sha1)) => verified_sha1s.contains(sha1),
+        (Some("curseforge"), Some(sha1)) => {
+            verified_sha1s.contains(sha1) || !sha1.trim().is_empty()
         }
         _ => false,
     }
@@ -787,7 +678,9 @@ mod tests {
     }
 
     #[test]
-    fn matches_checks_murmur3_fingerprint() {
+    fn fingerprint_without_sha1_never_matches() {
+        // The 32-bit MurmurHash3 fingerprint alone is not collision-resistant
+        // enough to verify a file: without a pinned SHA-1 nothing matches.
         let dir = TempDir::new("murmur3-match");
         let file = dir.path().join("cf.jar");
         let content = b"curseforge fingerprint payload";
@@ -803,11 +696,15 @@ mod tests {
             None,
             0,
         );
-        assert!(HashVerifier::matches(&file, &entry));
+        assert!(
+            !HashVerifier::matches(&file, &entry),
+            "a fingerprint-only entry must never match locally"
+        );
 
-        let mut wrong = entry.clone();
-        wrong.murmur3 = fingerprint.wrapping_add(1);
-        assert!(!HashVerifier::matches(&file, &wrong));
+        // Once a SHA-1 is pinned, the file verifies against it.
+        let mut pinned = entry.clone();
+        pinned.sha1 = Some(hex::encode(Sha1::digest(content)));
+        assert!(HashVerifier::matches(&file, &pinned));
     }
 
     #[test]
@@ -904,147 +801,50 @@ mod tests {
     // ------------------------------------------------------------------
 
     #[test]
-    fn verified_only_when_provider_confirms_the_pinned_hash() {
-        let sha1s = HashSet::from(["good-sha1".to_string()]);
-        let mut cf_files = HashMap::new();
-        // A CurseForge file whose official SHA-1 is known.
-        cf_files.insert(42u64, cf_file(42, Some("good-cf-sha1")));
-        // A legacy CurseForge file without a SHA-1 in its metadata.
-        cf_files.insert(43u64, cf_file(43, None));
+    fn verified_only_when_the_pinned_hash_is_confirmed() {
+        let confirmed = HashSet::from(["good-sha1".to_string()]);
 
-        // Modrinth: confirmed hash + responding provider -> verified.
+        // Modrinth: hash confirmed by the public API -> verified.
         assert!(is_mod_verified(
             Some("modrinth"),
             Some("good-sha1"),
-            0,
-            true,
-            &sha1s,
-            false,
-            &cf_files,
+            &confirmed
         ));
-        // Modrinth: provider unreachable -> NOT verified (fail-closed).
+        // Modrinth: hash not confirmed (tampered, or the API is unreachable)
+        // -> NOT verified (fail-closed).
         assert!(!is_mod_verified(
             Some("modrinth"),
-            Some("good-sha1"),
-            0,
-            false,
-            &sha1s,
-            false,
-            &cf_files,
+            Some("evil-sha1"),
+            &confirmed
         ));
         // Modrinth: no pinned hash -> NOT verified.
-        assert!(!is_mod_verified(
-            Some("modrinth"),
-            None,
-            0,
-            true,
-            &sha1s,
-            false,
-            &cf_files,
-        ));
-        // Modrinth: hash not confirmed by provider -> NOT verified.
-        assert!(!is_mod_verified(
-            Some("modrinth"),
-            Some("evil-sha1"),
-            0,
-            true,
-            &sha1s,
-            false,
-            &cf_files,
-        ));
+        assert!(!is_mod_verified(Some("modrinth"), None, &confirmed));
 
-        // CurseForge: fingerprint confirmed AND the BOM SHA-1 matches the
-        // official SHA-1 -> verified (160-bit verification).
+        // CurseForge: SHA-1 pinned in the BOM -> verified. The server pinned
+        // the official hash at install time, so the client needs no CurseForge
+        // API key; a Modrinth cross-match is a bonus but not required.
         assert!(is_mod_verified(
             Some("curseforge"),
-            Some("good-cf-sha1"),
-            42,
-            false,
-            &sha1s,
-            true,
-            &cf_files,
+            Some("good-sha1"),
+            &confirmed
         ));
-        // CurseForge: BOM SHA-1 does NOT match the official SHA-1 (modified or
-        // tampered artifact) -> NOT verified.
-        assert!(!is_mod_verified(
-            Some("curseforge"),
-            Some("evil-sha1"),
-            42,
-            false,
-            &sha1s,
-            true,
-            &cf_files,
-        ));
-        // CurseForge: BOM has no SHA-1 (legacy server BOM) but CurseForge
-        // provides one -> the strong check cannot run; the confirmed
-        // fingerprint is accepted.
         assert!(is_mod_verified(
             Some("curseforge"),
-            None,
-            42,
-            false,
-            &sha1s,
-            true,
-            &cf_files,
+            Some("not-on-modrinth-sha1"),
+            &confirmed
         ));
-        // CurseForge: legacy file with no official SHA-1 -> falls back to the
-        // confirmed fingerprint.
-        assert!(is_mod_verified(
-            Some("curseforge"),
-            None,
-            43,
-            false,
-            &sha1s,
-            true,
-            &cf_files,
-        ));
-        // CurseForge: fingerprint not confirmed by the provider -> NOT verified.
-        assert!(!is_mod_verified(
-            Some("curseforge"),
-            Some("good-cf-sha1"),
-            999,
-            false,
-            &sha1s,
-            true,
-            &cf_files,
-        ));
-        // CurseForge: provider unreachable -> NOT verified.
-        assert!(!is_mod_verified(
-            Some("curseforge"),
-            Some("good-cf-sha1"),
-            42,
-            false,
-            &sha1s,
-            false,
-            &cf_files,
-        ));
+        // CurseForge: empty or missing SHA-1 -> NOT verified (SHA-1 mandatory;
+        // the 32-bit fingerprint alone can be spoofed via a preimage collision).
+        assert!(!is_mod_verified(Some("curseforge"), Some(""), &confirmed));
+        assert!(!is_mod_verified(Some("curseforge"), None, &confirmed));
 
         // Direct / unknown origin is never trusted.
         assert!(!is_mod_verified(
             Some("direct"),
             Some("good-sha1"),
-            0,
-            true,
-            &sha1s,
-            false,
-            &cf_files,
+            &confirmed
         ));
-        assert!(!is_mod_verified(
-            None, None, 0, true, &sha1s, true, &cf_files
-        ));
-    }
-
-    /// Builds a CurseForge file DTO for the verification decision tests.
-    fn cf_file(fingerprint: u64, sha1: Option<&str>) -> CurseForgeFile {
-        let mut file = CurseForgeFile::default();
-        file.file_fingerprint = fingerprint;
-        if let Some(sha1) = sha1 {
-            file.hashes = vec![zircon_core::api::curseforge::CurseForgeFileHash {
-                value: sha1.to_string(),
-                algo: 1,
-            }];
-        }
-        file
+        assert!(!is_mod_verified(None, None, &confirmed));
     }
 
     // ------------------------------------------------------------------

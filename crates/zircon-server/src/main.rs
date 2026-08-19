@@ -92,6 +92,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // login attempts (15 min window, 10 attempts) + an append-only audit log.
     let sessions = Arc::new(SessionRegistry::new());
     let login_limiter = Arc::new(FixedWindowLimiter::new(Duration::from_secs(15 * 60), 10));
+    // Public join-intent registrations (1 min window, 30 per real client IP):
+    // the launcher heartbeats roughly every 30s, so this comfortably covers
+    // legit players behind a shared NAT while making ticket-store floods
+    // impractical.
+    let join_intent_limiter = Arc::new(FixedWindowLimiter::new(Duration::from_secs(60), 30));
     let audit = Arc::new(AuditLogger::new(&config.data_dir));
 
     let state = AppState {
@@ -109,6 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         curseforge_api_key: config.get_config().curseforge_api_key,
         sessions: sessions.clone(),
         login_limiter: login_limiter.clone(),
+        join_intent_limiter: join_intent_limiter.clone(),
         audit,
     };
 
@@ -148,6 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let housekeeping_tickets = tickets.clone();
     let housekeeping_sessions = sessions.clone();
     let housekeeping_limiter = login_limiter.clone();
+    let housekeeping_join_limiter = join_intent_limiter.clone();
     let housekeeping = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(120));
         loop {
@@ -155,6 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             housekeeping_tickets.purge_expired();
             housekeeping_sessions.purge_expired();
             housekeeping_limiter.purge_expired();
+            housekeeping_join_limiter.purge_expired();
         }
     });
 
