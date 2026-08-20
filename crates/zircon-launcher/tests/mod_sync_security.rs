@@ -8,9 +8,9 @@ use std::time::Duration;
 use ed25519_dalek::SigningKey;
 use zircon_core::crypto::signing;
 use zircon_core::model::{BillOfMaterials, ModEntry};
-use zircon_launcher::commands::{evaluate_bom_trust, BomTrustOutcome};
-use zircon_launcher::error::LauncherError;
-use zircon_launcher::sync::mod_sync::ModSyncEngine;
+use zircon_launcher_lib::commands::{evaluate_bom_trust, BomTrustOutcome};
+use zircon_launcher_lib::error::LauncherError;
+use zircon_launcher_lib::sync::mod_sync::ModSyncEngine;
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(

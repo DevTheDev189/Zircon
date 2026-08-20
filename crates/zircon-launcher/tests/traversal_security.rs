@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
-use zircon_launcher::error::LauncherError;
-use zircon_launcher::offline::OfflineInstanceManager;
+use zircon_launcher_lib::error::LauncherError;
+use zircon_launcher_lib::offline::OfflineInstanceManager;
 
 fn temp_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
