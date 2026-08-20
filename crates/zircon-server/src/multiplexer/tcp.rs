@@ -521,14 +521,18 @@ const MAX_HTTP_HEAD_BYTES: usize = 16 * 1024;
 ///
 /// * completes the request head by reading from `client` until `\r\n\r\n`
 ///   (bounded), then
-/// * strips any attacker-supplied `X-Zircon-Real-IP` and `Connection` headers
-///   (case-insensitively), then
+/// * strips any attacker-supplied `X-Zircon-Real-IP` header (and, for non-
+///   WebSocket requests, `Connection` headers too), then
 /// * injects the multiplexer's own `X-Zircon-Real-IP: <client ip>` — the web
 ///   server binds loopback-only, so only this trusted proxy may set that
 ///   header — and
 /// * forces `Connection: close` so every proxied request is the first (and
 ///   only) request on its connection and therefore always carries the header
 ///   (no keep-alive reuse that could bypass the rate limiter's IP keying).
+///
+/// WebSocket upgrade requests keep their original `Connection: Upgrade`
+/// header — replacing it with `Connection: close` makes the upstream server
+/// reject the handshake with HTTP 400.
 ///
 /// Without the strip step, a remote client could send its own
 /// `X-Zircon-Real-IP` header; because it appears before the injected header,
@@ -558,6 +562,14 @@ async fn prepare_http_forward(
     let head_str = String::from_utf8_lossy(&buf[..head_end]);
     let mut sanitized_lines = Vec::new();
 
+    // WebSocket handshakes need their `Connection: Upgrade` header preserved;
+    // forcing `Connection: close` here makes Axum/Hyper reject the upgrade
+    // with HTTP 400 Bad Request.
+    let is_ws = head_str.lines().any(|line| {
+        let lower = line.to_ascii_lowercase();
+        lower.starts_with("upgrade:") && lower.contains("websocket")
+    });
+
     for (i, line) in head_str.lines().enumerate() {
         if i == 0 {
             // Preserve the request line, e.g. "GET /index.html HTTP/1.1".
@@ -565,8 +577,13 @@ async fn prepare_http_forward(
             continue;
         }
         let lower = line.to_ascii_lowercase();
-        // Drop attacker-injected real-IP or connection overrides.
-        if lower.starts_with("x-zircon-real-ip:") || lower.starts_with("connection:") {
+        // Drop attacker-injected real-IP overrides.
+        if lower.starts_with("x-zircon-real-ip:") {
+            continue;
+        }
+        // Keep the original `Connection: Upgrade` for WebSocket handshakes,
+        // but strip any other Connection header so we stay in control below.
+        if !is_ws && lower.starts_with("connection:") {
             continue;
         }
         sanitized_lines.push(line.to_string());
@@ -574,7 +591,9 @@ async fn prepare_http_forward(
 
     // Append our verified headers.
     sanitized_lines.push(format!("X-Zircon-Real-IP: {client_ip}"));
-    sanitized_lines.push("Connection: close".to_string());
+    if !is_ws {
+        sanitized_lines.push("Connection: close".to_string());
+    }
 
     let mut out = sanitized_lines.join("\r\n").into_bytes();
     out.extend_from_slice(b"\r\n\r\n");

@@ -1,9 +1,9 @@
 //! Inspects the first bytes of an incoming connection on the public port and
 //! decides where to proxy it:
 //!
-//! * **HTTP** (GET/POST/HEAD/PUT/DELETE/OPTIONS, each with a trailing space to
-//!   avoid false positives on the Minecraft protocol) → the admin web server on
-//!   the internal web port.
+//! * **HTTP** (GET/POST/HEAD/PUT/DELETE/OPTIONS/PATCH, each with a trailing
+//!   space to avoid false positives on the Minecraft protocol) → the admin web
+//!   server on the internal web port.
 //! * **Minecraft handshake** → the internal MC port of the instance whose
 //!   id/name matches the handshake hostname, or the legacy default MC port.
 //!
@@ -16,13 +16,14 @@
 //! portion; the async connection loop lives in `multiplexer.rs`).
 
 /// Require trailing space so e.g. "GET " never collides with MC binary packets.
-const HTTP_PREFIXES: [&[u8]; 6] = [
+const HTTP_PREFIXES: [&[u8]; 7] = [
     b"GET ",
     b"POST ",
     b"HEAD ",
     b"PUT ",
     b"DELETE ",
     b"OPTIONS ",
+    b"PATCH ",
 ];
 
 /// A parsed server-list-ping handshake packet.
@@ -208,6 +209,7 @@ mod tests {
         assert!(is_http_method(b"GET /index.html HTTP/1.1"));
         assert!(is_http_method(b"POST /api HTTP/1.1"));
         assert!(is_http_method(b"OPTIONS * HTTP/1.1"));
+        assert!(is_http_method(b"PATCH /api/instances/1 HTTP/1.1"));
         assert!(!is_http_method(b"\x10\x00\x09localhost"));
     }
 

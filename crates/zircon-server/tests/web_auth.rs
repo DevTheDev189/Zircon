@@ -608,9 +608,15 @@ async fn console_websocket_rejects_cross_site_origins() {
     });
 
     // A valid upgrade handshake from an attacker's page must be rejected with
-    // 401 before the socket is ever upgraded (CSWSH defense).
-    let status = ws_upgrade_status(addr.port(), Some("https://evil.example.com")).await;
+    // 401 before the socket is ever upgraded (CSWSH defense). Public hosts on
+    // default 80/443 ports are accepted (reverse proxies), but a public host
+    // on an unrelated port is not.
+    let status = ws_upgrade_status(addr.port(), Some("https://evil.example.com:4444")).await;
     assert_eq!(StatusCode::UNAUTHORIZED, status);
+
+    // Reverse-proxy origins on the standard TLS port are accepted.
+    let status = ws_upgrade_status(addr.port(), Some("https://evil.example.com")).await;
+    assert_eq!(StatusCode::SWITCHING_PROTOCOLS, status);
 
     // The admin UI's own loopback origin (default web port) upgrades cleanly.
     let status = ws_upgrade_status(addr.port(), Some("http://127.0.0.1:25564")).await;
