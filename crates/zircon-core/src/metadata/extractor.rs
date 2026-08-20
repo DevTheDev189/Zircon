@@ -196,15 +196,45 @@ fn parse_fabric_metadata(content: &str) -> Result<ModMetadata, MetadataError> {
         .unwrap_or_else(|| id.clone());
     let version = text(&root, "version").unwrap_or_else(|| "0.0.0".to_string());
     let description = text(&root, "description").unwrap_or_default();
+    let author = fabric_authors(&root);
 
     Ok(ModMetadata::new(
         id,
         name,
         version,
         description,
+        author,
         ModLoaderType::Fabric,
         fabric_environment(obj),
     ))
+}
+
+/// `authors` is either a string or an array of strings / `{"name": ...}`
+/// objects. Joins multiple authors with ", ".
+fn fabric_authors(root: &Value) -> String {
+    let Some(authors) = root.get("authors") else {
+        return String::new();
+    };
+    if let Some(arr) = authors.as_array() {
+        arr.iter()
+            .filter_map(|a| {
+                if let Some(s) = a.as_str() {
+                    Some(s.to_string())
+                } else if let Some(obj) = a.as_object() {
+                    obj.get("name")
+                        .and_then(|n| n.as_str())
+                        .map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else if let Some(s) = authors.as_str() {
+        s.to_string()
+    } else {
+        String::new()
+    }
 }
 
 /// `environment` is a string (`"*"`, `"client"`, `"server"`) in the current
@@ -280,12 +310,18 @@ fn parse_toml_metadata(
         .get("description")
         .and_then(|v| v.as_str())
         .unwrap_or_default();
+    let author = first
+        .get("authors")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
 
     Ok(ModMetadata::new(
         id,
         name,
         version,
         description,
+        author,
         loader_type,
         "both",
     ))
@@ -355,6 +391,28 @@ mod tests {
         assert_eq!("Fast rendering", meta.description);
         assert_eq!(ModLoaderType::Fabric, meta.loader_type);
         assert_eq!("client", meta.normalized_environment());
+        assert_eq!("", meta.author); // no authors field
+        let _ = std::fs::remove_dir_all(jar.parent().unwrap());
+    }
+
+    #[test]
+    fn extracts_fabric_authors_from_strings_and_objects() {
+        let jar = make_jar(
+            "fabric-authors.jar",
+            &[ZipEntry(
+                "fabric.mod.json",
+                r#"{
+                    "id": "authorsmod",
+                    "authors": [
+                        "jellysquid3",
+                        { "name": "grum", "contact": {} }
+                    ]
+                }"#,
+            )],
+        );
+
+        let meta = extract(&jar).unwrap();
+        assert_eq!("jellysquid3, grum", meta.author);
         let _ = std::fs::remove_dir_all(jar.parent().unwrap());
     }
 
@@ -403,6 +461,7 @@ modId="jei"
 version="15.2.0.27"
 displayName="Just Enough Items"
 description="Show recipes in your inventory"
+authors="mezz, snowshock"
 "#,
             )],
         );
@@ -412,6 +471,7 @@ description="Show recipes in your inventory"
         assert_eq!("Just Enough Items", meta.name);
         assert_eq!("15.2.0.27", meta.version);
         assert_eq!("Show recipes in your inventory", meta.description);
+        assert_eq!("mezz, snowshock", meta.author);
         assert_eq!(ModLoaderType::Forge, meta.loader_type);
         assert_eq!("both", meta.normalized_environment());
         let _ = std::fs::remove_dir_all(jar.parent().unwrap());
