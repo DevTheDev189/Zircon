@@ -1,8 +1,10 @@
-//! Skin storage, Mojang skin integration and bundled default skins.
+//! Skin storage and Mojang skin integration.
 //!
-//! Port of `com.mcmanager.client.skin.SkinManager`,
-//! `com.mcmanager.client.skin.MojangSkinService` and
-//! `com.mcmanager.client.skin.BundledSkins`.
+//! Port of `com.mcmanager.client.skin.SkinManager` and
+//! `com.mcmanager.client.skin.MojangSkinService`. The legacy bundled Steve/Alex
+//! presets were removed because their embedded textures render with broken
+//! opaque overlays; the launcher now relies on custom uploaded skins and direct
+//! Mojang UUID downloads.
 //!
 //! The active skin lives at `~/.mcmanager/skins/active_skin.png`; every saved
 //! skin is archived under `~/.mcmanager/skins/history/` (pruned to 25 entries).
@@ -12,12 +14,10 @@
 use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use crate::error::LauncherError;
-use crate::paths::{
-    active_skin_file, active_skin_variant_file, skin_history_dir, skin_presets_dir, skins_dir,
-};
+use crate::paths::{active_skin_file, active_skin_variant_file, skin_history_dir, skins_dir};
 
 /// Maximum number of skin files retained in history; the oldest are pruned.
 const HISTORY_LIMIT: usize = 25;
@@ -233,11 +233,18 @@ impl SkinManager {
         }
         let mut face = image::imageops::crop_imm(&skin, 8, 8, 8, 8).to_image();
         let hat = image::imageops::crop_imm(&skin, 40, 8, 8, 8).to_image();
-        // Hard overlay (like vanilla): hat pixels with meaningful alpha replace
-        // the face, transparent hat pixels let the face show through.
-        for (x, y, pixel) in hat.enumerate_pixels() {
-            if pixel[3] >= 128 {
-                face.put_pixel(x, y, *pixel);
+        // Guard against legacy/corrupt skins whose hat overlay is entirely
+        // opaque (secondary-layer sections filled with solid pixels). Such
+        // textures render as solid black/voodoo helmets, so skip the overlay
+        // entirely and keep only the base face.
+        let is_solid_overlay = hat.pixels().all(|p| p[3] == 255);
+        if !is_solid_overlay {
+            // Hard overlay (like vanilla): hat pixels with meaningful alpha
+            // replace the face, transparent hat pixels let the face show through.
+            for (x, y, pixel) in hat.enumerate_pixels() {
+                if pixel[3] >= 128 {
+                    face.put_pixel(x, y, *pixel);
+                }
             }
         }
         let size = 8 * scale.max(1);
@@ -504,130 +511,6 @@ fn truncate(text: &str, max: usize) -> String {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Preset skins (the user-editable gallery)
-// ---------------------------------------------------------------------------
-
-/// The preset skin gallery: every PNG in `~/.mcmanager/skins/presets`, seeded
-/// with the embedded defaults on first use. Drop PNG files into that folder to
-/// add or replace presets without rebuilding. Keys are `bundled:<name>`.
-pub struct BundledSkins;
-
-impl BundledSkins {
-    pub const KEY_PREFIX: &'static str = "bundled:";
-
-    /// Every preset skin as `(name, png_bytes)`, sorted by name: the user's
-    /// `presets/` folder wins; the embedded defaults are used only when the
-    /// folder is empty.
-    pub fn all() -> Vec<(String, Vec<u8>)> {
-        ensure_presets_seeded();
-        let mut skins = read_preset_files(&skin_presets_dir());
-        if skins.is_empty() {
-            skins = embedded_defaults();
-        }
-        skins
-    }
-
-    /// Presets from an explicit directory (used by tests).
-    pub fn all_from(dir: &Path) -> Vec<(String, Vec<u8>)> {
-        let mut skins = read_preset_files(dir);
-        if skins.is_empty() {
-            skins = embedded_defaults();
-        }
-        skins
-    }
-
-    /// Looks up a preset by its UI selection key.
-    pub fn by_key(key: &str) -> Option<(String, Vec<u8>)> {
-        let name = key.strip_prefix(Self::KEY_PREFIX)?;
-        Self::all().into_iter().find(|(n, _)| n == name)
-    }
-
-    /// Looks up a preset in an explicit directory (used by tests).
-    pub fn by_key_from(dir: &Path, key: &str) -> Option<(String, Vec<u8>)> {
-        let name = key.strip_prefix(Self::KEY_PREFIX)?;
-        Self::all_from(dir).into_iter().find(|(n, _)| n == name)
-    }
-
-    /// The arm variant of a preset by filename: names hinting at Alex/slim
-    /// (`alex`, `slim`) are slim, everything else is classic.
-    pub fn variant(name: &str) -> String {
-        let lower = name.to_ascii_lowercase();
-        if lower.contains("alex") || lower.contains("slim") {
-            "slim".to_string()
-        } else {
-            "classic".to_string()
-        }
-    }
-}
-
-/// The embedded default presets (steve/alex), sorted by name.
-fn embedded_defaults() -> Vec<(String, Vec<u8>)> {
-    let mut skins = vec![
-        (
-            "steve.png".to_string(),
-            include_bytes!("../ui/src/assets/skins/steve.png").to_vec(),
-        ),
-        (
-            "alex.png".to_string(),
-            include_bytes!("../ui/src/assets/skins/alex.png").to_vec(),
-        ),
-    ];
-    skins.sort_by(|a, b| a.0.cmp(&b.0));
-    skins
-}
-
-/// PNG files directly inside `dir`, sorted by name; missing/unreadable files
-/// are skipped.
-fn read_preset_files(dir: &Path) -> Vec<(String, Vec<u8>)> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-    let mut names: Vec<String> = entries
-        .flatten()
-        .filter_map(|e| {
-            let path = e.path();
-            if !path.is_file() {
-                return None;
-            }
-            let name = path.file_name()?.to_string_lossy().into_owned();
-            if name.to_ascii_lowercase().ends_with(".png") {
-                Some(name)
-            } else {
-                None
-            }
-        })
-        .collect();
-    names.sort();
-    names
-        .into_iter()
-        .filter_map(|name| {
-            std::fs::read(dir.join(&name))
-                .ok()
-                .map(|bytes| (name, bytes))
-        })
-        .collect()
-}
-
-/// Creates the presets folder with the embedded defaults on first use so the
-/// gallery has a starting set users can edit by dropping in PNGs.
-fn ensure_presets_seeded() {
-    let dir = skin_presets_dir();
-    if dir.is_dir() {
-        return;
-    }
-    if let Err(e) = std::fs::create_dir_all(&dir) {
-        warn!("Could not create preset skins dir {}: {e}", dir.display());
-        return;
-    }
-    for (name, bytes) in embedded_defaults() {
-        if let Err(e) = std::fs::write(dir.join(&name), &bytes) {
-            warn!("Could not seed preset skin {}: {e}", name);
-        }
-    }
-    info!("Seeded default preset skins into {}", dir.display());
-}
-
 /// True when a filename is safe to resolve inside a skin folder: a `.png` name
 /// with no path separators or `..` (blocks traversal through user input).
 fn is_safe_skin_filename(filename: &str) -> bool {
@@ -671,54 +554,6 @@ mod tests {
             image::Rgba([(x % 255) as u8, (y % 255) as u8, 128, 255])
         });
         img.save(path).unwrap();
-    }
-
-    #[test]
-    fn preset_skins_read_from_directory_and_fallback_to_embedded() {
-        // User-dropped presets win, sorted by name, skipping non-PNG files.
-        let dir = TempDir::new();
-        write_skin(&dir.path().join("b-custom.png"));
-        write_skin(&dir.path().join("a-custom.png"));
-        std::fs::write(dir.path().join("notes.txt"), b"not a skin").unwrap();
-
-        let skins = BundledSkins::all_from(dir.path());
-        let names: Vec<&str> = skins.iter().map(|(n, _)| n.as_str()).collect();
-        assert_eq!(vec!["a-custom.png", "b-custom.png"], names);
-        for (_, bytes) in &skins {
-            assert_eq!(
-                &bytes[..8],
-                &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]
-            );
-        }
-        assert!(BundledSkins::by_key_from(dir.path(), "bundled:b-custom.png").is_some());
-        assert!(BundledSkins::by_key_from(dir.path(), "bundled:notes.txt").is_none());
-
-        // Empty / missing directory falls back to the embedded defaults.
-        let empty = TempDir::new();
-        let fallback = BundledSkins::all_from(empty.path());
-        assert!(!fallback.is_empty());
-        assert!(fallback.iter().any(|(n, _)| n == "steve.png"));
-        assert!(fallback.iter().any(|(n, _)| n == "alex.png"));
-        assert!(BundledSkins::by_key_from(empty.path(), "bundled:steve.png").is_some());
-    }
-
-    #[test]
-    fn bundled_defaults_embed_valid_pngs() {
-        let skins = embedded_defaults();
-        assert!(!skins.is_empty());
-        for (name, bytes) in &skins {
-            assert!(name.ends_with(".png"));
-            assert!(bytes.len() > 8, "PNG bytes too small for {name}");
-            // PNG magic
-            assert_eq!(
-                &bytes[..8],
-                &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]
-            );
-        }
-        assert_eq!("classic", BundledSkins::variant("steve.png"));
-        assert_eq!("slim", BundledSkins::variant("alex.png"));
-        assert_eq!("slim", BundledSkins::variant("MyAlexSkin.png"));
-        assert_eq!("classic", BundledSkins::variant("unknown.png"));
     }
 
     #[test]
