@@ -215,6 +215,15 @@ pub fn router(state: AppState) -> Router {
             "/api/instances/:id/join-intent",
             post(instance_controller::register_join_intent),
         )
+        // Path-based port routing for HTTPS reverse proxies: the launcher's
+        // base URL may carry the instance port as a path segment, so the
+        // wakeup / join-intent endpoints are reachable at /:port/api/... too.
+        // Both handlers resolve the instance from the request body.
+        .route("/:port/api/wakeup", post(config_routes::wakeup_server))
+        .route(
+            "/:port/api/join-intent",
+            post(instance_controller::register_join_intent),
+        )
         .route("/api/wakeup", post(config_routes::wakeup_server));
 
     // ----------------------------------------------------------------------
@@ -286,7 +295,17 @@ pub fn router(state: AppState) -> Router {
         .route("/api/players/command", post(player_controller::run_command))
         .route(
             "/api/config",
-            get(config_routes::get_config).post(config_routes::update_config),
+            get(config_routes::get_config)
+                .post(config_routes::update_config)
+                .put(config_routes::update_config)
+                .patch(config_routes::update_config),
+        )
+        .route(
+            "/api/settings",
+            get(config_routes::get_config)
+                .post(config_routes::update_config)
+                .put(config_routes::update_config)
+                .patch(config_routes::update_config),
         )
         .route("/api/status", get(config_routes::get_status))
         .route("/api/server/start", post(config_routes::start_server))
@@ -300,6 +319,8 @@ pub fn router(state: AppState) -> Router {
             "/api/instances/:id",
             get(instance_controller::get_instance)
                 .patch(instance_controller::update_instance)
+                .put(instance_controller::update_instance)
+                .post(instance_controller::update_instance)
                 .delete(instance_controller::delete_instance),
         )
         .route(
@@ -321,7 +342,15 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/instances/:id/server-properties",
             get(instance_controller::get_server_properties)
-                .post(instance_controller::save_server_properties),
+                .post(instance_controller::save_server_properties)
+                .put(instance_controller::save_server_properties),
+        )
+        .route(
+            "/api/instances/:id/settings",
+            get(instance_controller::get_instance)
+                .patch(instance_controller::update_instance)
+                .put(instance_controller::update_instance)
+                .post(instance_controller::update_instance),
         )
         .route(
             "/api/instances/:id/players/online",
@@ -456,6 +485,23 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/files/resourcepacks/:filename",
             get(pack_controller::download_resourcepack),
+        )
+        // Path-based port routing: HTTPS reverse proxies cannot carry a port in
+        // the Host header (e.g. https://domain.net), so instance ports are
+        // encoded as the first path segment instead.
+        .route("/:port/status", get(config_routes::client_status_by_port))
+        .route("/:port/bom", get(bom_controller::get_bom_by_port))
+        .route(
+            "/:port/files/mods/:filename",
+            get(mod_controller::download_mod_by_port),
+        )
+        .route(
+            "/:port/files/shaderpacks/:filename",
+            get(pack_controller::download_shaderpack_by_port),
+        )
+        .route(
+            "/:port/files/resourcepacks/:filename",
+            get(pack_controller::download_resourcepack_by_port),
         );
 
     Router::new()

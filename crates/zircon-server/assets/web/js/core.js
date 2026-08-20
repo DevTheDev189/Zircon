@@ -47,6 +47,24 @@ window.Zircon.core = {
             if (this.activeTab === 'players') this.loadPlayers();
             if (this.activeTab === 'backups') this.loadBackups();
         }, 5000);
+
+        // Tire the idle-sleep countdown down locally so the badge ticks every
+        // second between the 5s instance polls (the server re-syncs the true
+        // value on each poll, so drift stays bounded).
+        if (this.idleTicker) clearInterval(this.idleTicker);
+        this.idleTicker = setInterval(() => {
+            if (!this.authenticated || !this.instances) return;
+            for (const inst of this.instances) {
+                if (
+                    inst.running &&
+                    inst.playerCount === 0 &&
+                    typeof inst.idleRemainingSeconds === 'number' &&
+                    inst.idleRemainingSeconds > 0
+                ) {
+                    inst.idleRemainingSeconds = inst.idleRemainingSeconds - 1;
+                }
+            }
+        }, 1000);
     },
     formatBytes(bytes) {
         if (!bytes) return '0 B';
@@ -57,5 +75,13 @@ window.Zircon.core = {
     formatDate(ts) {
         if (!ts) return '—';
         return new Date(ts).toLocaleString();
+    },
+    // Formats a whole number of seconds as "{m}m {ss}s" for the idle-sleep
+    // countdown badge (e.g. 222 -> "3m 42s").
+    formatIdleTime(seconds) {
+        const s = Math.max(0, Math.floor(seconds));
+        const m = Math.floor(s / 60);
+        const remain = s % 60;
+        return `${m}m ${remain < 10 ? '0' : ''}${remain}s`;
     },
 };

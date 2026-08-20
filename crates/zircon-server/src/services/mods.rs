@@ -120,7 +120,7 @@ impl ModManagementService {
             _ => Uuid::new_v4().to_string(),
         };
 
-        let entry = ModEntry::new(
+        let mut entry = ModEntry::new(
             Some(id),
             safe_name.clone(),
             Some(sha1),
@@ -129,6 +129,18 @@ impl ModManagementService {
             None,
             size,
         );
+
+        // Enrich the entry with author/description/title read from the JAR's
+        // mod metadata (fabric.mod.json / mods.toml / neoforge.mods.toml).
+        if let Ok(meta) = zircon_core::metadata::extractor::extract(&target) {
+            entry.title = Some(meta.name);
+            if !meta.description.is_empty() {
+                entry.description = Some(meta.description);
+            }
+            if !meta.author.is_empty() {
+                entry.author = Some(meta.author);
+            }
+        }
 
         self.bom_service.with_bom(|bom| {
             bom.mods.retain(|m| m.filename != safe_name);
@@ -499,23 +511,57 @@ impl ModManagementService {
     /// Lists mods, opportunistically backfilling provider metadata (icon,
     /// title, real Modrinth project id) for legacy entries that were persisted
     /// before enrichment was written back to the BOM. Network round-trips only
-    /// happen for entries whose stored id is a file name, so healthy mods are
-    /// returned untouched.
+    /// happen for entries that actually need repair; the repairs run in parallel
+    /// (bounded concurrency) so a single offline incident cannot block the whole
+    /// list. Once repaired, the enriched metadata is cached back into `bom.json`
+    /// so subsequent loads require zero external requests.
     pub async fn list_mods_enriched(&self) -> Vec<ModEntry> {
-        let mut mods = self.bom_service.get_bom().mods;
+        let mods = self.bom_service.get_bom().mods;
+
+        // Fast path: every entry is already healthy, so no network calls at all.
+        let needs_repair = mods.iter().any(|m| {
+            m.origin.as_deref() == Some(ORIGIN_MODRINTH)
+                && !m.id.as_deref().is_some_and(|id| {
+                    !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric())
+                })
+                && m.icon_url.is_none()
+                && m.sha1.is_some()
+        });
+        if !needs_repair {
+            return mods;
+        }
+
+        // Parallelize the repair work with bounded concurrency, then reorder
+        // back by the original index so callers see a stable list.
+        use futures_util::stream::{self, StreamExt};
+        let results: Vec<(usize, ModEntry, bool)> = stream::iter(mods.into_iter().enumerate())
+            .map(|(idx, mut entry)| {
+                let this = self.clone();
+                async move {
+                    let changed = this.repair_modrinth_metadata(&mut entry).await;
+                    (idx, entry, changed)
+                }
+            })
+            .buffer_unordered(8)
+            .collect()
+            .await;
+
+        let mut updated = vec![ModEntry::default(); results.len()];
         let mut changed = false;
-        for entry in mods.iter_mut() {
-            if self.repair_modrinth_metadata(entry).await {
+        for (idx, entry, entry_changed) in results {
+            if entry_changed {
                 changed = true;
             }
+            updated[idx] = entry;
         }
+
         if changed {
             self.bom_service.with_bom(|bom| {
-                bom.mods = mods.clone();
+                bom.mods = updated.clone();
             });
             let _ = self.bom_service.save();
         }
-        mods
+        updated
     }
 
     /// Replaces the BOM entry for `entry.filename` with this entry and
@@ -616,6 +662,8 @@ impl ModManagementService {
         }
         match self.modrinth.get_project(&id).await {
             Ok(project) => {
+                entry.slug = Some(project.slug.clone());
+                entry.project_url = Some(format!("https://modrinth.com/mod/{}", project.slug));
                 if !project.title.is_empty() {
                     entry.title = Some(project.title);
                 }
