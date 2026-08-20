@@ -122,7 +122,7 @@
         <p class="text-muted text-sm mb-1">
           {{ shaderPrompt.server }} offers shaders
           <span v-if="shaderPrompt.shaderName" class="text-muted">
-            ({{ shaderPrompt.shaderName }})
+            ({{ shaderPrompt.shaderName }}<span v-if="shaderPrompt.shaderAuthor"> by {{ shaderPrompt.shaderAuthor }}</span>)
           </span>
           .
         </p>
@@ -317,19 +317,42 @@ onMounted(async () => {
 
 // Best-effort launcher self-update: silently checks Cloudflare R2 for a newer
 // signed build and relaunches once it's downloaded and installed.
+//
+// Tauri's `downloadAndInstall` reports *delta* progress: `Started` carries the
+// total content length and each `Progress` event carries `chunkLength`, the
+// bytes received for that chunk. Progress is accumulated here rather than read
+// from a cumulative field (which does not exist and shows NaN / stuck at
+// "Downloading...").
 async function checkLauncherUpdate() {
   try {
     const update = await checkUpdate();
     if (update?.available) {
+      let totalBytes = 0;
+      let downloadedBytes = 0;
       statusText.value = `Downloading launcher update ${update.version}...`;
+      progress.value = 0;
       await update.downloadAndInstall((event) => {
-        if (event.event === 'Finished') {
+        if (event.event === 'Started') {
+          totalBytes = event.data.contentLength || 0;
+          statusText.value = `Downloading launcher update ${update.version}...`;
+        } else if (event.event === 'Progress') {
+          downloadedBytes += event.data.chunkLength || 0;
+          const percent =
+            totalBytes > 0
+              ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100))
+              : 0;
+          progress.value = percent / 100;
+          statusText.value = `Downloading launcher update ${update.version}... ${percent}%`;
+        } else if (event.event === 'Finished') {
+          progress.value = 1;
           statusText.value = 'Update downloaded. Restarting...';
         }
       });
       await relaunch();
     }
   } catch (err) {
+    statusText.value = '';
+    progress.value = null;
     console.warn('Launcher update check failed:', err);
   }
 }

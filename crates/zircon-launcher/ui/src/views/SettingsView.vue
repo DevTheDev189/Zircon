@@ -29,6 +29,23 @@
         {{ saving ? 'Saving…' : 'Save Settings' }}
       </button>
       <p class="z-label mt-3">{{ savedAt }}</p>
+
+      <!-- Debug logs -->
+      <div class="mt-8 pt-6 border-t border-edge">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-white font-bold">Debug Logs</h3>
+          <div class="flex gap-2">
+            <button class="z-btn-ghost text-[11px]" @click="copyLogs">Copy to Clipboard</button>
+            <button class="z-btn-ghost text-[11px]" @click="clearLogs">Clear Logs</button>
+          </div>
+        </div>
+        <p class="z-label mb-2">
+          Recent launcher events (in-memory only — cleared on exit). Useful when reporting issues.
+        </p>
+        <button class="z-btn-ghost text-[11px] mb-2" @click="refreshLogs">Refresh</button>
+        <pre class="bg-black/40 border border-edge rounded-lg p-3 text-[10px] leading-relaxed text-muted h-64 overflow-y-auto whitespace-pre-wrap">{{ logText || 'No log lines captured yet.' }}</pre>
+        <p v-if="copiedAt" class="z-label mt-2">{{ copiedAt }}</p>
+      </div>
     </div>
   </div>
 </template>
@@ -40,6 +57,8 @@ import { api } from '../lib/api';
 const settings = ref({ memoryGb: 4 });
 const saving = ref(false);
 const savedAt = ref('');
+const logText = ref('');
+const copiedAt = ref('');
 
 onMounted(async () => {
   try {
@@ -47,7 +66,36 @@ onMounted(async () => {
   } catch {
     // keep defaults
   }
+  refreshLogs();
 });
+
+async function refreshLogs() {
+  try {
+    const lines = await api.getLauncherLogs();
+    logText.value = lines.join('\n');
+  } catch {
+    logText.value = 'Failed to read launcher logs.';
+  }
+}
+
+async function copyLogs() {
+  try {
+    await navigator.clipboard.writeText(logText.value || '');
+    copiedAt.value = `Copied at ${new Date().toLocaleTimeString()}.`;
+  } catch {
+    copiedAt.value = 'Copy failed — select and copy manually.';
+  }
+}
+
+async function clearLogs() {
+  try {
+    await api.clearLauncherLogs();
+    logText.value = '';
+    copiedAt.value = '';
+  } catch {
+    copiedAt.value = 'Failed to clear logs.';
+  }
+}
 
 async function save() {
   saving.value = true;

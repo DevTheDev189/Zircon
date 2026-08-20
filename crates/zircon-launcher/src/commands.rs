@@ -33,7 +33,7 @@ use crate::offline::{OfflineInstance, OfflineInstanceManager};
 use crate::pack_selection::{ClientPackManager, PackSelection};
 use crate::servers;
 use crate::settings::{self, load_settings, LauncherSettings};
-use crate::skin::{BundledSkins, MojangSkinService, SkinManager};
+use crate::skin::{MojangSkinService, SkinManager};
 use crate::sync::mod_sync::{ModSyncEngine, ProgressListener};
 use crate::sync::pack_sync::{PackProgressListener, PackSyncEngine};
 
@@ -242,28 +242,26 @@ pub fn save_server_list(servers_list: Vec<servers::SavedServer>) -> Result<(), S
 /// the latency everywhere and acts as the fallback for third-party servers.
 /// Returns `None` when the server is unreachable.
 ///
-/// Builds the HTTP base URL for a server, refusing plaintext HTTP to remote
-/// hosts: BOM/mod/pack downloads and join-intent registrations over an
-/// unauthenticated remote network could be tampered with by an on-path
-/// attacker, so they must travel over TLS. Loopback hosts (local dev/test
-/// servers) may fall back to plaintext HTTP, as may port 443 (the standard TLS
-/// port implies HTTPS even when the saved flag is off). The Minecraft
-/// connection always uses `host:port` regardless.
+/// Builds the HTTP base URL for a server. Plaintext HTTP is allowed for any
+/// host (LAN IPs, bare domains, simple setups without TLS) — mod integrity is
+/// still enforced end-to-end: every BOM is verified against the server's
+/// pinned Ed25519 key and every downloaded mod against its SHA-1, so an
+/// on-path attacker cannot silently substitute files.
+///
+/// The `use_https` flag (the launcher's "Use HTTPS" checkbox) selects the
+/// scheme; port 443 is treated as implicit HTTPS even when the flag is off.
+/// Non-443 HTTPS ports travel as a path segment (`https://host/25566`) so
+/// reverse proxies can route by port. The Minecraft connection always uses
+/// `host:port` regardless.
 fn server_base_url(host: &str, port: u16, use_https: bool) -> Result<String, LauncherError> {
     let is_local = servers::is_loopback_host(host);
-    if !is_local && !use_https && port != 443 {
-        return Err(LauncherError::InvalidInput(
-            "Plaintext HTTP connections to remote servers are forbidden for security. \
-             Ensure HTTPS is enabled on your server or reverse proxy."
-                .to_string(),
-        ));
-    }
-
     if use_https || (!is_local && port == 443) {
         if port == 443 {
             Ok(format!("https://{host}"))
         } else {
-            Ok(format!("https://{host}:{port}"))
+            // Reverse proxies cannot see a port in the Host header, so the
+            // instance port travels as a path segment: https://host/25566
+            Ok(format!("https://{host}/{port}"))
         }
     } else {
         Ok(format!("http://{host}:{port}"))
@@ -362,19 +360,59 @@ pub struct ServerStatusInfo {
 // Wakeup (idle-shutdown companion)
 // ---------------------------------------------------------------------------
 
-/// Whether the launcher should attempt a wakeup for a Zircon server: the
-/// wrapper is reachable (so a wakeup endpoint exists) and the Minecraft port
-/// is not answering yet. Kept pure so the decision is unit-testable.
-fn should_wake(wrapper_present: bool, ping_ok: bool) -> bool {
-    wrapper_present && !ping_ok
+/// Why the launcher should (or should not) wake a Zircon server. Kept pure so
+/// the decision is unit-testable.
+#[derive(Debug, PartialEq)]
+enum WakeDecision {
+    /// No wakeup needed: third-party server (no wrapper) or the Minecraft port
+    /// already answers.
+    PassThrough,
+    /// The wrapper reports the server running, so an unreachable game port is
+    /// a routing/firewall problem, not a sleep state.
+    PortUnreachable,
+    /// The server was stopped manually (maintenance mode) and must stay down.
+    Maintenance,
+    /// The server is asleep (idle shutdown) and may be woken.
+    Wake,
 }
 
-/// Called at the start of an online launch: if the target is a Zircon server
+/// Classifies a Zircon server's wakeup need from its `/status` and a live
+/// Minecraft-port ping. Third-party servers (no wrapper) and already-answering
+/// servers pass through; a running-but-unreachable server is a port-forwarding
+/// failure; a stopped, non-wakeable server is in maintenance; only a stopped,
+/// wakeable server should be woken.
+fn wake_decision(wrapper: Option<WrapperStatus>, ping_ok: bool) -> WakeDecision {
+    let Some(w) = wrapper else {
+        return WakeDecision::PassThrough;
+    };
+    if ping_ok {
+        return WakeDecision::PassThrough;
+    }
+    if w.running.unwrap_or(false) {
+        return WakeDecision::PortUnreachable;
+    }
+    if !w.wakeable {
+        return WakeDecision::Maintenance;
+    }
+    WakeDecision::Wake
+}
+
+/// Called at the start of an online wake: if the target is a Zircon server
 /// whose Minecraft port is not answering, asks the wrapper to start the right
 /// instance via the public `/api/wakeup` endpoint (the wrapper resolves the
 /// instance by hostname/port, and refuses manual stops), then waits for the
 /// status ping before the rest of the launch flow runs. Third-party servers
 /// (no wrapper) pass straight through.
+///
+/// Uses the wrapper's `/status` to distinguish the failure modes so the
+/// launcher fails fast instead of looping:
+///
+/// 1. Wrapper reports the server **running** but the Minecraft port is
+///    unreachable → the port is closed on the router/firewall; fail immediately.
+/// 2. Wrapper reports it **stopped** and not wakeable (maintenance mode) → fail
+///    immediately; the server must stay down.
+/// 3. Wrapper reports it **stopped** but wakeable (idle sleep) → send `/api/wakeup`
+///    and wait for the server to finish booting.
 ///
 /// Returns `true` when the target is a Zircon server (wrapper reachable), so
 /// the caller can run the join-intent keep-alive that holds the instance's
@@ -386,16 +424,29 @@ async fn wake_if_needed(
     host: &str,
     port: u16,
 ) -> Result<bool, LauncherError> {
-    let wrapper_present = fetch_wrapper_status(http, base_url).await.is_some();
+    let wrapper = fetch_wrapper_status(http, base_url).await;
+    let wrapper_present = wrapper.is_some();
     let ping_ok = crate::status::ping_status(host, port).await.is_ok();
-    if !should_wake(wrapper_present, ping_ok) {
-        return Ok(wrapper_present);
+
+    match wake_decision(wrapper, ping_ok) {
+        WakeDecision::PassThrough => return Ok(wrapper_present),
+        WakeDecision::PortUnreachable => {
+            return Err(LauncherError::InvalidInput(format!(
+                "The server is running, but Minecraft port {host}:{port} is \
+unreachable. Ensure TCP port {port} is open and port-forwarded on your \
+router/firewall."
+            )));
+        }
+        WakeDecision::Maintenance => {
+            return Err(LauncherError::InvalidInput(format!(
+                "The server is stopped and not wakeable (maintenance mode). Ask \
+an admin to start it before playing."
+            )));
+        }
+        WakeDecision::Wake => {}
     }
 
-    // Server is down (asleep, still booting, or stopped). The wakeup endpoint
-    // resolves the instance the same way the multiplexer routes connections,
-    // returns 200 when it is (now) running, and 409 when it was stopped
-    // manually and must stay down.
+    // The server is asleep (idle shutdown) and may be woken.
     emit_status(app, "Waking up server...");
     let body = serde_json::json!({ "hostname": host, "port": port });
     let response = http
@@ -735,6 +786,11 @@ async fn run_online_flow(
                         .shaderpacks
                         .first()
                         .map(|p| p.filename.clone())
+                        .unwrap_or_default(),
+                    "shaderAuthor": bom
+                        .shaderpacks
+                        .first()
+                        .and_then(|p| p.author.clone())
                         .unwrap_or_default(),
                 }),
             );
@@ -1340,9 +1396,12 @@ fn override_heap(java_args: &str, memory_gb: u32) -> String {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModFileInfo {
     pub filename: String,
     pub size_bytes: u64,
+    /// Author read from the JAR's mod metadata when available.
+    pub author: Option<String>,
 }
 
 #[tauri::command]
@@ -1360,9 +1419,14 @@ pub fn list_offline_mods(
         .filter_map(|path| {
             let filename = path.file_name()?.to_string_lossy().into_owned();
             let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            let author = zircon_core::metadata::extractor::extract(&path)
+                .ok()
+                .map(|meta| meta.author)
+                .filter(|a| !a.trim().is_empty());
             Some(ModFileInfo {
                 filename,
                 size_bytes,
+                author,
             })
         })
         .collect();
@@ -1503,35 +1567,22 @@ pub fn get_skin_history() -> Result<Vec<SkinImage>, String> {
     Ok(out)
 }
 
-/// Bundled default skins (steve/alex) as data URLs, with their arm variants.
+/// Bundled default skins (steve/alex) were removed because their embedded
+/// textures render with broken opaque overlays. Returns an empty list so the
+/// frontend gracefully shows nothing for the preset gallery.
 #[tauri::command]
 pub fn get_bundled_skins() -> Result<Vec<SkinImage>, String> {
-    Ok(BundledSkins::all()
-        .into_iter()
-        .map(|(name, bytes)| SkinImage {
-            name: name.clone(),
-            data_url: SkinManager::png_data_url(&bytes),
-            variant: BundledSkins::variant(&name),
-        })
-        .collect())
+    Ok(Vec::new())
 }
 
-/// Activates a preset skin by key (`bundled:<name>`): the current active skin
-/// moves to history and the preset becomes active (no duplicate history entry
-/// for the preset itself). The optional `variant` (`classic`/`slim`) is what
-/// the user picked in the UI; it defaults to the preset's own variant.
+/// Activates a preset skin by key. Legacy bundled presets are gone, so this is
+/// a no-op kept only for command-name compatibility with the frontend.
 #[tauri::command]
 pub fn save_bundled_skin(
-    app: AppHandle,
-    key: String,
-    variant: Option<String>,
+    _app: AppHandle,
+    _key: String,
+    _variant: Option<String>,
 ) -> Result<(), String> {
-    let Some((name, bytes)) = BundledSkins::by_key(&key) else {
-        return Err("Unknown bundled skin".to_string());
-    };
-    let variant = variant.unwrap_or_else(|| BundledSkins::variant(&name));
-    SkinManager::set_active_png(&bytes, &variant, true).map_err(err_string)?;
-    emit_skin_updated(&app);
     Ok(())
 }
 
@@ -1711,6 +1762,126 @@ pub fn list_instance_packs(game_dir: String) -> Result<InstancePacks, String> {
             .iter()
             .cloned()
             .collect(),
+    })
+}
+
+/// A pack file with optional enriched metadata (title, author, description,
+/// icon and Modrinth project URL) resolved from the instance's BOM.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackFileInfo {
+    pub filename: String,
+    pub size_bytes: u64,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub description: Option<String>,
+    pub icon_url: Option<String>,
+    pub project_url: Option<String>,
+    pub is_active: bool,
+    pub is_local: bool,
+}
+
+/// Enriched pack listing for an instance, including shader/resource pack
+/// metadata and whether shaders are currently enabled.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnrichedInstancePacks {
+    pub shaderpacks: Vec<PackFileInfo>,
+    pub resourcepacks: Vec<PackFileInfo>,
+    pub shaders_enabled: bool,
+}
+
+/// Opens an external URL in the user's default browser. Only `http(s)` URLs
+/// are allowed to avoid `open::that` being abused to launch local programs.
+#[tauri::command]
+pub async fn open_external_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Invalid URL protocol".to_string());
+    }
+    open::that(&url).map_err(|e| format!("Could not open browser: {e}"))
+}
+
+/// Lists an instance's shaderpacks and resourcepacks with enriched metadata
+/// (title, author, description, icon and Modrinth project URL) resolved from
+/// the instance's BOM, plus each pack's active/local state.
+#[tauri::command]
+pub async fn list_instance_packs_detailed(
+    _state: State<'_, LauncherState>,
+    game_dir: String,
+) -> Result<EnrichedInstancePacks, String> {
+    let dir = PathBuf::from(&game_dir);
+    let selection = PackSelection::load(&dir);
+
+    // Read the BOM (if present) to enrich pack metadata.
+    let bom_file = dir.join("bom.json");
+    let bom: Option<BillOfMaterials> = if bom_file.is_file() {
+        std::fs::read_to_string(&bom_file)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+    } else {
+        None
+    };
+
+    let map_packs = |folder_name: &str, is_shader: bool| -> Vec<PackFileInfo> {
+        let pack_dir = dir.join(folder_name);
+        let files = list_pack_files(&pack_dir);
+        files
+            .into_iter()
+            .map(|filename| {
+                let path = pack_dir.join(&filename);
+                let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                let bom_entry = bom.as_ref().and_then(|b| {
+                    if is_shader {
+                        b.get_shaderpack_by_filename(&filename)
+                    } else {
+                        b.get_resourcepack_by_filename(&filename)
+                    }
+                });
+
+                let (title, author, description, icon_url, project_url) = if let Some(e) = bom_entry
+                {
+                    (
+                        e.title.clone().or_else(|| Some(e.filename.clone())),
+                        e.author.clone(),
+                        e.description.clone(),
+                        e.icon_url.clone(),
+                        e.modrinth_url(is_shader).or_else(|| e.project_url.clone()),
+                    )
+                } else {
+                    (Some(filename.clone()), None, None, None, None)
+                };
+
+                let is_active = if is_shader {
+                    selection.active_shaderpack.as_deref() == Some(&filename)
+                } else {
+                    selection.active_resourcepacks.contains(&filename)
+                };
+
+                let is_local = if is_shader {
+                    selection.is_locally_added_shaderpack(&filename)
+                } else {
+                    selection.is_locally_added_resourcepack(&filename)
+                };
+
+                PackFileInfo {
+                    filename,
+                    size_bytes,
+                    title,
+                    author,
+                    description,
+                    icon_url,
+                    project_url,
+                    is_active,
+                    is_local,
+                }
+            })
+            .collect()
+    };
+
+    Ok(EnrichedInstancePacks {
+        shaderpacks: map_packs("shaderpacks", true),
+        resourcepacks: map_packs("resourcepacks", false),
+        shaders_enabled: selection.shaders_enabled,
     })
 }
 
@@ -1969,6 +2140,41 @@ pub fn save_settings(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Debug logs & crash diagnostics
+// ---------------------------------------------------------------------------
+
+/// Returns the in-memory launcher debug log buffer (newest last).
+#[tauri::command]
+pub fn get_launcher_logs() -> Result<Vec<String>, String> {
+    let buffer = crate::logging::log_buffer();
+    let guard = buffer.lock().map_err(|e| e.to_string())?;
+    Ok(guard.iter().cloned().collect())
+}
+
+/// Empties the in-memory launcher debug log buffer.
+#[tauri::command]
+pub fn clear_launcher_logs() -> Result<(), String> {
+    let buffer = crate::logging::log_buffer();
+    let mut guard = buffer.lock().map_err(|e| e.to_string())?;
+    guard.clear();
+    Ok(())
+}
+
+/// Scans an instance's `crash-reports/` and `logs/latest.log` for known fatal
+/// patterns (missing deps, mixin failures, Java mismatches, OOMs) and returns
+/// an actionable summary, or `None` when nothing matches.
+#[tauri::command]
+pub fn check_game_crash(
+    game_dir: String,
+) -> Result<Option<crate::launch::crash_analyzer::CrashAnalysis>, String> {
+    Ok(
+        crate::launch::crash_analyzer::analyze_instance_latest_crash(std::path::Path::new(
+            &game_dir,
+        )),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2003,25 +2209,52 @@ mod tests {
     }
 
     #[test]
-    fn should_wake_only_for_reachable_zircon_servers_that_are_down() {
+    fn wake_decision_classifies_server_state() {
         // Third-party server (no wrapper) → never wake.
-        assert!(!should_wake(false, false));
-        assert!(!should_wake(false, true));
+        assert_eq!(WakeDecision::PassThrough, wake_decision(None, false));
+        assert_eq!(WakeDecision::PassThrough, wake_decision(None, true));
         // Zircon server already answering → no wake needed.
-        assert!(!should_wake(true, true));
-        // Zircon server down (asleep / booting / stopped) → wake.
-        assert!(should_wake(true, false));
+        let running = Some(WrapperStatus {
+            online: 0,
+            max: 0,
+            version: String::new(),
+            running: Some(true),
+            wakeable: false,
+        });
+        assert_eq!(
+            WakeDecision::PassThrough,
+            wake_decision(running.clone(), true)
+        );
+        // Running but port unreachable → port-forwarding failure.
+        assert_eq!(WakeDecision::PortUnreachable, wake_decision(running, false));
+        // Stopped and not wakeable (maintenance) → must stay down.
+        let stopped = Some(WrapperStatus {
+            online: 0,
+            max: 0,
+            version: String::new(),
+            running: Some(false),
+            wakeable: false,
+        });
+        assert_eq!(WakeDecision::Maintenance, wake_decision(stopped, false));
+        // Stopped but wakeable (idle sleep) → wake.
+        let asleep = Some(WrapperStatus {
+            online: 0,
+            max: 0,
+            version: String::new(),
+            running: Some(false),
+            wakeable: true,
+        });
+        assert_eq!(WakeDecision::Wake, wake_decision(asleep, false));
     }
 
     #[test]
-    fn server_base_url_refuses_plaintext_to_remote_hosts() {
-        // Remote host without HTTPS → refused outright (the launch flow and
-        // status refresh both surface the error).
-        let err = server_base_url("play.myserver.com", 25565, false).unwrap_err();
-        assert!(matches!(err, LauncherError::InvalidInput(_)));
-        assert!(
-            err.to_string().contains("forbidden"),
-            "unhelpful error: {err}"
+    fn server_base_url_builds_http_and_https() {
+        // Remote hosts may use plaintext HTTP when HTTPS is not enabled (simple
+        // LAN / no-TLS setups). Mod integrity is still guaranteed by the signed
+        // BOM + per-file SHA-1 verification.
+        assert_eq!(
+            "http://play.myserver.com:25565",
+            server_base_url("play.myserver.com", 25565, false).unwrap()
         );
 
         // Remote on the standard TLS port is implicitly HTTPS.
@@ -2030,13 +2263,14 @@ mod tests {
             server_base_url("play.myserver.com", 443, false).unwrap()
         );
 
-        // Explicit HTTPS flag wins on any port.
+        // Explicit HTTPS flag wins on any port. Non-443 ports travel as a
+        // path segment so reverse proxies can route by port.
         assert_eq!(
-            "https://play.myserver.com:25565",
+            "https://play.myserver.com/25565",
             server_base_url("play.myserver.com", 25565, true).unwrap()
         );
         assert_eq!(
-            "https://play.myserver.com:8443",
+            "https://play.myserver.com/8443",
             server_base_url("play.myserver.com", 8443, true).unwrap()
         );
 
@@ -2054,9 +2288,9 @@ mod tests {
             server_base_url("[::1]", 25567, false).unwrap()
         );
 
-        // Loopback may also use HTTPS when the flag is set.
+        // Loopback may also use HTTPS when the flag is set (path-based port).
         assert_eq!(
-            "https://localhost:25565",
+            "https://localhost/25565",
             server_base_url("localhost", 25565, true).unwrap()
         );
     }

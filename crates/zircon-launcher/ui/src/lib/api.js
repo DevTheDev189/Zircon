@@ -75,6 +75,11 @@ export const api = {
   // Settings
   getSettings: () => invoke('get_settings'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
+
+  // Debug logs & crash diagnostics
+  getLauncherLogs: () => invoke('get_launcher_logs'),
+  clearLauncherLogs: () => invoke('clear_launcher_logs'),
+  checkGameCrash: (gameDir) => invoke('check_game_crash', { gameDir }),
 };
 
 // Launch-flow events emitted from Rust while a game is being prepared/run.
