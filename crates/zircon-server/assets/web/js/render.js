@@ -3,492 +3,6 @@
 // dashboard only needs Vue’s runtime build: no template compilation (and
 // therefore no `unsafe-eval`) at runtime. See the CSP in src/web/app.rs.
 window.ZirconRender = (function () {
-const _Vue = Vue
-const { createElementVNode: _createElementVNode, createCommentVNode: _createCommentVNode, createTextVNode: _createTextVNode, createStaticVNode: _createStaticVNode } = _Vue
-
-const _hoisted_1 = {
-  key: 0,
-  class: "fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center"
-}
-const _hoisted_2 = { class: "bg-slate-900 border border-slate-800 p-8 rounded-xl w-96 shadow-2xl" }
-const _hoisted_3 = ["onSubmit"]
-const _hoisted_4 = ["onUpdate:modelValue"]
-const _hoisted_5 = ["onUpdate:modelValue"]
-const _hoisted_6 = { class: "flex w-full h-full" }
-const _hoisted_7 = { class: "w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4" }
-const _hoisted_8 = ["onClick"]
-const _hoisted_9 = { class: "flex-1 overflow-y-auto space-y-2" }
-const _hoisted_10 = ["onClick"]
-const _hoisted_11 = { class: "flex items-center justify-between gap-2" }
-const _hoisted_12 = { class: "font-semibold text-sm truncate" }
-const _hoisted_13 = { class: "flex items-center gap-2 mt-1" }
-const _hoisted_14 = { class: "inline-block text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded uppercase font-mono truncate" }
-const _hoisted_15 = {
-  key: 0,
-  class: "text-[10px] font-mono text-emerald-400/90 mt-0.5"
-}
-const _hoisted_16 = {
-  key: 1,
-  class: "text-[10px] text-amber-400/80 mt-0.5"
-}
-const _hoisted_17 = ["onClick"]
-const _hoisted_18 = {
-  key: 3,
-  class: "flex gap-1.5 mt-2"
-}
-const _hoisted_19 = ["onClick"]
-const _hoisted_20 = ["onClick"]
-const _hoisted_21 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-6"
-}
-const _hoisted_22 = ["onClick"]
-const _hoisted_23 = { class: "flex-1 flex flex-col bg-slate-950 overflow-hidden" }
-const _hoisted_24 = {
-  key: 0,
-  class: "h-16 border-b border-slate-800 px-6 flex items-center justify-between"
-}
-const _hoisted_25 = { class: "flex gap-2" }
-const _hoisted_26 = ["onClick"]
-const _hoisted_27 = ["onClick"]
-const _hoisted_28 = { class: "text-xs font-semibold text-slate-300" }
-const _hoisted_29 = { class: "w-8 h-8 rounded-full bg-emerald-600 border border-emerald-400 flex items-center justify-center text-xs font-bold text-slate-950 uppercase shadow" }
-const _hoisted_30 = { class: "flex-1 p-6 overflow-y-auto" }
-const _hoisted_31 = {
-  key: 0,
-  class: "space-y-6"
-}
-const _hoisted_32 = { class: "grid grid-cols-3 gap-6" }
-const _hoisted_33 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_34 = { class: "text-3xl font-bold text-emerald-400" }
-const _hoisted_35 = { class: "w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden" }
-const _hoisted_36 = { class: "text-xs text-slate-500 mt-1" }
-const _hoisted_37 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_38 = { class: "text-3xl font-bold text-emerald-400" }
-const _hoisted_39 = { class: "text-xs text-slate-500 mt-1" }
-const _hoisted_40 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_41 = { class: "text-3xl font-bold text-emerald-400" }
-const _hoisted_42 = { class: "text-xs text-slate-500 mt-1" }
-const _hoisted_43 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_44 = { class: "flex items-end gap-1 h-24" }
-const _hoisted_45 = ["title"]
-const _hoisted_46 = {
-  key: 1,
-  class: "flex flex-col gap-6 h-full overflow-hidden"
-}
-const _hoisted_47 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4 shrink-0" }
-const _hoisted_48 = { class: "grid grid-cols-3 gap-2.5 max-h-40 overflow-y-auto pr-1" }
-const _hoisted_49 = { class: "min-w-0" }
-const _hoisted_50 = { class: "font-semibold text-xs text-slate-200 truncate" }
-const _hoisted_51 = { class: "text-[11px] text-slate-400 truncate" }
-const _hoisted_52 = ["onClick", "disabled"]
-const _hoisted_53 = {
-  key: 0,
-  class: "animate-spin h-3 w-3 text-emerald-400",
-  xmlns: "http://www.w3.org/2000/svg",
-  fill: "none",
-  viewBox: "0 0 24 24"
-}
-const _hoisted_54 = {
-  key: 1,
-  class: "text-[10px] text-emerald-400 font-semibold px-2 py-0.5 bg-emerald-500/10 rounded shrink-0"
-}
-const _hoisted_55 = {
-  key: 0,
-  class: "col-span-3 text-xs text-slate-500 text-center py-4"
-}
-const _hoisted_56 = { class: "grid grid-cols-2 grid-rows-1 gap-6 flex-1 min-h-0" }
-const _hoisted_57 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col min-h-0" }
-const _hoisted_58 = { class: "flex items-center justify-between mb-3" }
-const _hoisted_59 = { class: "flex bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-xs font-medium" }
-const _hoisted_60 = ["onClick"]
-const _hoisted_61 = ["onClick"]
-const _hoisted_62 = { class: "flex gap-2 mb-4" }
-const _hoisted_63 = ["onUpdate:modelValue", "onKeyup", "placeholder"]
-const _hoisted_64 = ["onClick", "disabled"]
-const _hoisted_65 = { class: "flex-1 overflow-y-auto space-y-3 pr-1" }
-const _hoisted_66 = {
-  key: 0,
-  class: "flex items-center justify-center gap-2 py-8"
-}
-const _hoisted_67 = { class: "text-xs text-slate-400" }
-const _hoisted_68 = ["src"]
-const _hoisted_69 = { class: "flex-1 min-w-0" }
-const _hoisted_70 = { class: "flex items-center justify-between" }
-const _hoisted_71 = { class: "font-semibold text-sm truncate" }
-const _hoisted_72 = ["onClick", "disabled"]
-const _hoisted_73 = {
-  key: 0,
-  class: "animate-spin h-3.5 w-3.5 text-emerald-400",
-  xmlns: "http://www.w3.org/2000/svg",
-  fill: "none",
-  viewBox: "0 0 24 24"
-}
-const _hoisted_74 = { class: "text-xs text-slate-400 line-clamp-2 mt-1" }
-const _hoisted_75 = { class: "text-[10px] text-slate-500 mt-1" }
-const _hoisted_76 = {
-  key: 0,
-  class: "flex items-center gap-2 mt-1.5"
-}
-const _hoisted_77 = ["onUpdate:modelValue", "disabled"]
-const _hoisted_78 = {
-  key: 0,
-  value: "",
-  disabled: ""
-}
-const _hoisted_79 = {
-  key: 1,
-  value: "",
-  disabled: ""
-}
-const _hoisted_80 = ["value"]
-const _hoisted_81 = {
-  key: 1,
-  class: "text-xs text-slate-500 text-center py-6"
-}
-const _hoisted_82 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col min-h-0" }
-const _hoisted_83 = { class: "font-bold text-sm mb-3" }
-const _hoisted_84 = { class: "flex-1 overflow-y-auto space-y-3 pr-1" }
-const _hoisted_85 = ["src"]
-const _hoisted_86 = { class: "flex-1 min-w-0" }
-const _hoisted_87 = { class: "flex items-center gap-2" }
-const _hoisted_88 = { class: "font-semibold text-sm truncate" }
-const _hoisted_89 = {
-  key: 0,
-  class: "bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] px-2 py-0.5 rounded uppercase font-semibold"
-}
-const _hoisted_90 = {
-  key: 1,
-  class: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] px-2 py-0.5 rounded uppercase font-semibold"
-}
-const _hoisted_91 = { class: "text-xs text-slate-400 font-mono truncate" }
-const _hoisted_92 = {
-  key: 0,
-  class: "text-[10px] text-slate-500"
-}
-const _hoisted_93 = {
-  key: 1,
-  class: "text-xs text-red-400 mt-0.5"
-}
-const _hoisted_94 = ["onClick"]
-const _hoisted_95 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-6"
-}
-const _hoisted_96 = {
-  key: 2,
-  class: "space-y-6"
-}
-const _hoisted_97 = { class: "grid grid-cols-2 gap-6" }
-const _hoisted_98 = ["onDragover", "onDrop"]
-const _hoisted_99 = { class: "flex gap-2" }
-const _hoisted_100 = ["onUpdate:modelValue", "onKeyup"]
-const _hoisted_101 = ["onClick", "disabled"]
-const _hoisted_102 = {
-  key: 0,
-  class: "space-y-2 max-h-40 overflow-y-auto pr-1"
-}
-const _hoisted_103 = { class: "font-semibold text-xs truncate" }
-const _hoisted_104 = ["onClick", "disabled"]
-const _hoisted_105 = { class: "flex-1 overflow-y-auto space-y-2 pr-1 border-t border-slate-800 pt-3" }
-const _hoisted_106 = { class: "text-xs font-medium truncate" }
-const _hoisted_107 = ["onClick"]
-const _hoisted_108 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-6"
-}
-const _hoisted_109 = ["onDragover", "onDrop"]
-const _hoisted_110 = { class: "flex gap-2" }
-const _hoisted_111 = ["onUpdate:modelValue", "onKeyup"]
-const _hoisted_112 = ["onClick", "disabled"]
-const _hoisted_113 = {
-  key: 0,
-  class: "space-y-2 max-h-40 overflow-y-auto pr-1"
-}
-const _hoisted_114 = { class: "font-semibold text-xs truncate" }
-const _hoisted_115 = ["onClick", "disabled"]
-const _hoisted_116 = { class: "flex-1 overflow-y-auto space-y-2 pr-1 border-t border-slate-800 pt-3" }
-const _hoisted_117 = { class: "text-xs font-medium truncate" }
-const _hoisted_118 = ["onClick"]
-const _hoisted_119 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-6"
-}
-const _hoisted_120 = {
-  key: 3,
-  class: "bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col h-full"
-}
-const _hoisted_121 = { class: "flex items-center justify-between mb-3" }
-const _hoisted_122 = { class: "flex items-center gap-4" }
-const _hoisted_123 = { class: "flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs" }
-const _hoisted_124 = { class: "flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white transition" }
-const _hoisted_125 = ["onUpdate:modelValue"]
-const _hoisted_126 = { class: "flex items-center gap-1.5 cursor-pointer text-yellow-400 hover:text-yellow-300 transition" }
-const _hoisted_127 = ["onUpdate:modelValue"]
-const _hoisted_128 = { class: "flex items-center gap-1.5 cursor-pointer text-red-400 hover:text-red-300 transition" }
-const _hoisted_129 = ["onUpdate:modelValue"]
-const _hoisted_130 = ["onClick"]
-const _hoisted_131 = {
-  ref: "consoleBox",
-  class: "flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-0.5 min-h-0"
-}
-const _hoisted_132 = {
-  key: 0,
-  class: "text-slate-600"
-}
-const _hoisted_133 = ["onSubmit"]
-const _hoisted_134 = ["onUpdate:modelValue"]
-const _hoisted_135 = {
-  key: 4,
-  class: "space-y-6"
-}
-const _hoisted_136 = { class: "flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-xl" }
-const _hoisted_137 = ["onClick"]
-const _hoisted_138 = { class: "grid grid-cols-2 gap-6" }
-const _hoisted_139 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_140 = {
-  key: 0,
-  class: "text-[10px] font-normal text-slate-500 ml-1"
-}
-const _hoisted_141 = ["onSubmit"]
-const _hoisted_142 = ["onUpdate:modelValue", "disabled"]
-const _hoisted_143 = ["disabled"]
-const _hoisted_144 = {
-  key: 0,
-  class: "flex items-center justify-center gap-2 py-4"
-}
-const _hoisted_145 = ["onClick"]
-const _hoisted_146 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-4"
-}
-const _hoisted_147 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_148 = ["onSubmit"]
-const _hoisted_149 = ["onUpdate:modelValue"]
-const _hoisted_150 = { class: "space-y-1 max-h-48 overflow-y-auto" }
-const _hoisted_151 = {
-  key: 0,
-  class: "flex items-center justify-center gap-2 py-4"
-}
-const _hoisted_152 = ["onClick"]
-const _hoisted_153 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-4"
-}
-const _hoisted_154 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_155 = ["onSubmit"]
-const _hoisted_156 = ["onUpdate:modelValue"]
-const _hoisted_157 = ["onUpdate:modelValue"]
-const _hoisted_158 = { class: "space-y-1 max-h-48 overflow-y-auto" }
-const _hoisted_159 = {
-  key: 0,
-  class: "flex items-center justify-center gap-2 py-4"
-}
-const _hoisted_160 = { class: "min-w-0" }
-const _hoisted_161 = { class: "font-medium" }
-const _hoisted_162 = {
-  key: 0,
-  class: "text-xs text-slate-400 ml-2 truncate"
-}
-const _hoisted_163 = ["onClick"]
-const _hoisted_164 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-4"
-}
-const _hoisted_165 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_166 = { class: "font-bold text-sm mb-1" }
-const _hoisted_167 = { class: "space-y-1 max-h-48 overflow-y-auto" }
-const _hoisted_168 = {
-  key: 0,
-  class: "flex items-center justify-center gap-2 py-4"
-}
-const _hoisted_169 = { class: "font-medium truncate" }
-const _hoisted_170 = { class: "text-xs text-slate-400 shrink-0" }
-const _hoisted_171 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-4"
-}
-const _hoisted_172 = {
-  key: 5,
-  class: "bg-slate-900 border border-slate-800 rounded-xl p-4"
-}
-const _hoisted_173 = {
-  key: 0,
-  class: "grid grid-cols-2 gap-6 items-start"
-}
-const _hoisted_174 = { class: "space-y-8" }
-const _hoisted_175 = ["onSubmit"]
-const _hoisted_176 = ["onUpdate:modelValue"]
-const _hoisted_177 = ["onUpdate:modelValue"]
-const _hoisted_178 = ["onUpdate:modelValue"]
-const _hoisted_179 = { class: "flex items-center gap-2 text-sm text-slate-300 mb-3 cursor-pointer select-none" }
-const _hoisted_180 = ["onUpdate:modelValue"]
-const _hoisted_181 = {
-  key: 0,
-  class: "flex items-center gap-3"
-}
-const _hoisted_182 = ["max", "onUpdate:modelValue"]
-const _hoisted_183 = { class: "text-sm font-bold text-emerald-400 w-14 text-right tabular-nums" }
-const _hoisted_184 = {
-  key: 1,
-  class: "text-xs text-slate-400 mb-2"
-}
-const _hoisted_185 = {
-  key: 2,
-  class: "text-[10px] text-slate-500 mt-1"
-}
-const _hoisted_186 = { class: "mt-2" }
-const _hoisted_187 = ["onUpdate:modelValue"]
-const _hoisted_188 = ["onUpdate:modelValue"]
-const _hoisted_189 = { class: "flex items-center gap-2 text-sm text-slate-300 mb-1.5 cursor-pointer select-none" }
-const _hoisted_190 = ["onUpdate:modelValue"]
-const _hoisted_191 = { class: "text-[10px] text-slate-500 mb-2" }
-const _hoisted_192 = {
-  key: 0,
-  class: "flex items-center gap-2"
-}
-const _hoisted_193 = ["onUpdate:modelValue"]
-const _hoisted_194 = {
-  key: 1,
-  class: "text-[11px] text-amber-400/90 bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg mt-2"
-}
-const _hoisted_195 = { class: "text-xs text-yellow-400/90 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-lg" }
-const _hoisted_196 = { class: "pt-6 border-t border-slate-800" }
-const _hoisted_197 = ["onClick"]
-const _hoisted_198 = { class: "space-y-4" }
-const _hoisted_199 = ["onSubmit"]
-const _hoisted_200 = ["onUpdate:modelValue"]
-const _hoisted_201 = { class: "grid grid-cols-2 gap-3" }
-const _hoisted_202 = ["onUpdate:modelValue"]
-const _hoisted_203 = ["onUpdate:modelValue"]
-const _hoisted_204 = { class: "grid grid-cols-3 gap-3" }
-const _hoisted_205 = ["onUpdate:modelValue"]
-const _hoisted_206 = ["onUpdate:modelValue"]
-const _hoisted_207 = ["onUpdate:modelValue"]
-const _hoisted_208 = { class: "grid grid-cols-2 gap-3" }
-const _hoisted_209 = ["onUpdate:modelValue"]
-const _hoisted_210 = ["onUpdate:modelValue"]
-const _hoisted_211 = ["onUpdate:modelValue"]
-const _hoisted_212 = ["onUpdate:modelValue"]
-const _hoisted_213 = { class: "mt-4" }
-const _hoisted_214 = { class: "text-xs text-slate-400 cursor-pointer hover:text-slate-200" }
-const _hoisted_215 = { class: "grid grid-cols-2 gap-2 mt-2 max-h-[300px] overflow-y-auto" }
-const _hoisted_216 = { class: "text-xs text-slate-400 truncate" }
-const _hoisted_217 = ["onUpdate:modelValue"]
-const _hoisted_218 = {
-  key: 0,
-  class: "col-span-2 text-xs text-slate-500 py-2"
-}
-const _hoisted_219 = {
-  key: 1,
-  class: "text-xs text-slate-500"
-}
-const _hoisted_220 = {
-  key: 6,
-  class: "space-y-6"
-}
-const _hoisted_221 = { class: "flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-xl" }
-const _hoisted_222 = { class: "text-xs text-emerald-400/90 mt-1 font-medium" }
-const _hoisted_223 = ["onClick", "disabled"]
-const _hoisted_224 = {
-  key: 0,
-  class: "animate-spin h-4 w-4 text-white",
-  xmlns: "http://www.w3.org/2000/svg",
-  fill: "none",
-  viewBox: "0 0 24 24"
-}
-const _hoisted_225 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_226 = { class: "flex items-end gap-3" }
-const _hoisted_227 = ["onUpdate:modelValue"]
-const _hoisted_228 = ["onUpdate:modelValue", "disabled"]
-const _hoisted_229 = ["onClick", "disabled"]
-const _hoisted_230 = { class: "flex items-end gap-3 mt-4 pt-4 border-t border-slate-800" }
-const _hoisted_231 = ["onUpdate:modelValue"]
-const _hoisted_232 = { class: "text-xs text-slate-500 pb-2.5" }
-const _hoisted_233 = ["onClick", "disabled"]
-const _hoisted_234 = { class: "bg-slate-900 border border-slate-800 rounded-xl p-4" }
-const _hoisted_235 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-6"
-}
-const _hoisted_236 = {
-  key: 1,
-  class: "space-y-2 max-h-[500px] overflow-y-auto"
-}
-const _hoisted_237 = { class: "min-w-0" }
-const _hoisted_238 = { class: "flex items-center gap-2" }
-const _hoisted_239 = { class: "font-semibold text-sm text-slate-200" }
-const _hoisted_240 = { class: "text-xs text-slate-400 font-mono mt-1" }
-const _hoisted_241 = { class: "flex items-center gap-2 shrink-0" }
-const _hoisted_242 = ["onClick"]
-const _hoisted_243 = ["onClick", "disabled"]
-const _hoisted_244 = {
-  key: 0,
-  class: "text-xs text-slate-500 text-center py-6"
-}
-const _hoisted_245 = {
-  key: 3,
-  class: "fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center"
-}
-const _hoisted_246 = { class: "bg-slate-900 border border-slate-800 p-6 rounded-xl w-96 shadow-2xl" }
-const _hoisted_247 = ["onSubmit"]
-const _hoisted_248 = ["onUpdate:modelValue"]
-const _hoisted_249 = ["onUpdate:modelValue"]
-const _hoisted_250 = ["onUpdate:modelValue"]
-const _hoisted_251 = { class: "flex gap-2 justify-end items-center" }
-const _hoisted_252 = ["onClick"]
-const _hoisted_253 = ["onClick"]
-const _hoisted_254 = {
-  key: 4,
-  class: "fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center"
-}
-const _hoisted_255 = { class: "bg-slate-900 border border-slate-800 p-6 rounded-xl w-96 shadow-2xl" }
-const _hoisted_256 = ["onSubmit"]
-const _hoisted_257 = ["onUpdate:modelValue"]
-const _hoisted_258 = ["onUpdate:modelValue"]
-const _hoisted_259 = ["onUpdate:modelValue"]
-const _hoisted_260 = ["onUpdate:modelValue"]
-const _hoisted_261 = { class: "flex items-center gap-2 text-sm text-slate-300 mb-3 cursor-pointer select-none" }
-const _hoisted_262 = ["onUpdate:modelValue"]
-const _hoisted_263 = {
-  key: 0,
-  class: "flex items-center gap-3"
-}
-const _hoisted_264 = ["max", "onUpdate:modelValue"]
-const _hoisted_265 = { class: "text-sm font-bold text-emerald-400 w-14 text-right tabular-nums" }
-const _hoisted_266 = { class: "flex gap-2 justify-end pt-1" }
-const _hoisted_267 = ["onClick"]
-const _hoisted_268 = {
-  key: 5,
-  class: "fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center"
-}
-const _hoisted_269 = { class: "bg-slate-900 border border-red-500/30 p-6 rounded-xl w-[28rem] shadow-2xl" }
-const _hoisted_270 = { class: "text-sm text-slate-300 mb-2" }
-const _hoisted_271 = { class: "flex gap-2 justify-end" }
-const _hoisted_272 = ["onClick"]
-const _hoisted_273 = ["onClick"]
-const _hoisted_274 = {
-  key: 6,
-  class: "fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center"
-}
-const _hoisted_275 = { class: "bg-slate-900 border border-slate-800 p-6 rounded-xl w-[28rem] shadow-2xl" }
-const _hoisted_276 = { class: "text-sm text-slate-300 mb-2" }
-const _hoisted_277 = { class: "flex gap-2 justify-end" }
-const _hoisted_278 = ["onClick"]
-const _hoisted_279 = ["onClick"]
-const _hoisted_280 = {
-  key: 7,
-  class: "fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center"
-}
-const _hoisted_281 = { class: "bg-slate-900 border border-slate-800 p-6 rounded-xl w-[36rem] max-h-[70vh] shadow-2xl flex flex-col" }
-const _hoisted_282 = { class: "text-xs text-slate-400 font-mono mb-4" }
-const _hoisted_283 = { class: "flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs space-y-1" }
-const _hoisted_284 = {
-  key: 0,
-  class: "text-slate-500"
-}
-const _hoisted_285 = { class: "flex justify-end mt-4" }
-const _hoisted_286 = ["onClick"]
 
 return function render(_ctx, _cache) {
   with (_ctx) {
@@ -579,6 +93,14 @@ return function render(_ctx, _cache) {
                             _createTextVNode(" " + _toDisplayString(inst.running ? inst.playerCount + ' online' : (inst.wakeable ? 'sleeping' : 'offline')), 1 /* TEXT */)
                           ], 2 /* CLASS */)
                         ]),
+                        (inst.running && inst.playerCount === 0 && inst.idleRemainingSeconds != null)
+                          ? (_openBlock(), _createElementBlock("span", {
+                              class: "px-2 py-0.5 text-xs font-medium rounded-full bg-amber-950/70 border border-amber-500/40 text-amber-300 flex items-center gap-1.5"
+                            }, [
+                              _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" }, null, -1 /* CACHED */),
+                              _createElementVNode("span", null, "💤 Sleeps in " + _toDisplayString(formatIdleTime(inst.idleRemainingSeconds)), 1 /* TEXT */)
+                            ]))
+                          : _createCommentVNode("v-if", true),
                         (inst.running)
                           ? (_openBlock(), _createElementBlock("p", _hoisted_15, "Port " + _toDisplayString(inst.externalPort), 1 /* TEXT */))
                           : (inst.wakeable)
@@ -588,8 +110,33 @@ return function render(_ctx, _cache) {
                           ? (_openBlock(), _createElementBlock("button", {
                               key: 2,
                               onClick: _withModifiers($event => (startInstance(inst)), ["stop"]),
-                              class: "mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold py-1.5 rounded-lg transition"
-                            }, _toDisplayString(inst.wakeable ? 'Wake Server' : 'Start Server'), 9 /* TEXT, PROPS */, _hoisted_17))
+                              disabled: actionLoading[inst.id],
+                              class: _normalizeClass(["mt-2 w-full text-xs font-semibold py-1.5 rounded-lg transition flex items-center justify-center gap-2", actionLoading[inst.id] ? "bg-emerald-900/40 text-emerald-300 cursor-not-allowed border border-emerald-700/50" : "bg-emerald-600 hover:bg-emerald-500 text-white"])
+                            }, [
+                              (actionLoading[inst.id])
+                                ? (_openBlock(), _createElementBlock("svg", {
+                                    class: "animate-spin h-4 w-4 text-emerald-300",
+                                    xmlns: "http://www.w3.org/2000/svg",
+                                    fill: "none",
+                                    viewBox: "0 0 24 24"
+                                  }, [
+                                    _createElementVNode("circle", {
+                                      class: "opacity-25",
+                                      cx: "12",
+                                      cy: "12",
+                                      r: "10",
+                                      stroke: "currentColor",
+                                      "stroke-width": "4"
+                                    }),
+                                    _createElementVNode("path", {
+                                      class: "opacity-75",
+                                      fill: "currentColor",
+                                      d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    })
+                                  ], -1 /* CACHED */))
+                                  : _createCommentVNode("v-if", true),
+                                _createElementVNode("span", null, _toDisplayString(actionLoading[inst.id] ? 'Starting...' : (inst.wakeable ? 'Wake Server' : 'Start Server')), 1 /* TEXT */)
+                            ], 11 /* TEXT, CLASS, PROPS */, _hoisted_223))
                           : (_openBlock(), _createElementBlock("div", _hoisted_18, [
                               _createElementVNode("button", {
                                 onClick: _withModifiers($event => (restartInstance(inst)), ["stop"]),
@@ -872,7 +419,30 @@ return function render(_ctx, _cache) {
                             _createElementVNode("div", _hoisted_82, [
                               _createElementVNode("h3", _hoisted_83, "Installed Mods (" + _toDisplayString(installedMods.length) + ")", 1 /* TEXT */),
                               _createElementVNode("div", _hoisted_84, [
-                                (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(installedMods, (m) => {
+                                (isLoadingMods)
+                                  ? (_openBlock(), _createElementBlock("div", _hoisted_95, [_createElementVNode("svg", {
+                                      class: "animate-spin h-5 w-5 text-emerald-400 inline-block",
+                                      xmlns: "http://www.w3.org/2000/svg",
+                                      fill: "none",
+                                      viewBox: "0 0 24 24"
+                                    }, [
+                                      _createElementVNode("circle", {
+                                        class: "opacity-25",
+                                        cx: "12",
+                                        cy: "12",
+                                        r: "10",
+                                        stroke: "currentColor",
+                                        "stroke-width": "4"
+                                      }),
+                                      _createElementVNode("path", {
+                                        class: "opacity-75",
+                                        fill: "currentColor",
+                                        d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                      })
+                                    ], -1 /* CACHED */) ]))
+                                  : _createCommentVNode("v-if", true),
+                                (!isLoadingMods)
+                                  ? (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(installedMods, (m) => {
                                   return (_openBlock(), _createElementBlock("div", {
                                     key: m.filename,
                                     class: "bg-slate-800/60 border border-slate-700/40 p-3 rounded-lg flex gap-3 items-center"
@@ -884,16 +454,23 @@ return function render(_ctx, _cache) {
                                     _createElementVNode("div", _hoisted_86, [
                                       _createElementVNode("div", _hoisted_87, [
                                         _createElementVNode("p", _hoisted_88, _toDisplayString(m.title || m.filename), 1 /* TEXT */),
+                                        _createElementVNode("span", { class: "text-[10px] font-mono text-slate-500 shrink-0" }, _toDisplayString(m.fileSize ? (m.fileSize / 1024).toFixed(1) + ' KB' : ''), 1 /* TEXT */),
                                         (!m.compatible)
                                           ? (_openBlock(), _createElementBlock("span", _hoisted_89, "Incompatible"))
                                           : (_openBlock(), _createElementBlock("span", _hoisted_90, "OK"))
                                       ]),
                                       _createElementVNode("p", _hoisted_91, _toDisplayString(m.filename), 1 /* TEXT */),
+                                      (m.description)
+                                        ? (_openBlock(), _createElementBlock("p", { class: "text-xs text-slate-400 line-clamp-2 mt-1" }, _toDisplayString(m.description), 1 /* TEXT */))
+                                        : _createCommentVNode("v-if", true),
                                       (m.author)
                                         ? (_openBlock(), _createElementBlock("p", _hoisted_92, "by " + _toDisplayString(m.author), 1 /* TEXT */))
                                         : _createCommentVNode("v-if", true),
                                       (m.warningMessage)
                                         ? (_openBlock(), _createElementBlock("p", _hoisted_93, _toDisplayString(m.warningMessage), 1 /* TEXT */))
+                                        : _createCommentVNode("v-if", true),
+                                      (m.projectUrl)
+                                        ? (_openBlock(), _createElementBlock("a", { href: m.projectUrl, target: "_blank", rel: "noopener noreferrer", class: "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 rounded-md hover:bg-emerald-900/60 transition-colors mt-2" }, "View on Modrinth", 8 /* PROPS */))
                                         : _createCommentVNode("v-if", true)
                                     ]),
                                     _createElementVNode("button", {
@@ -901,8 +478,9 @@ return function render(_ctx, _cache) {
                                       class: "text-red-400 hover:text-red-300 text-xs px-2 py-1 shrink-0"
                                     }, "Delete", 8 /* PROPS */, _hoisted_94)
                                   ]))
-                                }), 128 /* KEYED_FRAGMENT */)),
-                                (!installedMods.length)
+                                }), 128 /* KEYED_FRAGMENT */))
+                                  : _createCommentVNode("v-if", true),
+                                (!isLoadingMods && !installedMods.length)
                                   ? (_openBlock(), _createElementBlock("p", _hoisted_95, "No mods installed yet."))
                                   : _createCommentVNode("v-if", true)
                               ])
@@ -946,7 +524,12 @@ return function render(_ctx, _cache) {
                                         key: hit.projectId,
                                         class: "bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex items-center justify-between gap-2"
                                       }, [
-                                        _createElementVNode("p", _hoisted_103, _toDisplayString(hit.title), 1 /* TEXT */),
+                                        _createElementVNode("div", { class: "flex flex-col min-w-0" }, [
+                                          _createElementVNode("p", _hoisted_103, _toDisplayString(hit.title), 1 /* TEXT */),
+                                          (hit.author)
+                                            ? (_openBlock(), _createElementBlock("span", _hoisted_67, "by " + _toDisplayString(hit.author), 1 /* TEXT */))
+                                            : _createCommentVNode("v-if", true)
+                                        ]),
                                         _createElementVNode("button", {
                                           onClick: $event => (installPack(hit, 'shaderpack')),
                                           disabled: installingPacks[hit.projectId],
@@ -960,9 +543,27 @@ return function render(_ctx, _cache) {
                                 (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(shaderpacks, (p) => {
                                   return (_openBlock(), _createElementBlock("div", {
                                     key: p.filename,
-                                    class: "bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex items-center justify-between gap-2"
+                                    class: "bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex gap-3 items-center"
                                   }, [
-                                    _createElementVNode("p", _hoisted_106, _toDisplayString(p.title || p.filename), 1 /* TEXT */),
+                                    _createElementVNode("img", {
+                                      src: p.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2347d2c9\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>',
+                                      class: "w-10 h-10 rounded object-cover shrink-0"
+                                    }, null, 8 /* PROPS */),
+                                    _createElementVNode("div", { class: "flex flex-col min-w-0 flex-1" }, [
+                                      _createElementVNode("div", { class: "flex items-center justify-between gap-2" }, [
+                                        _createElementVNode("p", _hoisted_106, _toDisplayString(p.title || p.filename), 1 /* TEXT */),
+                                        _createElementVNode("span", { class: "text-[10px] font-mono text-slate-500 shrink-0" }, _toDisplayString(p.fileSize ? (p.fileSize / 1024).toFixed(1) + ' KB' : ''), 1 /* TEXT */)
+                                      ]),
+                                      (p.description)
+                                        ? (_openBlock(), _createElementBlock("p", { class: "text-xs text-slate-400 line-clamp-2 mt-1" }, _toDisplayString(p.description), 1 /* TEXT */))
+                                        : _createCommentVNode("v-if", true),
+                                      (p.author)
+                                        ? (_openBlock(), _createElementBlock("span", _hoisted_67, "by " + _toDisplayString(p.author), 1 /* TEXT */))
+                                        : _createCommentVNode("v-if", true),
+                                      (p.projectUrl)
+                                        ? (_openBlock(), _createElementBlock("a", { href: p.projectUrl, target: "_blank", rel: "noopener noreferrer", class: "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 rounded-md hover:bg-emerald-900/60 transition-colors mt-2" }, "View on Modrinth", 8 /* PROPS */))
+                                        : _createCommentVNode("v-if", true)
+                                    ]),
                                     _createElementVNode("button", {
                                       onClick: $event => (deletePack(p.filename, 'shaderpack')),
                                       class: "text-red-400 hover:text-red-300 text-xs px-2 py-1 shrink-0"
@@ -1006,7 +607,12 @@ return function render(_ctx, _cache) {
                                         key: hit.projectId,
                                         class: "bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex items-center justify-between gap-2"
                                       }, [
-                                        _createElementVNode("p", _hoisted_114, _toDisplayString(hit.title), 1 /* TEXT */),
+                                        _createElementVNode("div", { class: "flex flex-col min-w-0" }, [
+                                          _createElementVNode("p", _hoisted_114, _toDisplayString(hit.title), 1 /* TEXT */),
+                                          (hit.author)
+                                            ? (_openBlock(), _createElementBlock("span", _hoisted_67, "by " + _toDisplayString(hit.author), 1 /* TEXT */))
+                                            : _createCommentVNode("v-if", true)
+                                        ]),
                                         _createElementVNode("button", {
                                           onClick: $event => (installPack(hit, 'resourcepack')),
                                           disabled: installingPacks[hit.projectId],
@@ -1020,9 +626,27 @@ return function render(_ctx, _cache) {
                                 (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(resourcepacks, (p) => {
                                   return (_openBlock(), _createElementBlock("div", {
                                     key: p.filename,
-                                    class: "bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex items-center justify-between gap-2"
+                                    class: "bg-slate-800/60 border border-slate-700/40 p-2.5 rounded-lg flex gap-3 items-center"
                                   }, [
-                                    _createElementVNode("p", _hoisted_117, _toDisplayString(p.title || p.filename), 1 /* TEXT */),
+                                    _createElementVNode("img", {
+                                      src: p.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2347d2c9\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>',
+                                      class: "w-10 h-10 rounded object-cover shrink-0"
+                                    }, null, 8 /* PROPS */),
+                                    _createElementVNode("div", { class: "flex flex-col min-w-0 flex-1" }, [
+                                      _createElementVNode("div", { class: "flex items-center justify-between gap-2" }, [
+                                        _createElementVNode("p", _hoisted_117, _toDisplayString(p.title || p.filename), 1 /* TEXT */),
+                                        _createElementVNode("span", { class: "text-[10px] font-mono text-slate-500 shrink-0" }, _toDisplayString(p.fileSize ? (p.fileSize / 1024).toFixed(1) + ' KB' : ''), 1 /* TEXT */)
+                                      ]),
+                                      (p.description)
+                                        ? (_openBlock(), _createElementBlock("p", { class: "text-xs text-slate-400 line-clamp-2 mt-1" }, _toDisplayString(p.description), 1 /* TEXT */))
+                                        : _createCommentVNode("v-if", true),
+                                      (p.author)
+                                        ? (_openBlock(), _createElementBlock("span", _hoisted_67, "by " + _toDisplayString(p.author), 1 /* TEXT */))
+                                        : _createCommentVNode("v-if", true),
+                                      (p.projectUrl)
+                                        ? (_openBlock(), _createElementBlock("a", { href: p.projectUrl, target: "_blank", rel: "noopener noreferrer", class: "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 rounded-md hover:bg-emerald-900/60 transition-colors mt-2" }, "View on Modrinth", 8 /* PROPS */))
+                                        : _createCommentVNode("v-if", true)
+                                    ]),
                                     _createElementVNode("button", {
                                       onClick: $event => (deletePack(p.filename, 'resourcepack')),
                                       class: "text-red-400 hover:text-red-300 text-xs px-2 py-1 shrink-0"

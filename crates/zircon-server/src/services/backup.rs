@@ -5,8 +5,11 @@
 //! nest a previous archive inside a new one. Each backup is a `.tar.lz4` file
 //! plus a sidecar `.json` metadata record that doubles as an audit trail.
 //!
-//! Backing up a live server first sends `save-off` + `save-all` so the archive
-//! captures a consistent world state, then `save-on` in a `finally` block.
+//! Backing up a live server first announces the operation in-game, waits 10
+//! seconds, gracefully stops the instance, archives the now-offline directory
+//! (a cold backup that avoids OS file-sharing violations on locked files), and
+//! restarts the instance if it was running beforehand. This is also what avoids
+//! the ghost JSON entries left behind when a live archive previously failed.
 //! Restoring stops the instance, moves the current state aside to a temporary
 //! rollback folder, extracts the archive, and only discards the rollback once
 //! extraction succeeded.
@@ -25,8 +28,9 @@ use zircon_core::model::BackupEntry;
 
 use crate::instance::{delete_recursively, ServerInstanceManager};
 
-/// How long to wait after `save-all` for the chunk flush to hit disk.
-const SAVE_FLUSH_WAIT_MS: u64 = 2500;
+/// How long to announce the upcoming cold backup in-game before stopping the
+/// server. Players see this countdown so they can finish what they are doing.
+const BACKUP_NOTICE_WAIT_SECS: u64 = 10;
 
 /// Monotonic sequence so two backups started within the same millisecond stay
 /// distinct.
@@ -87,13 +91,17 @@ impl BackupService {
         }
     }
 
-    /// Creates a backup of an instance: flushes/pauses autosave when the server
-    /// is live, streams the instance folder into an LZ4-compressed TAR archive,
-    /// persists a JSON metadata/audit record, and prunes old backups beyond the
-    /// retention limit.
+    /// Creates a backup of an instance, using the safe stop-backup-restart
+    /// workflow: if the instance is live it first announces the operation
+    /// in-game, waits a short countdown, gracefully stops the server, archives
+    /// the now-offline folder as an LZ4-compressed TAR, restarts the server if
+    /// it was running beforehand, and prunes old backups beyond the retention
+    /// limit.
     ///
-    /// The metadata file is written either way so failures stay visible in the
-    /// audit trail.
+    /// Because archiving only ever runs while the server is stopped, locked
+    /// files (on Windows) can no longer cause failed archives or ghost JSON
+    /// metadata entries. If the archive step fails, the instance is still
+    /// restarted and no partial archive is left behind.
     pub async fn create_backup(
         &self,
         instance_id: &str,
@@ -116,8 +124,24 @@ impl BackupService {
         ));
         audit_logs.push(format!("Trigger type: {trigger_type}"));
 
-        let pm = self.instance_manager.get_process_manager(instance_id);
-        let was_running = pm.as_ref().map(|p| p.is_running()).unwrap_or(false);
+        // Only stop the server if it is currently running; otherwise proceed
+        // straight to the cold archive.
+        let was_running = self.instance_manager.is_running(instance_id);
+        if was_running {
+            audit_logs.push("Server is running. Announcing backup and waiting 10s...".to_string());
+            if let Some(pm) = self.instance_manager.get_process_manager(instance_id) {
+                let _ = pm
+                    .send_command("say [Server is backing up, please check back in about 1 minute]")
+                    .await;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(BACKUP_NOTICE_WAIT_SECS)).await;
+
+            audit_logs.push("Stopping server for cold backup...".to_string());
+            self.instance_manager.stop_instance(instance_id).await;
+        } else {
+            audit_logs.push("Server is offline. Proceeding directly with archive.".to_string());
+        }
 
         let mut entry = BackupEntry::new(
             backup_id.clone(),
@@ -128,32 +152,7 @@ impl BackupService {
             zircon_core::model::backup::STATUS_IN_PROGRESS,
         );
 
-        // 1. Flush chunks and pause autosave while the server is live.
-        if was_running {
-            audit_logs.push(
-                "Server is running. Sending 'save-off' and 'save-all' commands...".to_string(),
-            );
-            if let Some(pm) = pm.as_ref() {
-                match pm.send_command("save-off").await {
-                    Ok(()) => match pm.send_command("save-all").await {
-                        Ok(()) => {
-                            tokio::time::sleep(std::time::Duration::from_millis(
-                                SAVE_FLUSH_WAIT_MS,
-                            ))
-                            .await;
-                        }
-                        Err(e) => {
-                            audit_logs.push(format!("WARNING: could not pause autosave: {e}"))
-                        }
-                    },
-                    Err(e) => audit_logs.push(format!("WARNING: could not pause autosave: {e}")),
-                }
-            }
-        } else {
-            audit_logs.push("Server is offline. Proceeding directly with archive.".to_string());
-        }
-
-        // 2. Stream the instance dir into an LZ4-compressed TAR archive.
+        // 2. Compress the (now offline) directory.
         {
             let audit_logs_shared: Arc<std::sync::Mutex<Vec<String>>> =
                 Arc::new(std::sync::Mutex::new(audit_logs));
@@ -192,27 +191,37 @@ impl BackupService {
             }
         }
 
-        // 3. Always resume autosave if the server is still alive.
+        // 3. Always restart the server if it was running prior to the backup, so
+        // the workflow restores the instance even when the archive failed.
         if was_running {
-            if let Some(pm) = pm.as_ref() {
-                match pm.send_command("save-on").await {
-                    Ok(()) => {
-                        audit_logs.push("Resumed server auto-saving ('save-on').".to_string())
-                    }
-                    Err(e) => {
-                        audit_logs.push(format!("WARNING: could not resume auto-saving: {e}"))
-                    }
+            audit_logs.push("Restarting server...".to_string());
+            match self.instance_manager.start_instance(instance_id).await {
+                Ok(()) => audit_logs.push("Server restarted successfully.".to_string()),
+                Err(e) => {
+                    audit_logs.push(format!("WARNING: Failed to auto-restart instance: {e}"));
+                    tracing::error!("Failed to restart instance {instance_id} after backup: {e}");
                 }
             }
         }
 
+        // 4. Finished archiving: write the metadata regardless.
         entry.logs = audit_logs;
         let json = serde_json::to_string_pretty(&entry).map_err(|e| {
             BackupError::Invalid(format!("Could not serialize backup metadata: {e}"))
         })?;
         fs::write(&metadata_file, json)?;
 
-        // 4. Enforce the retention policy configured for this instance.
+        // Do not leave broken ghost entries on disk if compression completely
+        // failed — surface the error to the caller instead.
+        if entry.status == zircon_core::model::backup::STATUS_FAILED {
+            let _ = fs::remove_file(&metadata_file);
+            return Err(BackupError::Io(std::io::Error::other(format!(
+                "Backup failed: {}",
+                entry.logs.last().cloned().unwrap_or_default()
+            ))));
+        }
+
+        // 5. Enforce the retention policy configured for this instance.
         self.prune_old_backups(instance_id, config.backup_retention)?;
 
         Ok(entry)

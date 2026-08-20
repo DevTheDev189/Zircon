@@ -40,6 +40,9 @@ createApp({
                 { projectId: 'appleskin', title: 'AppleSkin', description: 'Adds food value information to tooltips and HUD.', loader: 'both' }
             ],
             installedMods: [],
+            // True while the Installed Mods list is being fetched so the tab can
+            // show a spinner instead of a jarring empty/offline flash.
+            isLoadingMods: false,
             shaderpacks: [],
             resourcepacks: [],
             shaderSearchQuery: '',
@@ -66,11 +69,16 @@ createApp({
             showEulaModal: false,
             eulaInstance: null,
             showDeleteModal: false,
+            // { [instanceId]: true } while a Start action is in flight so the
+            // start button can show a spinner and disable instead of appearing
+            // unresponsive during a long first-boot install.
+            actionLoading: {},
             consoleLines: [],
             command: '',
             consoleWs: null,
             autoScroll: true,
             pollTimer: null,
+            idleTicker: null,
             consoleFilters: { info: true, warnings: true, errors: true }
         };
     },

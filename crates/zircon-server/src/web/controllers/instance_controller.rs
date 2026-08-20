@@ -99,6 +99,14 @@ pub async fn update_instance(
             return Err(e.into());
         }
     }
+    // Auto-start on wrapper boot.
+    if let Some(auto) = body.auto_start.or(body.auto_start_server) {
+        state.instances.update_auto_start(&id, auto)?;
+    }
+    // Backup retention (0 = keep everything).
+    if let Some(retention) = body.backup_retention {
+        state.instances.update_backup_retention(&id, retention)?;
+    }
     // Backup schedule changes are independent of version re-sync.
     if body.backup_frequency.is_some() || body.backup_time.is_some() {
         if !valid_schedule(
@@ -123,6 +131,24 @@ pub async fn update_instance(
             body.idle_shutdown_enabled,
             body.idle_shutdown_minutes,
         )?;
+    }
+    // Partial server.properties update (e.g. MOTD / max-players from the
+    // settings screen) saved alongside the other fields.
+    if let Some(props) = &body.server_properties {
+        if !props.is_empty() {
+            let server_dir = state.instances.get_instance_dir(&id).join("server");
+            std::fs::create_dir_all(&server_dir)?;
+            let props_file = server_dir.join("server.properties");
+            let mut current = if props_file.is_file() {
+                crate::config::ServerProperties::load(&props_file)?
+            } else {
+                crate::config::ServerProperties::default()
+            };
+            for (key, value) in props {
+                current.set(key, value);
+            }
+            current.save(&props_file)?;
+        }
     }
 
     let current = state.instances.get_instance(&id)?;
@@ -798,7 +824,7 @@ pub async fn list_shaderpacks(
     let mapped: Vec<serde_json::Value> = packs
         .list_shaderpacks()
         .iter()
-        .map(views::pack_entry_to_map)
+        .map(|p| views::pack_entry_to_map(p, true))
         .collect();
     Ok(Json(serde_json::json!({ "shaderpacks": mapped })))
 }
@@ -839,7 +865,7 @@ pub async fn list_resourcepacks(
     let mapped: Vec<serde_json::Value> = packs
         .list_resourcepacks()
         .iter()
-        .map(views::pack_entry_to_map)
+        .map(|p| views::pack_entry_to_map(p, false))
         .collect();
     Ok(Json(serde_json::json!({ "resourcepacks": mapped })))
 }
@@ -963,6 +989,7 @@ fn live_instance_map(state: &AppState, config: &InstanceConfig) -> serde_json::V
         state.instances.is_running(&config.id),
         state.instances.get_online_player_count(&config.id),
         state.instances.get_online_players(&config.id),
+        state.instances.get_idle_remaining_seconds(&config.id),
     )
 }
 
@@ -977,18 +1004,18 @@ fn sync_result_to_value(summary: &ModSyncSummary) -> serde_json::Value {
 
 fn valid_schedule(frequency: Option<&str>, time: Option<&str>) -> bool {
     if let Some(f) = frequency {
-        if !zircon_core::model::instance::is_valid_backup_frequency(f) {
+        let f = f.trim();
+        if !f.is_empty() && !zircon_core::model::instance::is_valid_backup_frequency(f) {
             return false;
         }
     }
     if let Some(t) = time {
-        let is_time = t.len() == 5
-            && t.as_bytes()[2] == b':'
-            && t.as_bytes()[0].is_ascii_digit()
-            && t.as_bytes()[1].is_ascii_digit()
-            && t.as_bytes()[3].is_ascii_digit()
-            && t.as_bytes()[4].is_ascii_digit();
-        if !is_time {
+        let t = t.trim();
+        // Accept "HH:MM" and "H:MM" (and empty = no time change).
+        if !t.is_empty()
+            && chrono::NaiveTime::parse_from_str(t, "%H:%M").is_err()
+            && chrono::NaiveTime::parse_from_str(t, "%k:%M").is_err()
+        {
             return false;
         }
     }
@@ -1025,7 +1052,10 @@ async fn upload_pack(
             )
             .await?
     };
-    Ok((StatusCode::CREATED, Json(views::pack_entry_to_map(&entry))))
+    Ok((
+        StatusCode::CREATED,
+        Json(views::pack_entry_to_map(&entry, shader)),
+    ))
 }
 
 async fn install_pack(
@@ -1057,7 +1087,10 @@ async fn install_pack(
             )
             .await?
     };
-    Ok((StatusCode::CREATED, Json(views::pack_entry_to_map(&entry))))
+    Ok((
+        StatusCode::CREATED,
+        Json(views::pack_entry_to_map(&entry, shader)),
+    ))
 }
 
 async fn remove_pack(
@@ -1097,12 +1130,22 @@ pub struct CreateRequest {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateRequest {
+    /// Frontend sends `serverTitle` on the settings screen; the instance API
+    /// historically used `name`. Both bind here.
+    #[serde(alias = "serverTitle")]
     pub name: Option<String>,
+    #[serde(alias = "minecraftVersion")]
     pub mc_version: Option<String>,
+    #[serde(alias = "modLoaderVersion")]
     pub loader_version: Option<String>,
     pub java_args: Option<String>,
+    pub auto_start: Option<bool>,
+    #[serde(alias = "autoStartServer")]
+    pub auto_start_server: Option<bool>,
     pub backup_frequency: Option<String>,
     pub backup_time: Option<String>,
+    /// How many backups to keep (0 = unlimited).
+    pub backup_retention: Option<i32>,
     /// Player-facing port; 0 / absent leaves it unchanged.
     #[serde(default)]
     pub external_port: i32,
@@ -1111,6 +1154,8 @@ pub struct UpdateRequest {
     pub idle_shutdown_enabled: Option<bool>,
     /// Idle window in minutes (clamped to 1–60 server-side).
     pub idle_shutdown_minutes: Option<u32>,
+    /// Partial `server.properties` update applied alongside the other fields.
+    pub server_properties: Option<std::collections::BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]

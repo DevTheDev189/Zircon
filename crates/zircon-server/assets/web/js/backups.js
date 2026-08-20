@@ -13,6 +13,15 @@ window.Zircon.backups = {
     },
     async triggerBackup() {
         if (!this.selectedInstance) return;
+        if (this.selectedInstance.running) {
+            const confirmed = window.confirm(
+                '⚠️ Server is Currently Running\n\n' +
+                'Creating a backup will announce a 10-second warning in-game, temporarily stop the server, ' +
+                'create the archive, and restart it automatically (~1 minute downtime).\n\n' +
+                'Do you want to proceed?'
+            );
+            if (!confirmed) return;
+        }
         this.creatingBackup = true;
         try {
             await this.api(`/api/instances/${this.selectedInstance.id}/backups`, { method: 'POST' });

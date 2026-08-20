@@ -73,6 +73,7 @@ window.Zircon.auth = {
         this.showProfileModal = false;
         try { localStorage.removeItem(TOKEN_STORAGE_KEY); } catch (e) { /* storage unavailable */ }
         if (this.pollTimer) clearInterval(this.pollTimer);
+        if (this.idleTicker) clearInterval(this.idleTicker);
         if (this.consoleWs) this.consoleWs.close();
         // Best-effort server-side revocation so the token dies immediately, not
         // just at its 12h expiry. Raw fetch (not this.api) avoids recursion on 401.

@@ -709,6 +709,30 @@ impl ServerInstanceManager {
             .and_then(|t| t.idle_reference())
     }
 
+    /// Seconds left before an idle shutdown fires for `instance_id`, or `None`
+    /// when idle shutdown is disabled, the server is not up/joinable, a player
+    /// is online, or a launcher has a fresh join intent. Mirrors the
+    /// `IdleShutdownService` timing so the admin UI can show a live countdown
+    /// (e.g. "Sleeps in 3m 42s"). `idle_since` is only `Some` once the server
+    /// is ready, which covers the `is_server_ready` gate.
+    pub fn get_idle_remaining_seconds(&self, instance_id: &str) -> Option<u64> {
+        let config = self.get_instance(instance_id).ok()?;
+        if !config.idle_shutdown_enabled
+            || !self.is_running(instance_id)
+            || !self.is_server_ready(instance_id)
+        {
+            return None;
+        }
+        if self.get_online_player_count(instance_id) > 0
+            || self.has_pending_join_intent(instance_id)
+        {
+            return None;
+        }
+        let idle_since = self.idle_since(instance_id)?;
+        let window_secs = u64::from(clamp_idle_shutdown_minutes(config.idle_shutdown_minutes)) * 60;
+        Some(window_secs.saturating_sub(idle_since.elapsed().as_secs()))
+    }
+
     /// Defers an instance's idle shutdown by resetting its activity timestamp.
     /// Used when a launcher wakeup arrives while the server is already running
     /// (e.g. its status ping failed transiently during boot), so the server
@@ -1172,37 +1196,36 @@ pub fn has_invalid_heap_arg(args: &str) -> bool {
 
 /// Rejects an instance heap configuration that would overcommit the host's
 /// physical memory, protecting the daemon (and the OS) from the Linux OOM
-/// killer. At least 2.0 GB is reserved for the OS, the wrapper and native JVM
-/// overhead; the sum of every instance's `-Xmx` (defaulting to 4 GB when
-/// unset) must fit inside the remainder. `target_instance_id` excludes the
-/// instance being updated — its old value is replaced by `new_java_args`.
+/// killer. A proportional headroom (at most 1.5 GB) is reserved for the OS,
+/// the wrapper and native JVM overhead; the target instance's `-Xmx`
+/// (defaulting to 4 GB when unset) must fit inside the remainder.
+///
+/// Only the *target* heap is checked: summing every instance's heap would
+/// block entirely reasonable setups (e.g. several 4 GB defaults on an 8 GB
+/// machine) that never run all instances at once.
 pub fn validate_instance_memory_headroom(
-    current_instances: &[InstanceConfig],
-    target_instance_id: Option<&str>,
+    _current_instances: &[InstanceConfig],
+    _target_instance_id: Option<&str>,
     new_java_args: &str,
 ) -> Result<(), InstanceError> {
     let mut sys = System::new_all();
     sys.refresh_memory();
     let total_ram_bytes = sys.total_memory();
 
-    // Minimum 2.0 GB headroom for OS, daemon, and native JVM Metaspace.
-    let reserved_headroom_bytes: u64 = 2 * 1024 * 1024 * 1024;
-    let available_heap_limit = total_ram_bytes.saturating_sub(reserved_headroom_bytes);
-
-    let mut total_allocated_heap: u64 = 0;
-    for inst in current_instances {
-        if target_instance_id == Some(inst.id.as_str()) {
-            continue; // Will be replaced by new_java_args
-        }
-        total_allocated_heap += parse_xmx_bytes(&inst.java_args);
+    // Cannot measure the host (e.g. exotic platforms): never block.
+    if total_ram_bytes == 0 {
+        return Ok(());
     }
-    total_allocated_heap += parse_xmx_bytes(new_java_args);
 
-    if total_allocated_heap > available_heap_limit {
-        let allocated_gb = total_allocated_heap as f64 / (1024.0 * 1024.0 * 1024.0);
+    let reserved_headroom_bytes: u64 = (1536 * 1024 * 1024).min(total_ram_bytes / 4);
+    let available_heap_limit = total_ram_bytes.saturating_sub(reserved_headroom_bytes);
+    let target_heap = parse_xmx_bytes(new_java_args);
+
+    if target_heap > available_heap_limit {
+        let allocated_gb = target_heap as f64 / (1024.0 * 1024.0 * 1024.0);
         let limit_gb = available_heap_limit as f64 / (1024.0 * 1024.0 * 1024.0);
         return Err(InstanceError::Invalid(format!(
-            "Memory overcommit rejected: total instance heap ({allocated_gb:.1} GB) exceeds host safe limit ({limit_gb:.1} GB)"
+            "Requested heap ({allocated_gb:.1} GB) exceeds host safe limit ({limit_gb:.1} GB)"
         )));
     }
 
@@ -1545,7 +1568,8 @@ mod tests {
         a.java_args = "-Xmx512M".to_string();
         b.java_args = "-Xmx512M".to_string();
 
-        // Two modest heaps plus a new one always fit on any real machine.
+        // Modest heaps always fit on any real machine, regardless of how many
+        // instances exist.
         assert!(
             validate_instance_memory_headroom(&[a.clone(), b.clone()], None, "-Xmx512M").is_ok()
         );
@@ -1554,25 +1578,25 @@ mod tests {
         let err = validate_instance_memory_headroom(&[a.clone()], None, "-Xmx999999G").unwrap_err();
         assert!(matches!(err, InstanceError::Invalid(_)), "{err:?}");
         assert!(
-            err.to_string().contains("Memory overcommit rejected"),
+            err.to_string().contains("exceeds host safe limit"),
             "unhelpful error: {err}"
         );
 
-        // The target instance is excluded from the sum: replacing B's huge
-        // old heap with a sane one succeeds even though B's old value alone
-        // exceeds any host RAM.
+        // Only the target heap matters: a huge heap on a non-target instance
+        // no longer blocks updates for the target.
         b.java_args = "-Xmx999999G".to_string();
+        assert!(validate_instance_memory_headroom(
+            &[a.clone(), b.clone()],
+            Some(&a.id),
+            "-Xmx512M"
+        )
+        .is_ok());
+        // Replacing B's huge old heap with a sane one also succeeds.
         assert!(validate_instance_memory_headroom(
             &[a.clone(), b.clone()],
             Some(&b.id),
             "-Xmx512M"
         )
         .is_ok());
-
-        // ...but a huge heap on a NON-target instance still blocks updates.
-        let err =
-            validate_instance_memory_headroom(&[a.clone(), b.clone()], Some(&a.id), "-Xmx512M")
-                .unwrap_err();
-        assert!(matches!(err, InstanceError::Invalid(_)), "{err:?}");
     }
 }
