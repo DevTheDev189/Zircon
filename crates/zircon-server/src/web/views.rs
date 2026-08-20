@@ -135,6 +135,11 @@ pub fn modrinth_version_to_map(
 pub fn modrinth_hit_to_map(
     hit: &zircon_core::api::modrinth::ModrinthSearchHit,
 ) -> serde_json::Value {
+    let slug_or_id = if !hit.slug.trim().is_empty() {
+        &hit.slug
+    } else {
+        &hit.project_id
+    };
     serde_json::json!({
         "projectId": hit.project_id,
         "slug": hit.slug,
@@ -144,6 +149,7 @@ pub fn modrinth_hit_to_map(
         "downloads": hit.downloads,
         "iconUrl": hit.icon_url,
         "versions": hit.versions,
+        "projectUrl": format!("https://modrinth.com/project/{slug_or_id}"),
     })
 }
 

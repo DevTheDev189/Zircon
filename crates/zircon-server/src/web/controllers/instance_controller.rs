@@ -1064,28 +1064,33 @@ async fn install_pack(
     body: InstallRequest,
     shader: bool,
 ) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
-    let (Some(download_url), Some(filename)) = (&body.download_url, &body.filename) else {
-        return Err(ApiError::BadRequest(
-            "downloadUrl and filename are required".to_string(),
-        ));
-    };
     let packs = packs_for(state, id)?;
-    let entry = if shader {
+    let entry = if let Some(project_id) = &body.project_id {
         packs
-            .install_shaderpack_from_url(
-                download_url,
-                filename,
-                body.origin.as_deref().or(Some("modrinth")),
-            )
+            .install_modrinth_pack(project_id, body.version_id.as_deref(), shader)
             .await?
+    } else if let (Some(download_url), Some(filename)) = (&body.download_url, &body.filename) {
+        if shader {
+            packs
+                .install_shaderpack_from_url(
+                    download_url,
+                    filename,
+                    body.origin.as_deref().or(Some("modrinth")),
+                )
+                .await?
+        } else {
+            packs
+                .install_resourcepack_from_url(
+                    download_url,
+                    filename,
+                    body.origin.as_deref().or(Some("modrinth")),
+                )
+                .await?
+        }
     } else {
-        packs
-            .install_resourcepack_from_url(
-                download_url,
-                filename,
-                body.origin.as_deref().or(Some("modrinth")),
-            )
-            .await?
+        return Err(ApiError::BadRequest(
+            "projectId or (downloadUrl and filename) is required".to_string(),
+        ));
     };
     Ok((
         StatusCode::CREATED,

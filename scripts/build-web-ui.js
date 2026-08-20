@@ -53,8 +53,17 @@ const closeMarker = '</div>' + CRLF + CRLF + '<script src="js/core.js">';
 const close = html.lastIndexOf(closeMarker);
 const alreadyConverted = open < 0 || openEnd < 0 || close < 0 || openEnd === close;
 
+let template = '';
+const templateBackupPath = path.join(BUILD, 'template.html');
+
 if (!alreadyConverted) {
-  const template = html.slice(openEnd, close);
+  template = html.slice(openEnd, close);
+  fs.writeFileSync(templateBackupPath, template);
+} else if (fs.existsSync(templateBackupPath)) {
+  template = fs.readFileSync(templateBackupPath, 'utf8');
+}
+
+if (template) {
   const { compile } = requireFromBuild('@vue/compiler-dom');
   const result = compile(template, { mode: 'function', hoistStatic: true });
 
@@ -64,14 +73,15 @@ if (!alreadyConverted) {
     '// dashboard only needs Vue\u2019s runtime build: no template compilation (and\n' +
     '// therefore no `unsafe-eval`) at runtime. See the CSP in src/web/app.rs.\n' +
     'window.ZirconRender = (function () {\n' +
-    result.code +
+    'const _Vue = window.Vue || Vue\n' +
+    result.code.replace(/^const _Vue = Vue\r?\n?/, '') +
     '\n})();\n';
   fs.writeFileSync(path.join(WEB, 'js', 'render.js'), renderJs);
   console.log(
     `render.js: ${Buffer.byteLength(renderJs)} bytes (template ${Buffer.byteLength(template)} -> compiled ${result.code.length} chars)`,
   );
 } else {
-  console.log('index.html already converted (empty #app) — skipping template compile');
+  console.log('No template found in index.html or target/ui-build/template.html — skipping template compile');
 }
 
 // ---------------------------------------------------------------------------
