@@ -57,6 +57,7 @@ pub struct ModMetadata {
     pub name: String,
     pub version: String,
     pub description: String,
+    pub author: String,
     pub loader_type: ModLoaderType,
     pub environment: String,
 }
@@ -67,6 +68,7 @@ impl ModMetadata {
         name: impl Into<String>,
         version: impl Into<String>,
         description: impl Into<String>,
+        author: impl Into<String>,
         loader_type: ModLoaderType,
         environment: impl Into<String>,
     ) -> Self {
@@ -75,6 +77,7 @@ impl ModMetadata {
             name: name.into(),
             version: version.into(),
             description: description.into(),
+            author: author.into(),
             loader_type,
             environment: environment.into(),
         }
@@ -116,7 +119,7 @@ mod tests {
     #[test]
     fn environment_normalization() {
         let meta =
-            |env: &str| ModMetadata::new("id", "name", "1.0", "", ModLoaderType::Fabric, env);
+            |env: &str| ModMetadata::new("id", "name", "1.0", "", "", ModLoaderType::Fabric, env);
         assert_eq!("both", meta("*").normalized_environment());
         assert_eq!("both", meta("both").normalized_environment());
         assert_eq!("client", meta("client").normalized_environment());

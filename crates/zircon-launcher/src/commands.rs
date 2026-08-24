@@ -14,11 +14,13 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
+use sha2::Sha256;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::process::Child;
 use tokio::sync::Mutex as AsyncMutex;
 
 use zircon_core::api::modrinth::{ModrinthApiClient, ModrinthSearchHit};
+use zircon_core::crypto::signing;
 use zircon_core::model::{BillOfMaterials, ModLoaderInfo};
 
 use crate::auth::msa::MicrosoftAuthService;
@@ -31,7 +33,7 @@ use crate::offline::{OfflineInstance, OfflineInstanceManager};
 use crate::pack_selection::{ClientPackManager, PackSelection};
 use crate::servers;
 use crate::settings::{self, load_settings, LauncherSettings};
-use crate::skin::{BundledSkins, MojangSkinService, SkinManager};
+use crate::skin::{MojangSkinService, SkinManager};
 use crate::sync::mod_sync::{ModSyncEngine, ProgressListener};
 use crate::sync::pack_sync::{PackProgressListener, PackSyncEngine};
 
@@ -76,6 +78,10 @@ pub struct LauncherState {
     /// In-flight shader opt-in prompts awaiting the webview's answer.
     pub shader_requests: AsyncMutex<HashMap<u64, tokio::sync::oneshot::Sender<ShaderChoice>>>,
     pub next_shader_request_id: AtomicU64,
+    /// In-flight host-key rotation prompts awaiting the webview's decision
+    /// (TOFU key lifecycle; see [`KeyMismatchPrompt`]).
+    pub key_prompts: AsyncMutex<HashMap<u64, tokio::sync::oneshot::Sender<bool>>>,
+    pub next_key_prompt_id: AtomicU64,
     pub settings: StdMutex<LauncherSettings>,
 }
 
@@ -106,6 +112,8 @@ impl LauncherState {
             next_game_id: AtomicU64::new(1),
             shader_requests: AsyncMutex::new(HashMap::new()),
             next_shader_request_id: AtomicU64::new(1),
+            key_prompts: AsyncMutex::new(HashMap::new()),
+            next_key_prompt_id: AtomicU64::new(1),
             settings: StdMutex::new(load_settings()),
         }
     }
@@ -234,20 +242,29 @@ pub fn save_server_list(servers_list: Vec<servers::SavedServer>) -> Result<(), S
 /// the latency everywhere and acts as the fallback for third-party servers.
 /// Returns `None` when the server is unreachable.
 ///
-/// Builds the HTTP base URL for a server. HTTPS is enforced whenever it is
-/// enabled or the target port is the standard TLS port 443; loopback hosts
-/// may fall back to plaintext HTTP (local dev/test servers without TLS). The
-/// Minecraft connection always uses `host:port` regardless.
-fn server_base_url(host: &str, port: u16, use_https: bool) -> String {
+/// Builds the HTTP base URL for a server. Plaintext HTTP is allowed for any
+/// host (LAN IPs, bare domains, simple setups without TLS) — mod integrity is
+/// still enforced end-to-end: every BOM is verified against the server's
+/// pinned Ed25519 key and every downloaded mod against its SHA-1, so an
+/// on-path attacker cannot silently substitute files.
+///
+/// The `use_https` flag (the launcher's "Use HTTPS" checkbox) selects the
+/// scheme; port 443 is treated as implicit HTTPS even when the flag is off.
+/// Non-443 HTTPS ports travel as a path segment (`https://host/25566`) so
+/// reverse proxies can route by port. The Minecraft connection always uses
+/// `host:port` regardless.
+fn server_base_url(host: &str, port: u16, use_https: bool) -> Result<String, LauncherError> {
     let is_local = servers::is_loopback_host(host);
     if use_https || (!is_local && port == 443) {
         if port == 443 {
-            format!("https://{host}")
+            Ok(format!("https://{host}"))
         } else {
-            format!("https://{host}:{port}")
+            // Reverse proxies cannot see a port in the Host header, so the
+            // instance port travels as a path segment: https://host/25566
+            Ok(format!("https://{host}/{port}"))
         }
     } else {
-        format!("http://{host}:{port}")
+        Ok(format!("http://{host}:{port}"))
     }
 }
 
@@ -262,7 +279,7 @@ pub async fn server_status(
 ) -> Result<Option<ServerStatusInfo>, String> {
     let (host, port) = servers::parse_server_address(&address);
     let url_host = servers::format_host(&host);
-    let base_url = server_base_url(&url_host, port, use_https);
+    let base_url = server_base_url(&url_host, port, use_https).map_err(err_string)?;
 
     let (ping, wrapper) = tokio::join!(
         crate::status::ping_status(&host, port),
@@ -343,19 +360,59 @@ pub struct ServerStatusInfo {
 // Wakeup (idle-shutdown companion)
 // ---------------------------------------------------------------------------
 
-/// Whether the launcher should attempt a wakeup for a Zircon server: the
-/// wrapper is reachable (so a wakeup endpoint exists) and the Minecraft port
-/// is not answering yet. Kept pure so the decision is unit-testable.
-fn should_wake(wrapper_present: bool, ping_ok: bool) -> bool {
-    wrapper_present && !ping_ok
+/// Why the launcher should (or should not) wake a Zircon server. Kept pure so
+/// the decision is unit-testable.
+#[derive(Debug, PartialEq)]
+enum WakeDecision {
+    /// No wakeup needed: third-party server (no wrapper) or the Minecraft port
+    /// already answers.
+    PassThrough,
+    /// The wrapper reports the server running, so an unreachable game port is
+    /// a routing/firewall problem, not a sleep state.
+    PortUnreachable,
+    /// The server was stopped manually (maintenance mode) and must stay down.
+    Maintenance,
+    /// The server is asleep (idle shutdown) and may be woken.
+    Wake,
 }
 
-/// Called at the start of an online launch: if the target is a Zircon server
+/// Classifies a Zircon server's wakeup need from its `/status` and a live
+/// Minecraft-port ping. Third-party servers (no wrapper) and already-answering
+/// servers pass through; a running-but-unreachable server is a port-forwarding
+/// failure; a stopped, non-wakeable server is in maintenance; only a stopped,
+/// wakeable server should be woken.
+fn wake_decision(wrapper: Option<WrapperStatus>, ping_ok: bool) -> WakeDecision {
+    let Some(w) = wrapper else {
+        return WakeDecision::PassThrough;
+    };
+    if ping_ok {
+        return WakeDecision::PassThrough;
+    }
+    if w.running.unwrap_or(false) {
+        return WakeDecision::PortUnreachable;
+    }
+    if !w.wakeable {
+        return WakeDecision::Maintenance;
+    }
+    WakeDecision::Wake
+}
+
+/// Called at the start of an online wake: if the target is a Zircon server
 /// whose Minecraft port is not answering, asks the wrapper to start the right
 /// instance via the public `/api/wakeup` endpoint (the wrapper resolves the
 /// instance by hostname/port, and refuses manual stops), then waits for the
 /// status ping before the rest of the launch flow runs. Third-party servers
 /// (no wrapper) pass straight through.
+///
+/// Uses the wrapper's `/status` to distinguish the failure modes so the
+/// launcher fails fast instead of looping:
+///
+/// 1. Wrapper reports the server **running** but the Minecraft port is
+///    unreachable → the port is closed on the router/firewall; fail immediately.
+/// 2. Wrapper reports it **stopped** and not wakeable (maintenance mode) → fail
+///    immediately; the server must stay down.
+/// 3. Wrapper reports it **stopped** but wakeable (idle sleep) → send `/api/wakeup`
+///    and wait for the server to finish booting.
 ///
 /// Returns `true` when the target is a Zircon server (wrapper reachable), so
 /// the caller can run the join-intent keep-alive that holds the instance's
@@ -367,16 +424,29 @@ async fn wake_if_needed(
     host: &str,
     port: u16,
 ) -> Result<bool, LauncherError> {
-    let wrapper_present = fetch_wrapper_status(http, base_url).await.is_some();
+    let wrapper = fetch_wrapper_status(http, base_url).await;
+    let wrapper_present = wrapper.is_some();
     let ping_ok = crate::status::ping_status(host, port).await.is_ok();
-    if !should_wake(wrapper_present, ping_ok) {
-        return Ok(wrapper_present);
+
+    match wake_decision(wrapper, ping_ok) {
+        WakeDecision::PassThrough => return Ok(wrapper_present),
+        WakeDecision::PortUnreachable => {
+            return Err(LauncherError::InvalidInput(format!(
+                "The server is running, but Minecraft port {host}:{port} is \
+unreachable. Ensure TCP port {port} is open and port-forwarded on your \
+router/firewall."
+            )));
+        }
+        WakeDecision::Maintenance => {
+            return Err(LauncherError::InvalidInput(format!(
+                "The server is stopped and not wakeable (maintenance mode). Ask \
+an admin to start it before playing."
+            )));
+        }
+        WakeDecision::Wake => {}
     }
 
-    // Server is down (asleep, still booting, or stopped). The wakeup endpoint
-    // resolves the instance the same way the multiplexer routes connections,
-    // returns 200 when it is (now) running, and 409 when it was stopped
-    // manually and must stay down.
+    // The server is asleep (idle shutdown) and may be woken.
     emit_status(app, "Waking up server...");
     let body = serde_json::json!({ "hostname": host, "port": port });
     let response = http
@@ -546,7 +616,7 @@ async fn run_online_flow(
     let (host, port) = servers::parse_server_address(address);
     // IPv6 literals need square brackets in URLs and quick-play targets.
     let url_host = servers::format_host(&host);
-    let base_url = server_base_url(&url_host, port, use_https);
+    let base_url = server_base_url(&url_host, port, use_https)?;
     emit_status(app, format!("Server: {base_url}"));
     let game_dir = servers::instance_game_dir(&host, port);
     std::fs::create_dir_all(&game_dir)?;
@@ -578,6 +648,69 @@ async fn run_online_flow(
 
     // --- BOM ---
     let bom = fetch_bom(&state.http, &base_url).await?;
+
+    // --- BOM trust (TOFU pinning + Ed25519 attestation) ---
+    // Nothing is downloaded or launched until the mod list itself is trusted:
+    // pin the server public key on first contact, verify the Ed25519
+    // signature, and — when the server presents a *different* key than the one
+    // pinned — ask the player before accepting the rotation instead of
+    // crashing or silently trusting it.
+    let pinned = servers::pinned_public_key(address);
+    match evaluate_bom_trust(&bom, pinned.as_deref())? {
+        BomTrustOutcome::NoAttestation => {
+            emit_status(
+                app,
+                "Server does not sign its BOM — continuing with per-file hash \
+                 verification only.",
+            );
+        }
+        BomTrustOutcome::Verified(key) => {
+            if pinned.as_deref() != Some(key.as_str()) {
+                servers::pin_public_key(address, &key);
+                emit_status(app, "Trusted server public key on first use (TOFU).");
+            }
+        }
+        BomTrustOutcome::KeyMismatch {
+            received,
+            pinned: old,
+        } => {
+            // Server reinstall or possible takeover: show the fingerprint
+            // delta and require explicit player approval. A timeout or any
+            // rejection aborts the launch — never auto-accept a key change.
+            let request_id = state.next_key_prompt_id.fetch_add(1, Ordering::SeqCst);
+            let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
+            state.key_prompts.lock().await.insert(request_id, tx);
+
+            let _ = app.emit(
+                "server-key-mismatch",
+                KeyMismatchPrompt {
+                    request_id,
+                    server_address: address.to_string(),
+                    old_fingerprint: compute_key_fingerprint(&old),
+                    new_fingerprint: compute_key_fingerprint(&received),
+                },
+            );
+
+            let accepted = match tokio::time::timeout(Duration::from_secs(60), rx).await {
+                Ok(Ok(true)) => true,
+                _ => false,
+            };
+
+            if !accepted {
+                return Err(LauncherError::Security(
+                    "Host key verification failed: server identity changed and was \
+                     rejected."
+                        .to_string(),
+                ));
+            }
+
+            // The player explicitly trusted the rotation.
+            servers::pin_public_key(address, &received);
+            emit_status(app, "New server identity approved by the player.");
+            tracing::warn!("Player approved key rotation for {address} to {received}");
+        }
+    }
+
     if let Some(title) = bom.server_title.as_deref().filter(|t| !t.trim().is_empty()) {
         servers::record_played(title.trim(), address);
     }
@@ -654,6 +787,11 @@ async fn run_online_flow(
                         .first()
                         .map(|p| p.filename.clone())
                         .unwrap_or_default(),
+                    "shaderAuthor": bom
+                        .shaderpacks
+                        .first()
+                        .and_then(|p| p.author.clone())
+                        .unwrap_or_default(),
                 }),
             );
             // Wait for the webview's answer; a closed window or a long pause
@@ -695,7 +833,7 @@ async fn run_online_flow(
     let listener = UiProgressListener { app: app.clone() };
     let sync_result = state
         .sync_engine
-        .sync(&base_url, &game_dir, Some(&listener))
+        .sync_with_bom(&bom, &base_url, &game_dir, Some(&listener))
         .await?;
     if sync_result.aborted {
         return Err(LauncherError::InvalidInput(
@@ -798,6 +936,21 @@ pub async fn respond_shader_choice(
     Ok(())
 }
 
+/// Resolves an in-flight host-key rotation prompt with the player's decision.
+/// `accepted = true` re-pins the new key and lets the launch continue;
+/// `false` (or a dropped/expired prompt) aborts the launch.
+#[tauri::command]
+pub async fn respond_key_prompt(
+    state: State<'_, LauncherState>,
+    request_id: u64,
+    accepted: bool,
+) -> Result<(), String> {
+    if let Some(tx) = state.key_prompts.lock().await.remove(&request_id) {
+        let _ = tx.send(accepted);
+    }
+    Ok(())
+}
+
 /// Watches a running game; when it exits, clears the state slot and emits a
 /// `game-status` event. Polls `try_wait` so the child stays killable via
 /// `stop_game` while it runs.
@@ -886,6 +1039,112 @@ async fn fetch_bom(
     }
     let text = response.text().await?;
     Ok(serde_json::from_str(&text)?)
+}
+
+/// Outcome of evaluating a fetched BOM against the launcher's trust state.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BomTrustOutcome {
+    /// The BOM carries no attestation (unsigned server — third-party or legacy
+    /// wrapper). The launcher continues, relying on the always-strict per-file
+    /// hash verification of the mod sync.
+    NoAttestation,
+    /// The BOM's Ed25519 signature verified against `key` (hex public key).
+    /// `key` must be persisted as the server's TOFU pin.
+    Verified(String),
+    /// The BOM is signed, but with a **different** key than the one pinned for
+    /// this server on first contact (reinstall, or a possible takeover). The
+    /// caller must show the SHA-256 fingerprint delta and obtain explicit
+    /// player approval before re-pinning — never auto-accept.
+    KeyMismatch {
+        /// The newly presented key (hex public key).
+        received: String,
+        /// The previously pinned key (hex public key).
+        pinned: String,
+    },
+}
+
+/// Shown to the player when a server presents a different Ed25519 key than
+/// the one pinned on first contact. Emitted as `server-key-mismatch`; the
+/// player's answer goes back through [`respond_key_prompt`].
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyMismatchPrompt {
+    pub request_id: u64,
+    pub server_address: String,
+    pub old_fingerprint: String,
+    pub new_fingerprint: String,
+}
+
+/// SHA-256 fingerprint of a hex-encoded Ed25519 public key, SSH-style
+/// (`SHA256:<hex-of-digest>`). The digest of the raw key bytes is what the
+/// player compares when a server key changes — two fingerprints are far easier
+/// to eyeball than 64 raw hex bytes.
+pub fn compute_key_fingerprint(pubkey_hex: &str) -> String {
+    let bytes = hex::decode(pubkey_hex).unwrap_or_default();
+    let hash = Sha256::digest(&bytes);
+    format!("SHA256:{}", hex::encode(hash))
+}
+
+/// Evaluates the trust state of a fetched BOM against the currently pinned
+/// key (TOFU): pins on first attested contact, surfaces key rotation for
+/// interactive approval, rejects unsigned downgrades, and verifies the Ed25519
+/// signature before any mod download or launch happens. Pure (no I/O) so the
+/// decision is unit-testable; persistence of the pin is left to the caller.
+/// Public so the security test suite can drive it end to end.
+///
+/// Fails closed:
+/// * BOM signed with a key different from the pinned one → `KeyMismatch` (the
+///   caller prompts the player; rejecting the rotation aborts the launch).
+/// * BOM unsigned after a key was pinned → abort (attestation downgrade).
+/// * BOM with a signature but no public key, or a signature that does not
+///   verify → abort.
+///
+/// The only pass-through is a BOM with **no** attestation fields at all for a
+/// server that never presented a key — that is a server that does not run the
+/// Zircon wrapper, and the per-file hash checks still gate every download.
+pub fn evaluate_bom_trust(
+    bom: &BillOfMaterials,
+    pinned: Option<&str>,
+) -> Result<BomTrustOutcome, LauncherError> {
+    let Some(received_key) = bom.server_public_key.as_deref() else {
+        if bom.signature.is_some() {
+            return Err(LauncherError::Security(
+                "Server BOM carries a signature but no public key — refusing to launch."
+                    .to_string(),
+            ));
+        }
+        if pinned.is_some() {
+            return Err(LauncherError::Security(
+                "Server stopped signing its BOM after previously presenting a \
+                 signing key — refusing to launch (possible downgrade attack)."
+                    .to_string(),
+            ));
+        }
+        tracing::warn!(
+            "Server does not sign its BOM (no attestation); continuing with \
+             per-file hash verification only."
+        );
+        return Ok(BomTrustOutcome::NoAttestation);
+    };
+
+    let trusted_key = pinned.unwrap_or(received_key);
+    if trusted_key != received_key {
+        // Key rotation: the server presents a different key than the one
+        // pinned on first contact. Surface both keys so the caller can show
+        // the fingerprint delta and let the player decide.
+        return Ok(BomTrustOutcome::KeyMismatch {
+            received: received_key.to_string(),
+            pinned: trusted_key.to_string(),
+        });
+    }
+    if !signing::verify_bom_signature(bom, trusted_key) {
+        return Err(LauncherError::Security(
+            "BOM signature verification failed — the server's mod list is not \
+             authentic. Refusing to launch."
+                .to_string(),
+        ));
+    }
+    Ok(BomTrustOutcome::Verified(trusted_key.to_string()))
 }
 
 /// How often the launcher refreshes its join intent while preparing to launch.
@@ -1137,9 +1396,12 @@ fn override_heap(java_args: &str, memory_gb: u32) -> String {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModFileInfo {
     pub filename: String,
     pub size_bytes: u64,
+    /// Author read from the JAR's mod metadata when available.
+    pub author: Option<String>,
 }
 
 #[tauri::command]
@@ -1157,9 +1419,14 @@ pub fn list_offline_mods(
         .filter_map(|path| {
             let filename = path.file_name()?.to_string_lossy().into_owned();
             let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            let author = zircon_core::metadata::extractor::extract(&path)
+                .ok()
+                .map(|meta| meta.author)
+                .filter(|a| !a.trim().is_empty());
             Some(ModFileInfo {
                 filename,
                 size_bytes,
+                author,
             })
         })
         .collect();
@@ -1300,35 +1567,22 @@ pub fn get_skin_history() -> Result<Vec<SkinImage>, String> {
     Ok(out)
 }
 
-/// Bundled default skins (steve/alex) as data URLs, with their arm variants.
+/// Bundled default skins (steve/alex) were removed because their embedded
+/// textures render with broken opaque overlays. Returns an empty list so the
+/// frontend gracefully shows nothing for the preset gallery.
 #[tauri::command]
 pub fn get_bundled_skins() -> Result<Vec<SkinImage>, String> {
-    Ok(BundledSkins::all()
-        .into_iter()
-        .map(|(name, bytes)| SkinImage {
-            name: name.clone(),
-            data_url: SkinManager::png_data_url(&bytes),
-            variant: BundledSkins::variant(&name),
-        })
-        .collect())
+    Ok(Vec::new())
 }
 
-/// Activates a preset skin by key (`bundled:<name>`): the current active skin
-/// moves to history and the preset becomes active (no duplicate history entry
-/// for the preset itself). The optional `variant` (`classic`/`slim`) is what
-/// the user picked in the UI; it defaults to the preset's own variant.
+/// Activates a preset skin by key. Legacy bundled presets are gone, so this is
+/// a no-op kept only for command-name compatibility with the frontend.
 #[tauri::command]
 pub fn save_bundled_skin(
-    app: AppHandle,
-    key: String,
-    variant: Option<String>,
+    _app: AppHandle,
+    _key: String,
+    _variant: Option<String>,
 ) -> Result<(), String> {
-    let Some((name, bytes)) = BundledSkins::by_key(&key) else {
-        return Err("Unknown bundled skin".to_string());
-    };
-    let variant = variant.unwrap_or_else(|| BundledSkins::variant(&name));
-    SkinManager::set_active_png(&bytes, &variant, true).map_err(err_string)?;
-    emit_skin_updated(&app);
     Ok(())
 }
 
@@ -1508,6 +1762,126 @@ pub fn list_instance_packs(game_dir: String) -> Result<InstancePacks, String> {
             .iter()
             .cloned()
             .collect(),
+    })
+}
+
+/// A pack file with optional enriched metadata (title, author, description,
+/// icon and Modrinth project URL) resolved from the instance's BOM.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackFileInfo {
+    pub filename: String,
+    pub size_bytes: u64,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub description: Option<String>,
+    pub icon_url: Option<String>,
+    pub project_url: Option<String>,
+    pub is_active: bool,
+    pub is_local: bool,
+}
+
+/// Enriched pack listing for an instance, including shader/resource pack
+/// metadata and whether shaders are currently enabled.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnrichedInstancePacks {
+    pub shaderpacks: Vec<PackFileInfo>,
+    pub resourcepacks: Vec<PackFileInfo>,
+    pub shaders_enabled: bool,
+}
+
+/// Opens an external URL in the user's default browser. Only `http(s)` URLs
+/// are allowed to avoid `open::that` being abused to launch local programs.
+#[tauri::command]
+pub async fn open_external_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Invalid URL protocol".to_string());
+    }
+    open::that(&url).map_err(|e| format!("Could not open browser: {e}"))
+}
+
+/// Lists an instance's shaderpacks and resourcepacks with enriched metadata
+/// (title, author, description, icon and Modrinth project URL) resolved from
+/// the instance's BOM, plus each pack's active/local state.
+#[tauri::command]
+pub async fn list_instance_packs_detailed(
+    _state: State<'_, LauncherState>,
+    game_dir: String,
+) -> Result<EnrichedInstancePacks, String> {
+    let dir = PathBuf::from(&game_dir);
+    let selection = PackSelection::load(&dir);
+
+    // Read the BOM (if present) to enrich pack metadata.
+    let bom_file = dir.join("bom.json");
+    let bom: Option<BillOfMaterials> = if bom_file.is_file() {
+        std::fs::read_to_string(&bom_file)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+    } else {
+        None
+    };
+
+    let map_packs = |folder_name: &str, is_shader: bool| -> Vec<PackFileInfo> {
+        let pack_dir = dir.join(folder_name);
+        let files = list_pack_files(&pack_dir);
+        files
+            .into_iter()
+            .map(|filename| {
+                let path = pack_dir.join(&filename);
+                let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                let bom_entry = bom.as_ref().and_then(|b| {
+                    if is_shader {
+                        b.get_shaderpack_by_filename(&filename)
+                    } else {
+                        b.get_resourcepack_by_filename(&filename)
+                    }
+                });
+
+                let (title, author, description, icon_url, project_url) = if let Some(e) = bom_entry
+                {
+                    (
+                        e.title.clone().or_else(|| Some(e.filename.clone())),
+                        e.author.clone(),
+                        e.description.clone(),
+                        e.icon_url.clone(),
+                        e.modrinth_url(is_shader).or_else(|| e.project_url.clone()),
+                    )
+                } else {
+                    (Some(filename.clone()), None, None, None, None)
+                };
+
+                let is_active = if is_shader {
+                    selection.active_shaderpack.as_deref() == Some(&filename)
+                } else {
+                    selection.active_resourcepacks.contains(&filename)
+                };
+
+                let is_local = if is_shader {
+                    selection.is_locally_added_shaderpack(&filename)
+                } else {
+                    selection.is_locally_added_resourcepack(&filename)
+                };
+
+                PackFileInfo {
+                    filename,
+                    size_bytes,
+                    title,
+                    author,
+                    description,
+                    icon_url,
+                    project_url,
+                    is_active,
+                    is_local,
+                }
+            })
+            .collect()
+    };
+
+    Ok(EnrichedInstancePacks {
+        shaderpacks: map_packs("shaderpacks", true),
+        resourcepacks: map_packs("resourcepacks", false),
+        shaders_enabled: selection.shaders_enabled,
     })
 }
 
@@ -1766,10 +2140,55 @@ pub fn save_settings(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Debug logs & crash diagnostics
+// ---------------------------------------------------------------------------
+
+/// Returns the in-memory launcher debug log buffer (newest last).
+#[tauri::command]
+pub fn get_launcher_logs() -> Result<Vec<String>, String> {
+    let buffer = crate::logging::log_buffer();
+    let guard = buffer.lock().map_err(|e| e.to_string())?;
+    Ok(guard.iter().cloned().collect())
+}
+
+/// Empties the in-memory launcher debug log buffer.
+#[tauri::command]
+pub fn clear_launcher_logs() -> Result<(), String> {
+    let buffer = crate::logging::log_buffer();
+    let mut guard = buffer.lock().map_err(|e| e.to_string())?;
+    guard.clear();
+    Ok(())
+}
+
+/// Scans an instance's `crash-reports/` and `logs/latest.log` for known fatal
+/// patterns (missing deps, mixin failures, Java mismatches, OOMs) and returns
+/// an actionable summary, or `None` when nothing matches.
+#[tauri::command]
+pub fn check_game_crash(
+    game_dir: String,
+) -> Result<Option<crate::launch::crash_analyzer::CrashAnalysis>, String> {
+    Ok(
+        crate::launch::crash_analyzer::analyze_instance_latest_crash(std::path::Path::new(
+            &game_dir,
+        )),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::SigningKey;
     use zircon_core::model::PackEntry;
+
+    /// Builds a BOM signed with a deterministic key (seed).
+    fn attested_bom(seed: u8) -> BillOfMaterials {
+        let key = SigningKey::from_bytes(&[seed; 32]);
+        let mut bom = BillOfMaterials::new("1.20.4", None, Some("Attested".to_string()));
+        bom.server_public_key = Some(hex::encode(key.verifying_key().to_bytes()));
+        bom.signature = Some(signing::sign_bom(&bom, &key).expect("test signing failed"));
+        bom
+    }
 
     #[test]
     fn override_heap_replaces_xmx_and_xms() {
@@ -1790,14 +2209,90 @@ mod tests {
     }
 
     #[test]
-    fn should_wake_only_for_reachable_zircon_servers_that_are_down() {
+    fn wake_decision_classifies_server_state() {
         // Third-party server (no wrapper) → never wake.
-        assert!(!should_wake(false, false));
-        assert!(!should_wake(false, true));
+        assert_eq!(WakeDecision::PassThrough, wake_decision(None, false));
+        assert_eq!(WakeDecision::PassThrough, wake_decision(None, true));
         // Zircon server already answering → no wake needed.
-        assert!(!should_wake(true, true));
-        // Zircon server down (asleep / booting / stopped) → wake.
-        assert!(should_wake(true, false));
+        let running = Some(WrapperStatus {
+            online: 0,
+            max: 0,
+            version: String::new(),
+            running: Some(true),
+            wakeable: false,
+        });
+        assert_eq!(
+            WakeDecision::PassThrough,
+            wake_decision(running.clone(), true)
+        );
+        // Running but port unreachable → port-forwarding failure.
+        assert_eq!(WakeDecision::PortUnreachable, wake_decision(running, false));
+        // Stopped and not wakeable (maintenance) → must stay down.
+        let stopped = Some(WrapperStatus {
+            online: 0,
+            max: 0,
+            version: String::new(),
+            running: Some(false),
+            wakeable: false,
+        });
+        assert_eq!(WakeDecision::Maintenance, wake_decision(stopped, false));
+        // Stopped but wakeable (idle sleep) → wake.
+        let asleep = Some(WrapperStatus {
+            online: 0,
+            max: 0,
+            version: String::new(),
+            running: Some(false),
+            wakeable: true,
+        });
+        assert_eq!(WakeDecision::Wake, wake_decision(asleep, false));
+    }
+
+    #[test]
+    fn server_base_url_builds_http_and_https() {
+        // Remote hosts may use plaintext HTTP when HTTPS is not enabled (simple
+        // LAN / no-TLS setups). Mod integrity is still guaranteed by the signed
+        // BOM + per-file SHA-1 verification.
+        assert_eq!(
+            "http://play.myserver.com:25565",
+            server_base_url("play.myserver.com", 25565, false).unwrap()
+        );
+
+        // Remote on the standard TLS port is implicitly HTTPS.
+        assert_eq!(
+            "https://play.myserver.com",
+            server_base_url("play.myserver.com", 443, false).unwrap()
+        );
+
+        // Explicit HTTPS flag wins on any port. Non-443 ports travel as a
+        // path segment so reverse proxies can route by port.
+        assert_eq!(
+            "https://play.myserver.com/25565",
+            server_base_url("play.myserver.com", 25565, true).unwrap()
+        );
+        assert_eq!(
+            "https://play.myserver.com/8443",
+            server_base_url("play.myserver.com", 8443, true).unwrap()
+        );
+
+        // Loopback hosts keep plaintext HTTP for local dev/test servers.
+        assert_eq!(
+            "http://localhost:25565",
+            server_base_url("localhost", 25565, false).unwrap()
+        );
+        assert_eq!(
+            "http://127.0.0.1:25566",
+            server_base_url("127.0.0.1", 25566, false).unwrap()
+        );
+        assert_eq!(
+            "http://[::1]:25567",
+            server_base_url("[::1]", 25567, false).unwrap()
+        );
+
+        // Loopback may also use HTTPS when the flag is set (path-based port).
+        assert_eq!(
+            "https://localhost/25565",
+            server_base_url("localhost", 25565, true).unwrap()
+        );
     }
 
     #[test]
@@ -1840,5 +2335,116 @@ mod tests {
         apply_shader_choice(&mut selection, &bom, false);
         assert!(!selection.shaders_enabled);
         assert!(selection.active_shaderpack.is_none());
+    }
+
+    // ------------------------------------------------------------------
+    // BOM trust (TOFU pinning / Ed25519 attestation)
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn tofu_pins_key_on_first_attested_contact() {
+        let bom = attested_bom(7);
+        let key = bom.server_public_key.as_deref().unwrap().to_string();
+
+        // No pin yet → Verified with the received key, ready to be persisted.
+        assert_eq!(
+            BomTrustOutcome::Verified(key.clone()),
+            evaluate_bom_trust(&bom, None).unwrap()
+        );
+        // Same key already pinned → still Verified (no re-pin needed).
+        assert_eq!(
+            BomTrustOutcome::Verified(key.clone()),
+            evaluate_bom_trust(&bom, Some(&key)).unwrap()
+        );
+    }
+
+    #[test]
+    fn key_rotation_surfaces_mismatch_for_interactive_approval() {
+        let bom = attested_bom(7);
+        let received_key = bom.server_public_key.as_deref().unwrap().to_string();
+        let other_pinned_key = hex::encode(
+            SigningKey::from_bytes(&[8u8; 32])
+                .verifying_key()
+                .to_bytes(),
+        );
+
+        // Key rotation no longer hard-fails: both keys are surfaced so the
+        // caller can show the fingerprint delta and ask the player before
+        // accepting the rotation.
+        assert_eq!(
+            BomTrustOutcome::KeyMismatch {
+                received: received_key,
+                pinned: other_pinned_key.clone(),
+            },
+            evaluate_bom_trust(&bom, Some(&other_pinned_key)).unwrap()
+        );
+    }
+
+    #[test]
+    fn key_fingerprints_are_stable_sha256_of_key_bytes() {
+        let key = hex::encode(
+            SigningKey::from_bytes(&[9u8; 32])
+                .verifying_key()
+                .to_bytes(),
+        );
+        let fp = compute_key_fingerprint(&key);
+        assert!(fp.starts_with("SHA256:"), "unexpected fingerprint: {fp}");
+        // 32-byte key → SHA-256 digest → 64 hex chars after the prefix.
+        assert_eq!("SHA256:".len() + 64, fp.len());
+
+        // Deterministic: same key → same fingerprint, regardless of input case.
+        assert_eq!(fp, compute_key_fingerprint(&key.to_uppercase()));
+
+        // Garbage input fails closed (digest of empty bytes), never panics.
+        assert_eq!(
+            compute_key_fingerprint("not-hex!"),
+            compute_key_fingerprint("")
+        );
+    }
+
+    #[test]
+    fn tampered_bom_aborts_launch() {
+        let mut bom = attested_bom(7);
+        let key = bom.server_public_key.clone().unwrap();
+        // Change a mod AFTER signing: the signature no longer covers it.
+        bom.mods.push(zircon_core::model::ModEntry::new(
+            Some("injected".to_string()),
+            "injected.jar",
+            Some("deadbeef".to_string()),
+            0,
+            Some("direct".to_string()),
+            None,
+            0,
+        ));
+        let err = evaluate_bom_trust(&bom, Some(&key)).unwrap_err();
+        assert!(matches!(err, LauncherError::Security(_)));
+    }
+
+    #[test]
+    fn unsigned_bom_with_pin_is_a_downgrade_attack() {
+        let unsigned = BillOfMaterials::new("1.20.4", None, None);
+        let err = evaluate_bom_trust(&unsigned, Some("previously-pinned-key")).unwrap_err();
+        assert!(
+            matches!(err, LauncherError::Security(_)),
+            "unsigned BOM after pinning must abort"
+        );
+    }
+
+    #[test]
+    fn unsigned_bom_without_pin_passes_through() {
+        let unsigned = BillOfMaterials::new("1.20.4", None, None);
+        assert_eq!(
+            BomTrustOutcome::NoAttestation,
+            evaluate_bom_trust(&unsigned, None).unwrap()
+        );
+    }
+
+    #[test]
+    fn signature_without_key_aborts() {
+        // Signature present but no public key to pin/verify against.
+        let mut bom = BillOfMaterials::new("1.20.4", None, None);
+        bom.signature = Some("deadbeef".to_string());
+        let err = evaluate_bom_trust(&bom, None).unwrap_err();
+        assert!(matches!(err, LauncherError::Security(_)));
     }
 }

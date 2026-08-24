@@ -28,6 +28,24 @@ fn resolve_mods(state: &AppState, headers: &HeaderMap) -> ModManagementService {
     state.resolver.mods()
 }
 
+/// Resolves the mod service for a path-based `:port`/instance-id reference
+/// (HTTPS reverse proxies whose `Host` header carries no port).
+fn resolve_mods_for_ref(state: &AppState, port_or_id: &str) -> ModManagementService {
+    if let Ok(port) = port_or_id.parse::<i32>() {
+        if let Some(mods) = state.resolver.mods_by_external_port(port) {
+            return mods;
+        }
+        if let Some(cfg) = state.instances.find_by_internal_port(port as u16) {
+            return state.resolver.instance_service(&cfg).mods;
+        }
+        return state.resolver.mods();
+    }
+    if let Ok(cfg) = state.instances.get_instance(port_or_id) {
+        return state.resolver.instance_service(&cfg).mods;
+    }
+    state.resolver.mods()
+}
+
 /// GET /api/mods — list of installed mods from the BOM.
 pub async fn list_mods(
     State(state): State<AppState>,
@@ -45,6 +63,34 @@ pub async fn download_mod(
     Path(filename): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     let mods = resolve_mods(&state, &headers);
+    let file = mods
+        .get_mod_file(&filename)
+        .ok_or_else(|| ApiError::NotFound(format!("Mod not found: {filename}")))?;
+    let size = tokio::fs::metadata(&file).await?.len();
+    let stream = ReaderStream::new(tokio::fs::File::open(&file).await?);
+    Ok((
+        [(header::CONTENT_TYPE, "application/java-archive")],
+        [
+            (
+                header::CONTENT_DISPOSITION,
+                format!(
+                    "attachment; filename=\"{}\"",
+                    file.file_name().unwrap_or_default().to_string_lossy()
+                ),
+            ),
+            (header::CONTENT_LENGTH, size.to_string()),
+        ],
+        axum::body::Body::from_stream(stream),
+    ))
+}
+
+/// GET /{port}/files/mods/{filename} — download a hosted mod JAR for the
+/// instance owning the path port (HTTPS reverse proxy support).
+pub async fn download_mod_by_port(
+    State(state): State<AppState>,
+    Path((port_or_id, filename)): Path<(String, String)>,
+) -> Result<impl IntoResponse, ApiError> {
+    let mods = resolve_mods_for_ref(&state, &port_or_id);
     let file = mods
         .get_mod_file(&filename)
         .ok_or_else(|| ApiError::NotFound(format!("Mod not found: {filename}")))?;

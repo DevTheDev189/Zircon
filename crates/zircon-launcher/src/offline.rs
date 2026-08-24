@@ -14,7 +14,7 @@ use tracing::debug;
 use zircon_core::model::ModLoaderInfo;
 
 use crate::error::LauncherError;
-use crate::paths::offline_instances_dir;
+use crate::paths::{offline_instances_dir, sanitize_filename_strict};
 
 /// Persistent configuration of one offline (single-player) instance.
 ///
@@ -219,6 +219,10 @@ impl OfflineInstanceManager {
 
     /// Deletes a single mod jar from the instance's `mods/` folder. Deleting a
     /// missing mod is a no-op (Java `deleteMod`).
+    ///
+    /// The filename is strictly validated as a plain basename, so a malicious
+    /// caller cannot use `..` or path separators to delete files outside the
+    /// instance's `mods/` directory.
     pub fn delete_mod(
         &self,
         instance: &OfflineInstance,
@@ -227,7 +231,8 @@ impl OfflineInstanceManager {
         if instance.id.trim().is_empty() || filename.trim().is_empty() {
             return Ok(());
         }
-        let target = self.mods_dir(instance).join(filename);
+        let name = sanitize_filename_strict(filename)?;
+        let target = self.mods_dir(instance).join(name);
         match std::fs::remove_file(&target) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -405,6 +410,35 @@ mod tests {
 
         // Deleting a missing mod is a no-op.
         manager.delete_mod(&instance, "does-not-exist.jar").unwrap();
+    }
+
+    #[test]
+    fn delete_mod_traversal_is_rejected() {
+        let dir = TempDir::new("offline-delete-traversal");
+        let manager = OfflineInstanceManager::new(dir.path().join("offline_instances"));
+        let instance = manager
+            .create("Modded", "1.20.4", "fabric", "0.15.11")
+            .unwrap();
+        std::fs::write(manager.mods_dir(&instance).join("sodium.jar"), b"mod").unwrap();
+
+        // A sentry file just outside mods/ that must survive the attempt.
+        let sentry = dir.path().join("sentry.txt");
+        std::fs::write(&sentry, b"keep").unwrap();
+
+        for evil in [
+            "../../sentry.txt",
+            "..\\sentry.txt",
+            "/abs.txt",
+            ".hidden.jar",
+        ] {
+            let result = manager.delete_mod(&instance, evil);
+            assert!(
+                matches!(result, Err(LauncherError::InvalidInput(_))),
+                "traversal name {evil:?} must be rejected, got {result:?}"
+            );
+        }
+        assert!(sentry.is_file(), "delete_mod must never escape mods/");
+        assert!(manager.mods_dir(&instance).join("sodium.jar").is_file());
     }
 
     #[test]

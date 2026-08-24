@@ -24,9 +24,9 @@ const TTL_SECONDS: i64 = 12 * 60 * 60;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
-    /// Random per-token ID so sessions can be individually revoked. `default`
-    /// keeps tokens issued before this field existed valid across upgrades.
-    #[serde(default)]
+    /// Random per-token ID so sessions can be individually revoked. Mandatory:
+    /// tokens without a `jti` fail deserialization, so a hand-forged token
+    /// missing this claim can never bypass session revocation.
     pub jti: String,
     pub iat: i64,
     pub exp: i64,

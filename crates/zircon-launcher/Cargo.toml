@@ -6,7 +6,7 @@ description = "Zircon companion launcher: Tauri v2 shell + Vue 3 frontend over t
 license = "MIT"
 
 [lib]
-name = "zircon_launcher"
+name = "zircon_launcher_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -57,3 +57,5 @@ keyring = { version = "3", default-features = false, features = ["linux-native"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
+# Deterministic key construction in TOFU attestation tests.
+ed25519-dalek = { version = "2.1", default-features = false, features = ["std"] }

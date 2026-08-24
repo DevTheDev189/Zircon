@@ -3,6 +3,7 @@
 //! argument resolution.
 
 pub mod classpath;
+pub mod crash_analyzer;
 pub mod fabric_quilt;
 pub mod forge_neoforge;
 pub mod java;

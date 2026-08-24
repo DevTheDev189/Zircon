@@ -51,6 +51,9 @@ pub struct AppState {
     pub resolver: Arc<ModServiceResolver>,
     pub tickets: Arc<JoinTicketManager>,
     pub curseforge_api_key: String,
+    /// Server-level Ed25519 key for signing per-instance BOMs; shares the pin
+    /// launchers TOFU on via the legacy `/bom` endpoint.
+    pub signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
     /// Server-side session registry (sign-out / password-change revocation).
     pub sessions: Arc<SessionRegistry>,
     /// Fixed-window limiter for authentication endpoints.
@@ -212,6 +215,15 @@ pub fn router(state: AppState) -> Router {
             "/api/instances/:id/join-intent",
             post(instance_controller::register_join_intent),
         )
+        // Path-based port routing for HTTPS reverse proxies: the launcher's
+        // base URL may carry the instance port as a path segment, so the
+        // wakeup / join-intent endpoints are reachable at /:port/api/... too.
+        // Both handlers resolve the instance from the request body.
+        .route("/:port/api/wakeup", post(config_routes::wakeup_server))
+        .route(
+            "/:port/api/join-intent",
+            post(instance_controller::register_join_intent),
+        )
         .route("/api/wakeup", post(config_routes::wakeup_server));
 
     // ----------------------------------------------------------------------
@@ -283,7 +295,17 @@ pub fn router(state: AppState) -> Router {
         .route("/api/players/command", post(player_controller::run_command))
         .route(
             "/api/config",
-            get(config_routes::get_config).post(config_routes::update_config),
+            get(config_routes::get_config)
+                .post(config_routes::update_config)
+                .put(config_routes::update_config)
+                .patch(config_routes::update_config),
+        )
+        .route(
+            "/api/settings",
+            get(config_routes::get_config)
+                .post(config_routes::update_config)
+                .put(config_routes::update_config)
+                .patch(config_routes::update_config),
         )
         .route("/api/status", get(config_routes::get_status))
         .route("/api/server/start", post(config_routes::start_server))
@@ -297,6 +319,8 @@ pub fn router(state: AppState) -> Router {
             "/api/instances/:id",
             get(instance_controller::get_instance)
                 .patch(instance_controller::update_instance)
+                .put(instance_controller::update_instance)
+                .post(instance_controller::update_instance)
                 .delete(instance_controller::delete_instance),
         )
         .route(
@@ -318,7 +342,15 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/instances/:id/server-properties",
             get(instance_controller::get_server_properties)
-                .post(instance_controller::save_server_properties),
+                .post(instance_controller::save_server_properties)
+                .put(instance_controller::save_server_properties),
+        )
+        .route(
+            "/api/instances/:id/settings",
+            get(instance_controller::get_instance)
+                .patch(instance_controller::update_instance)
+                .put(instance_controller::update_instance)
+                .post(instance_controller::update_instance),
         )
         .route(
             "/api/instances/:id/players/online",
@@ -453,6 +485,23 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/files/resourcepacks/:filename",
             get(pack_controller::download_resourcepack),
+        )
+        // Path-based port routing: HTTPS reverse proxies cannot carry a port in
+        // the Host header (e.g. https://domain.net), so instance ports are
+        // encoded as the first path segment instead.
+        .route("/:port/status", get(config_routes::client_status_by_port))
+        .route("/:port/bom", get(bom_controller::get_bom_by_port))
+        .route(
+            "/:port/files/mods/:filename",
+            get(mod_controller::download_mod_by_port),
+        )
+        .route(
+            "/:port/files/shaderpacks/:filename",
+            get(pack_controller::download_shaderpack_by_port),
+        )
+        .route(
+            "/:port/files/resourcepacks/:filename",
+            get(pack_controller::download_resourcepack_by_port),
         );
 
     Router::new()
@@ -505,19 +554,22 @@ fn spa_response(path: &str) -> Response {
     }
 }
 
-/// Content-Security-Policy for the embedded SPA. The dashboard loads Vue and
-/// Tailwind from CDNs and compiles in-DOM templates at runtime (which needs
-/// `unsafe-eval`), so this can't be lock-tight — it still blocks arbitrary
-/// external script origins, inline data: execution and clickjacking.
+/// Content-Security-Policy for the embedded SPA. The dashboard is fully
+/// pre-compiled: Vue's runtime-only build is vendored locally, the template is
+/// compiled to a render function at build time (no `unsafe-eval`), and the
+/// Tailwind utilities are generated into `styles.css` at build time (no CDN
+/// JIT, no `unsafe-inline` scripts). Only same-origin scripts may run; inline
+/// styles remain allowed for Vue's dynamic style bindings.
 const SPA_CSP: &str = "default-src 'self'; \
-    script-src 'self' https://cdn.tailwindcss.com https://unpkg.com 'unsafe-inline' 'unsafe-eval'; \
-    style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; \
+    script-src 'self'; \
+    style-src 'self' 'unsafe-inline'; \
     img-src 'self' data: https:; \
     font-src 'self' data:; \
     connect-src 'self' ws: wss:; \
     frame-ancestors 'none'; \
     base-uri 'self'; \
-    form-action 'self'";
+    form-action 'self'; \
+    object-src 'none'";
 
 /// Embedded static assets for the admin SPA.
 pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
@@ -574,9 +626,17 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
             "application/javascript; charset=utf-8",
             include_str!("../../assets/web/js/players.js"),
         ),
+        "/js/render.js" => (
+            "application/javascript; charset=utf-8",
+            include_str!("../../assets/web/js/render.js"),
+        ),
         "/js/settings.js" => (
             "application/javascript; charset=utf-8",
             include_str!("../../assets/web/js/settings.js"),
+        ),
+        "/js/vue.runtime.global.prod.js" => (
+            "application/javascript; charset=utf-8",
+            include_str!("../../assets/web/js/vue.runtime.global.prod.js"),
         ),
         _ => return None,
     };
@@ -659,5 +719,57 @@ mod tests {
             "127.0.0.1".parse::<IpAddr>().unwrap(),
             real_ip(None, None).await
         );
+    }
+
+    #[test]
+    fn spa_csp_is_zero_eval_and_self_only() {
+        // Phase 4 hardening: the dashboard is pre-compiled and self-hosted, so
+        // the CSP must not allow any external origin, inline scripts, or
+        // unsafe-eval — an XSS can no longer escalate to arbitrary code.
+        assert!(
+            !SPA_CSP.contains("unsafe-eval"),
+            "CSP must not allow unsafe-eval: {SPA_CSP}"
+        );
+        // Inline styles stay allowed (Vue's style bindings); inline *scripts*
+        // must not be. Check the script-src directive specifically.
+        let script_src = SPA_CSP
+            .split(';')
+            .find(|d| d.trim_start().starts_with("script-src"))
+            .expect("script-src directive");
+        assert!(
+            !script_src.contains("unsafe-inline"),
+            "script-src must not allow inline scripts: {script_src}"
+        );
+        assert!(SPA_CSP.contains("script-src 'self'"), "CSP: {SPA_CSP}");
+        assert!(
+            !SPA_CSP.contains("https://") && !SPA_CSP.contains("http://"),
+            "CSP must not whitelist external origins: {SPA_CSP}"
+        );
+        assert!(SPA_CSP.contains("object-src 'none'"), "CSP: {SPA_CSP}");
+        assert!(SPA_CSP.contains("frame-ancestors 'none'"), "CSP: {SPA_CSP}");
+    }
+
+    #[test]
+    fn spa_assets_are_self_contained() {
+        // No CDN fetches may remain: the page must load only same-origin
+        // scripts, and the render/Vue files must exist for static_file.
+        let index = include_str!("../../assets/web/index.html");
+        assert!(
+            !index.contains("https://"),
+            "CDN script in index.html: {index}"
+        );
+        assert!(
+            static_file("/js/vue.runtime.global.prod.js").is_some(),
+            "vendored Vue runtime must be embedded"
+        );
+        assert!(
+            static_file("/js/render.js").is_some(),
+            "precompiled render must be embedded"
+        );
+        // The generated render defines ZirconRender and the app uses it.
+        let render = include_str!("../../assets/web/js/render.js");
+        assert!(render.contains("window.ZirconRender"));
+        let app_js = include_str!("../../assets/web/app.js");
+        assert!(app_js.contains("render: ZirconRender"));
     }
 }

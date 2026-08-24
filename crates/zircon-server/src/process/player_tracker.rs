@@ -26,6 +26,12 @@ const LOST: &str = " lost connection:";
 const DONE_MARKER: &str = "Done (";
 const DONE_SUFFIX: &str = "For help, type";
 
+/// Cap on the persisted ever-joined log. High-throughput public servers see
+/// thousands of unique players over a lifetime; beyond this the oldest entries
+/// (by `last_joined`) are pruned so the in-memory map and the players file
+/// stay bounded.
+const MAX_HISTORY_ENTRIES: usize = 10_000;
+
 /// One entry of the persistent "players who have ever joined" log.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -69,7 +75,21 @@ impl PlayerTracker {
                         map.insert(entry.name.to_lowercase(), entry);
                     }
                 }
-                map
+                // Trim oversized legacy logs immediately so a huge players
+                // file from before the cap cannot grow memory at startup.
+                let pruned = prune_history(&mut map);
+                let tracker = Self {
+                    online: Mutex::new(HashSet::new()),
+                    players_file: Some(file.clone()),
+                    history: Mutex::new(map),
+                    ready: Mutex::new(false),
+                    ready_at: Mutex::new(None),
+                    last_activity_at: Mutex::new(None),
+                };
+                if pruned {
+                    tracker.save_history(file);
+                }
+                return tracker;
             }
             None => HashMap::new(),
         };
@@ -240,6 +260,9 @@ impl PlayerTracker {
             }
             entry.last_joined = now;
             entry.join_count += 1;
+            // Keep the log bounded: once the cap is exceeded, the oldest
+            // players (by last_joined) are dropped before persisting.
+            prune_history(&mut history);
         }
         self.save_history(players_file);
     }
@@ -268,6 +291,30 @@ fn now_millis() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+/// Trims `history` down to `MAX_HISTORY_ENTRIES`, keeping the most recently
+/// joined players (by `last_joined`). Returns `true` when entries were removed.
+///
+/// The map is keyed by lower-cased player name, so pruning is done on the keys
+/// (never the display-case `name` field) to avoid evicting entries whose
+/// display casing differs from their key.
+fn prune_history(history: &mut HashMap<String, PlayerHistoryEntry>) -> bool {
+    if history.len() <= MAX_HISTORY_ENTRIES {
+        return false;
+    }
+    let mut entries: Vec<(&String, &PlayerHistoryEntry)> = history.iter().collect();
+    entries.sort_by(|a, b| b.1.last_joined.cmp(&a.1.last_joined));
+    // Owned keys (not references into `history`) so the borrow ends before the
+    // `retain` below mutates the map.
+    let keep: HashSet<String> = entries
+        .iter()
+        .take(MAX_HISTORY_ENTRIES)
+        .map(|(key, _)| (*key).clone())
+        .collect();
+    drop(entries);
+    history.retain(|key, _| keep.contains(key));
+    true
 }
 
 #[cfg(test)]
@@ -366,6 +413,123 @@ mod tests {
         // Most recently active first.
         assert!(history[0].name == "Alex" || history[0].name == "Steve");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Builds `count` history entries whose `last_joined` equals their index,
+    /// so index 0 is the oldest and higher indices are newer.
+    fn entries(count: usize) -> Vec<PlayerHistoryEntry> {
+        (0..count)
+            .map(|i| PlayerHistoryEntry {
+                name: format!("player{i:05}"),
+                first_joined: i as i64,
+                last_joined: i as i64,
+                join_count: 1,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn oversized_loaded_history_is_pruned_and_persisted_trimmed() {
+        let dir = temp_dir();
+        let players_file = dir.join("players.json");
+        let oversized = entries(MAX_HISTORY_ENTRIES + 4);
+        fs::write(&players_file, serde_json::to_string(&oversized).unwrap()).unwrap();
+
+        let tracker = PlayerTracker::new(Some(players_file.clone()));
+        let history = tracker.get_history();
+        assert_eq!(MAX_HISTORY_ENTRIES, history.len());
+        // The four oldest players (lowest last_joined) were evicted; the
+        // newest survived.
+        assert!(history.iter().all(|e| e.name != "player00000"));
+        assert!(history.iter().any(|e| e.name == "player10003"));
+
+        // The trim is persisted, so the file stays bounded across restarts.
+        let on_disk = PlayerTracker::load_history(&players_file);
+        assert_eq!(MAX_HISTORY_ENTRIES, on_disk.len());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn record_join_prunes_oldest_when_the_cap_is_reached() {
+        let dir = temp_dir();
+        let players_file = dir.join("players.json");
+        // Two below the cap on disk, then three new players join: the first two
+        // fill it to exactly 10,000, the third pushes one over and must evict
+        // the single oldest entry.
+        fs::write(
+            &players_file,
+            serde_json::to_string(&entries(MAX_HISTORY_ENTRIES - 2)).unwrap(),
+        )
+        .unwrap();
+        let tracker = PlayerTracker::new(Some(players_file.clone()));
+
+        tracker.on_line("[Server thread/INFO]: newbie1 joined the game");
+        tracker.on_line("[Server thread/INFO]: newbie2 joined the game");
+        tracker.on_line("[Server thread/INFO]: newbie3 joined the game");
+
+        let history = tracker.get_history();
+        assert_eq!(MAX_HISTORY_ENTRIES, history.len());
+        // The single oldest original entry is gone; the next-oldest and the
+        // newest joiners are all in.
+        assert!(history.iter().all(|e| e.name != "player00000"));
+        assert!(history.iter().any(|e| e.name == "player00001"));
+        assert!(history.iter().any(|e| e.name == "newbie1"));
+        assert!(history.iter().any(|e| e.name == "newbie3"));
+        // The trimmed log is what got persisted.
+        assert_eq!(
+            MAX_HISTORY_ENTRIES,
+            PlayerTracker::load_history(&players_file).len()
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn prune_history_keeps_entries_whose_display_case_differs_from_the_key() {
+        // The map is keyed by lower-cased name; pruning must compare against
+        // the keys, never the display-cased `name` field.
+        let mut map: HashMap<String, PlayerHistoryEntry> = (0..MAX_HISTORY_ENTRIES - 1)
+            .map(|i| {
+                (
+                    format!("player{i:05}"),
+                    PlayerHistoryEntry {
+                        name: format!("player{i:05}"),
+                        first_joined: i as i64,
+                        last_joined: i as i64,
+                        join_count: 1,
+                    },
+                )
+            })
+            .collect();
+        // A recent entry whose display name is upper-cased while its key is
+        // lower-cased ("STEVE" → key "steve"): a prune that compared display
+        // names to keys would wrongly evict it.
+        map.insert(
+            "steve".to_string(),
+            PlayerHistoryEntry {
+                name: "STEVE".to_string(),
+                first_joined: MAX_HISTORY_ENTRIES as i64,
+                last_joined: MAX_HISTORY_ENTRIES as i64,
+                join_count: 1,
+            },
+        );
+        // One genuinely oldest entry that must be the evicted one.
+        map.insert(
+            "oldman".to_string(),
+            PlayerHistoryEntry {
+                name: "oldman".to_string(),
+                first_joined: -1,
+                last_joined: -1,
+                join_count: 1,
+            },
+        );
+        assert_eq!(MAX_HISTORY_ENTRIES + 1, map.len());
+
+        assert!(prune_history(&mut map), "over-cap map must prune");
+        assert_eq!(MAX_HISTORY_ENTRIES, map.len());
+        // The newest entry survives even though its display name case differs
+        // from its map key; the genuinely oldest is gone.
+        assert!(map.contains_key("steve"));
+        assert!(!map.contains_key("oldman"));
     }
 
     #[test]

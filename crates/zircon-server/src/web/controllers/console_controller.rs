@@ -12,19 +12,110 @@
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
+
+use std::sync::Arc;
 
 use crate::auth::auth_service::AuthService;
 use crate::auth::jwt;
 use crate::auth::sessions::SessionRegistry;
+use crate::instance::ServerInstanceManager;
 use crate::process::console::ConsoleStreamHandler;
 use crate::process::manager::MinecraftProcessManager;
-use crate::web::app::AppState;
+use crate::web::app::{ApiError, AppState};
 
 /// WebSocket upgrade route `/api/console`.
-pub async fn console_ws(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_console_socket(socket, state))
+///
+/// CSWSH defense: the `Origin` header is validated during the HTTP upgrade
+/// handshake. Browsers always send `Origin` on WebSocket connects, so a page
+/// on an attacker-controlled site can never hijack the console — its origin is
+/// rejected with 401 before the socket is upgraded. Clients that omit the
+/// header entirely (the Tauri shell, other non-browser tooling) are unaffected:
+/// they still authenticate with their first message.
+pub async fn console_ws(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, ApiError> {
+    // Validate the Origin header during the HTTP upgrade handshake. When it is
+    // present and not trusted, fail closed and audit the attempt (under
+    // ANONYMOUS — no session exists yet).
+    if let Some(origin_header) = headers.get("origin").and_then(|o| o.to_str().ok()) {
+        let config = state.config.get_config();
+        let is_allowed = is_allowed_origin(origin_header, config.web_port, config.public_port);
+        if !is_allowed {
+            state.audit.log(
+                "ANONYMOUS",
+                "CSWSH_BLOCKED",
+                &format!("Blocked unauthorized WebSocket upgrade from origin: {origin_header}"),
+            );
+            return Err(ApiError::Unauthorized(
+                "Cross-Origin WebSocket request denied".into(),
+            ));
+        }
+    }
+
+    Ok(ws.on_upgrade(move |socket| handle_console_socket(socket, state)))
+}
+
+/// Whether a WebSocket handshake `Origin` is trusted.
+///
+/// CSWSH defense-in-depth on top of the first-message JWT authentication:
+/// browser clients behind reverse proxies (arbitrary hostnames, ports 80/443)
+/// must be able to connect, while origins that are neither loopback, private
+/// LAN, nor a matching web/public port are still rejected. The embedded Tauri
+/// frontend schemes and non-browser clients that omit `Origin` (or send
+/// `null`) are always accepted.
+fn is_allowed_origin(origin: &str, web_port: i32, public_port: i32) -> bool {
+    let clean = origin.trim().to_lowercase();
+    // Non-browser clients (Tauri shell, CLI tooling) may omit Origin entirely
+    // or send the literal "null" (e.g. sandboxed iframes / file:// pages).
+    // They still authenticate with their first message.
+    if clean.is_empty() || clean == "null" {
+        return true;
+    }
+    // Embedded Tauri frontend schemes (Windows/Linux: `tauri://localhost`,
+    // macOS: `http://tauri.localhost`).
+    if clean == "tauri://localhost"
+        || clean == "http://tauri.localhost"
+        || clean.starts_with("tauri://")
+    {
+        return true;
+    }
+
+    let Ok(parsed) = url::Url::parse(&clean) else {
+        return false;
+    };
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+
+    // Reverse proxies forward the origin's default port (80/443) when the
+    // host header carries no port, and the admin UI can also be served on the
+    // web/public ports through a proxy that keeps the port.
+    let port = parsed
+        .port()
+        .unwrap_or(if parsed.scheme() == "https" { 443 } else { 80 });
+    if port == web_port as u16 || port == public_port as u16 || port == 443 || port == 80 {
+        return true;
+    }
+
+    // Loopback and private LAN hosts are accepted regardless of port: an
+    // attacker-controlled page can never be served from these hosts.
+    let is_private = host == "localhost"
+        || host == "127.0.0.1"
+        || host == "::1"
+        || host.starts_with("192.168.")
+        || host.starts_with("10.")
+        || (host.starts_with("172.")
+            && host
+                .split('.')
+                .nth(1)
+                .and_then(|octet| octet.parse::<u8>().ok())
+                .is_some_and(|o| (16..=31).contains(&o)));
+    is_private
 }
 
 async fn handle_console_socket(socket: WebSocket, state: AppState) {
@@ -93,6 +184,7 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
                         match apply_inbound_message(
                             &state.audit,
                             &state.console,
+                            &state.instances,
                             &state.process_manager,
                             &user,
                             &text,
@@ -159,6 +251,7 @@ fn classify_inbound(text: &str) -> InboundAction {
 async fn apply_inbound_message(
     audit: &crate::audit::AuditLogger,
     console: &ConsoleStreamHandler,
+    instances: &ServerInstanceManager,
     process_manager: &MinecraftProcessManager,
     user: &str,
     text: &str,
@@ -171,7 +264,30 @@ async fn apply_inbound_message(
         }
         InboundAction::Command(command) => {
             audit.log(user, "CONSOLE_COMMAND", &command);
-            match process_manager.send_command(&command).await {
+
+            // Route command to the active instance's process manager when the
+            // wrapper runs in multi-instance mode, falling back to any instance
+            // currently running, then to the legacy process manager. Without
+            // this, inbound console commands reach a process manager that isn't
+            // running in multi-instance mode and are always rejected.
+            let target_pm: Option<Arc<MinecraftProcessManager>> =
+                if let Some(active_cfg) = instances.get_active_instance() {
+                    instances.get_process_manager(&active_cfg.id)
+                } else {
+                    instances
+                        .list_instances()
+                        .into_iter()
+                        .find(|inst| instances.is_running(&inst.id))
+                        .and_then(|inst| instances.get_process_manager(&inst.id))
+                };
+
+            let send_result = if let Some(pm) = target_pm {
+                pm.send_command(&command).await
+            } else {
+                process_manager.send_command(&command).await
+            };
+
+            match send_result {
                 Ok(()) => InboundResult::Ok,
                 Err(e) => InboundResult::Notify(format!("[wrapper] {e}")),
             }
@@ -217,12 +333,113 @@ mod tests {
     use crate::auth::jwt;
     use crate::auth::sessions::SessionRegistry;
     use crate::config::ConfigService;
+    use crate::instance::ServerInstanceManager;
     use crate::process::console::ConsoleStreamHandler;
     use crate::process::manager::MinecraftProcessManager;
     use std::sync::Arc;
 
     fn temp_dir() -> std::path::PathBuf {
         crate::test_util::temp_dir("console")
+    }
+
+    #[test]
+    fn origin_validation_accepts_admin_and_tauri_origins() {
+        let (web, public) = (25564, 25565);
+        // Admin UI on the web port (http/https, loopback hosts).
+        assert!(is_allowed_origin(
+            &format!("http://127.0.0.1:{web}"),
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            &format!("http://localhost:{web}"),
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            &format!("https://127.0.0.1:{web}"),
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            &format!("https://localhost:{web}"),
+            web,
+            public
+        ));
+        // Origins proxied via the public port.
+        assert!(is_allowed_origin(
+            &format!("http://127.0.0.1:{public}"),
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            &format!("http://localhost:{public}"),
+            web,
+            public
+        ));
+        // Embedded Tauri frontend schemes.
+        assert!(is_allowed_origin("tauri://localhost", web, public));
+        assert!(is_allowed_origin("http://tauri.localhost", web, public));
+        // Case and surrounding whitespace are normalized.
+        assert!(is_allowed_origin(
+            &format!("  HTTP://LOCALHOST:{web}  "),
+            web,
+            public
+        ));
+    }
+
+    #[test]
+    fn origin_validation_accepts_loopback_lan_and_proxy_origins() {
+        let (web, public) = (25564, 25565);
+        // Loopback and private LAN origins regardless of port.
+        assert!(is_allowed_origin("http://127.0.0.1:9999", web, public));
+        assert!(is_allowed_origin("http://127.0.0.1:25566", web, public));
+        assert!(is_allowed_origin("http://192.168.1.50:8080", web, public));
+        assert!(is_allowed_origin("http://10.0.0.7:25564", web, public));
+        assert!(is_allowed_origin("http://172.20.0.3:80", web, public));
+        // Non-browser / sandboxed clients that omit or null the Origin.
+        assert!(is_allowed_origin("", web, public));
+        assert!(is_allowed_origin("null", web, public));
+        // Reverse-proxy hostnames on default HTTP(S) ports.
+        assert!(is_allowed_origin("https://mc.example.com", web, public));
+        assert!(is_allowed_origin("http://mc.example.com", web, public));
+        assert!(is_allowed_origin(
+            "https://mc.example.com:25564",
+            web,
+            public
+        ));
+        assert!(is_allowed_origin(
+            "http://mc.example.com:25565",
+            web,
+            public
+        ));
+    }
+
+    #[test]
+    fn origin_validation_rejects_cross_site_and_lookalikes() {
+        let (web, public) = (25564, 25565);
+        // Non-loopback, non-LAN host on an unrelated port is rejected.
+        assert!(!is_allowed_origin(
+            "http://evil.example.com:4444",
+            web,
+            public
+        ));
+        // Unparseable values are rejected.
+        assert!(!is_allowed_origin("not a url", web, public));
+        // Exact-match only: lookalike hosts must never pass.
+        assert!(!is_allowed_origin(
+            "http://127.0.0.1:25564.evil.com",
+            web,
+            public
+        ));
+        assert!(!is_allowed_origin(
+            "http://localhost:25564.evil.com",
+            web,
+            public
+        ));
+        // Public (non-private) 172.x ranges are not treated as LAN.
+        assert!(!is_allowed_origin("http://172.32.0.1:8080", web, public));
+        assert!(!is_allowed_origin("http://172.15.0.1:8080", web, public));
     }
 
     #[test]
@@ -297,23 +514,46 @@ mod tests {
         let config =
             Arc::new(ConfigService::load_with_data_dir(Some(dir.display().to_string())).unwrap());
         let console = Arc::new(ConsoleStreamHandler::new());
+        let instances = Arc::new(ServerInstanceManager::new(&dir, console.clone()).unwrap());
         let process_manager = MinecraftProcessManager::legacy(config, console.clone());
         let audit = AuditLogger::new(&dir);
 
         // `__CLEAR__` is audited under the authenticated username and echoed.
-        let result =
-            apply_inbound_message(&audit, &console, &process_manager, "alice", "__CLEAR__").await;
+        let result = apply_inbound_message(
+            &audit,
+            &console,
+            &instances,
+            &process_manager,
+            "alice",
+            "__CLEAR__",
+        )
+        .await;
         assert_eq!(InboundResult::Notify("__CLEAR__".to_string()), result);
         assert!(console.recent_history(10).is_empty());
 
         // A command is audited before it is executed (the server is not
         // running here, so it is reported back — the audit entry still lands).
-        let result =
-            apply_inbound_message(&audit, &console, &process_manager, "alice", "say hello").await;
+        let result = apply_inbound_message(
+            &audit,
+            &console,
+            &instances,
+            &process_manager,
+            "alice",
+            "say hello",
+        )
+        .await;
         assert!(matches!(result, InboundResult::Notify(_)));
 
         // Empty payloads are ignored without touching the audit trail.
-        let result = apply_inbound_message(&audit, &console, &process_manager, "alice", "  ").await;
+        let result = apply_inbound_message(
+            &audit,
+            &console,
+            &instances,
+            &process_manager,
+            "alice",
+            "  ",
+        )
+        .await;
         assert_eq!(InboundResult::Ok, result);
 
         let content = std::fs::read_to_string(dir.join("audit.log")).unwrap();

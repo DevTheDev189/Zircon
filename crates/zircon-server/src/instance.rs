@@ -19,6 +19,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Instant;
 
+use ed25519_dalek::SigningKey;
+use sysinfo::System;
 use zircon_core::model::{clamp_idle_shutdown_minutes, BillOfMaterials, InstanceConfig};
 
 use crate::process::console::ConsoleStreamHandler;
@@ -98,8 +100,15 @@ pub struct ServerInstanceManager {
     instances_dir: PathBuf,
     installer_cache_dir: PathBuf,
     console: Arc<ConsoleStreamHandler>,
+    /// Server-level Ed25519 key used to sign instance BOMs on every write.
+    signing_key: Option<Arc<SigningKey>>,
     inner: Mutex<Inner>,
     port_binding_listener: Mutex<Option<Arc<dyn PortBindingListener>>>,
+    /// instance_id → a wake/start attempt is in flight. Guards the public
+    /// wakeup path from spawning duplicate start tasks for the same instance;
+    /// the entry is removed when the start attempt completes (success or
+    /// failure) so a later wakeup can retry.
+    in_progress_wakes: dashmap::DashSet<String>,
 }
 
 impl ServerInstanceManager {
@@ -113,6 +122,7 @@ impl ServerInstanceManager {
             instances_dir,
             installer_cache_dir,
             console,
+            signing_key: None,
             inner: Mutex::new(Inner {
                 instance_configs: HashMap::new(),
                 active_processes: HashMap::new(),
@@ -121,9 +131,17 @@ impl ServerInstanceManager {
                 pending_join_intents: HashMap::new(),
             }),
             port_binding_listener: Mutex::new(None),
+            in_progress_wakes: dashmap::DashSet::new(),
         };
         manager.load_from_disk()?;
         Ok(manager)
+    }
+
+    /// Attaches the server's BOM signing key so instance BOMs are attested on
+    /// every write (same key as the legacy store).
+    pub fn with_signing_key(mut self, signing_key: Option<Arc<SigningKey>>) -> Self {
+        self.signing_key = signing_key;
+        self
     }
 
     // ----------------------------------------------------------------------
@@ -147,6 +165,18 @@ impl ServerInstanceManager {
             self.allocate_next_port()?,
             self.allocate_next_external_port()?,
         );
+        // OOM guard: the new instance's heap (default 4G) must fit within the
+        // host's safe heap limit alongside every existing instance, so the
+        // daemon and OS are never starved into an OOM kill.
+        let instances: Vec<InstanceConfig> = self
+            .inner
+            .lock()
+            .unwrap()
+            .instance_configs
+            .values()
+            .cloned()
+            .collect();
+        validate_instance_memory_headroom(&instances, None, &config.java_args)?;
         let instance_dir = self.instance_dir(&config.id);
         fs::create_dir_all(instance_dir.join("mods"))?;
         fs::create_dir_all(instance_dir.join("server"))?;
@@ -320,6 +350,18 @@ impl ServerInstanceManager {
                         .to_string(),
                 ));
             }
+            // OOM guard: the new heap must fit within the host's safe limit
+            // alongside every other instance (this instance's old value is
+            // excluded from the sum).
+            let instances: Vec<InstanceConfig> = self
+                .inner
+                .lock()
+                .unwrap()
+                .instance_configs
+                .values()
+                .cloned()
+                .collect();
+            validate_instance_memory_headroom(&instances, Some(instance_id), &sanitized)?;
             config.java_args = sanitized;
         }
         self.save_instance_to_disk(&config)?;
@@ -465,14 +507,17 @@ impl ServerInstanceManager {
             .insert(instance_id.to_string(), config.clone());
 
         let instance_dir = self.instance_dir(instance_id);
-        let bom = Arc::new(BomService::new(
-            instance_dir.join("bom.json"),
-            Some(BillOfMaterials::new(
-                config.minecraft_version.clone(),
-                config.mod_loader.clone(),
-                Some(config.name.clone()),
-            )),
-        ));
+        let bom = Arc::new(
+            BomService::new(
+                instance_dir.join("bom.json"),
+                Some(BillOfMaterials::new(
+                    config.minecraft_version.clone(),
+                    config.mod_loader.clone(),
+                    Some(config.name.clone()),
+                )),
+            )
+            .with_signing_key(self.signing_key.clone()),
+        );
         let mods = ModManagementService::new(bom, instance_dir.join("mods"), "");
         let summary = mods
             .sync_mods_for_version_change(
@@ -636,6 +681,20 @@ impl ServerInstanceManager {
             .unwrap_or(false)
     }
 
+    /// Marks `instance_id` as waking. Returns `true` only when this call won
+    /// the race (the instance was not already waking), so duplicate concurrent
+    /// wakeup requests for the same instance are discarded instead of spawning
+    /// parallel start attempts.
+    pub fn mark_waking(&self, instance_id: &str) -> bool {
+        self.in_progress_wakes.insert(instance_id.to_string())
+    }
+
+    /// Clears the waking marker once the start attempt completes (success or
+    /// failure) so a later wakeup request can try again.
+    pub fn unmark_waking(&self, instance_id: &str) {
+        self.in_progress_wakes.remove(instance_id);
+    }
+
     /// The instant from which idle time should be measured for an instance:
     /// the most recent join/leave/lost event, or boot completion for a server
     /// nobody has played on yet. `None` before the server is ready. Event-
@@ -648,6 +707,30 @@ impl ServerInstanceManager {
             .player_trackers
             .get(instance_id)
             .and_then(|t| t.idle_reference())
+    }
+
+    /// Seconds left before an idle shutdown fires for `instance_id`, or `None`
+    /// when idle shutdown is disabled, the server is not up/joinable, a player
+    /// is online, or a launcher has a fresh join intent. Mirrors the
+    /// `IdleShutdownService` timing so the admin UI can show a live countdown
+    /// (e.g. "Sleeps in 3m 42s"). `idle_since` is only `Some` once the server
+    /// is ready, which covers the `is_server_ready` gate.
+    pub fn get_idle_remaining_seconds(&self, instance_id: &str) -> Option<u64> {
+        let config = self.get_instance(instance_id).ok()?;
+        if !config.idle_shutdown_enabled
+            || !self.is_running(instance_id)
+            || !self.is_server_ready(instance_id)
+        {
+            return None;
+        }
+        if self.get_online_player_count(instance_id) > 0
+            || self.has_pending_join_intent(instance_id)
+        {
+            return None;
+        }
+        let idle_since = self.idle_since(instance_id)?;
+        let window_secs = u64::from(clamp_idle_shutdown_minutes(config.idle_shutdown_minutes)) * 60;
+        Some(window_secs.saturating_sub(idle_since.elapsed().as_secs()))
     }
 
     /// Defers an instance's idle shutdown by resetting its activity timestamp.
@@ -1111,6 +1194,67 @@ pub fn has_invalid_heap_arg(args: &str) -> bool {
     })
 }
 
+/// Rejects an instance heap configuration that would overcommit the host's
+/// physical memory, protecting the daemon (and the OS) from the Linux OOM
+/// killer. A proportional headroom (at most 1.5 GB) is reserved for the OS,
+/// the wrapper and native JVM overhead; the target instance's `-Xmx`
+/// (defaulting to 4 GB when unset) must fit inside the remainder.
+///
+/// Only the *target* heap is checked: summing every instance's heap would
+/// block entirely reasonable setups (e.g. several 4 GB defaults on an 8 GB
+/// machine) that never run all instances at once.
+pub fn validate_instance_memory_headroom(
+    _current_instances: &[InstanceConfig],
+    _target_instance_id: Option<&str>,
+    new_java_args: &str,
+) -> Result<(), InstanceError> {
+    let mut sys = System::new_all();
+    sys.refresh_memory();
+    let total_ram_bytes = sys.total_memory();
+
+    // Cannot measure the host (e.g. exotic platforms): never block.
+    if total_ram_bytes == 0 {
+        return Ok(());
+    }
+
+    let reserved_headroom_bytes: u64 = (1536 * 1024 * 1024).min(total_ram_bytes / 4);
+    let available_heap_limit = total_ram_bytes.saturating_sub(reserved_headroom_bytes);
+    let target_heap = parse_xmx_bytes(new_java_args);
+
+    if target_heap > available_heap_limit {
+        let allocated_gb = target_heap as f64 / (1024.0 * 1024.0 * 1024.0);
+        let limit_gb = available_heap_limit as f64 / (1024.0 * 1024.0 * 1024.0);
+        return Err(InstanceError::Invalid(format!(
+            "Requested heap ({allocated_gb:.1} GB) exceeds host safe limit ({limit_gb:.1} GB)"
+        )));
+    }
+
+    Ok(())
+}
+
+/// The `-Xmx` heap size in bytes from a JVM arg string: the first `-Xmx<g>` /
+/// `-Xmx<m>` token (case-insensitive). Unsuffixed or unparseable values are
+/// ignored (the JVM reads them as bytes, i.e. negligible). When no usable
+/// `-Xmx` is present the default 4 GB is assumed, matching the default
+/// `javaArgs`.
+fn parse_xmx_bytes(java_args: &str) -> u64 {
+    for token in java_args.split_whitespace() {
+        let lower = token.to_ascii_lowercase();
+        if let Some(val) = lower.strip_prefix("-xmx") {
+            if let Some(num_str) = val.strip_suffix('g') {
+                if let Ok(gb) = num_str.parse::<u64>() {
+                    return gb * 1024 * 1024 * 1024;
+                }
+            } else if let Some(num_str) = val.strip_suffix('m') {
+                if let Ok(mb) = num_str.parse::<u64>() {
+                    return mb * 1024 * 1024;
+                }
+            }
+        }
+    }
+    4 * 1024 * 1024 * 1024 // Default fallback 4GB
+}
+
 /// Summary of a mod re-sync after an instance version change.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1399,5 +1543,60 @@ mod tests {
             manager.get_instance(&instance.id).unwrap().java_args
         );
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn parse_xmx_bytes_parses_g_and_m_case_insensitively() {
+        let gb = 1024u64 * 1024 * 1024;
+        assert_eq!(4 * gb, parse_xmx_bytes("-Xms2G -Xmx4G"));
+        assert_eq!(8 * gb, parse_xmx_bytes("-Xmx8G"));
+        assert_eq!(gb, parse_xmx_bytes("-xmx1g")); // case-insensitive
+        assert_eq!(2 * gb, parse_xmx_bytes("-Xms1G -Xmx2048M"));
+        // The first -Xmx token wins; unrelated flags are skipped.
+        assert_eq!(4 * gb, parse_xmx_bytes("-XX:+UseG1GC -Xmx4G -Xmx16G"));
+        // No usable -Xmx → the 4 GB default (matches default javaArgs).
+        assert_eq!(4 * gb, parse_xmx_bytes(""));
+        assert_eq!(4 * gb, parse_xmx_bytes("-XX:+UseZGC"));
+        // Unsuffixed values are bytes (negligible) → ignored, default applies.
+        assert_eq!(4 * gb, parse_xmx_bytes("-Xmx8"));
+    }
+
+    #[test]
+    fn memory_headroom_rejects_overcommit_and_excludes_target() {
+        let mut a = InstanceConfig::new("A", "1.20.4", "vanilla", "", 25700);
+        let mut b = InstanceConfig::new("B", "1.21", "vanilla", "", 25701);
+        a.java_args = "-Xmx512M".to_string();
+        b.java_args = "-Xmx512M".to_string();
+
+        // Modest heaps always fit on any real machine, regardless of how many
+        // instances exist.
+        assert!(
+            validate_instance_memory_headroom(&[a.clone(), b.clone()], None, "-Xmx512M").is_ok()
+        );
+
+        // A heap beyond any real host's RAM is always rejected.
+        let err = validate_instance_memory_headroom(&[a.clone()], None, "-Xmx999999G").unwrap_err();
+        assert!(matches!(err, InstanceError::Invalid(_)), "{err:?}");
+        assert!(
+            err.to_string().contains("exceeds host safe limit"),
+            "unhelpful error: {err}"
+        );
+
+        // Only the target heap matters: a huge heap on a non-target instance
+        // no longer blocks updates for the target.
+        b.java_args = "-Xmx999999G".to_string();
+        assert!(validate_instance_memory_headroom(
+            &[a.clone(), b.clone()],
+            Some(&a.id),
+            "-Xmx512M"
+        )
+        .is_ok());
+        // Replacing B's huge old heap with a sane one also succeeds.
+        assert!(validate_instance_memory_headroom(
+            &[a.clone(), b.clone()],
+            Some(&b.id),
+            "-Xmx512M"
+        )
+        .is_ok());
     }
 }

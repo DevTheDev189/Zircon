@@ -34,6 +34,21 @@ tokio-util = { workspace = true, features = ["io"] }
 futures-util = "0.3"
 sha2.workspace = true
 hex.workspace = true
+# Ed25519 for BOM attestation (same version/features as zircon-core).
+ed25519-dalek = { version = "2.1", default-features = false, features = ["std", "rand_core"] }
+# CSPRNG for generating the persistent BOM signing key (ed25519-dalek's
+# `rand_core` feature only needs a `CryptoRngCore` implementation).
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Restricted-DACL hardening of secret files (users.json, jwt-secret.key,
+# audit.log): non-admins must not read or tamper with them.
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Threading",
+] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

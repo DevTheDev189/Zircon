@@ -67,6 +67,9 @@ pub fn is_installed(server_dir: &Path, server_jar: &Path, loader: &ModLoaderInfo
         Some(t) if t.is_forge_like() => {
             find_server_args_file(server_dir, &loader.version).is_some()
         }
+        Some(ModLoaderType::Quilt) => {
+            server_dir.join("quilt-server-launch.jar").is_file() || server_jar.is_file()
+        }
         _ => server_jar.is_file(),
     }
 }
@@ -96,7 +99,7 @@ pub async fn ensure_server_installed(
                 install_fabric_like(server_jar, mc_version, loader, false).await?
             }
             Some(ModLoaderType::Quilt) => {
-                install_fabric_like(server_jar, mc_version, loader, true).await?
+                install_quilt(server_dir, cache_dir, mc_version, loader).await?
             }
             Some(ModLoaderType::Forge) => {
                 install_forge_like(server_dir, cache_dir, mc_version, loader, false).await?
@@ -294,6 +297,71 @@ async fn install_fabric_like(
         if quilt { "Quilt" } else { "Fabric" }
     );
     download(&url, server_jar).await?;
+    Ok(())
+}
+
+/// Installs a Quilt server by downloading `quilt-installer.jar` and running it
+/// with `java -jar quilt-installer.jar install server <mc> [<loader>]
+/// --download-server --install-dir=<dir>`. Quilt's meta API does not serve a
+/// pre-packaged server launch JAR, so we must run the installer CLI to produce
+/// `quilt-server-launch.jar`.
+async fn install_quilt(
+    server_dir: &Path,
+    cache_dir: &Path,
+    mc_version: &str,
+    loader: &ModLoaderInfo,
+) -> Result<(), InstallError> {
+    let loader_version = if loader.version.trim().is_empty() {
+        resolve_latest_loader_version(mc_version, QUILT_META_URL).await?
+    } else {
+        loader.version.clone()
+    };
+
+    let installers: Vec<serde_json::Value> =
+        get_json(&format!("{QUILT_META_URL}/versions/installer")).await?;
+    let installer_entry = installers.first().ok_or_else(|| {
+        InstallError::Config("No Quilt installer versions found at meta API".to_string())
+    })?;
+    let installer_url = installer_entry
+        .get("url")
+        .and_then(|u| u.as_str())
+        .ok_or_else(|| InstallError::Config("Missing Quilt installer download URL".to_string()))?;
+    let installer_ver = installer_entry
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("latest");
+
+    fs::create_dir_all(cache_dir)?;
+    let installer_jar = cache_dir.join(format!("quilt-installer-{installer_ver}.jar"));
+    if !installer_jar.is_file() {
+        tracing::info!("Downloading Quilt installer from {installer_url}");
+        download(&installer_url, &installer_jar).await?;
+    }
+
+    fs::create_dir_all(server_dir)?;
+    let java = java_bin();
+    let mut args = vec![
+        java.as_str(),
+        "-jar",
+        installer_jar.to_str().unwrap_or_default(),
+        "install",
+        "server",
+        mc_version,
+    ];
+    if !loader_version.is_empty() {
+        args.push(&loader_version);
+    }
+    args.push("--download-server");
+    let install_dir_arg = format!("--install-dir={}", server_dir.to_str().unwrap_or_default());
+    args.push(&install_dir_arg);
+
+    tracing::info!("Running Quilt installer into {}...", server_dir.display());
+    let exit_code = run_installer(&args, server_dir).await?;
+    if exit_code != 0 {
+        return Err(InstallError::Process(format!(
+            "Quilt installer failed with exit code {exit_code}"
+        )));
+    }
     Ok(())
 }
 

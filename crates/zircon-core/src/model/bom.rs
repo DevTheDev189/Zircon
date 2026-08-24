@@ -28,6 +28,17 @@ pub struct BillOfMaterials {
     pub resourcepacks: Vec<PackEntry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server_title: Option<String>,
+
+    // --- Cryptographic Attestation Fields ---
+    // Set by the server on every disk write (Ed25519): `server_public_key` is
+    // the hex-encoded public key the launcher pins on first use (TOFU) and
+    // `signature` covers the canonical digest of the content above. Both are
+    // stripped from the digest itself, so adding/refreshing them never changes
+    // what was signed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_public_key: Option<String>,
 }
 
 fn default_schema_version() -> i32 {
@@ -48,6 +59,8 @@ impl BillOfMaterials {
             shaderpacks: Vec::new(),
             resourcepacks: Vec::new(),
             server_title,
+            signature: None,
+            server_public_key: None,
         }
     }
 
@@ -150,6 +163,12 @@ pub struct ModEntry {
     /// direct uploads.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// Modrinth project slug (e.g. "sodium"), used to build the project page URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    /// Canonical Modrinth project page URL, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_url: Option<String>,
     /// File name as it must appear in the client's mods folder, e.g. "sodium-0.5.8.jar".
     pub filename: String,
     /// Lower-case hex SHA-1 of the file.
@@ -205,6 +224,8 @@ impl ModEntry {
     ) -> Self {
         Self {
             id,
+            slug: None,
+            project_url: None,
             filename: filename.into(),
             sha1,
             murmur3,
@@ -224,6 +245,19 @@ impl ModEntry {
     pub fn display_title(&self) -> &str {
         self.title.as_deref().unwrap_or(&self.filename)
     }
+
+    /// Computes the external Modrinth URL if not explicitly set.
+    pub fn modrinth_url(&self) -> Option<String> {
+        if let Some(ref url) = self.project_url {
+            return Some(url.clone());
+        }
+        if self.origin.as_deref() == Some("modrinth") {
+            if let Some(ref target) = self.slug.as_ref().or(self.id.as_ref()) {
+                return Some(format!("https://modrinth.com/mod/{target}"));
+            }
+        }
+        None
+    }
 }
 
 /// A single shaderpack or resourcepack entry inside a `BillOfMaterials`.
@@ -237,6 +271,12 @@ pub struct PackEntry {
     /// Modrinth project id, CurseForge file id, or a client-generated id for direct uploads.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// Modrinth project slug (e.g. "complementary-shaders"), used to build the project page URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    /// Canonical Modrinth project page URL, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_url: Option<String>,
     /// File name as it must appear on disk, e.g. "ComplementaryShaders.zip".
     pub filename: String,
     /// Lower-case hex SHA-1 of the file.
@@ -260,6 +300,12 @@ pub struct PackEntry {
     /// Icon URL for the admin UI (Modrinth CDN, etc.).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon_url: Option<String>,
+    /// Author name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    /// Short human-readable description of the pack.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 impl PackEntry {
@@ -275,6 +321,8 @@ impl PackEntry {
     ) -> Self {
         Self {
             id,
+            slug: None,
+            project_url: None,
             filename: filename.into(),
             sha1,
             murmur3,
@@ -283,12 +331,28 @@ impl PackEntry {
             file_size,
             title: None,
             icon_url: None,
+            author: None,
+            description: None,
         }
     }
 
     /// Display title, falling back to the file name when unset.
     pub fn display_title(&self) -> &str {
         self.title.as_deref().unwrap_or(&self.filename)
+    }
+
+    /// Computes the Modrinth URL based on whether it is a shader or resource pack.
+    pub fn modrinth_url(&self, is_shader: bool) -> Option<String> {
+        if let Some(ref url) = self.project_url {
+            return Some(url.clone());
+        }
+        if self.origin.as_deref() == Some("modrinth") {
+            if let Some(ref target) = self.slug.as_ref().or(self.id.as_ref()) {
+                let category = if is_shader { "shader" } else { "resourcepack" };
+                return Some(format!("https://modrinth.com/{category}/{target}"));
+            }
+        }
+        None
     }
 }
 

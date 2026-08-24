@@ -10,6 +10,7 @@ use serde_json::json;
 
 use crate::updater::{ServerUpdater, CURRENT_SERVER_VERSION};
 use crate::web::app::{ApiError, AppState};
+use crate::web::auth::CurrentUser;
 
 /// GET /api/system/update/check — reports the running version and whether a
 /// newer release is available (with the manifest for UI display).
@@ -24,9 +25,11 @@ pub async fn check_update() -> Result<Json<serde_json::Value>, ApiError> {
 }
 
 /// POST /api/system/update/apply — stops all instances, swaps in the verified
-/// binary and relaunches the daemon with the original arguments.
+/// binary and relaunches the daemon with the original arguments. The action is
+/// recorded in the audit log under the authenticated admin's identity.
 pub async fn apply_update(
     State(state): State<AppState>,
+    user: CurrentUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let updater = ServerUpdater::new();
     let Some(manifest) = updater.check_update().await.map_err(ApiError::Internal)? else {
@@ -34,7 +37,7 @@ pub async fn apply_update(
     };
 
     state.audit.log(
-        "ADMIN",
+        &user.username,
         "SERVER_UPDATE_APPLY",
         &format!("Target version: {}", manifest.version),
     );

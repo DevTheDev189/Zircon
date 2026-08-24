@@ -11,6 +11,7 @@ pub mod auth;
 pub mod commands;
 pub mod error;
 pub mod launch;
+pub mod logging;
 pub mod model;
 pub mod offline;
 pub mod pack_selection;
@@ -25,14 +26,18 @@ pub mod sync;
 /// launcher state and exposes every IPC command from [`commands`].
 ///
 /// Logging goes to stderr; set `RUST_LOG` (e.g. `RUST_LOG=debug`) for more
-/// verbose output when running from a terminal.
+/// verbose output when running from a terminal. Every event is also mirrored
+/// into an in-memory ring buffer for the Settings tab's debug log viewer.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
+    use tracing_subscriber::prelude::*;
+    tracing_subscriber::registry()
+        .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
+        .with(tracing_subscriber::fmt::layer())
+        .with(logging::InMemoryLogLayer)
         .init();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -75,6 +80,8 @@ pub fn run() {
             commands::delete_history_skin,
             commands::upload_skin_to_mojang,
             commands::list_instance_packs,
+            commands::list_instance_packs_detailed,
+            commands::open_external_url,
             commands::add_local_pack,
             commands::remove_local_pack,
             commands::set_active_shaderpack,
@@ -85,6 +92,9 @@ pub fn run() {
             commands::list_loader_types,
             commands::get_settings,
             commands::save_settings,
+            commands::get_launcher_logs,
+            commands::clear_launcher_logs,
+            commands::check_game_crash,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Zircon launcher");

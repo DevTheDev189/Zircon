@@ -62,7 +62,10 @@
                 :key="mod.filename"
                 class="flex items-center gap-2 text-xs"
               >
-                <span class="flex-1 truncate text-text">{{ mod.filename }}</span>
+                <div class="flex-1 min-w-0">
+                  <div class="truncate text-text">{{ mod.filename }}</div>
+                  <div v-if="mod.author" class="text-[10px] text-muted">by {{ mod.author }}</div>
+                </div>
                 <span class="text-muted">{{ fmtBytes(mod.sizeBytes) }}</span>
                 <button class="text-muted hover:text-[#f85149]" title="Delete" @click="deleteMod(mod.filename)">✕</button>
               </div>

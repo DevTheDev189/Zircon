@@ -9,7 +9,7 @@ use axum::Json;
 use serde::Deserialize;
 use zircon_core::model::{InstanceConfig, ModLoaderInfo};
 
-use super::app::{ApiError, AppState};
+use super::app::{ApiError, AppState, RealIp};
 use crate::config::ServerProperties;
 use crate::instance::ServerInstanceManager;
 use crate::web::controllers::config_helpers::instance_to_map;
@@ -83,7 +83,12 @@ pub async fn update_config(
             cfg.java_args = args.clone();
         }
         if let Some(key) = &body.curseforge_api_key {
-            cfg.curseforge_api_key = key.clone();
+            let key = key.trim();
+            // `get_config` returns a masked key ("****abcd"); sending it back
+            // on save must NOT overwrite the real stored key.
+            if !key.starts_with("****") {
+                cfg.curseforge_api_key = key.to_string();
+            }
         }
         if let Some(auto) = body.auto_start_server {
             cfg.auto_start_server = auto;
@@ -94,6 +99,19 @@ pub async fn update_config(
     }
     state.config.save_config()?;
     if bom_updated {
+        // Keep the persisted BOM in sync with the updated config fields before
+        // saving, so the two stores can never drift.
+        state.bom.with_bom(|b| {
+            if let Some(title) = &body.server_title {
+                b.server_title = Some(title.clone());
+            }
+            if let Some(mc) = &body.minecraft_version {
+                b.minecraft_version = mc.clone();
+            }
+            if let Some(loader) = &body.mod_loader {
+                b.mod_loader = Some(loader.clone());
+            }
+        });
         state.bom.save()?;
     }
     if let Some(props) = &body.server_properties {
@@ -131,7 +149,37 @@ pub async fn stop_server(State(state): State<AppState>) -> Json<serde_json::Valu
 /// admin token is required, so the launcher can render player counts in its
 /// server list without authenticating.
 pub async fn client_status(State(state): State<AppState>) -> Json<serde_json::Value> {
-    let value = match state.instances.get_active_instance() {
+    Json(instance_status(
+        &state,
+        state.instances.get_active_instance().as_ref(),
+    ))
+}
+
+/// GET /{port}/status — same as `/status` but for the instance owning the path
+/// port (or id), for HTTPS reverse proxies whose `Host` header carries no port.
+pub async fn client_status_by_port(
+    State(state): State<AppState>,
+    axum::extract::Path(port_or_id): axum::extract::Path<String>,
+) -> Json<serde_json::Value> {
+    Json(instance_status(
+        &state,
+        resolve_instance_for_ref(&state, &port_or_id).as_ref(),
+    ))
+}
+
+/// Resolves an instance for a path-based `:port`/instance-id reference.
+fn resolve_instance_for_ref(state: &AppState, port_or_id: &str) -> Option<InstanceConfig> {
+    if let Ok(port) = port_or_id.parse::<i32>() {
+        if let Some(cfg) = state.instances.find_by_external_port(port) {
+            return Some(cfg);
+        }
+        return state.instances.find_by_internal_port(port as u16);
+    }
+    state.instances.get_instance(port_or_id).ok()
+}
+
+fn instance_status(state: &AppState, instance: Option<&InstanceConfig>) -> serde_json::Value {
+    match instance {
         Some(instance) => {
             let id = instance.id.clone();
             let running = state.instances.is_running(&id);
@@ -167,8 +215,7 @@ pub async fn client_status(State(state): State<AppState>) -> Json<serde_json::Va
                 "name": state.config.get_config().server_title,
             })
         }
-    };
-    Json(value)
+    }
 }
 
 /// Reads `max-players` from a `server.properties` file (0 when unavailable).
@@ -191,7 +238,13 @@ pub async fn get_status(State(state): State<AppState>) -> Json<serde_json::Value
         Some(instance) => {
             let running = state.instances.is_running(&instance.id);
             let players = state.instances.get_online_players(&instance.id);
-            instance_to_map(instance, running, players.len(), players)
+            instance_to_map(
+                instance,
+                running,
+                players.len(),
+                players,
+                state.instances.get_idle_remaining_seconds(&instance.id),
+            )
         }
         None => serde_json::json!({
             "running": state.process_manager.is_running(),
@@ -225,10 +278,23 @@ pub struct WakeupRequest {
 /// (hostname → player-facing port → active instance) and starts it in the
 /// background; the launcher then polls the status ping until it is online.
 /// Refuses instances that were stopped manually (not by the idle service).
+///
+/// Rate-limited per real client IP (same limiter as join intents) and
+/// deduplicated per instance so a single attacker cannot thrash sleeping
+/// instances into resource exhaustion, and concurrent duplicate wakeups for
+/// the same instance collapse into one start attempt.
 pub async fn wakeup_server(
     State(state): State<AppState>,
+    ip: RealIp,
     Json(body): Json<WakeupRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Rate limit wakeup requests identically to join intents.
+    if let Err(retry_after) = state.join_intent_limiter.check(&ip.0.to_string()) {
+        return Err(ApiError::TooManyRequests(format!(
+            "Too many wakeup attempts. Retry in {retry_after}s."
+        )));
+    }
+
     let public_port = state.config.get_config().public_port;
     let Some(cfg) = resolve_wake_target(
         &state.instances,
@@ -258,20 +324,25 @@ pub async fn wakeup_server(
         )));
     }
 
-    // Start in the background so the request returns immediately; the launcher
-    // polls the Minecraft status ping until the server is online.
-    let instances = state.instances.clone();
-    let id = cfg.id.clone();
-    let log_id = id.clone();
-    tokio::spawn(async move {
-        if let Err(e) = instances.start_instance(&id).await {
-            tracing::error!("Wakeup start failed for instance {id}: {e}");
-        }
-    });
-    tracing::info!(
-        "Wakeup request: starting instance '{}' ({log_id})",
-        cfg.name
-    );
+    // Atomically start if not already waking: a duplicate concurrent wakeup
+    // for the same instance is discarded (mark_waking returns false).
+    if state.instances.mark_waking(&cfg.id) {
+        let instances = state.instances.clone();
+        let id = cfg.id.clone();
+        let log_id = id.clone();
+        tokio::spawn(async move {
+            let result = instances.start_instance(&id).await;
+            instances.unmark_waking(&id);
+            if let Err(e) = result {
+                tracing::error!("Wakeup start failed for instance {id}: {e}");
+            }
+        });
+        tracing::info!(
+            "Wakeup request: starting instance '{}' ({log_id})",
+            cfg.name
+        );
+    }
+
     Ok(Json(
         serde_json::json!({ "ok": true, "instanceId": cfg.id }),
     ))

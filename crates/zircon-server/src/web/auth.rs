@@ -86,6 +86,15 @@ pub async fn require_auth(
         ));
     };
 
+    // Belt-and-suspenders: deserialization already rejects tokens without a
+    // `jti`, but a whitespace-only claim must not be able to bypass session
+    // revocation either.
+    if claims.jti.trim().is_empty() {
+        return Err(ApiError::Unauthorized(
+            "Invalid or expired session.".to_string(),
+        ));
+    }
+
     if state.sessions.is_revoked(&claims.jti) {
         return Err(ApiError::Unauthorized(
             "Session has been revoked.".to_string(),

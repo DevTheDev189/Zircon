@@ -23,6 +23,8 @@ pub enum LauncherError {
     Parse(String),
     /// Invalid user input or unsupported configuration.
     InvalidInput(String),
+    /// Security-trust failures: host-key mismatch, BOM attestation failure.
+    Security(String),
     /// Child-process failures (installers, the game itself).
     Process(String),
     /// A required artifact/entity could not be found.
@@ -39,6 +41,7 @@ impl fmt::Display for LauncherError {
             LauncherError::Auth(m) => write!(f, "authentication error: {m}"),
             LauncherError::Parse(m) => write!(f, "parse error: {m}"),
             LauncherError::InvalidInput(m) => write!(f, "invalid input: {m}"),
+            LauncherError::Security(m) => write!(f, "security error: {m}"),
             LauncherError::Process(m) => write!(f, "process error: {m}"),
             LauncherError::NotFound(m) => write!(f, "not found: {m}"),
         }

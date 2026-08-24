@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use ed25519_dalek::SigningKey;
 use zircon_core::model::{BillOfMaterials, InstanceConfig};
 
 use super::bom::BomService;
@@ -33,6 +34,9 @@ pub struct ModServiceResolver {
     legacy_mods: Arc<ModManagementService>,
     legacy_packs: PackManagementService,
     curse_forge_api_key: String,
+    /// Server-level Ed25519 key: instance BOMs are signed with the same key as
+    /// the legacy store so launchers verify every BOM with one pin.
+    signing_key: Option<Arc<SigningKey>>,
 }
 
 impl ModServiceResolver {
@@ -43,6 +47,7 @@ impl ModServiceResolver {
         legacy_mods: Arc<ModManagementService>,
         legacy_packs: PackManagementService,
         curse_forge_api_key: &str,
+        signing_key: Option<Arc<SigningKey>>,
     ) -> Self {
         Self {
             instance_manager,
@@ -50,6 +55,7 @@ impl ModServiceResolver {
             legacy_mods,
             legacy_packs,
             curse_forge_api_key: curse_forge_api_key.to_string(),
+            signing_key,
         }
     }
 
@@ -129,14 +135,17 @@ impl ModServiceResolver {
     /// Freshly built per-instance service trio (disk is always the source of truth).
     pub fn instance_service(&self, cfg: &InstanceConfig) -> InstanceServices {
         let instance_dir = self.instance_manager.get_instance_dir(&cfg.id);
-        let bom = Arc::new(BomService::new(
-            instance_dir.join("bom.json"),
-            Some(BillOfMaterials::new(
-                cfg.minecraft_version.clone(),
-                cfg.mod_loader.clone(),
-                Some(cfg.name.clone()),
-            )),
-        ));
+        let bom = Arc::new(
+            BomService::new(
+                instance_dir.join("bom.json"),
+                Some(BillOfMaterials::new(
+                    cfg.minecraft_version.clone(),
+                    cfg.mod_loader.clone(),
+                    Some(cfg.name.clone()),
+                )),
+            )
+            .with_signing_key(self.signing_key.clone()),
+        );
         let mods = ModManagementService::new(
             bom.clone(),
             instance_dir.join("mods"),

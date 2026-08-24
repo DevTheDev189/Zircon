@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use uuid::Uuid;
+use zircon_core::api::modrinth::ModrinthApiClient;
 use zircon_core::crypto::hash;
 use zircon_core::model::PackEntry;
 use zircon_core::security::ssrf;
@@ -300,6 +301,82 @@ impl PackManagementService {
             .await?;
         entry.download_url = Some(url.to_string());
         self.bom_service.save()?;
+        Ok(entry)
+    }
+
+    /// Installs a shaderpack or resourcepack from Modrinth by project id,
+    /// optionally pinning a specific version, and enriches the resulting BOM
+    /// entry with the project's rich metadata (icon, slug, author, description,
+    /// title, project URL).
+    pub async fn install_modrinth_pack(
+        &self,
+        project_id: &str,
+        version_id: Option<&str>,
+        is_shader: bool,
+    ) -> Result<PackEntry, PackError> {
+        let modrinth = ModrinthApiClient::new();
+        let versions = modrinth
+            .list_project_versions(project_id, None, None)
+            .await
+            .map_err(|e| PackError::Api(e.to_string()))?;
+
+        let version = versions
+            .into_iter()
+            .find(|v| version_id.is_none() || version_id == Some(v.id.as_str()))
+            .ok_or_else(|| PackError::Invalid("No matching pack version found".into()))?;
+
+        let file = version
+            .primary_file()
+            .ok_or_else(|| PackError::Invalid("No downloadable file found in version".into()))?;
+
+        let dir = if is_shader {
+            &self.shaderpacks_dir
+        } else {
+            &self.resourcepacks_dir
+        };
+
+        let bytes = reqwest::get(&file.url)
+            .await
+            .map_err(|e| PackError::Api(e.to_string()))?
+            .bytes()
+            .await
+            .map_err(|e| PackError::Api(e.to_string()))?
+            .to_vec();
+
+        let mut entry = self
+            .add(
+                std::io::Cursor::new(bytes),
+                &file.filename,
+                Some(ORIGIN_MODRINTH),
+                dir,
+                is_shader,
+            )
+            .await?;
+
+        // Enrich with Modrinth Project details.
+        if let Ok(project) = modrinth.get_project(project_id).await {
+            entry.id = Some(project.id.clone());
+            entry.slug = Some(project.slug.clone());
+            entry.title = Some(project.title);
+            entry.description = Some(project.description);
+            entry.icon_url = Some(project.icon_url);
+            entry.author = Some(project.author);
+            let category = if is_shader { "shader" } else { "resourcepack" };
+            entry.project_url = Some(format!("https://modrinth.com/{category}/{}", project.slug));
+        }
+
+        // Persist the enriched entry to the BOM.
+        self.bom_service.with_bom(|bom| {
+            let list = if is_shader {
+                &mut bom.shaderpacks
+            } else {
+                &mut bom.resourcepacks
+            };
+            list.retain(|p| p.filename != entry.filename);
+            list.push(entry.clone());
+        });
+        self.bom_service.save()?;
+
         Ok(entry)
     }
 

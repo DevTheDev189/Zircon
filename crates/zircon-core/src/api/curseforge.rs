@@ -171,6 +171,30 @@ pub struct CurseForgeMod {
     pub links: Option<CurseForgeLinks>,
     #[serde(default)]
     pub latest_files: Vec<CurseForgeFile>,
+    #[serde(default)]
+    pub authors: Vec<CurseForgeAuthor>,
+}
+
+impl CurseForgeMod {
+    /// Comma-joined author names, e.g. "jellysquid3, grum".
+    pub fn authors_string(&self) -> String {
+        self.authors
+            .iter()
+            .map(|a| a.name.as_str())
+            .filter(|n| !n.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+/// A CurseForge mod author.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurseForgeAuthor {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub url: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

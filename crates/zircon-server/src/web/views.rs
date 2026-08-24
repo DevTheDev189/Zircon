@@ -10,11 +10,13 @@ use crate::process::player_tracker::PlayerHistoryEntry;
 pub fn mod_entry_to_map(entry: &ModEntry) -> serde_json::Value {
     serde_json::json!({
         "id": entry.id,
+        "slug": entry.slug,
         "filename": entry.filename,
         "sha1": entry.sha1,
         "murmur3": entry.murmur3,
         "origin": entry.origin,
         "downloadUrl": entry.download_url,
+        "projectUrl": entry.modrinth_url().or_else(|| entry.project_url.clone()),
         "fileSize": entry.file_size,
         "title": entry.display_title(),
         "description": entry.description.clone().unwrap_or_default(),
@@ -26,17 +28,22 @@ pub fn mod_entry_to_map(entry: &ModEntry) -> serde_json::Value {
 }
 
 /// Plain map view of a `PackEntry` for the admin web UI.
-pub fn pack_entry_to_map(entry: &PackEntry) -> serde_json::Value {
+/// `is_shader` selects the Modrinth URL category (`shader` vs `resourcepack`).
+pub fn pack_entry_to_map(entry: &PackEntry, is_shader: bool) -> serde_json::Value {
     serde_json::json!({
         "id": entry.id,
+        "slug": entry.slug,
         "filename": entry.filename,
         "sha1": entry.sha1,
         "murmur3": entry.murmur3,
         "origin": entry.origin,
         "downloadUrl": entry.download_url,
+        "projectUrl": entry.modrinth_url(is_shader).or_else(|| entry.project_url.clone()),
         "fileSize": entry.file_size,
         "title": entry.display_title(),
         "iconUrl": entry.icon_url.clone().unwrap_or_default(),
+        "author": entry.author.clone().unwrap_or_default(),
+        "description": entry.description.clone().unwrap_or_default(),
     })
 }
 
@@ -71,6 +78,7 @@ pub fn instance_to_map(
     running: bool,
     player_count: usize,
     online_players: Vec<String>,
+    idle_remaining_seconds: Option<u64>,
 ) -> serde_json::Value {
     serde_json::json!({
         "id": instance.id,
@@ -94,6 +102,7 @@ pub fn instance_to_map(
         "running": running,
         "playerCount": player_count,
         "onlinePlayers": online_players,
+        "idleRemainingSeconds": idle_remaining_seconds,
     })
 }
 
@@ -126,6 +135,11 @@ pub fn modrinth_version_to_map(
 pub fn modrinth_hit_to_map(
     hit: &zircon_core::api::modrinth::ModrinthSearchHit,
 ) -> serde_json::Value {
+    let slug_or_id = if !hit.slug.trim().is_empty() {
+        &hit.slug
+    } else {
+        &hit.project_id
+    };
     serde_json::json!({
         "projectId": hit.project_id,
         "slug": hit.slug,
@@ -135,6 +149,7 @@ pub fn modrinth_hit_to_map(
         "downloads": hit.downloads,
         "iconUrl": hit.icon_url,
         "versions": hit.versions,
+        "projectUrl": format!("https://modrinth.com/project/{slug_or_id}"),
     })
 }
 
@@ -147,6 +162,7 @@ pub fn curseforge_mod_to_map(
         "name": mod_entry.name,
         "slug": mod_entry.slug,
         "summary": mod_entry.summary,
+        "author": mod_entry.authors_string(),
         "downloadCount": mod_entry.download_count,
         "gameVersions": mod_entry.game_versions,
         "websiteUrl": mod_entry.links.as_ref().map(|l| l.website_url.clone()),

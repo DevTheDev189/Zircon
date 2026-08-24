@@ -68,6 +68,8 @@ window.Zircon.instances = {
     async startInstance(inst) {
         inst = inst || this.selectedInstance;
         if (!inst) return;
+        if (this.actionLoading[inst.id]) return;
+        this.actionLoading[inst.id] = true;
         try {
             await this.api(`/api/instances/${inst.id}/start`, { method: 'POST' });
             await this.loadInstances();
@@ -78,6 +80,8 @@ window.Zircon.instances = {
             } else {
                 alert('Start failed: ' + e.message);
             }
+        } finally {
+            delete this.actionLoading[inst.id];
         }
     },
     async stopInstance(inst) {

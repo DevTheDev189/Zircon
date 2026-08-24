@@ -224,6 +224,23 @@ impl MinecraftProcessManager {
                     .to_string_lossy()
                     .into_owned();
                 launch_args.push(format!("@{rel}"));
+            } else if loader == ModLoaderType::Quilt
+                && self
+                    .context
+                    .server_dir
+                    .join("quilt-server-launch.jar")
+                    .is_file()
+            {
+                // Quilt servers install to `quilt-server-launch.jar` (unlike
+                // Fabric's combined `server.jar`).
+                launch_args.push("-jar".to_string());
+                launch_args.push(
+                    self.context
+                        .server_dir
+                        .join("quilt-server-launch.jar")
+                        .to_string_lossy()
+                        .into_owned(),
+                );
             } else {
                 launch_args.push("-jar".to_string());
                 launch_args.push(self.context.server_jar.to_string_lossy().into_owned());

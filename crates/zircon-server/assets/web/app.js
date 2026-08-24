@@ -2,8 +2,13 @@ const { createApp } = Vue;
 
 // Zircon admin SPA entry. State lives in data(); the methods are merged
 // in from the feature modules in js/ so every method keeps sharing the
-// same `this` as before the split.
+// same `this` as before the split. The view comes from `render`, a
+// pre-compiled version of the old in-DOM #app template (see
+// scripts/build-web-ui.js), so the page needs only Vue's runtime build —
+// no template compilation at runtime, which keeps `unsafe-eval` out of
+// the Content-Security-Policy.
 createApp({
+    render: ZirconRender,
     data() {
         return {
             authenticated: false,
@@ -35,6 +40,9 @@ createApp({
                 { projectId: 'appleskin', title: 'AppleSkin', description: 'Adds food value information to tooltips and HUD.', loader: 'both' }
             ],
             installedMods: [],
+            // True while the Installed Mods list is being fetched so the tab can
+            // show a spinner instead of a jarring empty/offline flash.
+            isLoadingMods: false,
             shaderpacks: [],
             resourcepacks: [],
             shaderSearchQuery: '',
@@ -61,11 +69,16 @@ createApp({
             showEulaModal: false,
             eulaInstance: null,
             showDeleteModal: false,
+            // { [instanceId]: true } while a Start action is in flight so the
+            // start button can show a spinner and disable instead of appearing
+            // unresponsive during a long first-boot install.
+            actionLoading: {},
             consoleLines: [],
             command: '',
             consoleWs: null,
             autoScroll: true,
             pollTimer: null,
+            idleTicker: null,
             consoleFilters: { info: true, warnings: true, errors: true }
         };
     },

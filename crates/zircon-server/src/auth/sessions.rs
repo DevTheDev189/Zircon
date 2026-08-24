@@ -53,10 +53,13 @@ impl SessionRegistry {
 
     /// Returns `true` when the token with `jti` was explicitly revoked and has
     /// not yet expired naturally. Unknown (never-registered) tokens — e.g.
-    /// issued before the registry existed — are treated as valid.
+    /// issued before the registry existed — are treated as valid, but an empty
+    /// `jti` is **always** treated as revoked (fail closed): a token without a
+    /// session identifier can never be tied to a revocable session, so it must
+    /// not be accepted.
     pub fn is_revoked(&self, jti: &str) -> bool {
-        if jti.is_empty() {
-            return false;
+        if jti.trim().is_empty() {
+            return true; // Fail closed
         }
         let sessions = self.sessions.lock().unwrap();
         match sessions.get(jti) {
@@ -138,10 +141,13 @@ mod tests {
     }
 
     #[test]
-    fn empty_or_unknown_jtis_are_never_revoked() {
+    fn empty_jti_is_revoked_but_unknown_jtis_are_not() {
         let registry = SessionRegistry::new();
         registry.revoke("", "admin", future());
-        assert!(!registry.is_revoked(""));
+        // Fail closed: a token with no session identifier is never valid.
+        assert!(registry.is_revoked(""));
+        assert!(registry.is_revoked("   "));
+        // A never-issued (but well-formed) jti is not revoked.
         assert!(!registry.is_revoked("never-issued"));
     }
 

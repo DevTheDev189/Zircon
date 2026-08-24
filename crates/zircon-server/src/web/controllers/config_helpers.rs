@@ -45,8 +45,15 @@ pub fn instance_to_map(
     running: bool,
     player_count: usize,
     online_players: Vec<String>,
+    idle_remaining_seconds: Option<u64>,
 ) -> serde_json::Value {
-    view_instance_to_map(instance, running, player_count, online_players)
+    view_instance_to_map(
+        instance,
+        running,
+        player_count,
+        online_players,
+        idle_remaining_seconds,
+    )
 }
 
 /// Reads a vanilla JSON player list (`whitelist.json`, `ops.json`,

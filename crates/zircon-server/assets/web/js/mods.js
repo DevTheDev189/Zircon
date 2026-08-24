@@ -106,11 +106,14 @@ window.Zircon.mods = {
     },
     async loadMods() {
         if (!this.selectedInstance) return;
+        this.isLoadingMods = true;
         try {
             const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods`);
             this.installedMods = data.mods || [];
         } catch (e) {
             this.installedMods = [];
+        } finally {
+            this.isLoadingMods = false;
         }
     },
     async deleteMod(filename) {

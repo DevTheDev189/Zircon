@@ -52,13 +52,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         console.clone(),
     ));
 
-    // Multi-instance engine (isolated <data>/instances/<id>/ dirs).
-    let instances = Arc::new(ServerInstanceManager::new(
-        &config.data_dir,
-        console.clone(),
-    )?);
+    // Persistent Ed25519 key used to sign every BOM write (generated on first
+    // run, cached in memory); launchers pin the matching public key via TOFU.
+    let signing_key = config.load_or_create_signing_key()?;
 
-    let bom = Arc::new(BomService::new(config.bom_file.clone(), None));
+    // Multi-instance engine (isolated <data>/instances/<id>/ dirs).
+    let instances = Arc::new(
+        ServerInstanceManager::new(&config.data_dir, console.clone())?
+            .with_signing_key(Some(signing_key.clone())),
+    );
+
+    let bom = Arc::new(
+        BomService::new(config.bom_file.clone(), None).with_signing_key(Some(signing_key.clone())),
+    );
     let mods = Arc::new(ModManagementService::new(
         bom.clone(),
         config.mods_dir.clone(),
@@ -75,6 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         mods.clone(),
         packs.clone(),
         &config.get_config().curseforge_api_key,
+        Some(signing_key.clone()),
     ));
 
     // LZ4-compressed backups + the automatic scheduler.
@@ -112,6 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         resolver,
         tickets: tickets.clone(),
         curseforge_api_key: config.get_config().curseforge_api_key,
+        signing_key: Some(signing_key),
         sessions: sessions.clone(),
         login_limiter: login_limiter.clone(),
         join_intent_limiter: join_intent_limiter.clone(),

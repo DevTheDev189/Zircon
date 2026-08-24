@@ -45,15 +45,9 @@ window.Zircon.packs = {
         const id = hit.projectId;
         this.installingPacks[id] = true;
         try {
-            // No loader filter here either — pack versions aren't tagged per mod loader.
-            const q = new URLSearchParams({ projectId: id, mcVersion: this.selectedInstance.minecraftVersion });
-            const versions = await this.api(`/api/instances/${this.selectedInstance.id}/mods/modrinth/versions?${q}`);
-            const chosen = (versions.versions || [])[0];
-            const file = chosen && chosen.file;
-            if (!file) { alert('No installable version found for ' + hit.title); return; }
             await this.api(`/api/instances/${this.selectedInstance.id}/${this.packEndpoint(type)}/install`, {
                 method: 'POST',
-                body: JSON.stringify({ downloadUrl: file.url, filename: file.filename, origin: 'modrinth' })
+                body: JSON.stringify({ origin: 'modrinth', projectId: id })
             });
             this.packSearchResults = this.packSearchResults.filter(r => r.projectId !== id);
             await this.loadShaders();
