@@ -630,6 +630,36 @@ pub async fn remove_mod(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// POST /api/instances/{id}/mods/bulk-delete — body `{"filenames": [...]}`.
+pub async fn bulk_delete_mods(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let deleted = mods_for(&state, &id)?.remove_mods(&body.filenames)?;
+    Ok(Json(serde_json::json!({ "deleted": deleted })))
+}
+
+/// POST /api/instances/{id}/mods/enable — body `{"filenames": [...]}`.
+pub async fn enable_mods(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let changed = mods_for(&state, &id)?.set_mods_enabled(&body.filenames, true)?;
+    Ok(Json(serde_json::json!({ "changed": changed })))
+}
+
+/// POST /api/instances/{id}/mods/disable — body `{"filenames": [...]}`.
+pub async fn disable_mods(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let changed = mods_for(&state, &id)?.set_mods_enabled(&body.filenames, false)?;
+    Ok(Json(serde_json::json!({ "changed": changed })))
+}
+
 /// GET /api/instances/{id}/mods/search
 pub async fn search_mods(
     State(state): State<AppState>,
@@ -1229,6 +1259,12 @@ pub struct InstallRequest {
     pub download_url: Option<String>,
     pub filename: Option<String>,
     pub file_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModFilenamesRequest {
+    pub filenames: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

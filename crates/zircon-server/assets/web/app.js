@@ -63,6 +63,11 @@ createApp({
             // True while the Installed Mods list is being fetched so the tab can
             // show a spinner instead of a jarring empty/offline flash.
             isLoadingMods: false,
+            // { [filename]: true } for mods checked in the bulk-action toolbar.
+            selectedMods: {},
+            // True after an enable/disable change until the admin restarts the
+            // server (mod loaders only rescan mods at JVM boot).
+            modsRestartNeeded: false,
             shaderpacks: [],
             resourcepacks: [],
             shaderSearchQuery: '',
@@ -164,6 +169,13 @@ createApp({
             if (!this.selectedInstance) return [];
             const loader = this.selectedInstance.modLoader.type;
             return this.recommendedMods.filter(r => r.loader === 'both' || r.loader === loader);
+        },
+        selectedModCount() {
+            return Object.keys(this.selectedMods).length;
+        },
+        allModsSelected() {
+            return this.installedMods.length > 0
+                && this.installedMods.every(m => this.selectedMods[m.filename]);
         }
     },
     watch: {

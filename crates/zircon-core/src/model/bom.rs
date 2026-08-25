@@ -208,6 +208,10 @@ pub struct ModEntry {
     /// Mod version string if known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// Whether the mod is currently active. `false` means the JAR is renamed
+    /// `<filename>.disabled` on disk and hidden from the mod loader's scan.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 fn default_true() -> bool {
@@ -242,6 +246,7 @@ impl ModEntry {
             compatible: true,
             warning_message: None,
             version: None,
+            enabled: true,
         }
     }
 
@@ -421,12 +426,21 @@ mod tests {
         assert_eq!(Some("modrinth".to_string()), sodium.origin);
         assert_eq!(Some("abc123def456".to_string()), sodium.sha1);
         assert_eq!(512000, sodium.file_size);
+        assert!(sodium.enabled, "new mods default to enabled");
 
         let curse = parsed
             .get_mod_by_filename("custom-mod.jar")
             .expect("custom");
         assert_eq!(987654321, curse.murmur3);
         assert_eq!(Some("curseforge".to_string()), curse.origin);
+    }
+
+    #[test]
+    fn mod_entry_missing_enabled_field_deserializes_as_enabled() {
+        // Simulates a bom.json written before the `enabled` field existed.
+        let json = r#"{"filename":"old-mod.jar","compatible":true}"#;
+        let parsed: ModEntry = serde_json::from_str(json).unwrap();
+        assert!(parsed.enabled);
     }
 
     #[test]

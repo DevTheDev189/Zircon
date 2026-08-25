@@ -63,4 +63,19 @@ body,
   .z-section {
     @apply text-sm font-bold text-text tracking-wide;
   }
+  .z-toggle {
+    @apply relative inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-edge/60
+      border border-edge cursor-pointer transition-colors duration-150
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50;
+  }
+  .z-toggle-on {
+    @apply bg-accent/80 border-accent;
+  }
+  .z-toggle-thumb {
+    @apply inline-block h-2.5 w-2.5 translate-x-0.5 transform rounded-full bg-white
+      shadow transition-transform duration-150;
+  }
+  .z-toggle-on .z-toggle-thumb {
+    @apply translate-x-3.5;
+  }
 }

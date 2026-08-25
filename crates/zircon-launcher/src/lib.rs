@@ -64,6 +64,7 @@ pub fn run() {
             commands::launch_offline_instance,
             commands::list_offline_mods,
             commands::delete_offline_mod,
+            commands::set_offline_mod_enabled,
             commands::add_offline_mod,
             commands::get_active_skin,
             commands::get_skin_head_icon,

@@ -52,7 +52,33 @@
 
           <!-- Mods -->
           <div class="bg-bg border border-edge rounded-lg p-3">
-            <div class="z-section mb-2">Mods</div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="z-section">Mods</div>
+              <label
+                v-if="mods.length"
+                class="flex items-center gap-1.5 text-[10px] text-muted cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  class="accent-[#47d2c9]"
+                  :checked="allModsSelected"
+                  @change="toggleSelectAllMods"
+                />
+                Select All
+              </label>
+            </div>
+
+            <div
+              v-if="selectedModCount > 0"
+              class="flex items-center gap-2 mb-2 bg-card border border-edge rounded-md px-2 py-1.5"
+            >
+              <span class="text-[10px] text-muted">{{ selectedModCount }} selected</span>
+              <div class="flex-1"></div>
+              <button class="z-btn-ghost text-[10px] px-2 py-1" @click="bulkEnableSelected">Enable</button>
+              <button class="z-btn-ghost text-[10px] px-2 py-1" @click="bulkDisableSelected">Disable</button>
+              <button class="text-[10px] px-2 py-1 text-[#f85149] hover:underline" @click="bulkDeleteSelected">Delete</button>
+            </div>
+
             <div
               v-if="mods.length"
               class="max-h-[140px] overflow-y-auto mb-2 flex flex-col gap-1"
@@ -61,7 +87,14 @@
                 v-for="mod in mods"
                 :key="mod.filename"
                 class="flex items-center gap-2 text-xs"
+                :class="{ 'opacity-50': !mod.enabled }"
               >
+                <input
+                  type="checkbox"
+                  class="accent-[#47d2c9] shrink-0"
+                  :checked="!!selectedMods[mod.filename]"
+                  @change="toggleModSelected(mod.filename)"
+                />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-1.5 truncate">
                     <span class="truncate text-text">{{ mod.filename }}</span>
@@ -73,6 +106,14 @@
                   <div v-if="mod.author" class="text-[10px] text-muted">by {{ mod.author }}</div>
                 </div>
                 <span class="text-muted">{{ fmtBytes(mod.sizeBytes) }}</span>
+                <button
+                  class="z-toggle"
+                  :class="{ 'z-toggle-on': mod.enabled }"
+                  :title="mod.enabled ? 'Disable' : 'Enable'"
+                  @click="toggleModEnabled(mod)"
+                >
+                  <span class="z-toggle-thumb"></span>
+                </button>
                 <button class="text-muted hover:text-[#f85149]" title="Delete" @click="deleteMod(mod.filename)">✕</button>
               </div>
             </div>
@@ -276,6 +317,7 @@ const instances = ref([]);
 const selected = ref(null);
 const selectedDir = ref('');
 const mods = ref([]);
+const selectedMods = ref({});
 const packs = ref({
   shaderpacks: [],
   resourcepacks: [],
@@ -305,6 +347,11 @@ const newForm = ref({ name: '', mcVersion: '1.20.4', loaderType: 'fabric', loade
 
 const allPacks = computed(() => packs.value);
 
+const selectedModCount = computed(() => Object.keys(selectedMods.value).length);
+const allModsSelected = computed(
+  () => mods.value.length > 0 && mods.value.every((m) => selectedMods.value[m.filename])
+);
+
 // Formats a raw download count like the Modrinth API returns it.
 function fmtCount(n) {
   if (!n) return '0';
@@ -329,6 +376,7 @@ async function selectInstance(instance) {
 async function loadMods() {
   if (!selected.value) return;
   mods.value = await api.listOfflineMods(selected.value.id);
+  selectedMods.value = {};
 }
 
 async function loadPacks() {
@@ -367,6 +415,57 @@ async function deleteInstance() {
 
 async function deleteMod(filename) {
   await api.deleteOfflineMod(selected.value.id, filename);
+  await loadMods();
+}
+
+function toggleModSelected(filename) {
+  const next = { ...selectedMods.value };
+  if (next[filename]) {
+    delete next[filename];
+  } else {
+    next[filename] = true;
+  }
+  selectedMods.value = next;
+}
+
+function toggleSelectAllMods() {
+  if (allModsSelected.value) {
+    selectedMods.value = {};
+    return;
+  }
+  const next = {};
+  for (const mod of mods.value) next[mod.filename] = true;
+  selectedMods.value = next;
+}
+
+async function toggleModEnabled(mod) {
+  await api.setOfflineModEnabled(selected.value.id, mod.filename, !mod.enabled);
+  await loadMods();
+}
+
+async function setSelectedModsEnabled(enabled) {
+  const filenames = Object.keys(selectedMods.value);
+  if (!filenames.length) return;
+  await Promise.all(
+    filenames.map((filename) => api.setOfflineModEnabled(selected.value.id, filename, enabled))
+  );
+  await loadMods();
+}
+
+function bulkEnableSelected() {
+  return setSelectedModsEnabled(true);
+}
+
+function bulkDisableSelected() {
+  return setSelectedModsEnabled(false);
+}
+
+async function bulkDeleteSelected() {
+  const filenames = Object.keys(selectedMods.value);
+  if (!filenames.length) return;
+  const label = filenames.length === 1 ? 'mod' : 'mods';
+  if (!window.confirm(`Delete ${filenames.length} selected ${label}?`)) return;
+  await Promise.all(filenames.map((filename) => api.deleteOfflineMod(selected.value.id, filename)));
   await loadMods();
 }
 

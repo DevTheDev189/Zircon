@@ -525,12 +525,25 @@ pub(crate) fn reconcile_atomic(
     let mut removed = Vec::new();
     let mut kept = Vec::new();
 
-    // Delete local JARs in mods/ that are NOT part of the BOM.
+    // Delete local JARs in mods/ that are NOT part of the BOM — both the
+    // active `.jar` and a disabled `.jar.disabled` variant, since a mod
+    // removed from the BOM entirely should not linger on disk in either
+    // state.
     for name in list_jar_names(mods_dir)? {
         if !wanted_set.contains(name.as_str()) {
             std::fs::remove_file(mods_dir.join(&name))?;
             removed.push(name.clone());
             info!("Removed stale/unlisted mod from instance: {}", name);
+        }
+    }
+    for disabled_name in list_disabled_jar_names(mods_dir)? {
+        let base = disabled_name
+            .strip_suffix(".disabled")
+            .unwrap_or(&disabled_name);
+        if !wanted_set.contains(base) {
+            std::fs::remove_file(mods_dir.join(&disabled_name))?;
+            removed.push(base.to_string());
+            info!("Removed stale/unlisted disabled mod from instance: {}", disabled_name);
         }
     }
 
@@ -543,23 +556,58 @@ pub(crate) fn reconcile_atomic(
         }
     }
 
-    // Transfer wanted mods from staging into the active mods/ with
-    // verification-on-write: copy to a hidden temp file inside mods/, hash
-    // that on-disk copy, and atomically rename it over the final name. The
-    // hash is computed on the exact bytes that end up in mods/, so nothing can
-    // slip in between the check and the install.
+    // Transfer wanted mods from staging into mods/ with verification-on-write:
+    // copy to a hidden temp file inside mods/, hash that on-disk copy, and
+    // atomically rename it over the final name. The hash is computed on the
+    // exact bytes that end up in mods/, so nothing can slip in between the
+    // check and the install.
+    //
+    // The final name depends on `mod_entry.enabled`: a disabled mod is
+    // installed as `<filename>.disabled` instead of `<filename>`, hiding it
+    // from the mod loader's directory scan without deleting it. The server is
+    // authoritative for this state (see module docs) — the client always
+    // renames to match, it never overrides it locally.
     for mod_entry in bom_mods {
         let filename = &mod_entry.filename;
         let staged_file = staging_dir.join(filename);
         let active_target = mods_dir.join(filename);
+        let disabled_target = mods_dir.join(format!("{filename}.disabled"));
+        let install_target = if mod_entry.enabled {
+            &active_target
+        } else {
+            &disabled_target
+        };
+        let other_target = if mod_entry.enabled {
+            &disabled_target
+        } else {
+            &active_target
+        };
         let temp_target = mods_dir.join(format!(".{filename}.tmp"));
 
         if !staged_file.is_file() {
+            // No staged copy to (re)verify from — this only happens if the
+            // staging area was cleared externally. If a correctly-placed
+            // local copy already exists, or only needs a state-flip rename to
+            // reach it, apply that without requiring a fresh download.
+            if install_target.is_file() {
+                kept.push(filename.clone());
+                continue;
+            }
+            if other_target.is_file() {
+                std::fs::rename(other_target, install_target)?;
+                info!(
+                    "Applied enabled-state change for {} without a download",
+                    filename
+                );
+                kept.push(filename.clone());
+                continue;
+            }
             warn!("Staged file missing for mod: {}", filename);
             continue;
         }
 
-        // Copy directly into the active mods directory as a hidden temp file.
+        // Copy directly into the wanted location (active or disabled) as a
+        // hidden temp file.
         std::fs::copy(&staged_file, &temp_target)?;
 
         // Hash the destination disk block — not the staging copy.
@@ -582,7 +630,14 @@ pub(crate) fn reconcile_atomic(
         // Atomic rename overwrites the final destination. Both paths live in
         // `mods_dir`, so the rename cannot cross filesystems and is atomic on
         // every supported platform.
-        std::fs::rename(&temp_target, &active_target)?;
+        std::fs::rename(&temp_target, install_target)?;
+
+        // Clean up a stale copy left in the opposite enabled state (e.g. the
+        // mod was disabled and is now being re-enabled, or vice versa).
+        if other_target.is_file() {
+            let _ = std::fs::remove_file(other_target);
+        }
+
         kept.push(filename.clone());
     }
 
@@ -603,6 +658,33 @@ fn list_jar_names(dir: &Path) -> std::io::Result<Vec<String>> {
         }
     }
     Ok(names)
+}
+
+/// `.jar.disabled` file names directly inside `dir` (not recursive). Returns
+/// the disabled file's own name (including the `.disabled` suffix) — callers
+/// strip it to get the base mod filename.
+fn list_disabled_jar_names(dir: &Path) -> std::io::Result<Vec<String>> {
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if is_disabled_mod_jar(&name) {
+            names.push(name);
+        }
+    }
+    Ok(names)
+}
+
+/// True when `name` looks like a disabled mod JAR: `<...>.jar.disabled`,
+/// mirroring `HashVerifier::is_mod_jar` on the stripped base name.
+fn is_disabled_mod_jar(name: &str) -> bool {
+    match name.strip_suffix(".disabled") {
+        Some(base) => HashVerifier::is_mod_jar(base),
+        None => false,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1081,5 +1163,97 @@ mod tests {
         // Nothing was installed and no temp file is left behind.
         assert!(!mods_dir.join("evil.jar").exists());
         assert!(!mods_dir.join(".evil.jar.tmp").exists());
+    }
+
+    #[test]
+    fn reconcile_atomic_installs_disabled_mods_as_dot_disabled() {
+        let dir = TempDir::new("reconcile-disabled-install");
+        let mods_dir = dir.path().join("mods");
+        let staging_dir = dir.path().join(".mod_staging");
+        std::fs::create_dir_all(&mods_dir).unwrap();
+        std::fs::create_dir_all(&staging_dir).unwrap();
+
+        let content = b"disabled mod content";
+        std::fs::write(staging_dir.join("d.jar"), content).unwrap();
+        let sha1 = HashVerifier::sha1_file(&staging_dir.join("d.jar")).unwrap();
+
+        let mut entry = ModEntry::new(
+            None,
+            "d.jar",
+            Some(sha1),
+            0,
+            Some("direct".to_string()),
+            None,
+            0,
+        );
+        entry.enabled = false;
+
+        let (_removed, kept) = reconcile_atomic(&mods_dir, &staging_dir, &[entry]).unwrap();
+
+        assert_eq!(vec!["d.jar".to_string()], kept);
+        assert!(!mods_dir.join("d.jar").exists());
+        assert!(mods_dir.join("d.jar.disabled").is_file());
+        assert_eq!(
+            content.to_vec(),
+            std::fs::read(mods_dir.join("d.jar.disabled")).unwrap()
+        );
+    }
+
+    #[test]
+    fn reconcile_atomic_toggles_enabled_state_via_rename_without_staged_file() {
+        let dir = TempDir::new("reconcile-toggle-no-staging");
+        let mods_dir = dir.path().join("mods");
+        let staging_dir = dir.path().join(".mod_staging");
+        std::fs::create_dir_all(&mods_dir).unwrap();
+        std::fs::create_dir_all(&staging_dir).unwrap();
+
+        // An already-installed, active mod — no staged copy present (as if
+        // staging had been cleared since the last sync).
+        std::fs::write(mods_dir.join("e.jar"), b"already installed").unwrap();
+        let mut entry = ModEntry::new(
+            None,
+            "e.jar",
+            Some("irrelevant-without-staging".to_string()),
+            0,
+            Some("direct".to_string()),
+            None,
+            0,
+        );
+        entry.enabled = false;
+
+        let (_removed, kept) =
+            reconcile_atomic(&mods_dir, &staging_dir, std::slice::from_ref(&entry)).unwrap();
+        assert_eq!(vec!["e.jar".to_string()], kept);
+        assert!(!mods_dir.join("e.jar").exists());
+        assert!(mods_dir.join("e.jar.disabled").is_file());
+        // Content preserved exactly — a rename, not a re-download.
+        assert_eq!(
+            b"already installed".to_vec(),
+            std::fs::read(mods_dir.join("e.jar.disabled")).unwrap()
+        );
+
+        // Re-enabling likewise renames back with no staged file needed.
+        entry.enabled = true;
+        let (_removed, kept) =
+            reconcile_atomic(&mods_dir, &staging_dir, std::slice::from_ref(&entry)).unwrap();
+        assert_eq!(vec!["e.jar".to_string()], kept);
+        assert!(mods_dir.join("e.jar").is_file());
+        assert!(!mods_dir.join("e.jar.disabled").exists());
+    }
+
+    #[test]
+    fn reconcile_atomic_prunes_stale_disabled_files_not_in_bom() {
+        let dir = TempDir::new("reconcile-prune-disabled");
+        let mods_dir = dir.path().join("mods");
+        let staging_dir = dir.path().join(".mod_staging");
+        std::fs::create_dir_all(&mods_dir).unwrap();
+        std::fs::create_dir_all(&staging_dir).unwrap();
+
+        std::fs::write(mods_dir.join("gone.jar.disabled"), b"leftover").unwrap();
+
+        let (removed, kept) = reconcile_atomic(&mods_dir, &staging_dir, &[]).unwrap();
+        assert_eq!(vec!["gone.jar".to_string()], removed);
+        assert!(kept.is_empty());
+        assert!(!mods_dir.join("gone.jar.disabled").exists());
     }
 }

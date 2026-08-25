@@ -289,9 +289,71 @@ window.Zircon.mods = {
         } finally {
             this.isLoadingMods = false;
         }
+        this.selectedMods = {};
     },
     async deleteMod(filename) {
         await this.api(`/api/instances/${this.selectedInstance.id}/mods/${encodeURIComponent(filename)}`, { method: 'DELETE' });
         this.loadMods();
+    },
+
+    // --- Bulk selection & enable/disable ---
+
+    toggleModSelected(filename) {
+        const next = { ...this.selectedMods };
+        if (next[filename]) {
+            delete next[filename];
+        } else {
+            next[filename] = true;
+        }
+        this.selectedMods = next;
+    },
+    toggleSelectAllMods() {
+        if (this.allModsSelected) {
+            this.selectedMods = {};
+            return;
+        }
+        const next = {};
+        for (const m of this.installedMods) next[m.filename] = true;
+        this.selectedMods = next;
+    },
+    async toggleModEnabled(mod) {
+        const route = mod.enabled ? 'disable' : 'enable';
+        await this.api(`/api/instances/${this.selectedInstance.id}/mods/${route}`, {
+            method: 'POST',
+            body: JSON.stringify({ filenames: [mod.filename] })
+        });
+        this.modsRestartNeeded = true;
+        await this.loadMods();
+    },
+    async setSelectedModsEnabled(enabled) {
+        const filenames = Object.keys(this.selectedMods);
+        if (!filenames.length) return;
+        const route = enabled ? 'enable' : 'disable';
+        await this.api(`/api/instances/${this.selectedInstance.id}/mods/${route}`, {
+            method: 'POST',
+            body: JSON.stringify({ filenames })
+        });
+        this.modsRestartNeeded = true;
+        await this.loadMods();
+    },
+    bulkEnableMods() {
+        return this.setSelectedModsEnabled(true);
+    },
+    bulkDisableMods() {
+        return this.setSelectedModsEnabled(false);
+    },
+    async bulkDeleteMods() {
+        const filenames = Object.keys(this.selectedMods);
+        if (!filenames.length) return;
+        const label = filenames.length === 1 ? 'mod' : 'mods';
+        if (!confirm(`Delete ${filenames.length} selected ${label}? This cannot be undone.`)) return;
+        await this.api(`/api/instances/${this.selectedInstance.id}/mods/bulk-delete`, {
+            method: 'POST',
+            body: JSON.stringify({ filenames })
+        });
+        await this.loadMods();
+    },
+    dismissModsRestartBanner() {
+        this.modsRestartNeeded = false;
     },
 };

@@ -1404,6 +1404,8 @@ pub struct ModFileInfo {
     pub author: Option<String>,
     /// Version read from the JAR's mod metadata when available.
     pub version: Option<String>,
+    /// `false` when the file is currently `<filename>.disabled` on disk.
+    pub enabled: bool,
 }
 
 #[tauri::command]
@@ -1419,7 +1421,16 @@ pub fn list_offline_mods(
         .list_mods(&instance)
         .into_iter()
         .filter_map(|path| {
-            let filename = path.file_name()?.to_string_lossy().into_owned();
+            let raw_name = path.file_name()?.to_string_lossy().into_owned();
+            let enabled = !raw_name.to_ascii_lowercase().ends_with(".disabled");
+            let filename = if enabled {
+                raw_name
+            } else {
+                raw_name
+                    .strip_suffix(".disabled")
+                    .unwrap_or(&raw_name)
+                    .to_string()
+            };
             let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
             let meta = zircon_core::metadata::extractor::extract(&path).ok();
             let author = meta
@@ -1435,6 +1446,7 @@ pub fn list_offline_mods(
                 size_bytes,
                 author,
                 version,
+                enabled,
             })
         })
         .collect();
@@ -1454,6 +1466,24 @@ pub fn delete_offline_mod(
     state
         .offline
         .delete_mod(&instance, &filename)
+        .map_err(err_string)
+}
+
+/// Enables or disables a single offline mod by renaming its file in place.
+/// Purely local — offline instances have no server to sync this state with.
+#[tauri::command]
+pub fn set_offline_mod_enabled(
+    state: State<'_, LauncherState>,
+    id: String,
+    filename: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let Some(instance) = state.offline.load(&id) else {
+        return Err("Instance not found".to_string());
+    };
+    state
+        .offline
+        .set_mod_enabled(&instance, &filename, enabled)
         .map_err(err_string)
 }
 

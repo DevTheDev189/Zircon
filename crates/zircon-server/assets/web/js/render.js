@@ -1083,13 +1083,73 @@ return function render(_ctx, _cache) {
                             ]),
                             _createCommentVNode(" Panel 2: Installed Mods with Compatibility Badges "),
                             _createElementVNode("div", _hoisted_88, [
-                              _createElementVNode("h3", _hoisted_89, "Installed Mods (" + _toDisplayString(installedMods.length) + ")", 1 /* TEXT */),
+                              (modsRestartNeeded)
+                                ? (_openBlock(), _createElementBlock("div", {
+                                    key: 0,
+                                    class: "mods-restart-banner"
+                                  }, [
+                                    _createElementVNode("span", { class: "flex-1" }, "Restart required to apply mod changes."),
+                                    _createElementVNode("button", {
+                                      class: "mods-restart-now",
+                                      onClick: $event => (restartInstance())
+                                    }, "Restart Now", 8 /* PROPS */, ["onClick"]),
+                                    _createElementVNode("button", {
+                                      class: "mods-restart-dismiss",
+                                      title: "Dismiss",
+                                      onClick: $event => (dismissModsRestartBanner())
+                                    }, "✕", 8 /* PROPS */, ["onClick"])
+                                  ]))
+                                : _createCommentVNode("v-if", true),
+                              _createElementVNode("div", { class: "flex items-center justify-between mb-3" }, [
+                                _createElementVNode("h3", { class: "font-bold text-sm text-slate-200" }, "Installed Mods (" + _toDisplayString(installedMods.length) + ")", 1 /* TEXT */),
+                                (installedMods.length)
+                                  ? (_openBlock(), _createElementBlock("label", {
+                                      key: 0,
+                                      class: "flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer"
+                                    }, [
+                                      _createElementVNode("input", {
+                                        type: "checkbox",
+                                        class: "zircon-check",
+                                        checked: allModsSelected,
+                                        onChange: $event => (toggleSelectAllMods())
+                                      }, null, 8 /* PROPS */, ["checked", "onChange"]),
+                                      _createTextVNode(" Select All")
+                                    ]))
+                                  : _createCommentVNode("v-if", true)
+                              ]),
+                              (selectedModCount > 0)
+                                ? (_openBlock(), _createElementBlock("div", {
+                                    key: 1,
+                                    class: "mods-bulk-toolbar"
+                                  }, [
+                                    _createElementVNode("span", { class: "text-xs text-slate-400" }, _toDisplayString(selectedModCount) + " selected", 1 /* TEXT */),
+                                    _createElementVNode("div", { class: "flex-1" }, null),
+                                    _createElementVNode("button", {
+                                      class: "mods-bulk-enable",
+                                      onClick: $event => (bulkEnableMods())
+                                    }, "Enable", 8 /* PROPS */, ["onClick"]),
+                                    _createElementVNode("button", {
+                                      class: "mods-bulk-disable",
+                                      onClick: $event => (bulkDisableMods())
+                                    }, "Disable", 8 /* PROPS */, ["onClick"]),
+                                    _createElementVNode("button", {
+                                      class: "mods-bulk-delete",
+                                      onClick: $event => (bulkDeleteMods())
+                                    }, "Delete", 8 /* PROPS */, ["onClick"])
+                                  ]))
+                                : _createCommentVNode("v-if", true),
                               _createElementVNode("div", _hoisted_90, [
                                 (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(installedMods, (m) => {
                                   return (_openBlock(), _createElementBlock("div", {
                                     key: m.filename,
-                                    class: "bg-slate-800/60 border border-slate-700/40 p-3 rounded-lg flex gap-3 items-center"
+                                    class: _normalizeClass(["bg-slate-800/60 border border-slate-700/40 p-3 rounded-lg flex gap-3 items-center", { "mod-row-disabled": !m.enabled }])
                                   }, [
+                                    _createElementVNode("input", {
+                                      type: "checkbox",
+                                      class: "zircon-check shrink-0",
+                                      checked: !!selectedMods[m.filename],
+                                      onChange: $event => (toggleModSelected(m.filename))
+                                    }, null, 8 /* PROPS */, ["checked", "onChange"]),
                                     _createElementVNode("img", {
                                       src: m.iconUrl || (m.origin === 'curseforge' ? 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%23F16436\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>' : 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2346d66d\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>'),
                                       class: "w-10 h-10 rounded object-cover shrink-0"
@@ -1124,10 +1184,17 @@ return function render(_ctx, _cache) {
                                         : _createCommentVNode("v-if", true)
                                     ]),
                                     _createElementVNode("button", {
+                                      class: _normalizeClass(["z-mod-toggle shrink-0", { "z-mod-toggle-on": m.enabled }]),
+                                      title: m.enabled ? 'Disable' : 'Enable',
+                                      onClick: $event => (toggleModEnabled(m))
+                                    }, [
+                                      _createElementVNode("span", { class: "z-mod-toggle-thumb" }, null)
+                                    ], 10 /* CLASS, PROPS */, ["title", "onClick"]),
+                                    _createElementVNode("button", {
                                       onClick: $event => (deleteMod(m.filename)),
                                       class: "text-red-400 hover:text-red-300 text-xs px-2 py-1 shrink-0"
                                     }, "Delete", 8 /* PROPS */, _hoisted_103)
-                                  ]))
+                                  ], 2 /* CLASS */))
                                 }), 128 /* KEYED_FRAGMENT */)),
                                 (!installedMods.length)
                                   ? (_openBlock(), _createElementBlock("p", _hoisted_104, "No mods installed yet."))

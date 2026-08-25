@@ -35,6 +35,8 @@ export const api = {
   launchOfflineInstance: (id) => invoke('launch_offline_instance', { id }),
   listOfflineMods: (id) => invoke('list_offline_mods', { id }),
   deleteOfflineMod: (id, filename) => invoke('delete_offline_mod', { id, filename }),
+  setOfflineModEnabled: (id, filename, enabled) =>
+    invoke('set_offline_mod_enabled', { id, filename, enabled }),
   addOfflineMod: (id, sourcePath) => invoke('add_offline_mod', { id, sourcePath }),
 
   // Skins

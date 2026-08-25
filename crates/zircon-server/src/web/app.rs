@@ -417,6 +417,18 @@ pub fn router(state: AppState) -> Router {
             post(instance_controller::install_mod),
         )
         .route(
+            "/api/instances/:id/mods/bulk-delete",
+            post(instance_controller::bulk_delete_mods),
+        )
+        .route(
+            "/api/instances/:id/mods/enable",
+            post(instance_controller::enable_mods),
+        )
+        .route(
+            "/api/instances/:id/mods/disable",
+            post(instance_controller::disable_mods),
+        )
+        .route(
             "/api/instances/:id/modpacks/install",
             post(instance_controller::install_modpack),
         )

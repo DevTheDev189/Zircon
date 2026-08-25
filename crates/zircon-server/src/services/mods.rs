@@ -277,6 +277,79 @@ impl ModManagementService {
         Ok(deleted || removed_from_bom)
     }
 
+    /// Bulk version of `remove_mod`: deletes each mod's file (whichever
+    /// physical variant — enabled `.jar` or disabled `.jar.disabled` —
+    /// currently exists) and drops its BOM entry, with a single retain +
+    /// save pass for the whole batch instead of one per file.
+    pub fn remove_mods(&self, filenames: &[String]) -> Result<Vec<String>, ModError> {
+        let mut targets = Vec::new();
+        for filename in filenames {
+            let safe_name = sanitize_filename(filename)?;
+            for candidate in [
+                self.mods_dir.join(&safe_name),
+                self.mods_dir.join(format!("{safe_name}.disabled")),
+            ] {
+                if candidate.is_file() {
+                    fs::remove_file(&candidate)?;
+                }
+            }
+            targets.push(safe_name);
+        }
+
+        let removed_from_bom = self.bom_service.with_bom(|bom| {
+            let before = bom.mods.len();
+            bom.mods.retain(|m| !targets.contains(&m.filename));
+            bom.mods.len() != before
+        });
+        if removed_from_bom {
+            self.bom_service.save()?;
+        }
+        Ok(targets)
+    }
+
+    /// Enables or disables a batch of mods by renaming their file in place
+    /// (`<name>` <-> `<name>.disabled`) and updating the BOM's `enabled`
+    /// flag. Mod loaders only scan `*.jar` at startup, so this hides a mod
+    /// from the game process without deleting or needing to re-download it.
+    /// Filenames with no matching file on disk (in either state) are skipped
+    /// silently. Returns the filenames actually resolved/affected.
+    pub fn set_mods_enabled(
+        &self,
+        filenames: &[String],
+        enabled: bool,
+    ) -> Result<Vec<String>, ModError> {
+        let mut targets = Vec::new();
+        for filename in filenames {
+            let safe_name = sanitize_filename(filename)?;
+            if let Some((current_path, currently_enabled)) = self.resolve_variant(&safe_name) {
+                if currently_enabled != enabled {
+                    let target_path = if enabled {
+                        self.mods_dir.join(&safe_name)
+                    } else {
+                        self.mods_dir.join(format!("{safe_name}.disabled"))
+                    };
+                    fs::rename(&current_path, &target_path)?;
+                }
+                targets.push(safe_name);
+            }
+        }
+
+        let bom_changed = self.bom_service.with_bom(|bom| {
+            let mut changed = false;
+            for mod_entry in bom.mods.iter_mut() {
+                if targets.contains(&mod_entry.filename) && mod_entry.enabled != enabled {
+                    mod_entry.enabled = enabled;
+                    changed = true;
+                }
+            }
+            changed
+        });
+        if bom_changed {
+            self.bom_service.save()?;
+        }
+        Ok(targets)
+    }
+
     /// Installs a specific Modrinth version into the mods folder and enriches
     /// the resulting entry with the project's rich metadata.
     pub async fn install_modrinth_version(
@@ -530,7 +603,25 @@ impl ModManagementService {
                                         new_entry.description = mod_entry.description.clone();
                                         new_entry.compatible = true;
                                         new_entry.warning_message = None;
+                                        new_entry.enabled = mod_entry.enabled;
                                         self.enrich_metadata(&mut new_entry).await;
+
+                                        // The resync always (re-)downloads the
+                                        // file as a plain active `.jar` — if
+                                        // the mod was disabled before the
+                                        // resync, re-hide the freshly
+                                        // installed file from the loader too.
+                                        if !new_entry.enabled {
+                                            let active =
+                                                self.mods_dir.join(&new_entry.filename);
+                                            let disabled = self.mods_dir.join(format!(
+                                                "{}.disabled",
+                                                new_entry.filename
+                                            ));
+                                            if active.is_file() {
+                                                let _ = fs::rename(&active, &disabled);
+                                            }
+                                        }
 
                                         self.bom_service.with_bom(|bom| {
                                             bom.mods.retain(|m| m.filename != mod_entry.filename);
@@ -946,6 +1037,27 @@ impl ModManagementService {
         }
     }
 
+    /// Resolves an already-sanitized BOM filename to whichever physical
+    /// variant currently exists on disk — the active `<name>` or the
+    /// disabled `<name>.disabled` — along with which state that is.
+    ///
+    /// Deliberately does not route through `sanitize_filename` for the
+    /// `.disabled` form: that function force-appends `.jar` to anything not
+    /// already ending in `.jar`, which would corrupt `foo.jar.disabled` into
+    /// `foo.jar.disabled.jar`. `safe_name` must already be sanitized by the
+    /// caller, so the join below cannot escape `mods_dir`.
+    fn resolve_variant(&self, safe_name: &str) -> Option<(PathBuf, bool)> {
+        let enabled_path = self.mods_dir.join(safe_name);
+        if enabled_path.starts_with(&self.mods_dir) && enabled_path.is_file() {
+            return Some((enabled_path, true));
+        }
+        let disabled_path = self.mods_dir.join(format!("{safe_name}.disabled"));
+        if disabled_path.starts_with(&self.mods_dir) && disabled_path.is_file() {
+            return Some((disabled_path, false));
+        }
+        None
+    }
+
     /// Best-effort metadata enrichment: fetches the provider project page for
     /// the entry's id and fills in title/description/icon/author. Never throws.
     async fn enrich_metadata(&self, entry: &mut ModEntry) {
@@ -1184,6 +1296,84 @@ mod tests {
             Some("https://cdn.modrinth.com/data/AANobbMI/icon.png".to_string()),
             disk[0].icon_url
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn set_mods_enabled_renames_file_and_updates_bom_without_download() {
+        let dir = temp_dir();
+        let mods_dir = dir.join("mods");
+        let bom = Arc::new(BomService::new(
+            dir.join("bom.json"),
+            Some(zircon_core::model::BillOfMaterials::new(
+                "1.20.4", None, None,
+            )),
+        ));
+        let service = ModManagementService::new(bom, mods_dir.clone(), "");
+        service
+            .add_mod(std::io::Cursor::new(vec![1u8, 2, 3]), "mod.jar", None)
+            .await
+            .unwrap();
+        assert!(mods_dir.join("mod.jar").is_file());
+
+        let changed = service
+            .set_mods_enabled(&["mod.jar".to_string()], false)
+            .unwrap();
+        assert_eq!(vec!["mod.jar".to_string()], changed);
+        assert!(!mods_dir.join("mod.jar").exists());
+        assert!(mods_dir.join("mod.jar.disabled").is_file());
+        assert!(!service.list_mods()[0].enabled);
+
+        // Re-enabling renames the exact same file back — no re-download.
+        let changed = service
+            .set_mods_enabled(&["mod.jar".to_string()], true)
+            .unwrap();
+        assert_eq!(vec!["mod.jar".to_string()], changed);
+        assert!(mods_dir.join("mod.jar").is_file());
+        assert!(!mods_dir.join("mod.jar.disabled").exists());
+        assert!(service.list_mods()[0].enabled);
+
+        // Unknown filenames are skipped, not errored.
+        let changed = service
+            .set_mods_enabled(&["missing.jar".to_string()], false)
+            .unwrap();
+        assert!(changed.is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn remove_mods_deletes_batch_regardless_of_enabled_state() {
+        let dir = temp_dir();
+        let mods_dir = dir.join("mods");
+        let bom = Arc::new(BomService::new(
+            dir.join("bom.json"),
+            Some(zircon_core::model::BillOfMaterials::new(
+                "1.20.4", None, None,
+            )),
+        ));
+        let service = ModManagementService::new(bom, mods_dir.clone(), "");
+        service
+            .add_mod(std::io::Cursor::new(vec![1u8]), "a.jar", None)
+            .await
+            .unwrap();
+        service
+            .add_mod(std::io::Cursor::new(vec![2u8]), "b.jar", None)
+            .await
+            .unwrap();
+        service
+            .set_mods_enabled(&["b.jar".to_string()], false)
+            .unwrap();
+        assert!(mods_dir.join("b.jar.disabled").is_file());
+
+        let deleted = service
+            .remove_mods(&["a.jar".to_string(), "b.jar".to_string()])
+            .unwrap();
+        assert_eq!(2, deleted.len());
+        assert!(!mods_dir.join("a.jar").exists());
+        assert!(!mods_dir.join("b.jar.disabled").exists());
+        assert_eq!(0, service.list_mods().len());
+
         let _ = fs::remove_dir_all(&dir);
     }
 

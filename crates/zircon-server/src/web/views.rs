@@ -25,6 +25,7 @@ pub fn mod_entry_to_map(entry: &ModEntry) -> serde_json::Value {
         "compatible": entry.compatible,
         "warningMessage": entry.warning_message.clone().unwrap_or_default(),
         "version": entry.version,
+        "enabled": entry.enabled,
     })
 }
 
