@@ -203,48 +203,44 @@ impl MinecraftProcessManager {
             .split_whitespace()
             .map(|s| s.to_string())
             .collect();
-        let loader = ModLoaderType::from_id(&self.context.loader_info.r#type);
-        if let Some(loader) = loader {
-            if loader.is_forge_like() {
-                // Forge/NeoForge servers launch through the installer-generated
-                // @args file (module path + JVM args + main class). Paths inside
-                // the file are relative to the server dir, which is the CWD.
-                let args_file = installer::find_server_args_file(
-                    &self.context.server_dir,
-                    &self.context.loader_info.version,
+        let loader = ModLoaderType::from_id(&self.context.loader_info.r#type)
+            .unwrap_or(ModLoaderType::Vanilla);
+        if loader.is_forge_like() {
+            // Forge/NeoForge servers launch through the installer-generated
+            // @args file (module path + JVM args + main class). Paths inside
+            // the file are relative to the server dir, which is the CWD.
+            let args_file = installer::find_server_args_file(
+                &self.context.server_dir,
+                &self.context.loader_info.version,
+            )
+            .ok_or_else(|| {
+                ProcessError::Install(
+                    "Forge/NeoForge server args file not found after installation".to_string(),
                 )
-                .ok_or_else(|| {
-                    ProcessError::Install(
-                        "Forge/NeoForge server args file not found after installation".to_string(),
-                    )
-                })?;
-                let rel = args_file
-                    .strip_prefix(&self.context.server_dir)
-                    .unwrap_or(&args_file)
-                    .to_string_lossy()
-                    .into_owned();
-                launch_args.push(format!("@{rel}"));
-            } else if loader == ModLoaderType::Quilt
-                && self
-                    .context
+            })?;
+            let rel = args_file
+                .strip_prefix(&self.context.server_dir)
+                .unwrap_or(&args_file)
+                .to_string_lossy()
+                .into_owned();
+            launch_args.push(format!("@{rel}"));
+        } else if loader == ModLoaderType::Quilt
+            && self
+                .context
+                .server_dir
+                .join("quilt-server-launch.jar")
+                .is_file()
+        {
+            // Quilt servers install to `quilt-server-launch.jar` (unlike
+            // Fabric's combined `server.jar`).
+            launch_args.push("-jar".to_string());
+            launch_args.push(
+                self.context
                     .server_dir
                     .join("quilt-server-launch.jar")
-                    .is_file()
-            {
-                // Quilt servers install to `quilt-server-launch.jar` (unlike
-                // Fabric's combined `server.jar`).
-                launch_args.push("-jar".to_string());
-                launch_args.push(
-                    self.context
-                        .server_dir
-                        .join("quilt-server-launch.jar")
-                        .to_string_lossy()
-                        .into_owned(),
-                );
-            } else {
-                launch_args.push("-jar".to_string());
-                launch_args.push(self.context.server_jar.to_string_lossy().into_owned());
-            }
+                    .to_string_lossy()
+                    .into_owned(),
+            );
         } else {
             if !self.context.server_jar.is_file() {
                 return Err(ProcessError::Io(std::io::Error::new(

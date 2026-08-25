@@ -11,10 +11,22 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use zircon_core::model::ModLoaderInfo;
+use zircon_core::model::{ModLoaderInfo, ModLoaderType};
 
 use crate::error::LauncherError;
 use crate::paths::{offline_instances_dir, sanitize_filename_strict};
+
+/// Normalizes and validates the loader for an offline instance, falling back to Vanilla
+/// if an unsupported or legacy loader is found.
+fn sanitize_instance_loader(mut instance: OfflineInstance) -> OfflineInstance {
+    if let Some(loader_enum) = ModLoaderType::from_id(&instance.mod_loader.r#type) {
+        instance.mod_loader.r#type = loader_enum.id().to_string();
+    } else {
+        instance.mod_loader.r#type = "vanilla".to_string();
+        instance.mod_loader.version.clear();
+    }
+    instance
+}
 
 /// Persistent configuration of one offline (single-player) instance.
 ///
@@ -109,7 +121,7 @@ impl OfflineInstanceManager {
 
     /// Creates and persists a new offline instance with a fresh UUID and the
     /// supplied Minecraft version / mod loader configuration. Blank inputs fall
-    /// back to the Java defaults ("New Instance", "1.20.4", "fabric").
+    /// back to defaults ("New Instance", "1.20.4", "fabric").
     ///
     /// Port of the Java `createInstance`.
     pub fn create(
@@ -119,6 +131,18 @@ impl OfflineInstanceManager {
         loader_type: &str,
         loader_version: &str,
     ) -> Result<OfflineInstance, LauncherError> {
+        let loader_str = loader_type.trim();
+        let loader_enum = if loader_str.is_empty() {
+            ModLoaderType::Fabric
+        } else {
+            ModLoaderType::from_id(loader_str).ok_or_else(|| {
+                LauncherError::InvalidInput(format!(
+                    "Invalid mod loader '{loader_str}'. Allowed loaders: {}",
+                    ModLoaderType::ALLOWED_IDS.join(", ")
+                ))
+            })?
+        };
+
         let instance = OfflineInstance {
             id: uuid::Uuid::new_v4().to_string(),
             name: if name.trim().is_empty() {
@@ -132,11 +156,7 @@ impl OfflineInstanceManager {
                 mc_version.trim().to_string()
             },
             mod_loader: ModLoaderInfo::new(
-                if loader_type.trim().is_empty() {
-                    "fabric"
-                } else {
-                    loader_type.trim()
-                },
+                loader_enum.id(),
                 loader_version.trim(),
                 None,
             ),
@@ -155,9 +175,10 @@ impl OfflineInstanceManager {
                 "Cannot save an offline instance without an id".to_string(),
             ));
         }
-        let dir = self.instance_dir(&instance.id);
+        let sanitized = sanitize_instance_loader(instance.clone());
+        let dir = self.instance_dir(&sanitized.id);
         std::fs::create_dir_all(dir.join("mods"))?;
-        let json = serde_json::to_string_pretty(instance)?;
+        let json = serde_json::to_string_pretty(&sanitized)?;
         std::fs::write(dir.join("instance.json"), json)?;
         Ok(())
     }
@@ -172,7 +193,7 @@ impl OfflineInstanceManager {
         if instance.id.trim().is_empty() {
             return None;
         }
-        Some(instance)
+        Some(sanitize_instance_loader(instance))
     }
 
     /// All saved instances ordered by `lastPlayed` descending.
@@ -195,7 +216,9 @@ impl OfflineInstanceManager {
             }
             match std::fs::read_to_string(&json) {
                 Ok(text) => match serde_json::from_str::<OfflineInstance>(&text) {
-                    Ok(instance) if !instance.id.trim().is_empty() => result.push(instance),
+                    Ok(instance) if !instance.id.trim().is_empty() => {
+                        result.push(sanitize_instance_loader(instance));
+                    }
                     _ => debug!("Skipping unreadable instance.json at {}", json.display()),
                 },
                 Err(_) => debug!("Skipping unreadable instance.json at {}", json.display()),
@@ -507,5 +530,58 @@ mod tests {
         );
         assert!(base.is_dir());
         assert!(manager.mods_dir(&real).join("sodium.jar").is_file());
+    }
+
+    #[test]
+    fn create_all_allowed_loaders_and_reject_invalid() {
+        let root = TempDir::new("offline-loaders");
+        let manager = OfflineInstanceManager::new(root.path().join("offline_instances"));
+
+        for loader in &["forge", "neoforge", "fabric", "quilt", "vanilla"] {
+            let instance = manager.create("Test", "1.20.4", loader, "1.0").unwrap();
+            assert_eq!(*loader, instance.mod_loader.r#type);
+            let loaded = manager.load(&instance.id).unwrap();
+            assert_eq!(*loader, loaded.mod_loader.r#type);
+        }
+
+        // Invalid loaders rejected on create
+        for invalid in &["liteloader", "rift", "babric", "custom_loader"] {
+            let res = manager.create("Bad", "1.20.4", invalid, "1.0");
+            assert!(
+                matches!(res, Err(LauncherError::InvalidInput(_))),
+                "loader {invalid} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_or_unsupported_loader_falls_back_to_vanilla_on_load() {
+        let root = TempDir::new("offline-legacy-fallback");
+        let manager = OfflineInstanceManager::new(root.path().join("offline_instances"));
+
+        let dir = manager.instance_dir("legacy-inst");
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // Write an instance.json with an unsupported legacy loader ("liteloader")
+        let legacy_json = r#"{
+            "id": "legacy-inst",
+            "name": "Legacy Modpack",
+            "minecraftVersion": "1.12.2",
+            "modLoader": {
+                "type": "liteloader",
+                "version": "1.12.2-00"
+            },
+            "javaArgs": "-Xmx2G",
+            "lastPlayed": 1000
+        }"#;
+        std::fs::write(dir.join("instance.json"), legacy_json).unwrap();
+
+        let loaded = manager.load("legacy-inst").expect("load legacy instance");
+        assert_eq!("vanilla", loaded.mod_loader.r#type);
+        assert_eq!("", loaded.mod_loader.version);
+
+        let list = manager.list();
+        assert_eq!(1, list.len());
+        assert_eq!("vanilla", list[0].mod_loader.r#type);
     }
 }
