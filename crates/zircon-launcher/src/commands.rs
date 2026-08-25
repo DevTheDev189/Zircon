@@ -1402,6 +1402,8 @@ pub struct ModFileInfo {
     pub size_bytes: u64,
     /// Author read from the JAR's mod metadata when available.
     pub author: Option<String>,
+    /// Version read from the JAR's mod metadata when available.
+    pub version: Option<String>,
 }
 
 #[tauri::command]
@@ -1419,14 +1421,20 @@ pub fn list_offline_mods(
         .filter_map(|path| {
             let filename = path.file_name()?.to_string_lossy().into_owned();
             let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-            let author = zircon_core::metadata::extractor::extract(&path)
-                .ok()
-                .map(|meta| meta.author)
+            let meta = zircon_core::metadata::extractor::extract(&path).ok();
+            let author = meta
+                .as_ref()
+                .map(|m| m.author.clone())
                 .filter(|a| !a.trim().is_empty());
+            let version = meta
+                .as_ref()
+                .map(|m| m.version.clone())
+                .filter(|v| !v.trim().is_empty());
             Some(ModFileInfo {
                 filename,
                 size_bytes,
                 author,
+                version,
             })
         })
         .collect();
@@ -1779,6 +1787,8 @@ pub struct PackFileInfo {
     pub project_url: Option<String>,
     pub is_active: bool,
     pub is_local: bool,
+    pub version: Option<String>,
+    pub pack_format: Option<u32>,
 }
 
 /// Enriched pack listing for an instance, including shader/resource pack
@@ -1802,8 +1812,9 @@ pub async fn open_external_url(url: String) -> Result<(), String> {
 }
 
 /// Lists an instance's shaderpacks and resourcepacks with enriched metadata
-/// (title, author, description, icon and Modrinth project URL) resolved from
-/// the instance's BOM, plus each pack's active/local state.
+/// (title, author, description, icon, version, and Modrinth project URL) resolved
+/// from the instance's BOM (or extracted from the pack archive on disk), plus each
+/// pack's active/local state.
 #[tauri::command]
 pub async fn list_instance_packs_detailed(
     _state: State<'_, LauncherState>,
@@ -1838,18 +1849,45 @@ pub async fn list_instance_packs_detailed(
                     }
                 });
 
-                let (title, author, description, icon_url, project_url) = if let Some(e) = bom_entry
-                {
-                    (
-                        e.title.clone().or_else(|| Some(e.filename.clone())),
-                        e.author.clone(),
-                        e.description.clone(),
-                        e.icon_url.clone(),
-                        e.modrinth_url(is_shader).or_else(|| e.project_url.clone()),
-                    )
-                } else {
-                    (Some(filename.clone()), None, None, None, None)
-                };
+                let (title, author, description, icon_url, project_url, version, pack_format) =
+                    if let Some(e) = bom_entry {
+                        (
+                            e.title.clone().or_else(|| Some(e.filename.clone())),
+                            e.author.clone(),
+                            e.description.clone(),
+                            e.icon_url.clone(),
+                            e.modrinth_url(is_shader).or_else(|| e.project_url.clone()),
+                            e.version.clone(),
+                            e.pack_format,
+                        )
+                    } else {
+                        // Extract from file on disk
+                        if is_shader {
+                            let meta =
+                                zircon_core::metadata::extract_shader_pack_metadata(&path).ok();
+                            (
+                                Some(filename.clone()),
+                                None,
+                                meta.as_ref().and_then(|m| m.description.clone()),
+                                None,
+                                None,
+                                meta.as_ref().and_then(|m| m.version.clone()),
+                                None,
+                            )
+                        } else {
+                            let meta =
+                                zircon_core::metadata::extract_resource_pack_metadata(&path).ok();
+                            (
+                                Some(filename.clone()),
+                                None,
+                                meta.as_ref().and_then(|m| m.description.clone()),
+                                None,
+                                None,
+                                meta.as_ref().and_then(|m| m.version.clone()),
+                                meta.as_ref().and_then(|m| m.pack_format),
+                            )
+                        }
+                    };
 
                 let is_active = if is_shader {
                     selection.active_shaderpack.as_deref() == Some(&filename)
@@ -1873,6 +1911,8 @@ pub async fn list_instance_packs_detailed(
                     project_url,
                     is_active,
                     is_local,
+                    version,
+                    pack_format,
                 }
             })
             .collect()
@@ -2452,4 +2492,26 @@ mod tests {
         let err = evaluate_bom_trust(&bom, None).unwrap_err();
         assert!(matches!(err, LauncherError::Security(_)));
     }
+
+    #[test]
+    fn pack_file_info_serializes_version_and_pack_format() {
+        let pack = PackFileInfo {
+            filename: "Faithful.zip".to_string(),
+            size_bytes: 1024,
+            title: Some("Faithful 32x".to_string()),
+            author: Some("Faithful Team".to_string()),
+            description: Some("HD textures".to_string()),
+            icon_url: None,
+            project_url: Some("https://modrinth.com/resourcepack/faithful".to_string()),
+            is_active: true,
+            is_local: false,
+            version: Some("v1.4.2".to_string()),
+            pack_format: Some(15),
+        };
+        let json = serde_json::to_string(&pack).unwrap();
+        assert!(json.contains("\"version\":\"v1.4.2\""));
+        assert!(json.contains("\"packFormat\":15"));
+        assert!(json.contains("\"isActive\":true"));
+    }
 }
+

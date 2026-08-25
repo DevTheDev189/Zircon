@@ -56,6 +56,7 @@ export const api = {
 
   // Packs
   listInstancePacks: (gameDir) => invoke('list_instance_packs', { gameDir }),
+  listInstancePacksDetailed: (gameDir) => invoke('list_instance_packs_detailed', { gameDir }),
   addLocalPack: (gameDir, sourcePath, kind) =>
     invoke('add_local_pack', { gameDir, sourcePath, kind }),
   removeLocalPack: (gameDir, kind, filename) =>

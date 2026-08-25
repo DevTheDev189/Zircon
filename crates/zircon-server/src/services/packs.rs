@@ -233,7 +233,24 @@ impl PackManagementService {
             Uuid::new_v4().to_string()
         };
 
-        let entry = PackEntry::new(
+        let mut version: Option<String> = None;
+        let mut pack_format: Option<u32> = None;
+        let mut description: Option<String> = None;
+
+        if shader {
+            if let Ok(meta) = zircon_core::metadata::extract_shader_pack_metadata(&target) {
+                version = meta.version;
+                description = meta.description;
+            }
+        } else {
+            if let Ok(meta) = zircon_core::metadata::extract_resource_pack_metadata(&target) {
+                version = meta.version;
+                pack_format = meta.pack_format;
+                description = meta.description;
+            }
+        }
+
+        let mut entry = PackEntry::new(
             Some(id),
             safe_name.clone(),
             Some(sha1),
@@ -242,6 +259,11 @@ impl PackManagementService {
             None,
             size,
         );
+        entry.version = version;
+        entry.pack_format = pack_format;
+        if description.is_some() {
+            entry.description = description;
+        }
 
         self.bom_service.with_bom(|bom| {
             if shader {
@@ -352,6 +374,8 @@ impl PackManagementService {
                 is_shader,
             )
             .await?;
+
+        entry.version = Some(version.version_number.clone());
 
         // Enrich with Modrinth Project details.
         if let Ok(project) = modrinth.get_project(project_id).await {
