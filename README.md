@@ -20,9 +20,9 @@
 </p>
 
 <p align="center">
-  <a href="https://zirconmc.net"><strong>🌐 Official Website: zirconmc.net</strong></a> &nbsp;|&nbsp;
+  <a href="https://zirconmc.net"><strong> Official Website: zirconmc.net</strong></a> &nbsp;|&nbsp;
   <a href="https://zirconmc.net/downloads.html"><strong>⬇ Download Launcher &amp; Server</strong></a> &nbsp;|&nbsp;
-  <a href="https://github.com/keyaiereharris-ops/Zircon/releases"><strong>📦 GitHub Releases</strong></a>
+  <a href="https://github.com/keyaiereharris-ops/Zircon/releases"><strong> GitHub Releases</strong></a>
 </p>
 
 > [!NOTE]
