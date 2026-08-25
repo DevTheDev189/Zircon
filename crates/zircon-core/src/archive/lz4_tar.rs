@@ -11,7 +11,7 @@
 
 use std::fs::File;
 use std::io::{self, Write};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use tar::{Archive, Builder, EntryType, Header};
@@ -134,8 +134,14 @@ fn append_file(
     Ok(())
 }
 
-const MAX_TOTAL_EXTRACT_BYTES: u64 = 10 * 1024 * 1024 * 1024; // 10 GB
-const MAX_FILE_ENTRIES: usize = 50_000;
+pub use crate::archive::limits::is_safe_entry_path;
+use crate::archive::limits::{
+    max_file_entries, max_uncompressed_bytes, sanitize_entry_path,
+    DEFAULT_MAX_FILE_ENTRIES, DEFAULT_MAX_UNCOMPRESSED_BYTES,
+};
+
+pub const MAX_TOTAL_EXTRACT_BYTES: u64 = DEFAULT_MAX_UNCOMPRESSED_BYTES; // 10 GB
+pub const MAX_FILE_ENTRIES: usize = DEFAULT_MAX_FILE_ENTRIES;
 
 /// Decompresses a `.tar.lz4` archive into `destination_dir`, overwriting files
 /// that already exist. Aborts the whole extraction when any entry:
@@ -151,16 +157,19 @@ pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Resul
 
     let dest = canonicalize_or_create(destination_dir)?;
 
+    let max_bytes = max_uncompressed_bytes();
+    let max_entries = max_file_entries();
+
     let mut entry_count = 0;
     let mut total_uncompressed: u64 = 0;
 
     let entries = tar_in.entries()?;
     for entry in entries {
         entry_count += 1;
-        if entry_count > MAX_FILE_ENTRIES {
+        if entry_count > max_entries {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "Archive exceeds maximum allowed entry count (decompression bomb defense)",
+                format!("Archive exceeds maximum allowed entry count ({max_entries}) (decompression bomb defense)"),
             ));
         }
 
@@ -198,6 +207,16 @@ pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Resul
         if entry_type.is_dir() {
             std::fs::create_dir_all(&target)?;
         } else {
+            // Header pre-check if available
+            if let Ok(declared_size) = entry.header().size() {
+                if total_uncompressed.saturating_add(declared_size) > max_bytes {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("Archive exceeds maximum allowed uncompressed size ({max_bytes} bytes)"),
+                    ));
+                }
+            }
+
             if let Some(parent) = target.parent() {
                 std::fs::create_dir_all(parent)?;
             }
@@ -205,32 +224,15 @@ pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Resul
             let written = io::copy(&mut entry, &mut out)?;
             total_uncompressed += written;
 
-            if total_uncompressed > MAX_TOTAL_EXTRACT_BYTES {
+            if total_uncompressed > max_bytes {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    "Archive exceeds maximum allowed uncompressed size",
+                    format!("Archive exceeds maximum allowed uncompressed size ({max_bytes} bytes)"),
                 ));
             }
         }
     }
     Ok(())
-}
-
-/// Rejects absolute paths, drive prefixes and `..` components. Returns the
-/// normalized relative path, or `None` when unsafe.
-fn sanitize_entry_path(path: &Path) -> Option<PathBuf> {
-    let mut result = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::Normal(part) => result.push(part),
-            Component::CurDir => {}
-            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
-        }
-    }
-    if result.as_os_str().is_empty() {
-        return None;
-    }
-    Some(result)
 }
 
 fn canonicalize_or_create(destination_dir: &Path) -> io::Result<PathBuf> {
@@ -241,11 +243,6 @@ fn canonicalize_or_create(destination_dir: &Path) -> io::Result<PathBuf> {
             std::fs::canonicalize(destination_dir)
         }
     }
-}
-
-/// Exposed for unit testing: is this archive entry path safe to extract?
-pub fn is_safe_entry_path(path: &Path) -> bool {
-    sanitize_entry_path(path).is_some()
 }
 
 #[cfg(test)]
