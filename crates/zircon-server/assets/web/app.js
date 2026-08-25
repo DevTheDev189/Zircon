@@ -28,10 +28,30 @@ createApp({
             systemStats: {},
             searchQuery: '',
             searchType: 'mod', // 'mod' or 'modpack'
+            searchProvider: 'modrinth', // 'modrinth' or 'curseforge'
             searching: false,
             searchSeq: 0, // bumped per search so stale responses never clobber newer ones
             searchResults: [],
             installingMods: {}, // { [projectId]: true } while an install is in flight
+            curseforgeDropModal: {
+                open: false,
+                modTitle: '',
+                modSlug: '',
+                modFileId: null,
+                targetFileName: '',
+                projectUrl: '',
+                iconUrl: '',
+                summary: '',
+                countdown: 3,
+                redirectTriggered: false,
+                uploading: false,
+                uploadSuccess: false,
+                successTitle: '',
+                error: '',
+                timer: null,
+                countdownInterval: null
+            },
+            isDraggingMod: false,
             recommendedMods: [
                 { projectId: 'sodium', title: 'Sodium', description: 'Modern rendering engine that greatly improves frame rates.', loader: 'fabric' },
                 { projectId: 'lithium', title: 'Lithium', description: 'General-purpose optimization for physics, chunk loading and entity ticking.', loader: 'fabric' },
@@ -47,9 +67,13 @@ createApp({
             resourcepacks: [],
             shaderSearchQuery: '',
             texturePackSearchQuery: '',
-            packSearchType: 'shaderpack', // 'shaderpack' or 'resourcepack' — which panel's results are shown
+            shaderSearchProvider: 'modrinth', // 'modrinth' or 'curseforge'
+            texturePackSearchProvider: 'modrinth', // 'modrinth' or 'curseforge'
+            packSearchType: 'shaderpack', // 'shaderpack' or 'resourcepack'
             packSearching: false,
             packSearchResults: [],
+            shaderSearchResults: [],
+            texturePackSearchResults: [],
             installingPacks: {}, // { [projectId]: true } while an install is in flight
             whitelistEnabled: false,
             whitelistPlayers: [],

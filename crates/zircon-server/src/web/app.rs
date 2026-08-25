@@ -594,6 +594,14 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
             "image/svg+xml",
             include_str!("../../assets/web/zircon-title.svg"),
         ),
+        "/modrinth.svg" => (
+            "image/svg+xml",
+            include_str!("../../assets/web/modrinth.svg"),
+        ),
+        "/curseforge.svg" => (
+            "image/svg+xml",
+            include_str!("../../assets/web/curseforge.svg"),
+        ),
         "/js/auth.js" => (
             "application/javascript; charset=utf-8",
             include_str!("../../assets/web/js/auth.js"),

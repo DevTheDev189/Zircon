@@ -32,6 +32,8 @@ use zircon_server::web::router;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::dotenv().ok();
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -40,6 +42,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let config = Arc::new(ConfigService::load()?);
+    let cf_key = config.get_config().curseforge_api_key;
+    if !cf_key.is_empty() {
+        tracing::info!("CurseForge API integration active (key configured)");
+    } else {
+        tracing::warn!("No CurseForge API key configured (CurseForge search disabled)");
+    }
 
     // Admin auth: creates users.json + a random initial admin password on first
     // run (printed to stdout) and the JWT signing secret.

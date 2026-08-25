@@ -2037,32 +2037,77 @@ pub async fn search_modrinth(
     Ok(hits)
 }
 
-/// Downloads the primary file of the newest compatible Modrinth version into
-/// the instance's `mods/` folder. Returns the installed filename.
+/// Lists published Modrinth versions for a project matching an offline instance's
+/// Minecraft version + loader.
 #[tauri::command]
-pub async fn install_modrinth_mod(
+pub async fn list_modrinth_versions(
     state: State<'_, LauncherState>,
     instance_id: String,
     project_id: String,
-) -> Result<String, String> {
+) -> Result<Vec<zircon_core::api::modrinth::ModrinthVersion>, String> {
     let Some(instance) = state.offline.load(&instance_id) else {
         return Err("Instance not found".to_string());
+    };
+    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
+        None
+    } else {
+        Some(instance.mod_loader.r#type.as_str())
     };
     let versions = state
         .modrinth
         .list_project_versions(
             &project_id,
             Some(&instance.minecraft_version),
-            Some(&instance.mod_loader.r#type),
+            loader,
         )
         .await
         .map_err(|e| e.to_string())?;
-    let version = versions.into_iter().next().ok_or_else(|| {
-        format!(
-            "No version of this mod supports Minecraft {} + {} loader",
-            instance.minecraft_version, instance.mod_loader.r#type
+    Ok(versions)
+}
+
+/// Downloads the primary file of a specific (or newest compatible) Modrinth version
+/// into the instance's `mods/` folder. Returns the installed filename.
+#[tauri::command]
+pub async fn install_modrinth_mod(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    project_id: String,
+    version_id: Option<String>,
+) -> Result<String, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
+        None
+    } else {
+        Some(instance.mod_loader.r#type.as_str())
+    };
+    let versions = state
+        .modrinth
+        .list_project_versions(
+            &project_id,
+            Some(&instance.minecraft_version),
+            loader,
         )
-    })?;
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let version = if let Some(ref vid) = version_id {
+        versions.into_iter().find(|v| &v.id == vid).ok_or_else(|| {
+            format!(
+                "Version '{}' not found or incompatible with Minecraft {} + {} loader",
+                vid, instance.minecraft_version, instance.mod_loader.r#type
+            )
+        })?
+    } else {
+        versions.into_iter().next().ok_or_else(|| {
+            format!(
+                "No version of this mod supports Minecraft {} + {} loader",
+                instance.minecraft_version, instance.mod_loader.r#type
+            )
+        })?
+    };
+
     let file = version
         .primary_file()
         .ok_or_else(|| "This mod has no downloadable file".to_string())?;
@@ -2206,6 +2251,100 @@ pub fn clear_launcher_logs() -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LastInstanceLogInfo {
+    pub instance_name: String,
+    pub instance_type: String,
+    pub log_path: String,
+    pub lines: Vec<String>,
+    pub last_played: i64,
+}
+
+struct InstanceCandidate {
+    name: String,
+    instance_type: String,
+    game_dir: PathBuf,
+    last_played: i64,
+}
+
+/// Scans saved servers and offline instances, returning log details for the most
+/// recently played Minecraft instance that has a `logs/latest.log` file.
+#[tauri::command]
+pub fn get_last_instance_log(
+    state: State<'_, LauncherState>,
+) -> Result<Option<LastInstanceLogInfo>, String> {
+    let mut candidates: Vec<InstanceCandidate> = Vec::new();
+
+    let saved_servers = servers::load_servers();
+    for server in saved_servers {
+        let (host, port) = servers::parse_server_address(&server.address);
+        let game_dir = servers::instance_game_dir(&host, port);
+        candidates.push(InstanceCandidate {
+            name: if server.name.is_empty() {
+                server.address.clone()
+            } else {
+                server.name.clone()
+            },
+            instance_type: "Server".to_string(),
+            game_dir,
+            last_played: server.last_played,
+        });
+    }
+
+    let offline_instances = state.offline.list();
+    for inst in offline_instances {
+        let game_dir = state.offline.instance_dir(&inst.id);
+        candidates.push(InstanceCandidate {
+            name: if inst.name.is_empty() {
+                "Offline Instance".to_string()
+            } else {
+                inst.name.clone()
+            },
+            instance_type: "Offline".to_string(),
+            game_dir,
+            last_played: inst.last_played,
+        });
+    }
+
+    candidates.sort_by(|a, b| b.last_played.cmp(&a.last_played));
+
+    for candidate in candidates {
+        let log_file = candidate.game_dir.join("logs").join("latest.log");
+        if log_file.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&log_file) {
+                let all_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+                let lines = if all_lines.len() > 2000 {
+                    all_lines[all_lines.len() - 2000..].to_vec()
+                } else {
+                    all_lines
+                };
+                return Ok(Some(LastInstanceLogInfo {
+                    instance_name: candidate.name,
+                    instance_type: candidate.instance_type,
+                    log_path: log_file.display().to_string(),
+                    lines,
+                    last_played: candidate.last_played,
+                }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Clears the `logs/latest.log` file of the most recently played Minecraft instance.
+#[tauri::command]
+pub fn clear_last_instance_log(state: State<'_, LauncherState>) -> Result<(), String> {
+    if let Some(info) = get_last_instance_log(state)? {
+        let path = PathBuf::from(&info.log_path);
+        if path.is_file() {
+            std::fs::write(&path, "").map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 /// Scans an instance's `crash-reports/` and `logs/latest.log` for known fatal
 /// patterns (missing deps, mixin failures, Java mismatches, OOMs) and returns
 /// an actionable summary, or `None` when nothing matches.
@@ -2219,6 +2358,7 @@ pub fn check_game_crash(
         )),
     )
 }
+
 
 #[cfg(test)]
 mod tests {

@@ -18,6 +18,13 @@ cd /d "%~dp0"
 set VERSION=0.1.0
 set DOMAIN=https://zirconmc.net
 
+echo Syncing VERSION %VERSION% across project configs...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\sync-version.ps1" "%VERSION%"
+if errorlevel 1 (
+    echo FAILED: could not sync version across project configs
+    exit /b 1
+)
+
 echo.
 echo === [1/3] Building server release exe ===
 cargo build --release -p zircon-server

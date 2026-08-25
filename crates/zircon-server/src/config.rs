@@ -87,6 +87,16 @@ impl ServerConfig {
         if self.java_args.is_empty() {
             self.java_args = "-Xms2G -Xmx4G".to_string();
         }
+        if self.curseforge_api_key.is_empty() {
+            if let Ok(key) = std::env::var("CURSEFORGE_API_KEY")
+                .or_else(|_| std::env::var("MC_MANAGER_CURSEFORGE_API_KEY"))
+            {
+                let trimmed = key.trim().trim_matches('"').trim_matches('\'').to_string();
+                if !trimmed.is_empty() {
+                    self.curseforge_api_key = trimmed;
+                }
+            }
+        }
     }
 }
 

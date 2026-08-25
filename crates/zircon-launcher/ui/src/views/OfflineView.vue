@@ -95,31 +95,70 @@
               <button class="z-btn-ghost" :disabled="modSearchBusy" @click="searchModrinth">Search</button>
             </div>
             <div v-if="modSearchBusy" class="text-xs text-muted mt-2">Searching Modrinth…</div>
-            <div class="mt-2 flex flex-col gap-1 max-h-[180px] overflow-y-auto">
+            <div class="mt-2 flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
               <div
                 v-for="hit in modResults"
                 :key="hit.projectId"
-                class="flex items-center gap-2 bg-card border border-edge rounded-md p-2"
+                class="bg-card border border-edge rounded-md p-2.5 flex flex-col gap-1.5"
               >
-                <img
-                  v-if="hit.iconUrl"
-                  :src="hit.iconUrl"
-                  class="w-7 h-7 rounded"
-                  loading="lazy"
-                />
-                <div class="flex-1 min-w-0">
-                  <div class="text-xs font-bold text-white truncate">{{ hit.title }}</div>
-                  <div class="text-[10px] text-muted truncate">
-                    {{ hit.author }} · {{ fmtCount(hit.downloads) }} downloads
+                <div class="flex items-start gap-2.5">
+                  <img
+                    v-if="hit.iconUrl"
+                    :src="hit.iconUrl"
+                    class="w-8 h-8 rounded shrink-0 mt-0.5"
+                    loading="lazy"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="text-xs font-bold text-white truncate">{{ hit.title }}</div>
+                      <button
+                        class="z-btn-ghost text-[10px] shrink-0"
+                        :disabled="installing === hit.projectId || hit.versionsLoading"
+                        @click="installMod(hit)"
+                      >
+                        {{ installing === hit.projectId ? 'Installing…' : 'Install' }}
+                      </button>
+                    </div>
+                    <div v-if="hit.description" class="text-[11px] text-text/80 line-clamp-2 my-0.5">
+                      {{ hit.description }}
+                    </div>
+                    <div class="flex items-center gap-2 text-[10px] text-muted flex-wrap">
+                      <span>by <strong class="text-text/90 font-medium">{{ hit.author }}</strong></span>
+                      <span>·</span>
+                      <span>{{ fmtCount(hit.downloads) }} downloads</span>
+                      <span>·</span>
+                      <a
+                        :href="hit.projectUrl || ('https://modrinth.com/project/' + (hit.slug || hit.projectId))"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-accent hover:underline inline-flex items-center gap-0.5"
+                        @click.prevent="openModrinthLink(hit)"
+                      >
+                        View on Modrinth ↗
+                      </a>
+                    </div>
                   </div>
                 </div>
-                <button
-                  class="z-btn-ghost text-[10px]"
-                  :disabled="installing === hit.projectId"
-                  @click="installMod(hit)"
-                >
-                  {{ installing === hit.projectId ? '…' : 'Install' }}
-                </button>
+
+                <!-- Version selector -->
+                <div class="flex items-center gap-2 pt-1 border-t border-edge/40">
+                  <label class="text-[10px] text-muted shrink-0">Version:</label>
+                  <select
+                    v-model="hit.selectedVersionId"
+                    :disabled="installing === hit.projectId || hit.versionsLoading || hit.versionsFailed || !hit.versionOptions?.length"
+                    class="flex-1 min-w-0 bg-bg border border-edge rounded px-2 py-0.5 text-[11px] text-text disabled:opacity-50"
+                  >
+                    <option v-if="hit.versionsLoading" value="" disabled>Loading versions…</option>
+                    <option v-else-if="hit.versionsFailed || !hit.versionOptions?.length" value="" disabled>No compatible versions</option>
+                    <option
+                      v-for="v in hit.versionOptions"
+                      :key="v.id"
+                      :value="v.id"
+                    >
+                      {{ v.versionNumber || v.name }}
+                    </option>
+                  </select>
+                </div>
               </div>
               <div v-if="!modSearchBusy && modSearchDone && modResults.length === 0" class="text-xs text-muted">
                 No mods found for this Minecraft version + loader.
@@ -357,7 +396,15 @@ async function searchModrinth() {
   modSearchBusy.value = true;
   modSearchDone.value = false;
   try {
-    modResults.value = await api.searchModrinth(selected.value.id, query);
+    const hits = await api.searchModrinth(selected.value.id, query);
+    modResults.value = (hits || []).map(hit => ({
+      ...hit,
+      versionOptions: [],
+      selectedVersionId: '',
+      versionsLoading: true,
+      versionsFailed: false,
+    }));
+    attachVersionOptions(modResults.value);
   } catch (e) {
     window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Search failed: ${e}` }));
     modResults.value = [];
@@ -367,10 +414,32 @@ async function searchModrinth() {
   }
 }
 
+async function attachVersionOptions(hits) {
+  if (!selected.value) return;
+  const instanceId = selected.value.id;
+  await Promise.all(
+    hits.map(async (hit) => {
+      try {
+        const versions = await api.listModrinthVersions(instanceId, hit.projectId);
+        hit.versionOptions = versions || [];
+        hit.selectedVersionId = hit.versionOptions[0] ? hit.versionOptions[0].id : '';
+        hit.versionsFailed = hit.versionOptions.length === 0;
+      } catch {
+        hit.versionOptions = [];
+        hit.selectedVersionId = '';
+        hit.versionsFailed = true;
+      } finally {
+        hit.versionsLoading = false;
+      }
+    })
+  );
+}
+
 async function installMod(hit) {
   installing.value = hit.projectId;
   try {
-    const filename = await api.installModrinthMod(selected.value.id, hit.projectId);
+    const versionId = hit.selectedVersionId || null;
+    const filename = await api.installModrinthMod(selected.value.id, hit.projectId, versionId);
     window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Installed ${filename}` }));
     await loadMods();
   } catch (e) {
@@ -378,6 +447,11 @@ async function installMod(hit) {
   } finally {
     installing.value = '';
   }
+}
+
+function openModrinthLink(hit) {
+  const url = hit.projectUrl || `https://modrinth.com/project/${hit.slug || hit.projectId}`;
+  api.openExternalUrl(url).catch(() => {});
 }
 
 async function addLocalPack(kind) {

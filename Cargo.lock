@@ -1102,6 +1102,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
+
+[[package]]
 name = "dpi"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6972,7 +6978,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-core"
-version = "0.1.0"
+version = "0.2.5"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -6986,6 +6992,7 @@ dependencies = [
  "tar",
  "tokio",
  "toml 0.8.2",
+ "tracing",
  "url",
  "uuid",
  "zip 2.4.2",
@@ -6993,7 +7000,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-launcher"
-version = "0.1.0"
+version = "0.2.5"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -7029,7 +7036,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-server"
-version = "0.1.0"
+version = "0.2.5"
 dependencies = [
  "axum",
  "axum-extra",
@@ -7037,6 +7044,7 @@ dependencies = [
  "bytes",
  "chrono",
  "dashmap",
+ "dotenvy",
  "ed25519-dalek",
  "futures-util",
  "getrandom 0.3.4",

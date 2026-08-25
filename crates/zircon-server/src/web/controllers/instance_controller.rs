@@ -602,11 +602,17 @@ pub async fn upload_mod(
             "No file uploaded (form field 'file')".to_string(),
         ));
     };
+    let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
     let entry = mods_for(&state, &id)?
-        .add_mod(
+        .add_mod_with_metadata(
             std::io::Cursor::new(bytes),
             &filename,
             params.origin.as_deref(),
+            params.icon_url.as_deref(),
+            params.title.as_deref(),
+            expected_mod_id,
+            params.expected_file_id.as_deref(),
+            params.project_url.as_deref(),
         )
         .await?;
     Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
@@ -651,9 +657,25 @@ pub async fn search_mods(
         }
         let hits = mods
             .curse_forge()
-            .search_mods(&query, params.mc_version.as_deref())
+            .search_mods_with_type(
+                &query,
+                params.mc_version.as_deref(),
+                params.loader.as_deref(),
+                params.project_type.as_deref(),
+            )
             .await
-            .map_err(|e| ApiError::BadGateway(e.to_string()))?;
+            .map_err(|e| {
+                tracing::error!("CurseForge search failed for query '{query}': {e}");
+                ApiError::BadGateway(format!("CurseForge search failed: {e}"))
+            })?;
+        tracing::info!(
+            "CurseForge search query='{}', mc_version={:?}, loader={:?}, type={:?} -> returned {} hit(s)",
+            query,
+            params.mc_version,
+            params.loader,
+            params.project_type,
+            hits.len()
+        );
         result.insert(
             "origin".to_string(),
             serde_json::Value::String("curseforge".to_string()),
@@ -927,10 +949,18 @@ fn mods_for(state: &AppState, id: &str) -> Result<ModManagementService, ApiError
         )
         .with_signing_key(state.signing_key.clone()),
     );
+    let curseforge_key = {
+        let key = state.config.get_config().curseforge_api_key;
+        if !key.is_empty() {
+            key
+        } else {
+            state.curseforge_api_key.clone()
+        }
+    };
     Ok(ModManagementService::new(
         bom,
         instance_dir.join("mods"),
-        &state.curseforge_api_key,
+        &curseforge_key,
     ))
 }
 
@@ -949,11 +979,20 @@ fn packs_for(state: &AppState, id: &str) -> Result<PackManagementService, ApiErr
         )
         .with_signing_key(state.signing_key.clone()),
     );
+    let curseforge_key = {
+        let key = state.config.get_config().curseforge_api_key;
+        if !key.is_empty() {
+            key
+        } else {
+            state.curseforge_api_key.clone()
+        }
+    };
     Ok(PackManagementService::new(
         bom,
         instance_dir.join("shaderpacks"),
         instance_dir.join("resourcepacks"),
-    ))
+    )
+    .with_curseforge_key(&curseforge_key))
 }
 
 /// Sends a command to the instance's own server process (no-op when offline).
@@ -1042,20 +1081,31 @@ async fn upload_pack(
         ));
     };
     let packs = packs_for(state, id)?;
+    let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
     let entry = if shader {
         packs
-            .add_shaderpack(
+            .add_shaderpack_with_metadata(
                 std::io::Cursor::new(bytes),
                 &filename,
                 params.origin.as_deref(),
+                params.icon_url.as_deref(),
+                params.title.as_deref(),
+                expected_mod_id,
+                params.expected_file_id.as_deref(),
+                params.project_url.as_deref(),
             )
             .await?
     } else {
         packs
-            .add_resourcepack(
+            .add_resourcepack_with_metadata(
                 std::io::Cursor::new(bytes),
                 &filename,
                 params.origin.as_deref(),
+                params.icon_url.as_deref(),
+                params.title.as_deref(),
+                expected_mod_id,
+                params.expected_file_id.as_deref(),
+                params.project_url.as_deref(),
             )
             .await?
     };

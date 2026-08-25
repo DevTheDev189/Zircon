@@ -124,11 +124,17 @@ pub async fn upload_mod(
             "No file uploaded (form field 'file')".to_string(),
         ));
     };
+    let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
     let entry = resolve_mods(&state, &headers)
-        .add_mod(
+        .add_mod_with_metadata(
             std::io::Cursor::new(bytes),
             &filename,
             params.origin.as_deref(),
+            params.icon_url.as_deref(),
+            params.title.as_deref(),
+            expected_mod_id,
+            params.expected_file_id.as_deref(),
+            params.project_url.as_deref(),
         )
         .await?;
     Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
@@ -159,10 +165,17 @@ pub struct SearchParams {
     pub project_type: Option<String>,
 }
 
-/// Query param for uploads: `?origin=...`.
+/// Query param for uploads: `?origin=...&expectedModId=...&expectedFileId=...&iconUrl=...&title=...&modId=...&projectUrl=...`.
 #[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OriginParam {
     pub origin: Option<String>,
+    pub expected_mod_id: Option<String>,
+    pub expected_file_id: Option<String>,
+    pub icon_url: Option<String>,
+    pub title: Option<String>,
+    pub mod_id: Option<String>,
+    pub project_url: Option<String>,
 }
 
 /// GET /api/mods/search?query=&mcVersion=&loader=&origin= — search Modrinth/CurseForge.
@@ -193,9 +206,25 @@ pub async fn search_mods(
         }
         let hits = mods
             .curse_forge()
-            .search_mods(&query, params.mc_version.as_deref())
+            .search_mods_with_type(
+                &query,
+                params.mc_version.as_deref(),
+                params.loader.as_deref(),
+                params.project_type.as_deref(),
+            )
             .await
-            .map_err(|e| ApiError::BadGateway(e.to_string()))?;
+            .map_err(|e| {
+                tracing::error!("CurseForge search failed for query '{query}': {e}");
+                ApiError::BadGateway(format!("CurseForge search failed: {e}"))
+            })?;
+        tracing::info!(
+            "CurseForge search query='{}', mc_version={:?}, loader={:?}, type={:?} -> returned {} hit(s)",
+            query,
+            params.mc_version,
+            params.loader,
+            params.project_type,
+            hits.len()
+        );
         result.insert(
             "origin".to_string(),
             serde_json::Value::String("curseforge".to_string()),

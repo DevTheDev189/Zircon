@@ -160,15 +160,51 @@ pub fn modrinth_hit_to_map(
 pub fn curseforge_mod_to_map(
     mod_entry: &zircon_core::api::curseforge::CurseForgeMod,
 ) -> serde_json::Value {
+    let icon_url = mod_entry
+        .logo
+        .as_ref()
+        .map(|l| {
+            if !l.thumbnail_url.is_empty() {
+                l.thumbnail_url.clone()
+            } else {
+                l.url.clone()
+            }
+        })
+        .filter(|u| !u.is_empty());
+    let website_url = mod_entry
+        .links
+        .as_ref()
+        .and_then(|l| l.website_url.clone())
+        .filter(|u| !u.is_empty())
+        .unwrap_or_else(|| {
+            if !mod_entry.slug.is_empty() {
+                format!("https://www.curseforge.com/minecraft/mc-mods/{}", mod_entry.slug)
+            } else {
+                format!("https://www.curseforge.com/projects/{}", mod_entry.id)
+            }
+        });
+
+    let game_versions: Vec<String> = mod_entry
+        .latest_files
+        .iter()
+        .flat_map(|f| f.game_versions.clone())
+        .collect();
+
     serde_json::json!({
         "id": mod_entry.id,
+        "projectId": mod_entry.id.to_string(),
+        "title": mod_entry.name,
         "name": mod_entry.name,
         "slug": mod_entry.slug,
         "summary": mod_entry.summary,
+        "description": mod_entry.summary,
         "author": mod_entry.authors_string(),
+        "iconUrl": icon_url,
         "downloadCount": mod_entry.download_count,
-        "gameVersions": mod_entry.game_versions,
-        "websiteUrl": mod_entry.links.as_ref().map(|l| l.website_url.clone()),
+        "gameVersions": game_versions,
+        "websiteUrl": website_url,
+        "projectUrl": website_url,
+        "origin": "curseforge",
     })
 }
 
@@ -177,7 +213,10 @@ pub fn curseforge_file_to_map(
     file: &zircon_core::api::curseforge::CurseForgeFile,
 ) -> serde_json::Value {
     serde_json::json!({
-        "id": file.id,
+        "id": file.id.to_string(),
+        "fileId": file.id,
+        "name": file.display_name,
+        "versionNumber": file.display_name,
         "displayName": file.display_name,
         "fileName": file.file_name,
         "downloadUrl": file.download_url,

@@ -1,6 +1,6 @@
 [package]
 name = "zircon-server"
-version = "0.1.0"
+version = "0.2.5"
 edition = "2021"
 description = "Zircon server manager daemon: process supervisor, TCP multiplexer, backup engine, Axum admin API"
 license = "MIT"
@@ -15,6 +15,7 @@ tower-http = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
 reqwest = { workspace = true }
+dotenvy.workspace = true
 bcrypt.workspace = true
 jsonwebtoken.workspace = true
 totp-rs = { version = "5.5", features = ["gen_secret", "otpauth"] }
