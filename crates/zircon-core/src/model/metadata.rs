@@ -142,6 +142,9 @@ impl ModMetadata {
     }
 }
 
+pub use crate::metadata::pack_extractor::{ResourcePackMetadata, ShaderPackMetadata};
+
+
 #[cfg(test)]
 mod tests {
     use super::*;

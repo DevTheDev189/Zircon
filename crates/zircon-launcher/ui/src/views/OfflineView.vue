@@ -63,7 +63,13 @@
                 class="flex items-center gap-2 text-xs"
               >
                 <div class="flex-1 min-w-0">
-                  <div class="truncate text-text">{{ mod.filename }}</div>
+                  <div class="flex items-center gap-1.5 truncate">
+                    <span class="truncate text-text">{{ mod.filename }}</span>
+                    <span
+                      v-if="mod.version"
+                      class="bg-card text-muted border border-edge text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0"
+                    >{{ mod.version }}</span>
+                  </div>
                   <div v-if="mod.author" class="text-[10px] text-muted">by {{ mod.author }}</div>
                 </div>
                 <span class="text-muted">{{ fmtBytes(mod.sizeBytes) }}</span>
@@ -128,26 +134,31 @@
             <div class="text-xs text-muted mb-1">Shaders</div>
             <select v-model="activeShaderpack" class="z-input mb-2" @change="onShaderpackChange">
               <option value="">None (shaders disabled)</option>
-              <option v-for="name in packs.shaderpacks" :key="name" :value="name">{{ name }}</option>
+              <option v-for="p in detailedPacks.shaderpacks" :key="p.filename" :value="p.filename">
+                {{ p.title || p.filename }} ({{ p.version || 'Unknown' }})
+              </option>
             </select>
             <button class="z-btn-ghost text-[11px] mb-3" @click="addLocalPack('shader')">+ Add Shaderpack (.zip)</button>
 
             <div class="text-xs text-muted mb-1">Texture Packs</div>
             <div class="flex flex-col gap-1 mb-2">
               <label
-                v-for="name in packs.resourcepacks"
-                :key="name"
+                v-for="p in detailedPacks.resourcepacks"
+                :key="p.filename"
                 class="flex items-center gap-2 text-xs cursor-pointer"
               >
                 <input
                   type="checkbox"
                   class="accent-[#47d2c9]"
-                  :checked="packs.activeResourcepacks.includes(name)"
-                  @change="togglePack(name)"
+                  :checked="packs.activeResourcepacks.includes(p.filename)"
+                  @change="togglePack(p.filename)"
                 />
-                <span class="truncate text-text">{{ name }}</span>
+                <span class="truncate text-text flex-1">{{ p.title || p.filename }}</span>
+                <span class="bg-card text-muted border border-edge text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0">
+                  {{ p.version || (p.packFormat ? 'v' + p.packFormat : 'Unknown') }}
+                </span>
               </label>
-              <div v-if="packs.resourcepacks.length === 0" class="text-xs text-muted">
+              <div v-if="detailedPacks.resourcepacks.length === 0" class="text-xs text-muted">
                 No texture packs added.
               </div>
             </div>
@@ -231,6 +242,11 @@ const packs = ref({
   resourcepacks: [],
   activeResourcepacks: [],
 });
+const detailedPacks = ref({
+  shaderpacks: [],
+  resourcepacks: [],
+  shadersEnabled: false,
+});
 const activeShaderpack = ref('');
 const launching = ref(false);
 
@@ -278,7 +294,12 @@ async function loadMods() {
 
 async function loadPacks() {
   if (!selected.value) return;
-  packs.value = await api.listInstancePacks(selectedDir.value);
+  const [basicPacks, detailed] = await Promise.all([
+    api.listInstancePacks(selectedDir.value),
+    api.listInstancePacksDetailed(selectedDir.value),
+  ]);
+  packs.value = basicPacks;
+  detailedPacks.value = detailed;
   activeShaderpack.value = packs.value.activeShaderpack || '';
 }
 

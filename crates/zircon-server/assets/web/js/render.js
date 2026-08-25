@@ -1091,6 +1091,7 @@ return function render(_ctx, _cache) {
                                     _createElementVNode("div", _hoisted_119, [
                                       _createElementVNode("div", _hoisted_120, [
                                         _createElementVNode("p", _hoisted_121, _toDisplayString(p.title || p.filename), 1 /* TEXT */),
+                                        _createElementVNode("span", { class: "bg-slate-800 text-slate-300 border border-slate-700 text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0" }, _toDisplayString(p.version || 'Unknown'), 1 /* TEXT */),
                                         (p.fileSize)
                                           ? (_openBlock(), _createElementBlock("span", _hoisted_122, _toDisplayString((p.fileSize / 1024).toFixed(1)) + " KB", 1 /* TEXT */))
                                           : _createCommentVNode("v-if", true)
@@ -1209,6 +1210,7 @@ return function render(_ctx, _cache) {
                                     _createElementVNode("div", _hoisted_146, [
                                       _createElementVNode("div", _hoisted_147, [
                                         _createElementVNode("p", _hoisted_148, _toDisplayString(p.title || p.filename), 1 /* TEXT */),
+                                        _createElementVNode("span", { class: "bg-slate-800 text-slate-300 border border-slate-700 text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0" }, _toDisplayString(p.version || (p.packFormat ? 'v' + p.packFormat : 'Unknown')), 1 /* TEXT */),
                                         (p.fileSize)
                                           ? (_openBlock(), _createElementBlock("span", _hoisted_149, _toDisplayString((p.fileSize / 1024).toFixed(1)) + " KB", 1 /* TEXT */))
                                           : _createCommentVNode("v-if", true)

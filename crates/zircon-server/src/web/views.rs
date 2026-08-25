@@ -24,6 +24,7 @@ pub fn mod_entry_to_map(entry: &ModEntry) -> serde_json::Value {
         "author": entry.author.clone().unwrap_or_default(),
         "compatible": entry.compatible,
         "warningMessage": entry.warning_message.clone().unwrap_or_default(),
+        "version": entry.version,
     })
 }
 
@@ -44,6 +45,8 @@ pub fn pack_entry_to_map(entry: &PackEntry, is_shader: bool) -> serde_json::Valu
         "iconUrl": entry.icon_url.clone().unwrap_or_default(),
         "author": entry.author.clone().unwrap_or_default(),
         "description": entry.description.clone().unwrap_or_default(),
+        "version": entry.version,
+        "packFormat": entry.pack_format,
     })
 }
 

@@ -140,6 +140,9 @@ impl ModManagementService {
             if !meta.author.is_empty() {
                 entry.author = Some(meta.author);
             }
+            if !meta.version.is_empty() {
+                entry.version = Some(meta.version);
+            }
         }
 
         self.bom_service.with_bom(|bom| {
@@ -178,8 +181,11 @@ impl ModManagementService {
             .bytes()
             .await
             .map_err(|e| ModError::Api(format!("Download failed: {e}")))?;
-        let reader = std::io::Cursor::new(bytes.to_vec());
-        let entry = self.add_mod(reader, filename, Some(origin)).await?;
+        let mut entry = self
+            .add_mod(std::io::Cursor::new(bytes.to_vec()), filename, Some(origin))
+            .await?;
+        entry.download_url = Some(url.to_string());
+        self.persist_entry(&entry)?;
         Ok(entry)
     }
 
@@ -236,6 +242,7 @@ impl ModManagementService {
             .install_from_url(&file.url, &file.filename, ORIGIN_MODRINTH)
             .await?;
         entry.id = Some(project_id.to_string());
+        entry.version = Some(chosen.version_number.clone());
         self.enrich_metadata(&mut entry).await;
         self.persist_entry(&entry)?;
         Ok(entry)
