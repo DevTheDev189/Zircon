@@ -612,6 +612,7 @@ fn maven_path_with_classifier(name: &str, classifier: Option<&str>) -> String {
 /// natives JAR into `natives_dir`, skipping entries that already exist on
 /// disk (mirrors the Java `extractNatives`).
 fn extract_natives(jar: &Path, natives_dir: &Path) -> Result<(), LauncherError> {
+    let guard = zircon_core::archive::ArchiveGuard::from_env();
     let mut existing: HashSet<String> = HashSet::new();
     if let Ok(entries) = std::fs::read_dir(natives_dir) {
         for entry in entries.flatten() {
@@ -623,12 +624,13 @@ fn extract_natives(jar: &Path, natives_dir: &Path) -> Result<(), LauncherError> 
     let file = std::fs::File::open(jar)?;
     let mut archive = zip::ZipArchive::new(file).map_err(zip_error)?;
     for i in 0..archive.len() {
+        guard.record_entry().map_err(|e| LauncherError::InvalidInput(e.to_string()))?;
         let mut entry = archive.by_index(i).map_err(zip_error)?;
         if entry.is_dir() {
             continue;
         }
         let name = entry.name().to_string();
-        if name.contains('/') {
+        if !zircon_core::archive::limits::is_safe_entry_path(Path::new(&name)) || name.contains('/') {
             continue;
         }
         if existing.contains(&name) {
@@ -637,8 +639,14 @@ fn extract_natives(jar: &Path, natives_dir: &Path) -> Result<(), LauncherError> 
         if !(name.ends_with(".dll") || name.ends_with(".so") || name.ends_with(".dylib")) {
             continue;
         }
+        guard
+            .check_entry_header(&name, entry.size(), entry.compressed_size())
+            .map_err(|e| LauncherError::InvalidInput(e.to_string()))?;
         let mut out = std::fs::File::create(natives_dir.join(&name))?;
-        std::io::copy(&mut entry, &mut out)?;
+        let written = std::io::copy(&mut entry, &mut out)?;
+        guard
+            .track_stream_chunk(written, entry.compressed_size())
+            .map_err(|e| LauncherError::InvalidInput(e.to_string()))?;
     }
     Ok(())
 }

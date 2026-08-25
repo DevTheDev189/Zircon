@@ -19,6 +19,10 @@ use std::path::Path;
 use serde_json::Value;
 use zip::result::ZipError;
 
+use crate::archive::limits::{
+    max_compression_ratio, max_file_entries, max_uncompressed_bytes,
+    DEFAULT_MAX_COMPRESSION_RATIO, DEFAULT_MAX_METADATA_BYTES, RATIO_ENFORCEMENT_THRESHOLD_BYTES,
+};
 use crate::model::{ModLoaderType, ModMetadata};
 
 pub const FABRIC_ENTRY: &str = "fabric.mod.json";
@@ -26,18 +30,17 @@ pub const NEOFORGE_ENTRY: &str = "META-INF/neoforge.mods.toml";
 pub const FORGE_ENTRY: &str = "META-INF/mods.toml";
 
 /// Max plausible ratio of total uncompressed bytes to total compressed bytes
-/// for a mod JAR. Legitimate jars (class files, JSON/TOML, small binary
-/// assets) sit far below this; anything exceeding it is treated as a
-/// decompression bomb (a tiny download that would explode into gigabytes if
-/// extracted).
-pub const MAX_JAR_COMPRESSION_RATIO: u64 = 50;
+/// for a mod JAR (default 200:1, configurable via `ZIP_MAX_COMPRESSION_RATIO`).
+/// Legitimate jars (class files, JSON/TOML, assets) sit far below this;
+/// anything exceeding it is treated as a decompression bomb.
+pub const MAX_JAR_COMPRESSION_RATIO: u64 = DEFAULT_MAX_COMPRESSION_RATIO;
 
 /// Structural sanity check on a mod JAR before it is executed:
 ///
 /// 1. the file must open as a valid ZIP archive (corrupt or truncated jars
 ///    are rejected instead of silently failing at game boot),
 /// 2. the entries' declared total uncompressed size must not exceed
-///    `MAX_JAR_COMPRESSION_RATIO` × total compressed size (zip-bomb guard), and
+///    `max_compression_ratio()` × total compressed size (zip-bomb guard), and
 /// 3. the jar must declare mod metadata — `fabric.mod.json`, or
 ///    `META-INF/neoforge.mods.toml`, or `META-INF/mods.toml` — so only files
 ///    the loader can actually consume ever reach the mods folder.
@@ -48,6 +51,18 @@ pub fn validate_mod_jar_structure(jar_file: &Path) -> Result<(), String> {
     let file = File::open(jar_file).map_err(|e| format!("cannot open JAR: {e}"))?;
     let mut zip =
         zip::ZipArchive::new(file).map_err(|e| format!("not a valid ZIP archive: {e}"))?;
+
+    let max_entries = max_file_entries();
+    let max_bytes = max_uncompressed_bytes();
+    let max_ratio = max_compression_ratio();
+
+    if zip.len() > max_entries {
+        return Err(format!(
+            "JAR contains {} entries, exceeding maximum allowed entry count of {}",
+            zip.len(),
+            max_entries
+        ));
+    }
 
     let mut total_uncompressed: u64 = 0;
     let mut total_compressed: u64 = 0;
@@ -69,10 +84,19 @@ pub fn validate_mod_jar_structure(jar_file: &Path) -> Result<(), String> {
             "no mod metadata found (expected {FABRIC_ENTRY}, {NEOFORGE_ENTRY} or {FORGE_ENTRY})"
         ));
     }
-    if total_compressed > 0 && total_uncompressed > MAX_JAR_COMPRESSION_RATIO * total_compressed {
+    if total_uncompressed > max_bytes {
+        return Err(format!(
+            "JAR declared uncompressed size ({total_uncompressed} bytes) exceeds maximum limit of {max_bytes} bytes"
+        ));
+    }
+    if total_compressed > 0
+        && total_uncompressed >= RATIO_ENFORCEMENT_THRESHOLD_BYTES
+        && total_uncompressed > max_ratio * total_compressed
+    {
+        let actual_ratio = total_uncompressed / total_compressed;
         return Err(format!(
             "implausible compression ratio: {total_uncompressed} uncompressed bytes vs \
-             {total_compressed} compressed (possible decompression bomb)"
+             {total_compressed} compressed (ratio {actual_ratio}:1 exceeds limit {max_ratio}:1, possible decompression bomb)"
         ));
     }
     Ok(())
@@ -81,7 +105,7 @@ pub fn validate_mod_jar_structure(jar_file: &Path) -> Result<(), String> {
 /// Cap on how many bytes of an embedded metadata file we will decompress.
 /// Prevents an uncompressed ZIP bomb from exhausting memory when inspecting
 /// untrusted mod jars.
-const MAX_METADATA_BYTES: u64 = 2 * 1024 * 1024; // 2 MB limit
+const MAX_METADATA_BYTES: u64 = DEFAULT_MAX_METADATA_BYTES; // 2 MB limit
 
 /// Errors raised while extracting mod metadata from a JAR.
 #[derive(Debug)]

@@ -152,7 +152,17 @@ impl ServerUpdater {
         let mut file = zip
             .by_name(&artifact.bin_name)
             .map_err(|_| format!("Binary '{}' not found inside archive", artifact.bin_name))?;
-        file.read_to_end(&mut new_bin_bytes)
+
+        let max_bytes = zircon_core::archive::max_uncompressed_bytes();
+        if file.size() > max_bytes {
+            return Err(format!(
+                "Binary inside archive exceeds maximum allowed size: {} bytes",
+                file.size()
+            ));
+        }
+        file.by_ref()
+            .take(max_bytes)
+            .read_to_end(&mut new_bin_bytes)
             .map_err(|e| e.to_string())?;
 
         let temp_bin_name = format!(

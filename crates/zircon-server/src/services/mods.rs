@@ -336,14 +336,23 @@ impl ModManagementService {
 
         let mut installed_count = 0;
         let mut failed_mods: Vec<String> = Vec::new();
-        let reader = std::io::Cursor::new(bytes.to_vec());
-        let mut archive = zip::ZipArchive::new(reader)
-            .map_err(|e| ModError::Invalid(format!("Invalid .mrpack: {e}")))?;
-        let index_entry = archive.by_name("modrinth.index.json").map_err(|_| {
-            ModError::Invalid("Invalid .mrpack: missing modrinth.index.json".to_string())
-        })?;
-        let index: serde_json::Value = serde_json::from_reader(index_entry)
-            .map_err(|e| ModError::Invalid(format!("Invalid modrinth.index.json: {e}")))?;
+        let index: serde_json::Value = {
+            let reader = std::io::Cursor::new(bytes.to_vec());
+            let mut archive = zip::ZipArchive::new(reader)
+                .map_err(|e| ModError::Invalid(format!("Invalid .mrpack: {e}")))?;
+            let mut index_entry = archive.by_name("modrinth.index.json").map_err(|_| {
+                ModError::Invalid("Invalid .mrpack: missing modrinth.index.json".to_string())
+            })?;
+            use std::io::Read;
+            let mut index_str = String::new();
+            index_entry
+                .by_ref()
+                .take(zircon_core::archive::limits::DEFAULT_MAX_METADATA_BYTES)
+                .read_to_string(&mut index_str)
+                .map_err(|e| ModError::Invalid(format!("Failed to read modrinth.index.json: {e}")))?;
+            serde_json::from_str(&index_str)
+                .map_err(|e| ModError::Invalid(format!("Invalid modrinth.index.json: {e}")))?
+        };
 
         if let Some(files) = index.get("files").and_then(|f| f.as_array()) {
             for element in files {
