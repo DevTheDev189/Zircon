@@ -11,7 +11,7 @@ use axum::Json;
 
 use serde::Deserialize;
 use tokio::time::Duration;
-use zircon_core::model::{BillOfMaterials, InstanceConfig};
+use zircon_core::model::{BillOfMaterials, InstanceConfig, ModLoaderType};
 
 use super::config_helpers::{
     command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
@@ -49,14 +49,21 @@ pub async fn create_instance(
     let mc_version = body.mc_version.ok_or_else(|| {
         ApiError::BadRequest("name, mcVersion and loaderType are required".to_string())
     })?;
-    let loader_type = body.loader_type.ok_or_else(|| {
+    let loader_raw = body.loader_type.ok_or_else(|| {
         ApiError::BadRequest("name, mcVersion and loaderType are required".to_string())
+    })?;
+    let loader_enum = ModLoaderType::from_id(loader_raw.trim()).ok_or_else(|| {
+        ApiError::BadRequest(format!(
+            "Invalid loaderType '{}'. Allowed loaders: {}",
+            loader_raw.trim(),
+            ModLoaderType::ALLOWED_IDS.join(", ")
+        ))
     })?;
     let loader_version = body.loader_version.unwrap_or_default();
     let created = state.instances.create_instance(
         name.trim(),
         mc_version.trim(),
-        loader_type.trim().to_lowercase().as_str(),
+        loader_enum.id(),
         loader_version.trim(),
     )?;
     if let Some(args) = body

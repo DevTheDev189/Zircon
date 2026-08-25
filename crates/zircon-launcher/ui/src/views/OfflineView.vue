@@ -388,11 +388,14 @@ async function openNewInstance() {
       mcVersions.value = ['1.20.4'];
     }
   }
+  const allowedLoaders = ['vanilla', 'fabric', 'forge', 'neoforge', 'quilt'];
   if (loaderTypes.value.length === 0) {
     try {
-      loaderTypes.value = await api.listLoaderTypes();
+      const fetched = await api.listLoaderTypes();
+      const filtered = (fetched || []).filter(l => allowedLoaders.includes(l.toLowerCase()));
+      loaderTypes.value = filtered.length > 0 ? filtered : allowedLoaders;
     } catch {
-      loaderTypes.value = ['vanilla', 'fabric', 'forge', 'neoforge', 'quilt'];
+      loaderTypes.value = allowedLoaders;
     }
   }
 }

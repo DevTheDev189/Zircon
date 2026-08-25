@@ -21,7 +21,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use zircon_core::api::modrinth::{ModrinthApiClient, ModrinthSearchHit};
 use zircon_core::crypto::signing;
-use zircon_core::model::{BillOfMaterials, ModLoaderInfo};
+use zircon_core::model::{BillOfMaterials, ModLoaderInfo, ModLoaderType};
 
 use crate::auth::msa::MicrosoftAuthService;
 use crate::auth::session::SessionData;
@@ -2102,18 +2102,23 @@ pub async fn list_minecraft_versions(
         .map_err(|e| e.to_string())
 }
 
-/// Loader types known to Modrinth plus `vanilla`, for the instance creation
-/// dropdown.
+/// Loader types for the instance creation dropdown:
+/// strictly restricted to Forge, NeoForge, Fabric, Quilt, and Vanilla.
 #[tauri::command]
 pub async fn list_loader_types(state: State<'_, LauncherState>) -> Result<Vec<String>, String> {
-    let mut loaders = state
-        .modrinth
-        .list_loaders()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !loaders.iter().any(|l| l == "vanilla") {
-        loaders.insert(0, "vanilla".to_string());
+    let mut loaders: Vec<String> = match state.modrinth.list_loaders().await {
+        Ok(all) => all
+            .into_iter()
+            .filter_map(|l| ModLoaderType::from_id(&l).map(|t| t.id().to_string()))
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    for id in ["vanilla", "fabric", "quilt", "forge", "neoforge"] {
+        if !loaders.iter().any(|l| l == id) {
+            loaders.push(id.to_string());
+        }
     }
+    loaders.retain(|l| ModLoaderType::from_id(l).is_some());
     Ok(loaders)
 }
 

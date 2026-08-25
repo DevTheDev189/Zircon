@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::bom::ModLoaderInfo;
+use super::metadata::ModLoaderType;
 
 /// Manual backups only — the scheduler never auto-backs up.
 pub const BACKUP_OFF: &str = "off";
@@ -201,6 +202,14 @@ impl InstanceConfig {
             .as_ref()
             .map(|l| l.r#type.as_str())
             .unwrap_or("vanilla")
+    }
+
+    /// Loader type as enum (`ModLoaderType::Vanilla`, `ModLoaderType::Fabric`, ...).
+    pub fn loader_enum(&self) -> ModLoaderType {
+        self.mod_loader
+            .as_ref()
+            .and_then(|l| ModLoaderType::from_id(&l.r#type))
+            .unwrap_or(ModLoaderType::Vanilla)
     }
 
     /// Loader version string, empty for vanilla installs.

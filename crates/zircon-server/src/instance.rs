@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use ed25519_dalek::SigningKey;
 use sysinfo::System;
-use zircon_core::model::{clamp_idle_shutdown_minutes, BillOfMaterials, InstanceConfig};
+use zircon_core::model::{clamp_idle_shutdown_minutes, BillOfMaterials, InstanceConfig, ModLoaderType};
 
 use crate::process::console::ConsoleStreamHandler;
 use crate::process::manager::MinecraftProcessManager;
@@ -157,10 +157,16 @@ impl ServerInstanceManager {
         loader_type: &str,
         loader_version: &str,
     ) -> Result<InstanceConfig, InstanceError> {
+        let loader_enum = ModLoaderType::from_id(loader_type).ok_or_else(|| {
+            InstanceError::Invalid(format!(
+                "Invalid mod loader '{loader_type}'. Allowed loaders: {}",
+                ModLoaderType::ALLOWED_IDS.join(", ")
+            ))
+        })?;
         let config = InstanceConfig::with_external_port(
             name,
             mc_version,
-            loader_type,
+            loader_enum.id(),
             loader_version,
             self.allocate_next_port()?,
             self.allocate_next_external_port()?,
@@ -1303,6 +1309,30 @@ mod tests {
             .join("instance.json")
             .is_file());
         assert!(manager.get_instance_dir(&first.id).join("mods").is_dir());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn creates_all_5_allowed_loaders_and_rejects_invalid() {
+        let dir = temp_dir();
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let manager = ServerInstanceManager::new(&dir, console).unwrap();
+
+        for loader in &["forge", "neoforge", "fabric", "quilt", "vanilla"] {
+            let inst = manager
+                .create_instance(loader, "1.20.4", loader, "1.0")
+                .unwrap();
+            assert_eq!(*loader, inst.loader_type());
+        }
+
+        // Invalid loaders fail
+        for invalid in &["liteloader", "rift", "babric", "custom", ""] {
+            let res = manager.create_instance("Bad", "1.20.4", invalid, "1.0");
+            assert!(
+                matches!(res, Err(InstanceError::Invalid(_))),
+                "loader {invalid} should be rejected"
+            );
+        }
         let _ = fs::remove_dir_all(&dir);
     }
 
