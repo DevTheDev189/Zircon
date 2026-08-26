@@ -2,6 +2,11 @@
   <div class="relative h-full flex flex-col bg-bg text-text">
     <!-- Microsoft login overlay (z-above everything) -->
     <LoginOverlay :visible="!session" @logged-in="onLoggedIn" />
+    <LaunchOverlay
+      :visible="launchOverlayVisible"
+      :status="statusText"
+      :progress="progress"
+    />
 
     <div class="flex flex-1 min-h-0">
       <!-- Sidebar -->
@@ -179,6 +184,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import LoginOverlay from './components/LoginOverlay.vue';
+import LaunchOverlay from './components/LaunchOverlay.vue';
 import StatusBar from './components/StatusBar.vue';
 import ServersView from './views/ServersView.vue';
 import OfflineView from './views/OfflineView.vue';
@@ -243,6 +249,7 @@ const avatarUrl = ref('');
 const statusText = ref('');
 const progress = ref(null);
 const busy = ref(false);
+const launchOverlayVisible = ref(false);
 const gameStatus = ref(null);
 const gameOutputBuffer = ref([]);
 const shaderPrompt = ref(null);
@@ -286,6 +293,7 @@ onMounted(async () => {
     }),
     onGameStatus((status) => {
       gameStatus.value = status;
+      launchOverlayVisible.value = false;
       if (status.running) {
         busy.value = true;
       } else {
@@ -434,11 +442,13 @@ async function respondKeyPrompt(accepted) {
 
 function onLaunching() {
   busy.value = true;
+  launchOverlayVisible.value = true;
   progress.value = null;
 }
 
 function onStopped() {
   busy.value = false;
+  launchOverlayVisible.value = false;
   progress.value = null;
 }
 </script>

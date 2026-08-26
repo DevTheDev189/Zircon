@@ -489,6 +489,8 @@ fn spawn_game(
     output: Option<Arc<dyn Fn(String) + Send + Sync>>,
 ) -> Result<Child, LauncherError> {
     let mut cmd = Command::new(&command[0]);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
     // Untrusted mod code runs inside this JVM: scrub the environment so host
     // secrets (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, ...) can never leak into the
     // game process. Keep only what the JVM needs to function.

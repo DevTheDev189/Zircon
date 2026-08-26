@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex as StdMutex;
 use std::time::Duration;
 
@@ -74,6 +74,7 @@ pub struct LauncherState {
     /// Plain client for BOM fetches, join-intent registration and downloads.
     pub http: reqwest::Client,
     pub running_game: AsyncMutex<Option<RunningGame>>,
+    pub launch_cancelled: AtomicBool,
     pub next_game_id: AtomicU64,
     /// In-flight shader opt-in prompts awaiting the webview's answer.
     pub shader_requests: AsyncMutex<HashMap<u64, tokio::sync::oneshot::Sender<ShaderChoice>>>,
@@ -109,6 +110,7 @@ impl LauncherState {
             offline: OfflineInstanceManager::new_default(),
             http,
             running_game: AsyncMutex::new(None),
+            launch_cancelled: AtomicBool::new(false),
             next_game_id: AtomicU64::new(1),
             shader_requests: AsyncMutex::new(HashMap::new()),
             next_shader_request_id: AtomicU64::new(1),
@@ -152,6 +154,14 @@ impl PackProgressListener for UiPackListener {
 
 fn emit_status(app: &AppHandle, message: impl AsRef<str>) {
     let _ = app.emit("launch-status", message.as_ref());
+}
+
+fn ensure_launch_active(cancelled: &AtomicBool) -> Result<(), LauncherError> {
+    if cancelled.load(Ordering::SeqCst) {
+        Err(LauncherError::InvalidInput("Launch cancelled.".to_string()))
+    } else {
+        Ok(())
+    }
 }
 
 /// Notifies the frontend that the active skin changed so it can refresh the
@@ -423,7 +433,9 @@ async fn wake_if_needed(
     base_url: &str,
     host: &str,
     port: u16,
+    cancelled: &AtomicBool,
 ) -> Result<bool, LauncherError> {
+    ensure_launch_active(cancelled)?;
     let wrapper = fetch_wrapper_status(http, base_url).await;
     let wrapper_present = wrapper.is_some();
     let ping_ok = crate::status::ping_status(host, port).await.is_ok();
@@ -466,14 +478,19 @@ an admin to start it before playing."
         };
         return Err(LauncherError::InvalidInput(message));
     }
-    wait_for_online(app, host, port).await?;
+    wait_for_online(app, host, port, cancelled).await?;
     Ok(wrapper_present)
 }
 
 /// Polls the Minecraft status ping until the server answers or a generous
 /// timeout elapses (modded servers can take minutes to boot). Emits periodic
 /// `launch-status` updates so the webview stays informed.
-async fn wait_for_online(app: &AppHandle, host: &str, port: u16) -> Result<(), LauncherError> {
+async fn wait_for_online(
+    app: &AppHandle,
+    host: &str,
+    port: u16,
+    cancelled: &AtomicBool,
+) -> Result<(), LauncherError> {
     const ONLINE_TIMEOUT: Duration = Duration::from_secs(600);
     const POLL_INTERVAL: Duration = Duration::from_secs(3);
     const STATUS_EVERY: u32 = 10; // every ~30s
@@ -481,6 +498,7 @@ async fn wait_for_online(app: &AppHandle, host: &str, port: u16) -> Result<(), L
     let deadline = std::time::Instant::now() + ONLINE_TIMEOUT;
     let mut attempts = 0u32;
     loop {
+        ensure_launch_active(cancelled)?;
         if crate::status::ping_status(host, port).await.is_ok() {
             return Ok(());
         }
@@ -569,6 +587,7 @@ async fn run_online_flow(
     install_recommended_packs: bool,
     use_https: bool,
 ) -> Result<(), LauncherError> {
+    state.launch_cancelled.store(false, Ordering::SeqCst);
     if state.running_game.lock().await.is_some() {
         return Err(LauncherError::InvalidInput(
             "A game is already running — stop it first.".to_string(),
@@ -624,7 +643,16 @@ async fn run_online_flow(
     // --- wake up a sleeping Zircon instance (idle shutdown) ---
     // The return value tells us whether a Zircon wrapper is reachable: only
     // then can the join intent hold the server's idle shutdown off.
-    let wrapper_present = wake_if_needed(&state.http, app, &base_url, &host, port).await?;
+    let wrapper_present = wake_if_needed(
+        &state.http,
+        app,
+        &base_url,
+        &host,
+        port,
+        &state.launch_cancelled,
+    )
+    .await?;
+    ensure_launch_active(&state.launch_cancelled)?;
 
     // A player is committed to joining: keep the server awake while the rest
     // of the flow runs (BOM, pack sync, Java/classpath, mod sync — any of
@@ -648,6 +676,7 @@ async fn run_online_flow(
 
     // --- BOM ---
     let bom = fetch_bom(&state.http, &base_url).await?;
+    ensure_launch_active(&state.launch_cancelled)?;
 
     // --- BOM trust (TOFU pinning + Ed25519 attestation) ---
     // Nothing is downloaded or launched until the mod list itself is trusted:
@@ -835,6 +864,7 @@ async fn run_online_flow(
         .sync_engine
         .sync_with_bom(&bom, &base_url, &game_dir, Some(&listener))
         .await?;
+    ensure_launch_active(&state.launch_cancelled)?;
     if sync_result.aborted {
         return Err(LauncherError::InvalidInput(
             sync_result
@@ -869,6 +899,7 @@ async fn run_online_flow(
 
     // --- spawn the game ---
     emit_status(app, "Starting Minecraft process...");
+    ensure_launch_active(&state.launch_cancelled)?;
     let output = game_output_emitter(app);
     let child = MinecraftRunner
         .launch(
@@ -989,8 +1020,10 @@ fn watch_game(app: AppHandle, id: u64, label: String) {
 /// Stops the running game (PLAY button toggle).
 #[tauri::command]
 pub async fn stop_game(app: AppHandle, state: State<'_, LauncherState>) -> Result<(), String> {
+    state.launch_cancelled.store(true, Ordering::SeqCst);
     let mut guard = state.running_game.lock().await;
     let Some(mut game) = guard.take() else {
+        let _ = app.emit("launch-status", "Launch cancelled.");
         return Ok(());
     };
     let label = game.label.clone();
@@ -1294,6 +1327,7 @@ async fn run_offline_flow(
     state: &LauncherState,
     instance: &OfflineInstance,
 ) -> Result<(), LauncherError> {
+    state.launch_cancelled.store(false, Ordering::SeqCst);
     if state.running_game.lock().await.is_some() {
         return Err(LauncherError::InvalidInput(
             "A game is already running — stop it first.".to_string(),
@@ -1317,6 +1351,7 @@ async fn run_offline_flow(
             required_java,
         )
         .await?;
+    ensure_launch_active(&state.launch_cancelled)?;
 
     let game_dir = state.offline.instance_dir(&instance.id);
     std::fs::create_dir_all(&game_dir)?;
@@ -1338,6 +1373,7 @@ async fn run_offline_flow(
         app,
         format!("Starting offline instance '{}'...", instance.name),
     );
+    ensure_launch_active(&state.launch_cancelled)?;
     let output = game_output_emitter(app);
     let child = MinecraftRunner
         .launch_offline(
