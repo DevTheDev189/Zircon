@@ -638,6 +638,22 @@ mod tests {
         )
     }
 
+    /// Reserves a genuinely free TCP port by binding an ephemeral listener
+    /// and immediately releasing it. `config_at` loads the default ports
+    /// (25564/25565/25566) unchanged, which collide with a real Zircon
+    /// server that might already be running on this machine — `MUX_TEST_LOCK`
+    /// only serializes these tests against each other, not against an
+    /// external process. Tests that bind a fixed port must reserve one of
+    /// these instead of hardcoding a default.
+    async fn free_port() -> u16 {
+        TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port()
+    }
+
     /// Builds a valid handshake frame: [VarInt len][VarInt 0x00][protocol][host][u16 port][nextState].
     fn handshake_frame(hostname: &str, next_state: i32) -> Vec<u8> {
         let mut payload = Vec::new();
@@ -670,13 +686,13 @@ mod tests {
         let _guard = MUX_TEST_LOCK.lock().await;
         let dir = temp_dir();
         let config = config_at(&dir);
+        let web_port = free_port().await;
+        config.with_config(|c| c.web_port = web_port as i32);
         let tickets = Arc::new(JoinTicketManager::new());
         let multiplexer = TcpMultiplexer::new(config.clone(), None, tickets);
 
         // Start a fake "web server" on the configured web port.
-        let web_listener = TcpListener::bind(("127.0.0.1", config.get_config().web_port as u16))
-            .await
-            .unwrap();
+        let web_listener = TcpListener::bind(("127.0.0.1", web_port)).await.unwrap();
         let web_handle = tokio::spawn(async move {
             let (mut socket, _) = web_listener.accept().await.unwrap();
             let mut buf = [0u8; 256];
@@ -688,7 +704,7 @@ mod tests {
             (String::from_utf8_lossy(&buf[..n]).to_string(), n)
         });
 
-        let main_port = 25565u16;
+        let main_port = free_port().await;
         let handle = multiplexer.spawn_listener(main_port, None);
 
         let mut client = TcpStream::connect(("127.0.0.1", main_port)).await.unwrap();
@@ -777,15 +793,22 @@ mod tests {
         let dir = temp_dir();
         let config = config_at(&dir);
         config.with_config(|c| c.http_proxy = false);
-        let tickets = Arc::new(JoinTicketManager::new());
-        let multiplexer = TcpMultiplexer::new(config.clone(), None, tickets);
 
         // An HTTP-looking request must NOT reach the web port when proxying is
         // disabled; it is treated as (invalid) Minecraft traffic and routed to
         // the MC backend instead. No web listener is bound — a proxy attempt
         // would fail with connection refused and surface in the test.
-        let web_port = config.get_config().web_port as u16;
-        let mc_port = config.get_config().mc_port as u16;
+        let web_port = free_port().await;
+        let mut mc_port = free_port().await;
+        while mc_port == web_port {
+            mc_port = free_port().await;
+        }
+        config.with_config(|c| {
+            c.web_port = web_port as i32;
+            c.mc_port = mc_port as i32;
+        });
+        let tickets = Arc::new(JoinTicketManager::new());
+        let multiplexer = TcpMultiplexer::new(config.clone(), None, tickets);
         assert_ne!(web_port, mc_port);
 
         let mc_listener = TcpListener::bind(("127.0.0.1", mc_port)).await.unwrap();
@@ -797,7 +820,7 @@ mod tests {
             (String::from_utf8_lossy(&buf[..n]).to_string(), n)
         });
 
-        let main_port = 25565u16;
+        let main_port = free_port().await;
         let handle = multiplexer.spawn_listener(main_port, None);
 
         let mut client = TcpStream::connect(("127.0.0.1", main_port)).await.unwrap();
@@ -920,6 +943,16 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    // KNOWN FLAKY under a fully parallel `cargo test` run (default test
+    // threading): the client's `read_to_end()` can race the backend task's
+    // write and observe an empty response under heavy CPU contention from
+    // the rest of the suite running concurrently. Passes reliably in
+    // isolation and with `--test-threads=1` (confirmed: 136/136, no
+    // failures). This is a pre-existing timing sensitivity in the test
+    // itself (two independent tokio tasks with no synchronization beyond
+    // the socket), not a port collision — left unfixed as out of scope;
+    // a real fix would need the client to retry/wait rather than assume the
+    // backend has already written by the time it reads.
     #[tokio::test]
     async fn ticketed_login_is_proxied_to_the_instance_backend() {
         let _guard = MUX_TEST_LOCK.lock().await;
@@ -929,6 +962,18 @@ mod tests {
         let instances = Arc::new(ServerInstanceManager::new(&dir, console).unwrap());
         let instance = instances
             .create_instance("Main", "1.20.4", "vanilla", "")
+            .unwrap();
+
+        // `create_instance` deterministically assigns the first instance
+        // `EXTERNAL_PORT_BASE` (25565), which collides with a real Zircon
+        // server that might already be running on this machine. This test
+        // exercises the `None`-fixed-instance path, which routes by looking
+        // up the *registered* external port, so reassign it to a genuinely
+        // free one via the public API (keeps the in-memory registry and the
+        // `port` variable below in sync).
+        let external_port = free_port().await;
+        instances
+            .update_external_port(&instance.id, external_port as i32)
             .unwrap();
 
         let tickets = Arc::new(JoinTicketManager::new());
@@ -947,7 +992,7 @@ mod tests {
             (buf[..n].to_vec(), n)
         });
 
-        let port = instance.external_mc_port as u16;
+        let port = external_port;
         let handle = multiplexer.spawn_listener(port, None);
 
         let mut frame = handshake_frame("main", 2);

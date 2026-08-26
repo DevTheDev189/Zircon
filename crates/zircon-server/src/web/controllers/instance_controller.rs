@@ -11,7 +11,7 @@ use axum::Json;
 
 use serde::Deserialize;
 use tokio::time::Duration;
-use zircon_core::model::{BillOfMaterials, InstanceConfig};
+use zircon_core::model::{BillOfMaterials, InstanceConfig, ModLoaderType};
 
 use super::config_helpers::{
     command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
@@ -49,14 +49,21 @@ pub async fn create_instance(
     let mc_version = body.mc_version.ok_or_else(|| {
         ApiError::BadRequest("name, mcVersion and loaderType are required".to_string())
     })?;
-    let loader_type = body.loader_type.ok_or_else(|| {
+    let loader_raw = body.loader_type.ok_or_else(|| {
         ApiError::BadRequest("name, mcVersion and loaderType are required".to_string())
+    })?;
+    let loader_enum = ModLoaderType::from_id(loader_raw.trim()).ok_or_else(|| {
+        ApiError::BadRequest(format!(
+            "Invalid loaderType '{}'. Allowed loaders: {}",
+            loader_raw.trim(),
+            ModLoaderType::ALLOWED_IDS.join(", ")
+        ))
     })?;
     let loader_version = body.loader_version.unwrap_or_default();
     let created = state.instances.create_instance(
         name.trim(),
         mc_version.trim(),
-        loader_type.trim().to_lowercase().as_str(),
+        loader_enum.id(),
         loader_version.trim(),
     )?;
     if let Some(args) = body
@@ -595,11 +602,17 @@ pub async fn upload_mod(
             "No file uploaded (form field 'file')".to_string(),
         ));
     };
+    let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
     let entry = mods_for(&state, &id)?
-        .add_mod(
+        .add_mod_with_metadata(
             std::io::Cursor::new(bytes),
             &filename,
             params.origin.as_deref(),
+            params.icon_url.as_deref(),
+            params.title.as_deref(),
+            expected_mod_id,
+            params.expected_file_id.as_deref(),
+            params.project_url.as_deref(),
         )
         .await?;
     Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
@@ -615,6 +628,36 @@ pub async fn remove_mod(
         return Err(ApiError::NotFound("Mod not found".to_string()));
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/instances/{id}/mods/bulk-delete — body `{"filenames": [...]}`.
+pub async fn bulk_delete_mods(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let deleted = mods_for(&state, &id)?.remove_mods(&body.filenames)?;
+    Ok(Json(serde_json::json!({ "deleted": deleted })))
+}
+
+/// POST /api/instances/{id}/mods/enable — body `{"filenames": [...]}`.
+pub async fn enable_mods(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let changed = mods_for(&state, &id)?.set_mods_enabled(&body.filenames, true)?;
+    Ok(Json(serde_json::json!({ "changed": changed })))
+}
+
+/// POST /api/instances/{id}/mods/disable — body `{"filenames": [...]}`.
+pub async fn disable_mods(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let changed = mods_for(&state, &id)?.set_mods_enabled(&body.filenames, false)?;
+    Ok(Json(serde_json::json!({ "changed": changed })))
 }
 
 /// GET /api/instances/{id}/mods/search
@@ -644,9 +687,25 @@ pub async fn search_mods(
         }
         let hits = mods
             .curse_forge()
-            .search_mods(&query, params.mc_version.as_deref())
+            .search_mods_with_type(
+                &query,
+                params.mc_version.as_deref(),
+                params.loader.as_deref(),
+                params.project_type.as_deref(),
+            )
             .await
-            .map_err(|e| ApiError::BadGateway(e.to_string()))?;
+            .map_err(|e| {
+                tracing::error!("CurseForge search failed for query '{query}': {e}");
+                ApiError::BadGateway(format!("CurseForge search failed: {e}"))
+            })?;
+        tracing::info!(
+            "CurseForge search query='{}', mc_version={:?}, loader={:?}, type={:?} -> returned {} hit(s)",
+            query,
+            params.mc_version,
+            params.loader,
+            params.project_type,
+            hits.len()
+        );
         result.insert(
             "origin".to_string(),
             serde_json::Value::String("curseforge".to_string()),
@@ -920,10 +979,18 @@ fn mods_for(state: &AppState, id: &str) -> Result<ModManagementService, ApiError
         )
         .with_signing_key(state.signing_key.clone()),
     );
+    let curseforge_key = {
+        let key = state.config.get_config().curseforge_api_key;
+        if !key.is_empty() {
+            key
+        } else {
+            state.curseforge_api_key.clone()
+        }
+    };
     Ok(ModManagementService::new(
         bom,
         instance_dir.join("mods"),
-        &state.curseforge_api_key,
+        &curseforge_key,
     ))
 }
 
@@ -942,11 +1009,20 @@ fn packs_for(state: &AppState, id: &str) -> Result<PackManagementService, ApiErr
         )
         .with_signing_key(state.signing_key.clone()),
     );
+    let curseforge_key = {
+        let key = state.config.get_config().curseforge_api_key;
+        if !key.is_empty() {
+            key
+        } else {
+            state.curseforge_api_key.clone()
+        }
+    };
     Ok(PackManagementService::new(
         bom,
         instance_dir.join("shaderpacks"),
         instance_dir.join("resourcepacks"),
-    ))
+    )
+    .with_curseforge_key(&curseforge_key))
 }
 
 /// Sends a command to the instance's own server process (no-op when offline).
@@ -1035,20 +1111,31 @@ async fn upload_pack(
         ));
     };
     let packs = packs_for(state, id)?;
+    let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
     let entry = if shader {
         packs
-            .add_shaderpack(
+            .add_shaderpack_with_metadata(
                 std::io::Cursor::new(bytes),
                 &filename,
                 params.origin.as_deref(),
+                params.icon_url.as_deref(),
+                params.title.as_deref(),
+                expected_mod_id,
+                params.expected_file_id.as_deref(),
+                params.project_url.as_deref(),
             )
             .await?
     } else {
         packs
-            .add_resourcepack(
+            .add_resourcepack_with_metadata(
                 std::io::Cursor::new(bytes),
                 &filename,
                 params.origin.as_deref(),
+                params.icon_url.as_deref(),
+                params.title.as_deref(),
+                expected_mod_id,
+                params.expected_file_id.as_deref(),
+                params.project_url.as_deref(),
             )
             .await?
     };
@@ -1172,6 +1259,12 @@ pub struct InstallRequest {
     pub download_url: Option<String>,
     pub filename: Option<String>,
     pub file_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModFilenamesRequest {
+    pub filenames: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

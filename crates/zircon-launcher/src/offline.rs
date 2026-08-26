@@ -11,10 +11,22 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use zircon_core::model::ModLoaderInfo;
+use zircon_core::model::{ModLoaderInfo, ModLoaderType};
 
 use crate::error::LauncherError;
 use crate::paths::{offline_instances_dir, sanitize_filename_strict};
+
+/// Normalizes and validates the loader for an offline instance, falling back to Vanilla
+/// if an unsupported or legacy loader is found.
+fn sanitize_instance_loader(mut instance: OfflineInstance) -> OfflineInstance {
+    if let Some(loader_enum) = ModLoaderType::from_id(&instance.mod_loader.r#type) {
+        instance.mod_loader.r#type = loader_enum.id().to_string();
+    } else {
+        instance.mod_loader.r#type = "vanilla".to_string();
+        instance.mod_loader.version.clear();
+    }
+    instance
+}
 
 /// Persistent configuration of one offline (single-player) instance.
 ///
@@ -109,7 +121,7 @@ impl OfflineInstanceManager {
 
     /// Creates and persists a new offline instance with a fresh UUID and the
     /// supplied Minecraft version / mod loader configuration. Blank inputs fall
-    /// back to the Java defaults ("New Instance", "1.20.4", "fabric").
+    /// back to defaults ("New Instance", "1.20.4", "fabric").
     ///
     /// Port of the Java `createInstance`.
     pub fn create(
@@ -119,6 +131,18 @@ impl OfflineInstanceManager {
         loader_type: &str,
         loader_version: &str,
     ) -> Result<OfflineInstance, LauncherError> {
+        let loader_str = loader_type.trim();
+        let loader_enum = if loader_str.is_empty() {
+            ModLoaderType::Fabric
+        } else {
+            ModLoaderType::from_id(loader_str).ok_or_else(|| {
+                LauncherError::InvalidInput(format!(
+                    "Invalid mod loader '{loader_str}'. Allowed loaders: {}",
+                    ModLoaderType::ALLOWED_IDS.join(", ")
+                ))
+            })?
+        };
+
         let instance = OfflineInstance {
             id: uuid::Uuid::new_v4().to_string(),
             name: if name.trim().is_empty() {
@@ -132,11 +156,7 @@ impl OfflineInstanceManager {
                 mc_version.trim().to_string()
             },
             mod_loader: ModLoaderInfo::new(
-                if loader_type.trim().is_empty() {
-                    "fabric"
-                } else {
-                    loader_type.trim()
-                },
+                loader_enum.id(),
                 loader_version.trim(),
                 None,
             ),
@@ -155,9 +175,10 @@ impl OfflineInstanceManager {
                 "Cannot save an offline instance without an id".to_string(),
             ));
         }
-        let dir = self.instance_dir(&instance.id);
+        let sanitized = sanitize_instance_loader(instance.clone());
+        let dir = self.instance_dir(&sanitized.id);
         std::fs::create_dir_all(dir.join("mods"))?;
-        let json = serde_json::to_string_pretty(instance)?;
+        let json = serde_json::to_string_pretty(&sanitized)?;
         std::fs::write(dir.join("instance.json"), json)?;
         Ok(())
     }
@@ -172,7 +193,7 @@ impl OfflineInstanceManager {
         if instance.id.trim().is_empty() {
             return None;
         }
-        Some(instance)
+        Some(sanitize_instance_loader(instance))
     }
 
     /// All saved instances ordered by `lastPlayed` descending.
@@ -195,7 +216,9 @@ impl OfflineInstanceManager {
             }
             match std::fs::read_to_string(&json) {
                 Ok(text) => match serde_json::from_str::<OfflineInstance>(&text) {
-                    Ok(instance) if !instance.id.trim().is_empty() => result.push(instance),
+                    Ok(instance) if !instance.id.trim().is_empty() => {
+                        result.push(sanitize_instance_loader(instance));
+                    }
                     _ => debug!("Skipping unreadable instance.json at {}", json.display()),
                 },
                 Err(_) => debug!("Skipping unreadable instance.json at {}", json.display()),
@@ -217,8 +240,10 @@ impl OfflineInstanceManager {
         }
     }
 
-    /// Deletes a single mod jar from the instance's `mods/` folder. Deleting a
-    /// missing mod is a no-op (Java `deleteMod`).
+    /// Deletes a single mod (in either enabled or disabled state) from the
+    /// instance's `mods/` folder. Deleting a missing mod is a no-op (Java
+    /// `deleteMod`, extended to also try the `.disabled` variant so "Delete"
+    /// works regardless of the mod's current enabled state).
     ///
     /// The filename is strictly validated as a plain basename, so a malicious
     /// caller cannot use `..` or path separators to delete files outside the
@@ -232,16 +257,62 @@ impl OfflineInstanceManager {
             return Ok(());
         }
         let name = sanitize_filename_strict(filename)?;
-        let target = self.mods_dir(instance).join(name);
-        match std::fs::remove_file(&target) {
-            Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(LauncherError::Io(e)),
+        let mods_dir = self.mods_dir(instance);
+        for candidate in [
+            mods_dir.join(&name),
+            mods_dir.join(format!("{name}.disabled")),
+        ] {
+            match std::fs::remove_file(&candidate) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(LauncherError::Io(e)),
+            }
         }
+        Ok(())
     }
 
-    /// Sorted list of `.jar` file paths in the instance's `mods/` folder
-    /// (Java `listMods`, sorted by path).
+    /// Enables or disables a single mod by renaming its file in place
+    /// (`<name>` <-> `<name>.disabled`) in the instance's `mods/` folder. A
+    /// no-op if the mod is already in the requested state; errors if no file
+    /// exists in either state.
+    ///
+    /// This is entirely local — offline instances have no server to sync
+    /// with, unlike a server-managed instance's mods (see `sync::mod_sync`,
+    /// which is one-directional the other way: the server dictates state
+    /// there and the client always complies).
+    pub fn set_mod_enabled(
+        &self,
+        instance: &OfflineInstance,
+        filename: &str,
+        enabled: bool,
+    ) -> Result<(), LauncherError> {
+        if instance.id.trim().is_empty() {
+            return Ok(());
+        }
+        let name = sanitize_filename_strict(filename)?;
+        let mods_dir = self.mods_dir(instance);
+        let active = mods_dir.join(&name);
+        let disabled = mods_dir.join(format!("{name}.disabled"));
+        let (current, target) = if enabled {
+            (&disabled, &active)
+        } else {
+            (&active, &disabled)
+        };
+        if target.is_file() {
+            return Ok(());
+        }
+        if !current.is_file() {
+            return Err(LauncherError::InvalidInput(format!(
+                "Mod not found: {filename}"
+            )));
+        }
+        std::fs::rename(current, target)?;
+        Ok(())
+    }
+
+    /// Sorted list of mod file paths (both enabled `.jar` and disabled
+    /// `.jar.disabled`) in the instance's `mods/` folder (Java `listMods`,
+    /// sorted by path, extended to surface disabled mods too).
     pub fn list_mods(&self, instance: &OfflineInstance) -> Vec<PathBuf> {
         let mods = self.mods_dir(instance);
         let Ok(entries) = std::fs::read_dir(&mods) else {
@@ -250,7 +321,7 @@ impl OfflineInstanceManager {
         let mut jars: Vec<PathBuf> = entries
             .flatten()
             .map(|entry| entry.path())
-            .filter(|path| path.is_file() && is_jar_name(path))
+            .filter(|path| path.is_file() && (is_jar_name(path) || is_disabled_jar_name(path)))
             .collect();
         jars.sort();
         jars
@@ -280,6 +351,18 @@ fn is_jar_name(path: &Path) -> bool {
             name.to_string_lossy()
                 .to_ascii_lowercase()
                 .ends_with(".jar")
+        })
+        .unwrap_or(false)
+}
+
+/// True for a disabled mod file (`<name>.jar.disabled`) — the on-disk marker
+/// that hides a mod from the loader's directory scan without deleting it.
+fn is_disabled_jar_name(path: &Path) -> bool {
+    path.file_name()
+        .map(|name| {
+            name.to_string_lossy()
+                .to_ascii_lowercase()
+                .ends_with(".jar.disabled")
         })
         .unwrap_or(false)
 }
@@ -413,6 +496,59 @@ mod tests {
     }
 
     #[test]
+    fn set_mod_enabled_toggles_via_rename_and_is_listed_either_way() {
+        let dir = TempDir::new("offline-mods-toggle");
+        let manager = OfflineInstanceManager::new(dir.path().join("offline_instances"));
+        let instance = manager
+            .create("Modded", "1.20.4", "fabric", "0.15.11")
+            .unwrap();
+        let mods = manager.mods_dir(&instance);
+        std::fs::write(mods.join("sodium.jar"), b"content").unwrap();
+
+        manager
+            .set_mod_enabled(&instance, "sodium.jar", false)
+            .unwrap();
+        assert!(!mods.join("sodium.jar").exists());
+        assert!(mods.join("sodium.jar.disabled").is_file());
+        assert_eq!(
+            b"content".to_vec(),
+            std::fs::read(mods.join("sodium.jar.disabled")).unwrap()
+        );
+
+        // Still shows up in list_mods (as the disabled file).
+        let names: Vec<String> = manager
+            .list_mods(&instance)
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(vec!["sodium.jar.disabled".to_string()], names);
+
+        // Toggling to the same state is a no-op, not an error.
+        manager
+            .set_mod_enabled(&instance, "sodium.jar", false)
+            .unwrap();
+        assert!(mods.join("sodium.jar.disabled").is_file());
+
+        manager
+            .set_mod_enabled(&instance, "sodium.jar", true)
+            .unwrap();
+        assert!(mods.join("sodium.jar").is_file());
+        assert!(!mods.join("sodium.jar.disabled").exists());
+
+        // Deleting works regardless of current enabled state.
+        manager
+            .set_mod_enabled(&instance, "sodium.jar", false)
+            .unwrap();
+        manager.delete_mod(&instance, "sodium.jar").unwrap();
+        assert!(manager.list_mods(&instance).is_empty());
+
+        // Toggling a mod that doesn't exist in either state errors.
+        assert!(manager
+            .set_mod_enabled(&instance, "missing.jar", false)
+            .is_err());
+    }
+
+    #[test]
     fn delete_mod_traversal_is_rejected() {
         let dir = TempDir::new("offline-delete-traversal");
         let manager = OfflineInstanceManager::new(dir.path().join("offline_instances"));
@@ -507,5 +643,58 @@ mod tests {
         );
         assert!(base.is_dir());
         assert!(manager.mods_dir(&real).join("sodium.jar").is_file());
+    }
+
+    #[test]
+    fn create_all_allowed_loaders_and_reject_invalid() {
+        let root = TempDir::new("offline-loaders");
+        let manager = OfflineInstanceManager::new(root.path().join("offline_instances"));
+
+        for loader in &["forge", "neoforge", "fabric", "quilt", "vanilla"] {
+            let instance = manager.create("Test", "1.20.4", loader, "1.0").unwrap();
+            assert_eq!(*loader, instance.mod_loader.r#type);
+            let loaded = manager.load(&instance.id).unwrap();
+            assert_eq!(*loader, loaded.mod_loader.r#type);
+        }
+
+        // Invalid loaders rejected on create
+        for invalid in &["liteloader", "rift", "babric", "custom_loader"] {
+            let res = manager.create("Bad", "1.20.4", invalid, "1.0");
+            assert!(
+                matches!(res, Err(LauncherError::InvalidInput(_))),
+                "loader {invalid} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_or_unsupported_loader_falls_back_to_vanilla_on_load() {
+        let root = TempDir::new("offline-legacy-fallback");
+        let manager = OfflineInstanceManager::new(root.path().join("offline_instances"));
+
+        let dir = manager.instance_dir("legacy-inst");
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // Write an instance.json with an unsupported legacy loader ("liteloader")
+        let legacy_json = r#"{
+            "id": "legacy-inst",
+            "name": "Legacy Modpack",
+            "minecraftVersion": "1.12.2",
+            "modLoader": {
+                "type": "liteloader",
+                "version": "1.12.2-00"
+            },
+            "javaArgs": "-Xmx2G",
+            "lastPlayed": 1000
+        }"#;
+        std::fs::write(dir.join("instance.json"), legacy_json).unwrap();
+
+        let loaded = manager.load("legacy-inst").expect("load legacy instance");
+        assert_eq!("vanilla", loaded.mod_loader.r#type);
+        assert_eq!("", loaded.mod_loader.version);
+
+        let list = manager.list();
+        assert_eq!(1, list.len());
+        assert_eq!("vanilla", list[0].mod_loader.r#type);
     }
 }

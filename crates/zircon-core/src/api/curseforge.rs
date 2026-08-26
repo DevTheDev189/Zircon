@@ -19,16 +19,37 @@ pub struct CurseForgeApiClient {
     api_key: String,
 }
 
+pub const CLASS_BUKKIT_PLUGINS: i64 = 5;
+pub const CLASS_MODS: i64 = 6;
+pub const CLASS_RESOURCE_PACKS: i64 = 12;
+pub const CLASS_WORLDS: i64 = 17;
+pub const CLASS_MODPACKS: i64 = 4471;
+pub const CLASS_SHADERS: i64 = 6552;
+
+pub fn class_id_for_type(project_type: Option<&str>) -> i64 {
+    match project_type.map(|t| t.to_ascii_lowercase()).as_deref() {
+        Some("modpack") | Some("modpacks") => CLASS_MODPACKS,
+        Some("shader") | Some("shaders") | Some("shaderpack") | Some("shaderpacks") => CLASS_SHADERS,
+        Some("resourcepack") | Some("resourcepacks") | Some("texturepack") | Some("texturepacks") => CLASS_RESOURCE_PACKS,
+        Some("plugin") | Some("plugins") | Some("bukkit") => CLASS_BUKKIT_PLUGINS,
+        Some("world") | Some("worlds") => CLASS_WORLDS,
+        _ => CLASS_MODS,
+    }
+}
+
 impl CurseForgeApiClient {
     pub fn new(api_key: impl Into<String>) -> Self {
+        let key_str = api_key.into();
+        let cleaned_key = key_str.trim().trim_matches('"').trim_matches('\'').to_string();
         let client = reqwest::Client::builder()
+            .user_agent("Zircon-Server/0.2.5 (https://github.com/DevTheDev189/Zircon)")
             .connect_timeout(std::time::Duration::from_secs(15))
             .redirect(reqwest::redirect::Policy::limited(10))
             .build()
             .expect("failed to build reqwest client");
         Self {
             client,
-            api_key: api_key.into(),
+            api_key: cleaned_key,
         }
     }
 
@@ -66,22 +87,60 @@ impl CurseForgeApiClient {
         Ok(matches)
     }
 
-    /// Searches CurseForge mods for Minecraft.
+    /// Searches CurseForge for Minecraft projects with specific classId (mods, modpacks, shaders, resourcepacks)
+    /// and modLoaderType.
+    pub async fn search_mods_with_type(
+        &self,
+        query: &str,
+        mc_version: Option<&str>,
+        loader: Option<&str>,
+        project_type: Option<&str>,
+    ) -> Result<Vec<CurseForgeMod>, ApiError> {
+        let class_id = class_id_for_type(project_type);
+        let mut url = format!(
+            "{BASE_URL}/mods/search?gameId={MINECRAFT_GAME_ID}&classId={class_id}&searchFilter={}&sortField=1&sortOrder=desc&pageSize=25",
+            form_encode(query)
+        );
+        if let Some(v) = mc_version {
+            let v = v.trim();
+            if !v.is_empty() {
+                url.push_str(&format!("&gameVersion={}", form_encode(v)));
+            }
+        }
+        if let Some(l) = loader {
+            let mod_loader_type = match l.to_ascii_lowercase().as_str() {
+                "forge" => Some(1),
+                "cauldron" => Some(2),
+                "liteloader" => Some(3),
+                "fabric" => Some(4),
+                "quilt" => Some(5),
+                "neoforge" => Some(6),
+                _ => None,
+            };
+            if let Some(lt) = mod_loader_type {
+                url.push_str(&format!("&modLoaderType={lt}"));
+            }
+        }
+
+        tracing::info!("Querying CurseForge API: {url}");
+        let text = self.get(&url).await?;
+        let parsed: Vec<CurseForgeMod> = parse_data_data(&text);
+        tracing::info!(
+            "CurseForge API responded ({} bytes) -> parsed {} hit(s) for classId {}",
+            text.len(),
+            parsed.len(),
+            class_id
+        );
+        Ok(parsed)
+    }
+
+    /// Searches CurseForge mods for Minecraft (defaults to Mods, classId 6).
     pub async fn search_mods(
         &self,
         query: &str,
         mc_version: Option<&str>,
     ) -> Result<Vec<CurseForgeMod>, ApiError> {
-        let mut url = format!(
-            "{BASE_URL}/mods/search?gameId={MINECRAFT_GAME_ID}&searchFilter={}&sortField=1&sortOrder=desc&pageSize=25",
-            form_encode(query)
-        );
-        if let Some(v) = mc_version {
-            url.push_str(&format!("&gameVersion={}", form_encode(v)));
-        }
-
-        let text = self.get(&url).await?;
-        Ok(parse_data_data(&text))
+        self.search_mods_with_type(query, mc_version, None, Some("mod")).await
     }
 
     /// Lists all files of a CurseForge mod, so the admin UI can pick which
@@ -91,6 +150,20 @@ impl CurseForgeApiClient {
             .get(&format!("{BASE_URL}/mods/{mod_id}/files?pageSize=50"))
             .await?;
         Ok(parse_data_data(&text))
+    }
+
+    /// Fetches full metadata for a single CurseForge mod by its project ID.
+    pub async fn get_mod(&self, mod_id: i64) -> Result<CurseForgeMod, ApiError> {
+        let text = self.get(&format!("{BASE_URL}/mods/{mod_id}")).await?;
+        let root: serde_json::Value = serde_json::from_str(&text)?;
+        if let Some(mod_obj) = root.get("data") {
+            let m: CurseForgeMod = serde_json::from_value(mod_obj.clone())?;
+            return Ok(m);
+        }
+        Err(ApiError::Status {
+            status: 404,
+            body: format!("CurseForge mod {mod_id} not found"),
+        })
     }
 
     // ----------------------------------------------------------------------
@@ -135,17 +208,36 @@ impl CurseForgeApiClient {
     }
 }
 
-/// CurseForge wraps list payloads as `{"data": {"data": [...]}}`.
+/// CurseForge wraps list payloads as `{"data": [...]}` or `{"data": {"data": [...]}}`.
 fn parse_data_data<T: serde::de::DeserializeOwned>(text: &str) -> Vec<T> {
     let root: serde_json::Value = match serde_json::from_str(text) {
         Ok(root) => root,
-        Err(_) => return Vec::new(),
+        Err(e) => {
+            tracing::error!("Failed to parse CurseForge JSON response: {e}");
+            return Vec::new();
+        }
     };
-    root.get("data")
+    if let Some(arr) = root.get("data").and_then(|d| d.as_array()) {
+        match serde_json::from_value::<Vec<T>>(serde_json::Value::Array(arr.clone())) {
+            Ok(vec) => return vec,
+            Err(e) => {
+                tracing::error!("Failed to deserialize CurseForge data array: {e}");
+            }
+        }
+    }
+    if let Some(arr) = root
+        .get("data")
         .and_then(|d| d.get("data"))
         .and_then(|d| d.as_array())
-        .and_then(|arr| serde_json::from_value(serde_json::Value::Array(arr.clone())).ok())
-        .unwrap_or_default()
+    {
+        match serde_json::from_value::<Vec<T>>(serde_json::Value::Array(arr.clone())) {
+            Ok(vec) => return vec,
+            Err(e) => {
+                tracing::error!("Failed to deserialize nested CurseForge data array: {e}");
+            }
+        }
+    }
+    Vec::new()
 }
 
 // --------------------------------------------------------------------------
@@ -166,9 +258,9 @@ pub struct CurseForgeMod {
     #[serde(default)]
     pub download_count: u64,
     #[serde(default)]
-    pub game_versions: Vec<String>,
-    #[serde(default)]
     pub links: Option<CurseForgeLinks>,
+    #[serde(default)]
+    pub logo: Option<CurseForgeLogo>,
     #[serde(default)]
     pub latest_files: Vec<CurseForgeFile>,
     #[serde(default)]
@@ -191,6 +283,7 @@ impl CurseForgeMod {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurseForgeAuthor {
+    pub id: Option<i64>,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -201,7 +294,30 @@ pub struct CurseForgeAuthor {
 #[serde(rename_all = "camelCase")]
 pub struct CurseForgeLinks {
     #[serde(default)]
-    pub website_url: String,
+    pub website_url: Option<String>,
+    #[serde(default)]
+    pub wiki_url: Option<String>,
+    #[serde(default)]
+    pub issues_url: Option<String>,
+    #[serde(default)]
+    pub source_url: Option<String>,
+}
+
+/// A CurseForge mod logo asset.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurseForgeLogo {
+    pub id: Option<i64>,
+    #[serde(default)]
+    pub mod_id: Option<i64>,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub thumbnail_url: String,
+    #[serde(default)]
+    pub url: String,
 }
 
 /// A CurseForge file (a concrete downloadable artifact of a mod).
@@ -210,17 +326,29 @@ pub struct CurseForgeLinks {
 pub struct CurseForgeFile {
     pub id: i64,
     #[serde(default)]
+    pub mod_id: i64,
+    #[serde(default)]
     pub display_name: String,
     #[serde(default)]
     pub file_name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_string")]
     pub download_url: String,
     #[serde(default)]
     pub file_fingerprint: u64,
-    #[serde(default)]
+    #[serde(default, alias = "fileLength")]
     pub length: u64,
     #[serde(default)]
     pub hashes: Vec<CurseForgeFileHash>,
+    #[serde(default)]
+    pub game_versions: Vec<String>,
+}
+
+fn deserialize_optional_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt: Option<String> = serde::Deserialize::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
 }
 
 /// A hash entry in CurseForge's file metadata.

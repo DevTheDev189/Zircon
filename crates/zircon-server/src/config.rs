@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use ed25519_dalek::SigningKey;
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
-use zircon_core::model::ModLoaderInfo;
+use zircon_core::model::{ModLoaderInfo, ModLoaderType};
 
 pub const DEFAULT_PUBLIC_PORT: i32 = 25565;
 pub const DEFAULT_WEB_PORT: i32 = 25564;
@@ -78,9 +78,24 @@ impl ServerConfig {
         }
         if self.mod_loader.r#type.is_empty() {
             self.mod_loader.r#type = "fabric".to_string();
+        } else if let Some(loader_enum) = ModLoaderType::from_id(&self.mod_loader.r#type) {
+            self.mod_loader.r#type = loader_enum.id().to_string();
+        } else {
+            self.mod_loader.r#type = "vanilla".to_string();
+            self.mod_loader.version.clear();
         }
         if self.java_args.is_empty() {
             self.java_args = "-Xms2G -Xmx4G".to_string();
+        }
+        if self.curseforge_api_key.is_empty() {
+            if let Ok(key) = std::env::var("CURSEFORGE_API_KEY")
+                .or_else(|_| std::env::var("MC_MANAGER_CURSEFORGE_API_KEY"))
+            {
+                let trimmed = key.trim().trim_matches('"').trim_matches('\'').to_string();
+                if !trimmed.is_empty() {
+                    self.curseforge_api_key = trimmed;
+                }
+            }
         }
     }
 }

@@ -35,6 +35,8 @@ export const api = {
   launchOfflineInstance: (id) => invoke('launch_offline_instance', { id }),
   listOfflineMods: (id) => invoke('list_offline_mods', { id }),
   deleteOfflineMod: (id, filename) => invoke('delete_offline_mod', { id, filename }),
+  setOfflineModEnabled: (id, filename, enabled) =>
+    invoke('set_offline_mod_enabled', { id, filename, enabled }),
   addOfflineMod: (id, sourcePath) => invoke('add_offline_mod', { id, sourcePath }),
 
   // Skins
@@ -56,6 +58,7 @@ export const api = {
 
   // Packs
   listInstancePacks: (gameDir) => invoke('list_instance_packs', { gameDir }),
+  listInstancePacksDetailed: (gameDir) => invoke('list_instance_packs_detailed', { gameDir }),
   addLocalPack: (gameDir, sourcePath, kind) =>
     invoke('add_local_pack', { gameDir, sourcePath, kind }),
   removeLocalPack: (gameDir, kind, filename) =>
@@ -67,10 +70,13 @@ export const api = {
 
   // Modrinth
   searchModrinth: (instanceId, query) => invoke('search_modrinth', { instanceId, query }),
-  installModrinthMod: (instanceId, projectId) =>
-    invoke('install_modrinth_mod', { instanceId, projectId }),
+  listModrinthVersions: (instanceId, projectId) =>
+    invoke('list_modrinth_versions', { instanceId, projectId }),
+  installModrinthMod: (instanceId, projectId, versionId = null) =>
+    invoke('install_modrinth_mod', { instanceId, projectId, versionId }),
   listMinecraftVersions: () => invoke('list_minecraft_versions'),
   listLoaderTypes: () => invoke('list_loader_types'),
+  openExternalUrl: (url) => invoke('open_external_url', { url }),
 
   // Settings
   getSettings: () => invoke('get_settings'),
@@ -79,6 +85,8 @@ export const api = {
   // Debug logs & crash diagnostics
   getLauncherLogs: () => invoke('get_launcher_logs'),
   clearLauncherLogs: () => invoke('clear_launcher_logs'),
+  getLastInstanceLog: () => invoke('get_last_instance_log'),
+  clearLastInstanceLog: () => invoke('clear_last_instance_log'),
   checkGameCrash: (gameDir) => invoke('check_game_crash', { gameDir }),
 };
 

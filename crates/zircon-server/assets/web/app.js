@@ -28,10 +28,30 @@ createApp({
             systemStats: {},
             searchQuery: '',
             searchType: 'mod', // 'mod' or 'modpack'
+            searchProvider: 'modrinth', // 'modrinth' or 'curseforge'
             searching: false,
             searchSeq: 0, // bumped per search so stale responses never clobber newer ones
             searchResults: [],
             installingMods: {}, // { [projectId]: true } while an install is in flight
+            curseforgeDropModal: {
+                open: false,
+                modTitle: '',
+                modSlug: '',
+                modFileId: null,
+                targetFileName: '',
+                projectUrl: '',
+                iconUrl: '',
+                summary: '',
+                countdown: 3,
+                redirectTriggered: false,
+                uploading: false,
+                uploadSuccess: false,
+                successTitle: '',
+                error: '',
+                timer: null,
+                countdownInterval: null
+            },
+            isDraggingMod: false,
             recommendedMods: [
                 { projectId: 'sodium', title: 'Sodium', description: 'Modern rendering engine that greatly improves frame rates.', loader: 'fabric' },
                 { projectId: 'lithium', title: 'Lithium', description: 'General-purpose optimization for physics, chunk loading and entity ticking.', loader: 'fabric' },
@@ -43,13 +63,22 @@ createApp({
             // True while the Installed Mods list is being fetched so the tab can
             // show a spinner instead of a jarring empty/offline flash.
             isLoadingMods: false,
+            // { [filename]: true } for mods checked in the bulk-action toolbar.
+            selectedMods: {},
+            // True after an enable/disable change until the admin restarts the
+            // server (mod loaders only rescan mods at JVM boot).
+            modsRestartNeeded: false,
             shaderpacks: [],
             resourcepacks: [],
             shaderSearchQuery: '',
             texturePackSearchQuery: '',
-            packSearchType: 'shaderpack', // 'shaderpack' or 'resourcepack' — which panel's results are shown
+            shaderSearchProvider: 'modrinth', // 'modrinth' or 'curseforge'
+            texturePackSearchProvider: 'modrinth', // 'modrinth' or 'curseforge'
+            packSearchType: 'shaderpack', // 'shaderpack' or 'resourcepack'
             packSearching: false,
             packSearchResults: [],
+            shaderSearchResults: [],
+            texturePackSearchResults: [],
             installingPacks: {}, // { [projectId]: true } while an install is in flight
             whitelistEnabled: false,
             whitelistPlayers: [],
@@ -140,6 +169,13 @@ createApp({
             if (!this.selectedInstance) return [];
             const loader = this.selectedInstance.modLoader.type;
             return this.recommendedMods.filter(r => r.loader === 'both' || r.loader === loader);
+        },
+        selectedModCount() {
+            return Object.keys(this.selectedMods).length;
+        },
+        allModsSelected() {
+            return this.installedMods.length > 0
+                && this.installedMods.every(m => this.selectedMods[m.filename]);
         }
     },
     watch: {

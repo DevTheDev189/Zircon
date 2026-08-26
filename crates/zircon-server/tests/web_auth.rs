@@ -1103,3 +1103,90 @@ async fn session_cookie_authenticates_and_logout_clears_it() {
     let response = app.clone().oneshot(request).await.unwrap();
     assert_eq!(StatusCode::UNAUTHORIZED, response.status());
 }
+
+#[tokio::test]
+async fn create_instance_loader_validation_and_success() {
+    let app = test_app();
+    let token = login(&app).await;
+
+    // Test creating instances with all 5 allowed loader types
+    for loader in &["forge", "neoforge", "fabric", "quilt", "vanilla"] {
+        let (status, body) = send(
+            &app,
+            "POST",
+            "/api/instances",
+            Some(&token),
+            Some(json!({
+                "name": format!("Server {loader}"),
+                "mcVersion": "1.20.4",
+                "loaderType": loader,
+                "loaderVersion": "1.0",
+            })),
+        )
+        .await;
+        assert_eq!(StatusCode::CREATED, status, "Expected 201 Created for loader {loader}");
+        assert_eq!(*loader, body["modLoader"]["type"].as_str().unwrap());
+    }
+
+    // Test invalid loader types are rejected with 400 Bad Request
+    for invalid in &["liteloader", "rift", "babric", "custom_loader", "invalid"] {
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/instances",
+            Some(&token),
+            Some(json!({
+                "name": "Invalid Loader Server",
+                "mcVersion": "1.20.4",
+                "loaderType": invalid,
+                "loaderVersion": "1.0",
+            })),
+        )
+        .await;
+        assert_eq!(StatusCode::BAD_REQUEST, status, "Expected 400 Bad Request for loader {invalid}");
+    }
+}
+
+#[tokio::test]
+async fn update_config_loader_validation() {
+    let app = test_app();
+    let token = login(&app).await;
+
+    // Valid mod loader update
+    let (status, body) = send(
+        &app,
+        "POST",
+        "/api/config",
+        Some(&token),
+        Some(json!({
+            "modLoader": {
+                "type": "quilt",
+                "version": "0.25.0"
+            }
+        })),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, status);
+    assert_eq!(true, body["ok"].as_bool().unwrap());
+
+    // Verify GET /api/config returns the updated loader
+    let (get_status, get_body) = send(&app, "GET", "/api/config", Some(&token), None).await;
+    assert_eq!(StatusCode::OK, get_status);
+    assert_eq!("quilt", get_body["modLoader"]["type"].as_str().unwrap());
+
+    // Invalid mod loader update rejected with 400 Bad Request
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/config",
+        Some(&token),
+        Some(json!({
+            "modLoader": {
+                "type": "liteloader",
+                "version": "1.12.2"
+            }
+        })),
+    )
+    .await;
+    assert_eq!(StatusCode::BAD_REQUEST, status);
+}

@@ -21,7 +21,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use zircon_core::api::modrinth::{ModrinthApiClient, ModrinthSearchHit};
 use zircon_core::crypto::signing;
-use zircon_core::model::{BillOfMaterials, ModLoaderInfo};
+use zircon_core::model::{BillOfMaterials, ModLoaderInfo, ModLoaderType};
 
 use crate::auth::msa::MicrosoftAuthService;
 use crate::auth::session::SessionData;
@@ -1438,6 +1438,10 @@ pub struct ModFileInfo {
     pub size_bytes: u64,
     /// Author read from the JAR's mod metadata when available.
     pub author: Option<String>,
+    /// Version read from the JAR's mod metadata when available.
+    pub version: Option<String>,
+    /// `false` when the file is currently `<filename>.disabled` on disk.
+    pub enabled: bool,
 }
 
 #[tauri::command]
@@ -1453,16 +1457,32 @@ pub fn list_offline_mods(
         .list_mods(&instance)
         .into_iter()
         .filter_map(|path| {
-            let filename = path.file_name()?.to_string_lossy().into_owned();
+            let raw_name = path.file_name()?.to_string_lossy().into_owned();
+            let enabled = !raw_name.to_ascii_lowercase().ends_with(".disabled");
+            let filename = if enabled {
+                raw_name
+            } else {
+                raw_name
+                    .strip_suffix(".disabled")
+                    .unwrap_or(&raw_name)
+                    .to_string()
+            };
             let size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-            let author = zircon_core::metadata::extractor::extract(&path)
-                .ok()
-                .map(|meta| meta.author)
+            let meta = zircon_core::metadata::extractor::extract(&path).ok();
+            let author = meta
+                .as_ref()
+                .map(|m| m.author.clone())
                 .filter(|a| !a.trim().is_empty());
+            let version = meta
+                .as_ref()
+                .map(|m| m.version.clone())
+                .filter(|v| !v.trim().is_empty());
             Some(ModFileInfo {
                 filename,
                 size_bytes,
                 author,
+                version,
+                enabled,
             })
         })
         .collect();
@@ -1482,6 +1502,24 @@ pub fn delete_offline_mod(
     state
         .offline
         .delete_mod(&instance, &filename)
+        .map_err(err_string)
+}
+
+/// Enables or disables a single offline mod by renaming its file in place.
+/// Purely local — offline instances have no server to sync this state with.
+#[tauri::command]
+pub fn set_offline_mod_enabled(
+    state: State<'_, LauncherState>,
+    id: String,
+    filename: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let Some(instance) = state.offline.load(&id) else {
+        return Err("Instance not found".to_string());
+    };
+    state
+        .offline
+        .set_mod_enabled(&instance, &filename, enabled)
         .map_err(err_string)
 }
 
@@ -1815,6 +1853,8 @@ pub struct PackFileInfo {
     pub project_url: Option<String>,
     pub is_active: bool,
     pub is_local: bool,
+    pub version: Option<String>,
+    pub pack_format: Option<u32>,
 }
 
 /// Enriched pack listing for an instance, including shader/resource pack
@@ -1838,8 +1878,9 @@ pub async fn open_external_url(url: String) -> Result<(), String> {
 }
 
 /// Lists an instance's shaderpacks and resourcepacks with enriched metadata
-/// (title, author, description, icon and Modrinth project URL) resolved from
-/// the instance's BOM, plus each pack's active/local state.
+/// (title, author, description, icon, version, and Modrinth project URL) resolved
+/// from the instance's BOM (or extracted from the pack archive on disk), plus each
+/// pack's active/local state.
 #[tauri::command]
 pub async fn list_instance_packs_detailed(
     _state: State<'_, LauncherState>,
@@ -1874,18 +1915,45 @@ pub async fn list_instance_packs_detailed(
                     }
                 });
 
-                let (title, author, description, icon_url, project_url) = if let Some(e) = bom_entry
-                {
-                    (
-                        e.title.clone().or_else(|| Some(e.filename.clone())),
-                        e.author.clone(),
-                        e.description.clone(),
-                        e.icon_url.clone(),
-                        e.modrinth_url(is_shader).or_else(|| e.project_url.clone()),
-                    )
-                } else {
-                    (Some(filename.clone()), None, None, None, None)
-                };
+                let (title, author, description, icon_url, project_url, version, pack_format) =
+                    if let Some(e) = bom_entry {
+                        (
+                            e.title.clone().or_else(|| Some(e.filename.clone())),
+                            e.author.clone(),
+                            e.description.clone(),
+                            e.icon_url.clone(),
+                            e.modrinth_url(is_shader).or_else(|| e.project_url.clone()),
+                            e.version.clone(),
+                            e.pack_format,
+                        )
+                    } else {
+                        // Extract from file on disk
+                        if is_shader {
+                            let meta =
+                                zircon_core::metadata::extract_shader_pack_metadata(&path).ok();
+                            (
+                                Some(filename.clone()),
+                                None,
+                                meta.as_ref().and_then(|m| m.description.clone()),
+                                None,
+                                None,
+                                meta.as_ref().and_then(|m| m.version.clone()),
+                                None,
+                            )
+                        } else {
+                            let meta =
+                                zircon_core::metadata::extract_resource_pack_metadata(&path).ok();
+                            (
+                                Some(filename.clone()),
+                                None,
+                                meta.as_ref().and_then(|m| m.description.clone()),
+                                None,
+                                None,
+                                meta.as_ref().and_then(|m| m.version.clone()),
+                                meta.as_ref().and_then(|m| m.pack_format),
+                            )
+                        }
+                    };
 
                 let is_active = if is_shader {
                     selection.active_shaderpack.as_deref() == Some(&filename)
@@ -1909,6 +1977,8 @@ pub async fn list_instance_packs_detailed(
                     project_url,
                     is_active,
                     is_local,
+                    version,
+                    pack_format,
                 }
             })
             .collect()
@@ -2033,32 +2103,77 @@ pub async fn search_modrinth(
     Ok(hits)
 }
 
-/// Downloads the primary file of the newest compatible Modrinth version into
-/// the instance's `mods/` folder. Returns the installed filename.
+/// Lists published Modrinth versions for a project matching an offline instance's
+/// Minecraft version + loader.
 #[tauri::command]
-pub async fn install_modrinth_mod(
+pub async fn list_modrinth_versions(
     state: State<'_, LauncherState>,
     instance_id: String,
     project_id: String,
-) -> Result<String, String> {
+) -> Result<Vec<zircon_core::api::modrinth::ModrinthVersion>, String> {
     let Some(instance) = state.offline.load(&instance_id) else {
         return Err("Instance not found".to_string());
+    };
+    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
+        None
+    } else {
+        Some(instance.mod_loader.r#type.as_str())
     };
     let versions = state
         .modrinth
         .list_project_versions(
             &project_id,
             Some(&instance.minecraft_version),
-            Some(&instance.mod_loader.r#type),
+            loader,
         )
         .await
         .map_err(|e| e.to_string())?;
-    let version = versions.into_iter().next().ok_or_else(|| {
-        format!(
-            "No version of this mod supports Minecraft {} + {} loader",
-            instance.minecraft_version, instance.mod_loader.r#type
+    Ok(versions)
+}
+
+/// Downloads the primary file of a specific (or newest compatible) Modrinth version
+/// into the instance's `mods/` folder. Returns the installed filename.
+#[tauri::command]
+pub async fn install_modrinth_mod(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    project_id: String,
+    version_id: Option<String>,
+) -> Result<String, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
+        None
+    } else {
+        Some(instance.mod_loader.r#type.as_str())
+    };
+    let versions = state
+        .modrinth
+        .list_project_versions(
+            &project_id,
+            Some(&instance.minecraft_version),
+            loader,
         )
-    })?;
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let version = if let Some(ref vid) = version_id {
+        versions.into_iter().find(|v| &v.id == vid).ok_or_else(|| {
+            format!(
+                "Version '{}' not found or incompatible with Minecraft {} + {} loader",
+                vid, instance.minecraft_version, instance.mod_loader.r#type
+            )
+        })?
+    } else {
+        versions.into_iter().next().ok_or_else(|| {
+            format!(
+                "No version of this mod supports Minecraft {} + {} loader",
+                instance.minecraft_version, instance.mod_loader.r#type
+            )
+        })?
+    };
+
     let file = version
         .primary_file()
         .ok_or_else(|| "This mod has no downloadable file".to_string())?;
@@ -2138,18 +2253,23 @@ pub async fn list_minecraft_versions(
         .map_err(|e| e.to_string())
 }
 
-/// Loader types known to Modrinth plus `vanilla`, for the instance creation
-/// dropdown.
+/// Loader types for the instance creation dropdown:
+/// strictly restricted to Forge, NeoForge, Fabric, Quilt, and Vanilla.
 #[tauri::command]
 pub async fn list_loader_types(state: State<'_, LauncherState>) -> Result<Vec<String>, String> {
-    let mut loaders = state
-        .modrinth
-        .list_loaders()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !loaders.iter().any(|l| l == "vanilla") {
-        loaders.insert(0, "vanilla".to_string());
+    let mut loaders: Vec<String> = match state.modrinth.list_loaders().await {
+        Ok(all) => all
+            .into_iter()
+            .filter_map(|l| ModLoaderType::from_id(&l).map(|t| t.id().to_string()))
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    for id in ["vanilla", "fabric", "quilt", "forge", "neoforge"] {
+        if !loaders.iter().any(|l| l == id) {
+            loaders.push(id.to_string());
+        }
     }
+    loaders.retain(|l| ModLoaderType::from_id(l).is_some());
     Ok(loaders)
 }
 
@@ -2197,6 +2317,100 @@ pub fn clear_launcher_logs() -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LastInstanceLogInfo {
+    pub instance_name: String,
+    pub instance_type: String,
+    pub log_path: String,
+    pub lines: Vec<String>,
+    pub last_played: i64,
+}
+
+struct InstanceCandidate {
+    name: String,
+    instance_type: String,
+    game_dir: PathBuf,
+    last_played: i64,
+}
+
+/// Scans saved servers and offline instances, returning log details for the most
+/// recently played Minecraft instance that has a `logs/latest.log` file.
+#[tauri::command]
+pub fn get_last_instance_log(
+    state: State<'_, LauncherState>,
+) -> Result<Option<LastInstanceLogInfo>, String> {
+    let mut candidates: Vec<InstanceCandidate> = Vec::new();
+
+    let saved_servers = servers::load_servers();
+    for server in saved_servers {
+        let (host, port) = servers::parse_server_address(&server.address);
+        let game_dir = servers::instance_game_dir(&host, port);
+        candidates.push(InstanceCandidate {
+            name: if server.name.is_empty() {
+                server.address.clone()
+            } else {
+                server.name.clone()
+            },
+            instance_type: "Server".to_string(),
+            game_dir,
+            last_played: server.last_played,
+        });
+    }
+
+    let offline_instances = state.offline.list();
+    for inst in offline_instances {
+        let game_dir = state.offline.instance_dir(&inst.id);
+        candidates.push(InstanceCandidate {
+            name: if inst.name.is_empty() {
+                "Offline Instance".to_string()
+            } else {
+                inst.name.clone()
+            },
+            instance_type: "Offline".to_string(),
+            game_dir,
+            last_played: inst.last_played,
+        });
+    }
+
+    candidates.sort_by(|a, b| b.last_played.cmp(&a.last_played));
+
+    for candidate in candidates {
+        let log_file = candidate.game_dir.join("logs").join("latest.log");
+        if log_file.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&log_file) {
+                let all_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+                let lines = if all_lines.len() > 2000 {
+                    all_lines[all_lines.len() - 2000..].to_vec()
+                } else {
+                    all_lines
+                };
+                return Ok(Some(LastInstanceLogInfo {
+                    instance_name: candidate.name,
+                    instance_type: candidate.instance_type,
+                    log_path: log_file.display().to_string(),
+                    lines,
+                    last_played: candidate.last_played,
+                }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Clears the `logs/latest.log` file of the most recently played Minecraft instance.
+#[tauri::command]
+pub fn clear_last_instance_log(state: State<'_, LauncherState>) -> Result<(), String> {
+    if let Some(info) = get_last_instance_log(state)? {
+        let path = PathBuf::from(&info.log_path);
+        if path.is_file() {
+            std::fs::write(&path, "").map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 /// Scans an instance's `crash-reports/` and `logs/latest.log` for known fatal
 /// patterns (missing deps, mixin failures, Java mismatches, OOMs) and returns
 /// an actionable summary, or `None` when nothing matches.
@@ -2210,6 +2424,7 @@ pub fn check_game_crash(
         )),
     )
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -2483,4 +2698,26 @@ mod tests {
         let err = evaluate_bom_trust(&bom, None).unwrap_err();
         assert!(matches!(err, LauncherError::Security(_)));
     }
+
+    #[test]
+    fn pack_file_info_serializes_version_and_pack_format() {
+        let pack = PackFileInfo {
+            filename: "Faithful.zip".to_string(),
+            size_bytes: 1024,
+            title: Some("Faithful 32x".to_string()),
+            author: Some("Faithful Team".to_string()),
+            description: Some("HD textures".to_string()),
+            icon_url: None,
+            project_url: Some("https://modrinth.com/resourcepack/faithful".to_string()),
+            is_active: true,
+            is_local: false,
+            version: Some("v1.4.2".to_string()),
+            pack_format: Some(15),
+        };
+        let json = serde_json::to_string(&pack).unwrap();
+        assert!(json.contains("\"version\":\"v1.4.2\""));
+        assert!(json.contains("\"packFormat\":15"));
+        assert!(json.contains("\"isActive\":true"));
+    }
 }
+

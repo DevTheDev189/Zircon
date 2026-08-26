@@ -75,6 +75,7 @@ pub fn sanitize_pack_filename(filename: &str) -> Result<String, PackError> {
 }
 
 pub const ORIGIN_MODRINTH: &str = "modrinth";
+pub const ORIGIN_CURSEFORGE: &str = "curseforge";
 pub const ORIGIN_DIRECT: &str = "direct";
 
 /// Errors raised by the pack management service.
@@ -109,12 +110,21 @@ impl From<super::mods::ModError> for PackError {
     }
 }
 
+use zircon_core::api::curseforge::CurseForgeApiClient;
+use zircon_core::crypto::murmur3;
+
 /// Manages shaderpacks and resourcepacks for one server/instance.
+///
+/// Holds paths to the physical folders (`<instance>/shaderpacks/` and
+/// `<instance>/resourcepacks/`) and references the `BomService` to keep BOM
+/// lists in sync with disk.
 #[derive(Clone)]
 pub struct PackManagementService {
     bom_service: Arc<BomService>,
     shaderpacks_dir: PathBuf,
     resourcepacks_dir: PathBuf,
+    curse_forge: CurseForgeApiClient,
+    curseforge_key: String,
 }
 
 impl PackManagementService {
@@ -127,7 +137,19 @@ impl PackManagementService {
             bom_service,
             shaderpacks_dir,
             resourcepacks_dir,
+            curse_forge: CurseForgeApiClient::new(""),
+            curseforge_key: String::new(),
         }
+    }
+
+    pub fn with_curseforge_key(mut self, key: &str) -> Self {
+        self.curseforge_key = key.to_string();
+        self.curse_forge = CurseForgeApiClient::new(key);
+        self
+    }
+
+    pub fn has_curse_forge_key(&self) -> bool {
+        !self.curseforge_key.trim().is_empty()
     }
 
     // ----------------------------------------------------------------------
@@ -140,8 +162,34 @@ impl PackManagementService {
         filename: &str,
         origin: Option<&str>,
     ) -> Result<PackEntry, PackError> {
-        self.add(content, filename, origin, &self.shaderpacks_dir, true)
+        self.add_shaderpack_with_metadata(content, filename, origin, None, None, None, None, None)
             .await
+    }
+
+    pub async fn add_shaderpack_with_metadata<R: tokio::io::AsyncRead + Unpin>(
+        &self,
+        content: R,
+        filename: &str,
+        origin: Option<&str>,
+        fallback_icon: Option<&str>,
+        fallback_title: Option<&str>,
+        expected_mod_id: Option<&str>,
+        expected_file_id: Option<&str>,
+        fallback_project_url: Option<&str>,
+    ) -> Result<PackEntry, PackError> {
+        self.add_with_metadata(
+            content,
+            filename,
+            origin,
+            fallback_icon,
+            fallback_title,
+            expected_mod_id,
+            expected_file_id,
+            fallback_project_url,
+            &self.shaderpacks_dir,
+            true,
+        )
+        .await
     }
 
     pub async fn install_shaderpack_from_url(
@@ -175,8 +223,34 @@ impl PackManagementService {
         filename: &str,
         origin: Option<&str>,
     ) -> Result<PackEntry, PackError> {
-        self.add(content, filename, origin, &self.resourcepacks_dir, false)
+        self.add_resourcepack_with_metadata(content, filename, origin, None, None, None, None, None)
             .await
+    }
+
+    pub async fn add_resourcepack_with_metadata<R: tokio::io::AsyncRead + Unpin>(
+        &self,
+        content: R,
+        filename: &str,
+        origin: Option<&str>,
+        fallback_icon: Option<&str>,
+        fallback_title: Option<&str>,
+        expected_mod_id: Option<&str>,
+        expected_file_id: Option<&str>,
+        fallback_project_url: Option<&str>,
+    ) -> Result<PackEntry, PackError> {
+        self.add_with_metadata(
+            content,
+            filename,
+            origin,
+            fallback_icon,
+            fallback_title,
+            expected_mod_id,
+            expected_file_id,
+            fallback_project_url,
+            &self.resourcepacks_dir,
+            false,
+        )
+        .await
     }
 
     pub async fn install_resourcepack_from_url(
@@ -204,11 +278,128 @@ impl PackManagementService {
     // Shared implementation
     // ----------------------------------------------------------------------
 
-    async fn add<R: tokio::io::AsyncRead + Unpin>(
+    /// Strictly verifies a CurseForge uploaded pack against official records,
+    /// checking SHA-1, matching expected pack ID, and populating rich metadata.
+    pub async fn verify_and_enrich_curseforge_upload(
+        &self,
+        entry: &mut PackEntry,
+        expected_mod_id: Option<&str>,
+        _expected_file_id: Option<&str>,
+    ) -> Result<(), PackError> {
+        if !self.has_curse_forge_key() {
+            return Ok(());
+        }
+        let murmur3 = entry.murmur3;
+        if murmur3 == 0 {
+            return Err(PackError::Invalid(
+                "Uploaded file fingerprint calculation failed (empty file or invalid format)".to_string(),
+            ));
+        }
+
+        let matches = self
+            .curse_forge
+            .verify_fingerprints(&[murmur3])
+            .await
+            .map_err(|e| PackError::Api(format!("CurseForge fingerprint verification failed: {e}")))?;
+
+        let Some(file_match) = matches.into_iter().next() else {
+            return Err(PackError::Invalid(format!(
+                "File verification failed: CurseForge does not recognize '{}' as an official pack file.",
+                entry.filename
+            )));
+        };
+
+        // 1. Strict SHA-1 check
+        if let Some(official_sha1) = file_match.sha1() {
+            if let Some(local_sha1) = &entry.sha1 {
+                if !local_sha1.eq_ignore_ascii_case(official_sha1) {
+                    return Err(PackError::Invalid(format!(
+                        "Integrity check failed: SHA-1 mismatch for '{}' (expected {}, got {}). File may be corrupted.",
+                        entry.filename, official_sha1, local_sha1
+                    )));
+                }
+            }
+            entry.sha1 = Some(official_sha1.to_string());
+        }
+
+        // 2. Strict mod match check
+        if let Some(expected_id_str) = expected_mod_id.filter(|s| !s.is_empty()) {
+            if let Ok(expected_id_num) = expected_id_str.parse::<i64>() {
+                if file_match.mod_id > 0 && file_match.mod_id != expected_id_num {
+                    return Err(PackError::Invalid(format!(
+                        "Pack mismatch: Uploaded file is for pack ID {}, but you are installing pack ID {}. Please upload the correct file.",
+                        file_match.mod_id, expected_id_num
+                    )));
+                }
+            }
+        }
+
+        // 3. Fetch rich pack metadata from CurseForge
+        if file_match.mod_id > 0 {
+            entry.id = Some(file_match.mod_id.to_string());
+            if let Ok(mod_info) = self.curse_forge.get_mod(file_match.mod_id).await {
+                if !mod_info.name.is_empty() {
+                    entry.title = Some(mod_info.name.clone());
+                }
+                if !mod_info.summary.is_empty() {
+                    entry.description = Some(mod_info.summary.clone());
+                }
+                let icon = mod_info.logo.as_ref().and_then(|l| {
+                    if !l.thumbnail_url.is_empty() {
+                        Some(l.thumbnail_url.clone())
+                    } else if !l.url.is_empty() {
+                        Some(l.url.clone())
+                    } else {
+                        None
+                    }
+                });
+                if let Some(icon) = icon {
+                    entry.icon_url = Some(icon);
+                }
+                let authors = mod_info.authors_string();
+                if !authors.is_empty() {
+                    entry.author = Some(authors);
+                }
+                let website = mod_info
+                    .links
+                    .as_ref()
+                    .and_then(|l| l.website_url.clone())
+                    .unwrap_or_else(|| {
+                        if !mod_info.slug.is_empty() {
+                            format!(
+                                "https://www.curseforge.com/minecraft/texture-packs/{}",
+                                mod_info.slug
+                            )
+                        } else {
+                            format!("https://www.curseforge.com/projects/{}", mod_info.id)
+                        }
+                    });
+                if !website.is_empty() {
+                    entry.project_url = Some(website);
+                }
+                entry.origin = Some(ORIGIN_CURSEFORGE.to_string());
+                tracing::info!(
+                    "Strictly verified and enriched CurseForge pack {} -> '{}' (id: {})",
+                    entry.filename,
+                    entry.display_title(),
+                    file_match.mod_id
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn add_with_metadata<R: tokio::io::AsyncRead + Unpin>(
         &self,
         mut content: R,
         filename: &str,
         origin: Option<&str>,
+        fallback_icon: Option<&str>,
+        fallback_title: Option<&str>,
+        expected_mod_id: Option<&str>,
+        expected_file_id: Option<&str>,
+        fallback_project_url: Option<&str>,
         dir: &Path,
         shader: bool,
     ) -> Result<PackEntry, PackError> {
@@ -220,28 +411,97 @@ impl PackManagementService {
         tokio::io::copy(&mut content, &mut out).await?;
         drop(out);
 
-        let size = fs::metadata(&target)?.len();
-        let sha1 = hash::sha1_file(&target).await?;
-        let normalized_origin = if origin.unwrap_or("").eq_ignore_ascii_case(ORIGIN_MODRINTH) {
+        let size = match fs::metadata(&target) {
+            Ok(m) => m.len(),
+            Err(e) => {
+                let _ = fs::remove_file(&target);
+                return Err(PackError::Io(e));
+            }
+        };
+
+        let sha1 = match hash::sha1_file(&target).await {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = fs::remove_file(&target);
+                return Err(PackError::Io(e));
+            }
+        };
+
+        let murmur3_value = match murmur3::curse_forge_fingerprint_of_file(&target) {
+            Ok(v) => v,
+            Err(_) => 0,
+        };
+
+        let normalized_origin = if origin.unwrap_or("").eq_ignore_ascii_case(ORIGIN_CURSEFORGE) {
+            ORIGIN_CURSEFORGE.to_string()
+        } else if origin.unwrap_or("").eq_ignore_ascii_case(ORIGIN_MODRINTH) {
             ORIGIN_MODRINTH.to_string()
         } else {
             ORIGIN_DIRECT.to_string()
         };
-        let id = if normalized_origin == ORIGIN_MODRINTH {
-            safe_name.clone()
-        } else {
-            Uuid::new_v4().to_string()
+
+        let id = match normalized_origin.as_str() {
+            ORIGIN_MODRINTH | ORIGIN_CURSEFORGE => {
+                expected_mod_id.filter(|id| !id.is_empty()).map(str::to_string).unwrap_or_else(|| safe_name.clone())
+            }
+            _ => Uuid::new_v4().to_string(),
         };
 
-        let entry = PackEntry::new(
+        let mut version: Option<String> = None;
+        let mut pack_format: Option<u32> = None;
+        let mut description: Option<String> = None;
+
+        if shader {
+            if let Ok(meta) = zircon_core::metadata::extract_shader_pack_metadata(&target) {
+                version = meta.version;
+                description = meta.description;
+            }
+        } else {
+            if let Ok(meta) = zircon_core::metadata::extract_resource_pack_metadata(&target) {
+                version = meta.version;
+                pack_format = meta.pack_format;
+                description = meta.description;
+            }
+        }
+        let mut entry = PackEntry::new(
             Some(id),
             safe_name.clone(),
             Some(sha1),
-            0,
+            murmur3_value,
             Some(normalized_origin.clone()),
             None,
             size,
         );
+        entry.version = version;
+        entry.pack_format = pack_format;
+        if description.is_some() {
+            entry.description = description;
+        }
+
+        // Strict verification for CurseForge origin packs
+        if normalized_origin == ORIGIN_CURSEFORGE {
+            if let Err(e) = self.verify_and_enrich_curseforge_upload(&mut entry, expected_mod_id, expected_file_id).await {
+                let _ = fs::remove_file(&target);
+                return Err(e);
+            }
+        }
+
+        // Apply fallback metadata
+        if entry.icon_url.as_ref().map_or(true, |i| i.is_empty()) {
+            if let Some(icon) = fallback_icon.filter(|i| !i.is_empty()) {
+                entry.icon_url = Some(icon.to_string());
+            }
+        }
+        if entry.title.as_ref().map_or(true, |t| t.is_empty()) {
+            if let Some(title) = fallback_title.filter(|t| !t.is_empty()) {
+                entry.title = Some(title.to_string());
+            }
+        }
+        if entry.project_url.as_ref().map_or(true, |u| u.is_empty()) {
+            if let Some(url) = fallback_project_url.filter(|u| !u.is_empty()) {
+                entry.project_url = Some(url.to_string());
+            }
+        }
 
         self.bom_service.with_bom(|bom| {
             if shader {
@@ -260,6 +520,29 @@ impl PackManagementService {
             size
         );
         Ok(entry)
+    }
+
+    async fn add<R: tokio::io::AsyncRead + Unpin>(
+        &self,
+        content: R,
+        filename: &str,
+        origin: Option<&str>,
+        dir: &Path,
+        shader: bool,
+    ) -> Result<PackEntry, PackError> {
+        self.add_with_metadata(
+            content,
+            filename,
+            origin,
+            None,
+            None,
+            None,
+            None,
+            None,
+            dir,
+            shader,
+        )
+        .await
     }
 
     async fn install_from_url(
@@ -352,6 +635,8 @@ impl PackManagementService {
                 is_shader,
             )
             .await?;
+
+        entry.version = Some(version.version_number.clone());
 
         // Enrich with Modrinth Project details.
         if let Ok(project) = modrinth.get_project(project_id).await {

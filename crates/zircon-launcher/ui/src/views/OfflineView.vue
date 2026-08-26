@@ -52,7 +52,33 @@
 
           <!-- Mods -->
           <div class="bg-bg border border-edge rounded-lg p-3">
-            <div class="z-section mb-2">Mods</div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="z-section">Mods</div>
+              <label
+                v-if="mods.length"
+                class="flex items-center gap-1.5 text-[10px] text-muted cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  class="accent-[#47d2c9]"
+                  :checked="allModsSelected"
+                  @change="toggleSelectAllMods"
+                />
+                Select All
+              </label>
+            </div>
+
+            <div
+              v-if="selectedModCount > 0"
+              class="flex items-center gap-2 mb-2 bg-card border border-edge rounded-md px-2 py-1.5"
+            >
+              <span class="text-[10px] text-muted">{{ selectedModCount }} selected</span>
+              <div class="flex-1"></div>
+              <button class="z-btn-ghost text-[10px] px-2 py-1" @click="bulkEnableSelected">Enable</button>
+              <button class="z-btn-ghost text-[10px] px-2 py-1" @click="bulkDisableSelected">Disable</button>
+              <button class="text-[10px] px-2 py-1 text-[#f85149] hover:underline" @click="bulkDeleteSelected">Delete</button>
+            </div>
+
             <div
               v-if="mods.length"
               class="max-h-[140px] overflow-y-auto mb-2 flex flex-col gap-1"
@@ -61,12 +87,33 @@
                 v-for="mod in mods"
                 :key="mod.filename"
                 class="flex items-center gap-2 text-xs"
+                :class="{ 'opacity-50': !mod.enabled }"
               >
+                <input
+                  type="checkbox"
+                  class="accent-[#47d2c9] shrink-0"
+                  :checked="!!selectedMods[mod.filename]"
+                  @change="toggleModSelected(mod.filename)"
+                />
                 <div class="flex-1 min-w-0">
-                  <div class="truncate text-text">{{ mod.filename }}</div>
+                  <div class="flex items-center gap-1.5 truncate">
+                    <span class="truncate text-text">{{ mod.filename }}</span>
+                    <span
+                      v-if="mod.version"
+                      class="bg-card text-muted border border-edge text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0"
+                    >{{ mod.version }}</span>
+                  </div>
                   <div v-if="mod.author" class="text-[10px] text-muted">by {{ mod.author }}</div>
                 </div>
                 <span class="text-muted">{{ fmtBytes(mod.sizeBytes) }}</span>
+                <button
+                  class="z-toggle"
+                  :class="{ 'z-toggle-on': mod.enabled }"
+                  :title="mod.enabled ? 'Disable' : 'Enable'"
+                  @click="toggleModEnabled(mod)"
+                >
+                  <span class="z-toggle-thumb"></span>
+                </button>
                 <button class="text-muted hover:text-[#f85149]" title="Delete" @click="deleteMod(mod.filename)">✕</button>
               </div>
             </div>
@@ -89,31 +136,70 @@
               <button class="z-btn-ghost" :disabled="modSearchBusy" @click="searchModrinth">Search</button>
             </div>
             <div v-if="modSearchBusy" class="text-xs text-muted mt-2">Searching Modrinth…</div>
-            <div class="mt-2 flex flex-col gap-1 max-h-[180px] overflow-y-auto">
+            <div class="mt-2 flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
               <div
                 v-for="hit in modResults"
                 :key="hit.projectId"
-                class="flex items-center gap-2 bg-card border border-edge rounded-md p-2"
+                class="bg-card border border-edge rounded-md p-2.5 flex flex-col gap-1.5"
               >
-                <img
-                  v-if="hit.iconUrl"
-                  :src="hit.iconUrl"
-                  class="w-7 h-7 rounded"
-                  loading="lazy"
-                />
-                <div class="flex-1 min-w-0">
-                  <div class="text-xs font-bold text-white truncate">{{ hit.title }}</div>
-                  <div class="text-[10px] text-muted truncate">
-                    {{ hit.author }} · {{ fmtCount(hit.downloads) }} downloads
+                <div class="flex items-start gap-2.5">
+                  <img
+                    v-if="hit.iconUrl"
+                    :src="hit.iconUrl"
+                    class="w-8 h-8 rounded shrink-0 mt-0.5"
+                    loading="lazy"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="text-xs font-bold text-white truncate">{{ hit.title }}</div>
+                      <button
+                        class="z-btn-ghost text-[10px] shrink-0"
+                        :disabled="installing === hit.projectId || hit.versionsLoading"
+                        @click="installMod(hit)"
+                      >
+                        {{ installing === hit.projectId ? 'Installing…' : 'Install' }}
+                      </button>
+                    </div>
+                    <div v-if="hit.description" class="text-[11px] text-text/80 line-clamp-2 my-0.5">
+                      {{ hit.description }}
+                    </div>
+                    <div class="flex items-center gap-2 text-[10px] text-muted flex-wrap">
+                      <span>by <strong class="text-text/90 font-medium">{{ hit.author }}</strong></span>
+                      <span>·</span>
+                      <span>{{ fmtCount(hit.downloads) }} downloads</span>
+                      <span>·</span>
+                      <a
+                        :href="hit.projectUrl || ('https://modrinth.com/project/' + (hit.slug || hit.projectId))"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-accent hover:underline inline-flex items-center gap-0.5"
+                        @click.prevent="openModrinthLink(hit)"
+                      >
+                        View on Modrinth ↗
+                      </a>
+                    </div>
                   </div>
                 </div>
-                <button
-                  class="z-btn-ghost text-[10px]"
-                  :disabled="installing === hit.projectId"
-                  @click="installMod(hit)"
-                >
-                  {{ installing === hit.projectId ? '…' : 'Install' }}
-                </button>
+
+                <!-- Version selector -->
+                <div class="flex items-center gap-2 pt-1 border-t border-edge/40">
+                  <label class="text-[10px] text-muted shrink-0">Version:</label>
+                  <select
+                    v-model="hit.selectedVersionId"
+                    :disabled="installing === hit.projectId || hit.versionsLoading || hit.versionsFailed || !hit.versionOptions?.length"
+                    class="flex-1 min-w-0 bg-bg border border-edge rounded px-2 py-0.5 text-[11px] text-text disabled:opacity-50"
+                  >
+                    <option v-if="hit.versionsLoading" value="" disabled>Loading versions…</option>
+                    <option v-else-if="hit.versionsFailed || !hit.versionOptions?.length" value="" disabled>No compatible versions</option>
+                    <option
+                      v-for="v in hit.versionOptions"
+                      :key="v.id"
+                      :value="v.id"
+                    >
+                      {{ v.versionNumber || v.name }}
+                    </option>
+                  </select>
+                </div>
               </div>
               <div v-if="!modSearchBusy && modSearchDone && modResults.length === 0" class="text-xs text-muted">
                 No mods found for this Minecraft version + loader.
@@ -128,26 +214,31 @@
             <div class="text-xs text-muted mb-1">Shaders</div>
             <select v-model="activeShaderpack" class="z-input mb-2" @change="onShaderpackChange">
               <option value="">None (shaders disabled)</option>
-              <option v-for="name in packs.shaderpacks" :key="name" :value="name">{{ name }}</option>
+              <option v-for="p in detailedPacks.shaderpacks" :key="p.filename" :value="p.filename">
+                {{ p.title || p.filename }} ({{ p.version || 'Unknown' }})
+              </option>
             </select>
             <button class="z-btn-ghost text-[11px] mb-3" @click="addLocalPack('shader')">+ Add Shaderpack (.zip)</button>
 
             <div class="text-xs text-muted mb-1">Texture Packs</div>
             <div class="flex flex-col gap-1 mb-2">
               <label
-                v-for="name in packs.resourcepacks"
-                :key="name"
+                v-for="p in detailedPacks.resourcepacks"
+                :key="p.filename"
                 class="flex items-center gap-2 text-xs cursor-pointer"
               >
                 <input
                   type="checkbox"
                   class="accent-[#47d2c9]"
-                  :checked="packs.activeResourcepacks.includes(name)"
-                  @change="togglePack(name)"
+                  :checked="packs.activeResourcepacks.includes(p.filename)"
+                  @change="togglePack(p.filename)"
                 />
-                <span class="truncate text-text">{{ name }}</span>
+                <span class="truncate text-text flex-1">{{ p.title || p.filename }}</span>
+                <span class="bg-card text-muted border border-edge text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0">
+                  {{ p.version || (p.packFormat ? 'v' + p.packFormat : 'Unknown') }}
+                </span>
               </label>
-              <div v-if="packs.resourcepacks.length === 0" class="text-xs text-muted">
+              <div v-if="detailedPacks.resourcepacks.length === 0" class="text-xs text-muted">
                 No texture packs added.
               </div>
             </div>
@@ -226,10 +317,16 @@ const instances = ref([]);
 const selected = ref(null);
 const selectedDir = ref('');
 const mods = ref([]);
+const selectedMods = ref({});
 const packs = ref({
   shaderpacks: [],
   resourcepacks: [],
   activeResourcepacks: [],
+});
+const detailedPacks = ref({
+  shaderpacks: [],
+  resourcepacks: [],
+  shadersEnabled: false,
 });
 const activeShaderpack = ref('');
 const launching = ref(false);
@@ -249,6 +346,11 @@ const loaderTypes = ref([]);
 const newForm = ref({ name: '', mcVersion: '1.20.4', loaderType: 'fabric', loaderVersion: '' });
 
 const allPacks = computed(() => packs.value);
+
+const selectedModCount = computed(() => Object.keys(selectedMods.value).length);
+const allModsSelected = computed(
+  () => mods.value.length > 0 && mods.value.every((m) => selectedMods.value[m.filename])
+);
 
 // Formats a raw download count like the Modrinth API returns it.
 function fmtCount(n) {
@@ -274,11 +376,17 @@ async function selectInstance(instance) {
 async function loadMods() {
   if (!selected.value) return;
   mods.value = await api.listOfflineMods(selected.value.id);
+  selectedMods.value = {};
 }
 
 async function loadPacks() {
   if (!selected.value) return;
-  packs.value = await api.listInstancePacks(selectedDir.value);
+  const [basicPacks, detailed] = await Promise.all([
+    api.listInstancePacks(selectedDir.value),
+    api.listInstancePacksDetailed(selectedDir.value),
+  ]);
+  packs.value = basicPacks;
+  detailedPacks.value = detailed;
   activeShaderpack.value = packs.value.activeShaderpack || '';
 }
 
@@ -310,6 +418,57 @@ async function deleteMod(filename) {
   await loadMods();
 }
 
+function toggleModSelected(filename) {
+  const next = { ...selectedMods.value };
+  if (next[filename]) {
+    delete next[filename];
+  } else {
+    next[filename] = true;
+  }
+  selectedMods.value = next;
+}
+
+function toggleSelectAllMods() {
+  if (allModsSelected.value) {
+    selectedMods.value = {};
+    return;
+  }
+  const next = {};
+  for (const mod of mods.value) next[mod.filename] = true;
+  selectedMods.value = next;
+}
+
+async function toggleModEnabled(mod) {
+  await api.setOfflineModEnabled(selected.value.id, mod.filename, !mod.enabled);
+  await loadMods();
+}
+
+async function setSelectedModsEnabled(enabled) {
+  const filenames = Object.keys(selectedMods.value);
+  if (!filenames.length) return;
+  await Promise.all(
+    filenames.map((filename) => api.setOfflineModEnabled(selected.value.id, filename, enabled))
+  );
+  await loadMods();
+}
+
+function bulkEnableSelected() {
+  return setSelectedModsEnabled(true);
+}
+
+function bulkDisableSelected() {
+  return setSelectedModsEnabled(false);
+}
+
+async function bulkDeleteSelected() {
+  const filenames = Object.keys(selectedMods.value);
+  if (!filenames.length) return;
+  const label = filenames.length === 1 ? 'mod' : 'mods';
+  if (!window.confirm(`Delete ${filenames.length} selected ${label}?`)) return;
+  await Promise.all(filenames.map((filename) => api.deleteOfflineMod(selected.value.id, filename)));
+  await loadMods();
+}
+
 async function browseMods() {
   const files = await pickFiles(JAR_FILTER);
   for (const file of files) {
@@ -336,7 +495,15 @@ async function searchModrinth() {
   modSearchBusy.value = true;
   modSearchDone.value = false;
   try {
-    modResults.value = await api.searchModrinth(selected.value.id, query);
+    const hits = await api.searchModrinth(selected.value.id, query);
+    modResults.value = (hits || []).map(hit => ({
+      ...hit,
+      versionOptions: [],
+      selectedVersionId: '',
+      versionsLoading: true,
+      versionsFailed: false,
+    }));
+    attachVersionOptions(modResults.value);
   } catch (e) {
     window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Search failed: ${e}` }));
     modResults.value = [];
@@ -346,10 +513,32 @@ async function searchModrinth() {
   }
 }
 
+async function attachVersionOptions(hits) {
+  if (!selected.value) return;
+  const instanceId = selected.value.id;
+  await Promise.all(
+    hits.map(async (hit) => {
+      try {
+        const versions = await api.listModrinthVersions(instanceId, hit.projectId);
+        hit.versionOptions = versions || [];
+        hit.selectedVersionId = hit.versionOptions[0] ? hit.versionOptions[0].id : '';
+        hit.versionsFailed = hit.versionOptions.length === 0;
+      } catch {
+        hit.versionOptions = [];
+        hit.selectedVersionId = '';
+        hit.versionsFailed = true;
+      } finally {
+        hit.versionsLoading = false;
+      }
+    })
+  );
+}
+
 async function installMod(hit) {
   installing.value = hit.projectId;
   try {
-    const filename = await api.installModrinthMod(selected.value.id, hit.projectId);
+    const versionId = hit.selectedVersionId || null;
+    const filename = await api.installModrinthMod(selected.value.id, hit.projectId, versionId);
     window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Installed ${filename}` }));
     await loadMods();
   } catch (e) {
@@ -357,6 +546,11 @@ async function installMod(hit) {
   } finally {
     installing.value = '';
   }
+}
+
+function openModrinthLink(hit) {
+  const url = hit.projectUrl || `https://modrinth.com/project/${hit.slug || hit.projectId}`;
+  api.openExternalUrl(url).catch(() => {});
 }
 
 async function addLocalPack(kind) {
@@ -388,11 +582,14 @@ async function openNewInstance() {
       mcVersions.value = ['1.20.4'];
     }
   }
+  const allowedLoaders = ['vanilla', 'fabric', 'forge', 'neoforge', 'quilt'];
   if (loaderTypes.value.length === 0) {
     try {
-      loaderTypes.value = await api.listLoaderTypes();
+      const fetched = await api.listLoaderTypes();
+      const filtered = (fetched || []).filter(l => allowedLoaders.includes(l.toLowerCase()));
+      loaderTypes.value = filtered.length > 0 ? filtered : allowedLoaders;
     } catch {
-      loaderTypes.value = ['vanilla', 'fabric', 'forge', 'neoforge', 'quilt'];
+      loaderTypes.value = allowedLoaders;
     }
   }
 }

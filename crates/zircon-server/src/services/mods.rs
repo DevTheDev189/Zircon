@@ -98,9 +98,27 @@ impl ModManagementService {
     /// adds it to the BOM. Replaces any existing mod with the same file name.
     pub async fn add_mod<R: tokio::io::AsyncRead + Unpin>(
         &self,
+        content: R,
+        filename: &str,
+        origin: Option<&str>,
+    ) -> Result<ModEntry, ModError> {
+        self.add_mod_with_metadata(content, filename, origin, None, None, None, None, None)
+            .await
+    }
+
+    /// Ingests an uploaded JAR and applies optional fallback metadata (icon,
+    /// title, mod id, project url) while enforcing strict verification for
+    /// CurseForge origin mods.
+    pub async fn add_mod_with_metadata<R: tokio::io::AsyncRead + Unpin>(
+        &self,
         mut content: R,
         filename: &str,
         origin: Option<&str>,
+        fallback_icon: Option<&str>,
+        fallback_title: Option<&str>,
+        expected_mod_id: Option<&str>,
+        expected_file_id: Option<&str>,
+        fallback_project_url: Option<&str>,
     ) -> Result<ModEntry, ModError> {
         let safe_name = sanitize_filename(filename)?;
         let target = self.mods_dir.join(&safe_name);
@@ -110,13 +128,35 @@ impl ModManagementService {
         tokio::io::copy(&mut content, &mut out).await?;
         drop(out);
 
-        let size = fs::metadata(&target)?.len();
-        let sha1 = hash::sha1_file(&target).await?;
-        let murmur3_value = murmur3::curse_forge_fingerprint_of_file(&target)?;
+        let size = match fs::metadata(&target) {
+            Ok(m) => m.len(),
+            Err(e) => {
+                let _ = fs::remove_file(&target);
+                return Err(ModError::Io(e));
+            }
+        };
+
+        let sha1 = match hash::sha1_file(&target).await {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = fs::remove_file(&target);
+                return Err(ModError::Io(e));
+            }
+        };
+
+        let murmur3_value = match murmur3::curse_forge_fingerprint_of_file(&target) {
+            Ok(v) => v,
+            Err(e) => {
+                let _ = fs::remove_file(&target);
+                return Err(ModError::Invalid(format!("Fingerprint calculation failed: {e}")));
+            }
+        };
 
         let normalized_origin = normalize_origin(origin);
         let id = match normalized_origin.as_str() {
-            ORIGIN_MODRINTH | ORIGIN_CURSEFORGE => safe_name.clone(),
+            ORIGIN_MODRINTH | ORIGIN_CURSEFORGE => {
+                expected_mod_id.filter(|id| !id.is_empty()).map(str::to_string).unwrap_or_else(|| safe_name.clone())
+            }
             _ => Uuid::new_v4().to_string(),
         };
 
@@ -139,6 +179,36 @@ impl ModManagementService {
             }
             if !meta.author.is_empty() {
                 entry.author = Some(meta.author);
+            }
+            if !meta.version.is_empty() {
+                entry.version = Some(meta.version);
+            }
+        }
+
+        // Strict verification for CurseForge origin mods
+        if normalized_origin == ORIGIN_CURSEFORGE {
+            if let Err(e) = self.verify_and_enrich_curseforge_upload(&mut entry, expected_mod_id, expected_file_id).await {
+                let _ = fs::remove_file(&target);
+                return Err(e);
+            }
+        } else if self.has_curse_forge_key() {
+            self.enrich_curseforge_metadata(&mut entry).await;
+        }
+
+        // Apply fallback metadata if API enrichment didn't populate them
+        if entry.icon_url.as_ref().map_or(true, |i| i.is_empty()) {
+            if let Some(icon) = fallback_icon.filter(|i| !i.is_empty()) {
+                entry.icon_url = Some(icon.to_string());
+            }
+        }
+        if entry.title.as_ref().map_or(true, |t| t.is_empty()) {
+            if let Some(title) = fallback_title.filter(|t| !t.is_empty()) {
+                entry.title = Some(title.to_string());
+            }
+        }
+        if entry.project_url.as_ref().map_or(true, |u| u.is_empty()) {
+            if let Some(url) = fallback_project_url.filter(|u| !u.is_empty()) {
+                entry.project_url = Some(url.to_string());
             }
         }
 
@@ -178,8 +248,11 @@ impl ModManagementService {
             .bytes()
             .await
             .map_err(|e| ModError::Api(format!("Download failed: {e}")))?;
-        let reader = std::io::Cursor::new(bytes.to_vec());
-        let entry = self.add_mod(reader, filename, Some(origin)).await?;
+        let mut entry = self
+            .add_mod(std::io::Cursor::new(bytes.to_vec()), filename, Some(origin))
+            .await?;
+        entry.download_url = Some(url.to_string());
+        self.persist_entry(&entry)?;
         Ok(entry)
     }
 
@@ -202,6 +275,79 @@ impl ModManagementService {
             self.bom_service.save()?;
         }
         Ok(deleted || removed_from_bom)
+    }
+
+    /// Bulk version of `remove_mod`: deletes each mod's file (whichever
+    /// physical variant — enabled `.jar` or disabled `.jar.disabled` —
+    /// currently exists) and drops its BOM entry, with a single retain +
+    /// save pass for the whole batch instead of one per file.
+    pub fn remove_mods(&self, filenames: &[String]) -> Result<Vec<String>, ModError> {
+        let mut targets = Vec::new();
+        for filename in filenames {
+            let safe_name = sanitize_filename(filename)?;
+            for candidate in [
+                self.mods_dir.join(&safe_name),
+                self.mods_dir.join(format!("{safe_name}.disabled")),
+            ] {
+                if candidate.is_file() {
+                    fs::remove_file(&candidate)?;
+                }
+            }
+            targets.push(safe_name);
+        }
+
+        let removed_from_bom = self.bom_service.with_bom(|bom| {
+            let before = bom.mods.len();
+            bom.mods.retain(|m| !targets.contains(&m.filename));
+            bom.mods.len() != before
+        });
+        if removed_from_bom {
+            self.bom_service.save()?;
+        }
+        Ok(targets)
+    }
+
+    /// Enables or disables a batch of mods by renaming their file in place
+    /// (`<name>` <-> `<name>.disabled`) and updating the BOM's `enabled`
+    /// flag. Mod loaders only scan `*.jar` at startup, so this hides a mod
+    /// from the game process without deleting or needing to re-download it.
+    /// Filenames with no matching file on disk (in either state) are skipped
+    /// silently. Returns the filenames actually resolved/affected.
+    pub fn set_mods_enabled(
+        &self,
+        filenames: &[String],
+        enabled: bool,
+    ) -> Result<Vec<String>, ModError> {
+        let mut targets = Vec::new();
+        for filename in filenames {
+            let safe_name = sanitize_filename(filename)?;
+            if let Some((current_path, currently_enabled)) = self.resolve_variant(&safe_name) {
+                if currently_enabled != enabled {
+                    let target_path = if enabled {
+                        self.mods_dir.join(&safe_name)
+                    } else {
+                        self.mods_dir.join(format!("{safe_name}.disabled"))
+                    };
+                    fs::rename(&current_path, &target_path)?;
+                }
+                targets.push(safe_name);
+            }
+        }
+
+        let bom_changed = self.bom_service.with_bom(|bom| {
+            let mut changed = false;
+            for mod_entry in bom.mods.iter_mut() {
+                if targets.contains(&mod_entry.filename) && mod_entry.enabled != enabled {
+                    mod_entry.enabled = enabled;
+                    changed = true;
+                }
+            }
+            changed
+        });
+        if bom_changed {
+            self.bom_service.save()?;
+        }
+        Ok(targets)
     }
 
     /// Installs a specific Modrinth version into the mods folder and enriches
@@ -236,6 +382,7 @@ impl ModManagementService {
             .install_from_url(&file.url, &file.filename, ORIGIN_MODRINTH)
             .await?;
         entry.id = Some(project_id.to_string());
+        entry.version = Some(chosen.version_number.clone());
         self.enrich_metadata(&mut entry).await;
         self.persist_entry(&entry)?;
         Ok(entry)
@@ -336,14 +483,23 @@ impl ModManagementService {
 
         let mut installed_count = 0;
         let mut failed_mods: Vec<String> = Vec::new();
-        let reader = std::io::Cursor::new(bytes.to_vec());
-        let mut archive = zip::ZipArchive::new(reader)
-            .map_err(|e| ModError::Invalid(format!("Invalid .mrpack: {e}")))?;
-        let index_entry = archive.by_name("modrinth.index.json").map_err(|_| {
-            ModError::Invalid("Invalid .mrpack: missing modrinth.index.json".to_string())
-        })?;
-        let index: serde_json::Value = serde_json::from_reader(index_entry)
-            .map_err(|e| ModError::Invalid(format!("Invalid modrinth.index.json: {e}")))?;
+        let index: serde_json::Value = {
+            let reader = std::io::Cursor::new(bytes.to_vec());
+            let mut archive = zip::ZipArchive::new(reader)
+                .map_err(|e| ModError::Invalid(format!("Invalid .mrpack: {e}")))?;
+            let mut index_entry = archive.by_name("modrinth.index.json").map_err(|_| {
+                ModError::Invalid("Invalid .mrpack: missing modrinth.index.json".to_string())
+            })?;
+            use std::io::Read;
+            let mut index_str = String::new();
+            index_entry
+                .by_ref()
+                .take(zircon_core::archive::limits::DEFAULT_MAX_METADATA_BYTES)
+                .read_to_string(&mut index_str)
+                .map_err(|e| ModError::Invalid(format!("Failed to read modrinth.index.json: {e}")))?;
+            serde_json::from_str(&index_str)
+                .map_err(|e| ModError::Invalid(format!("Invalid modrinth.index.json: {e}")))?
+        };
 
         if let Some(files) = index.get("files").and_then(|f| f.as_array()) {
             for element in files {
@@ -447,7 +603,25 @@ impl ModManagementService {
                                         new_entry.description = mod_entry.description.clone();
                                         new_entry.compatible = true;
                                         new_entry.warning_message = None;
+                                        new_entry.enabled = mod_entry.enabled;
                                         self.enrich_metadata(&mut new_entry).await;
+
+                                        // The resync always (re-)downloads the
+                                        // file as a plain active `.jar` — if
+                                        // the mod was disabled before the
+                                        // resync, re-hide the freshly
+                                        // installed file from the loader too.
+                                        if !new_entry.enabled {
+                                            let active =
+                                                self.mods_dir.join(&new_entry.filename);
+                                            let disabled = self.mods_dir.join(format!(
+                                                "{}.disabled",
+                                                new_entry.filename
+                                            ));
+                                            if active.is_file() {
+                                                let _ = fs::rename(&active, &disabled);
+                                            }
+                                        }
 
                                         self.bom_service.with_bom(|bom| {
                                             bom.mods.retain(|m| m.filename != mod_entry.filename);
@@ -515,17 +689,27 @@ impl ModManagementService {
     /// (bounded concurrency) so a single offline incident cannot block the whole
     /// list. Once repaired, the enriched metadata is cached back into `bom.json`
     /// so subsequent loads require zero external requests.
+    /// Lists mods, opportunistically backfilling provider metadata (icon,
+    /// title, real project id) for legacy entries that were persisted
+    /// before enrichment was written back to the BOM. Network round-trips only
+    /// happen for entries that actually need repair; the repairs run in parallel
+    /// (bounded concurrency) so a single offline incident cannot block the whole
+    /// list. Once repaired, the enriched metadata is cached back into `bom.json`
+    /// so subsequent loads require zero external requests.
     pub async fn list_mods_enriched(&self) -> Vec<ModEntry> {
         let mods = self.bom_service.get_bom().mods;
 
-        // Fast path: every entry is already healthy, so no network calls at all.
+        // Fast path: check if any entry needs Modrinth or CurseForge repair
         let needs_repair = mods.iter().any(|m| {
-            m.origin.as_deref() == Some(ORIGIN_MODRINTH)
+            (m.origin.as_deref() == Some(ORIGIN_MODRINTH)
                 && !m.id.as_deref().is_some_and(|id| {
                     !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric())
                 })
                 && m.icon_url.is_none()
-                && m.sha1.is_some()
+                && m.sha1.is_some())
+            || (m.origin.as_deref() == Some(ORIGIN_CURSEFORGE)
+                && m.icon_url.is_none()
+                && m.murmur3 > 0)
         });
         if !needs_repair {
             return mods;
@@ -538,7 +722,11 @@ impl ModManagementService {
             .map(|(idx, mut entry)| {
                 let this = self.clone();
                 async move {
-                    let changed = this.repair_modrinth_metadata(&mut entry).await;
+                    let changed = if entry.origin.as_deref() == Some(ORIGIN_CURSEFORGE) {
+                        this.enrich_curseforge_metadata(&mut entry).await
+                    } else {
+                        this.repair_modrinth_metadata(&mut entry).await
+                    };
                     (idx, entry, changed)
                 }
             })
@@ -572,6 +760,207 @@ impl ModManagementService {
             bom.mods.push(entry.clone());
         });
         self.bom_service.save()
+    }
+
+    /// Strictly verifies a CurseForge uploaded file against official CurseForge
+    /// records, comparing SHA-1, checking that it matches the expected mod ID,
+    /// and populating rich metadata.
+    pub async fn verify_and_enrich_curseforge_upload(
+        &self,
+        entry: &mut ModEntry,
+        expected_mod_id: Option<&str>,
+        _expected_file_id: Option<&str>,
+    ) -> Result<(), ModError> {
+        if !self.has_curse_forge_key() {
+            return Ok(());
+        }
+        let murmur3 = entry.murmur3;
+        if murmur3 == 0 {
+            return Err(ModError::Invalid(
+                "Uploaded file fingerprint calculation failed (empty file or invalid format)".to_string(),
+            ));
+        }
+
+        let matches = self
+            .curse_forge
+            .verify_fingerprints(&[murmur3])
+            .await
+            .map_err(|e| ModError::Api(format!("CurseForge fingerprint verification failed: {e}")))?;
+
+        let Some(file_match) = matches.into_iter().next() else {
+            return Err(ModError::Invalid(format!(
+                "File verification failed: CurseForge does not recognize '{}' as an official mod file.",
+                entry.filename
+            )));
+        };
+
+        // 1. Strict SHA-1 check
+        if let Some(official_sha1) = file_match.sha1() {
+            if let Some(local_sha1) = &entry.sha1 {
+                if !local_sha1.eq_ignore_ascii_case(official_sha1) {
+                    return Err(ModError::Invalid(format!(
+                        "Integrity check failed: SHA-1 mismatch for '{}' (expected {}, got {}). File may be corrupted.",
+                        entry.filename, official_sha1, local_sha1
+                    )));
+                }
+            }
+            entry.sha1 = Some(official_sha1.to_string());
+        }
+
+        // 2. Strict mod match check
+        if let Some(expected_id_str) = expected_mod_id.filter(|s| !s.is_empty()) {
+            if let Ok(expected_id_num) = expected_id_str.parse::<i64>() {
+                if file_match.mod_id > 0 && file_match.mod_id != expected_id_num {
+                    return Err(ModError::Invalid(format!(
+                        "Mod mismatch: Uploaded file is for mod ID {}, but you are installing mod ID {}. Please upload the correct file.",
+                        file_match.mod_id, expected_id_num
+                    )));
+                }
+            }
+        }
+
+        // 3. Fetch rich mod metadata from CurseForge
+        if file_match.mod_id > 0 {
+            entry.id = Some(file_match.mod_id.to_string());
+            if let Ok(mod_info) = self.curse_forge.get_mod(file_match.mod_id).await {
+                if !mod_info.name.is_empty() {
+                    entry.title = Some(mod_info.name.clone());
+                }
+                if !mod_info.summary.is_empty() {
+                    entry.description = Some(mod_info.summary.clone());
+                }
+                let icon = mod_info.logo.as_ref().and_then(|l| {
+                    if !l.thumbnail_url.is_empty() {
+                        Some(l.thumbnail_url.clone())
+                    } else if !l.url.is_empty() {
+                        Some(l.url.clone())
+                    } else {
+                        None
+                    }
+                });
+                if let Some(icon) = icon {
+                    entry.icon_url = Some(icon);
+                }
+                let authors = mod_info.authors_string();
+                if !authors.is_empty() {
+                    entry.author = Some(authors);
+                }
+                let website = mod_info
+                    .links
+                    .as_ref()
+                    .and_then(|l| l.website_url.clone())
+                    .unwrap_or_else(|| {
+                        if !mod_info.slug.is_empty() {
+                            format!(
+                                "https://www.curseforge.com/minecraft/mc-mods/{}",
+                                mod_info.slug
+                            )
+                        } else {
+                            format!("https://www.curseforge.com/projects/{}", mod_info.id)
+                        }
+                    });
+                if !website.is_empty() {
+                    entry.project_url = Some(website);
+                }
+                entry.origin = Some(ORIGIN_CURSEFORGE.to_string());
+                tracing::info!(
+                    "Strictly verified and enriched CurseForge mod {} -> '{}' (id: {})",
+                    entry.filename,
+                    entry.display_title(),
+                    file_match.mod_id
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Enriches a CurseForge mod entry by querying CurseForge's fingerprint API,
+    /// verifying the file against the official CurseForge record, comparing SHA-1,
+    /// and populating the official title, summary, icon_url, author, and project_url.
+    pub async fn enrich_curseforge_metadata(&self, entry: &mut ModEntry) -> bool {
+        if !self.has_curse_forge_key() {
+            return false;
+        }
+        let murmur3 = entry.murmur3;
+        if murmur3 == 0 {
+            return false;
+        }
+        let Ok(matches) = self.curse_forge.verify_fingerprints(&[murmur3]).await else {
+            return false;
+        };
+        let Some(file_match) = matches.into_iter().next() else {
+            tracing::info!("CurseForge fingerprint {murmur3} not matched to a known file");
+            return false;
+        };
+
+        // If CurseForge has an official SHA-1 for this file, verify it
+        if let Some(official_sha1) = file_match.sha1() {
+            if let Some(local_sha1) = &entry.sha1 {
+                if !local_sha1.eq_ignore_ascii_case(official_sha1) {
+                    tracing::warn!(
+                        "Uploaded mod {} SHA-1 mismatch: local={}, official={}",
+                        entry.filename,
+                        local_sha1,
+                        official_sha1
+                    );
+                } else {
+                    tracing::info!(
+                        "Uploaded mod {} SHA-1 verified successfully against CurseForge: {}",
+                        entry.filename,
+                        official_sha1
+                    );
+                }
+            }
+            entry.sha1 = Some(official_sha1.to_string());
+        }
+
+        if file_match.mod_id > 0 {
+            entry.id = Some(file_match.mod_id.to_string());
+            if let Ok(mod_info) = self.curse_forge.get_mod(file_match.mod_id).await {
+                if !mod_info.name.is_empty() {
+                    entry.title = Some(mod_info.name.clone());
+                }
+                if !mod_info.summary.is_empty() {
+                    entry.description = Some(mod_info.summary.clone());
+                }
+                let icon = mod_info.logo.as_ref().and_then(|l| {
+                    if !l.thumbnail_url.is_empty() {
+                        Some(l.thumbnail_url.clone())
+                    } else if !l.url.is_empty() {
+                        Some(l.url.clone())
+                    } else {
+                        None
+                    }
+                });
+                if let Some(icon) = icon {
+                    entry.icon_url = Some(icon);
+                }
+                let authors = mod_info.authors_string();
+                if !authors.is_empty() {
+                    entry.author = Some(authors);
+                }
+                let website = mod_info.links.as_ref().and_then(|l| l.website_url.clone()).unwrap_or_else(|| {
+                    if !mod_info.slug.is_empty() {
+                        format!("https://www.curseforge.com/minecraft/mc-mods/{}", mod_info.slug)
+                    } else {
+                        format!("https://www.curseforge.com/projects/{}", mod_info.id)
+                    }
+                });
+                if !website.is_empty() {
+                    entry.project_url = Some(website);
+                }
+                entry.origin = Some(ORIGIN_CURSEFORGE.to_string());
+                tracing::info!(
+                    "Enriched CurseForge mod {} -> '{}' (icon: {:?})",
+                    entry.filename,
+                    entry.display_title(),
+                    entry.icon_url
+                );
+                return true;
+            }
+        }
+        false
     }
 
     /// One-shot repair for a Modrinth entry stored in the pre-fix format
@@ -646,6 +1035,27 @@ impl ModManagementService {
         } else {
             None
         }
+    }
+
+    /// Resolves an already-sanitized BOM filename to whichever physical
+    /// variant currently exists on disk — the active `<name>` or the
+    /// disabled `<name>.disabled` — along with which state that is.
+    ///
+    /// Deliberately does not route through `sanitize_filename` for the
+    /// `.disabled` form: that function force-appends `.jar` to anything not
+    /// already ending in `.jar`, which would corrupt `foo.jar.disabled` into
+    /// `foo.jar.disabled.jar`. `safe_name` must already be sanitized by the
+    /// caller, so the join below cannot escape `mods_dir`.
+    fn resolve_variant(&self, safe_name: &str) -> Option<(PathBuf, bool)> {
+        let enabled_path = self.mods_dir.join(safe_name);
+        if enabled_path.starts_with(&self.mods_dir) && enabled_path.is_file() {
+            return Some((enabled_path, true));
+        }
+        let disabled_path = self.mods_dir.join(format!("{safe_name}.disabled"));
+        if disabled_path.starts_with(&self.mods_dir) && disabled_path.is_file() {
+            return Some((disabled_path, false));
+        }
+        None
     }
 
     /// Best-effort metadata enrichment: fetches the provider project page for
@@ -886,6 +1296,84 @@ mod tests {
             Some("https://cdn.modrinth.com/data/AANobbMI/icon.png".to_string()),
             disk[0].icon_url
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn set_mods_enabled_renames_file_and_updates_bom_without_download() {
+        let dir = temp_dir();
+        let mods_dir = dir.join("mods");
+        let bom = Arc::new(BomService::new(
+            dir.join("bom.json"),
+            Some(zircon_core::model::BillOfMaterials::new(
+                "1.20.4", None, None,
+            )),
+        ));
+        let service = ModManagementService::new(bom, mods_dir.clone(), "");
+        service
+            .add_mod(std::io::Cursor::new(vec![1u8, 2, 3]), "mod.jar", None)
+            .await
+            .unwrap();
+        assert!(mods_dir.join("mod.jar").is_file());
+
+        let changed = service
+            .set_mods_enabled(&["mod.jar".to_string()], false)
+            .unwrap();
+        assert_eq!(vec!["mod.jar".to_string()], changed);
+        assert!(!mods_dir.join("mod.jar").exists());
+        assert!(mods_dir.join("mod.jar.disabled").is_file());
+        assert!(!service.list_mods()[0].enabled);
+
+        // Re-enabling renames the exact same file back — no re-download.
+        let changed = service
+            .set_mods_enabled(&["mod.jar".to_string()], true)
+            .unwrap();
+        assert_eq!(vec!["mod.jar".to_string()], changed);
+        assert!(mods_dir.join("mod.jar").is_file());
+        assert!(!mods_dir.join("mod.jar.disabled").exists());
+        assert!(service.list_mods()[0].enabled);
+
+        // Unknown filenames are skipped, not errored.
+        let changed = service
+            .set_mods_enabled(&["missing.jar".to_string()], false)
+            .unwrap();
+        assert!(changed.is_empty());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn remove_mods_deletes_batch_regardless_of_enabled_state() {
+        let dir = temp_dir();
+        let mods_dir = dir.join("mods");
+        let bom = Arc::new(BomService::new(
+            dir.join("bom.json"),
+            Some(zircon_core::model::BillOfMaterials::new(
+                "1.20.4", None, None,
+            )),
+        ));
+        let service = ModManagementService::new(bom, mods_dir.clone(), "");
+        service
+            .add_mod(std::io::Cursor::new(vec![1u8]), "a.jar", None)
+            .await
+            .unwrap();
+        service
+            .add_mod(std::io::Cursor::new(vec![2u8]), "b.jar", None)
+            .await
+            .unwrap();
+        service
+            .set_mods_enabled(&["b.jar".to_string()], false)
+            .unwrap();
+        assert!(mods_dir.join("b.jar.disabled").is_file());
+
+        let deleted = service
+            .remove_mods(&["a.jar".to_string(), "b.jar".to_string()])
+            .unwrap();
+        assert_eq!(2, deleted.len());
+        assert!(!mods_dir.join("a.jar").exists());
+        assert!(!mods_dir.join("b.jar.disabled").exists());
+        assert_eq!(0, service.list_mods().len());
+
         let _ = fs::remove_dir_all(&dir);
     }
 

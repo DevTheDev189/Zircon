@@ -10,12 +10,19 @@
 </p>
 
 <p align="center">
+  <a href="https://zirconmc.net"><img src="https://img.shields.io/badge/website-zirconmc.net-teal?logo=cloudflare&logoColor=white" alt="Website"></a>
   <img src="https://img.shields.io/badge/Rust-2021-orange?logo=rust&logoColor=white" alt="Rust 2021">
   <img src="https://img.shields.io/badge/Tauri-2-teal?logo=tauri&logoColor=white" alt="Tauri 2">
   <img src="https://img.shields.io/badge/Vue-3-green?logo=vue.js&logoColor=white" alt="Vue 3">
   <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build passing">
   <img src="https://img.shields.io/badge/status-active_development-yellow" alt="Status: active development">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
+</p>
+
+<p align="center">
+  <a href="https://zirconmc.net"><strong> Official Website: zirconmc.net</strong></a> &nbsp;|&nbsp;
+  <a href="https://zirconmc.net/downloads.html"><strong> Download Launcher &amp; Server</strong></a> &nbsp;|&nbsp;
+  <a href="https://github.com/keyaiereharris-ops/Zircon/releases"><strong> GitHub Releases</strong></a>
 </p>
 
 > [!NOTE]
@@ -106,7 +113,25 @@ sequenceDiagram
 
 ---
 
-## ► Quick Start
+## 📥 Downloads & Installation
+
+Pre-built binaries and installers are hosted at [**zirconmc.net/downloads.html**](https://zirconmc.net/downloads.html) and on [**GitHub Releases**](https://github.com/keyaiereharris-ops/Zircon/releases).
+
+### 🎮 For Players (Companion Launcher)
+1. **Download:** Grab the latest Windows installer (`.msi`) or setup executable (`.exe`) from [zirconmc.net/downloads.html#players](https://zirconmc.net/downloads.html#players).
+2. **Install & Launch:** Run the installer and launch **Zircon**.
+3. **Sign In:** Sign in with your official Microsoft account (OAuth2/PKCE).
+4. **Join & Play:** Pick or add your server and click **PLAY**. Zircon automatically syncs and verifies all required mods on launch.
+
+### 🖥️ For Server Owners (Server Manager)
+1. **Download:** Get the standalone server package (`zircon-server-windows-x86_64.zip`) from [zirconmc.net/downloads.html#server-owners](https://zirconmc.net/downloads.html#server-owners).
+2. **Extract & Run:** Extract the archive and launch `zircon-server.exe`. Copy the generated admin password printed to the console on first launch.
+3. **Open Dashboard:** Navigate to [http://localhost:25564](http://localhost:25564) (or `http://<host>:25565`) and sign in.
+4. **Create Instance:** Accept the EULA, choose your Minecraft version and mod loader (Fabric, Quilt, Forge, NeoForge), add your mods, and start the server.
+
+---
+
+## ► Quick Start (Building from Source)
 
 ### Prerequisites
 

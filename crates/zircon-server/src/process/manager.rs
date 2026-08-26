@@ -30,6 +30,7 @@ use crate::process::console::ConsoleStreamHandler;
 struct LaunchContext {
     server_dir: PathBuf,
     server_jar: PathBuf,
+    mods_dir: PathBuf,
     installer_cache_dir: PathBuf,
     minecraft_version: String,
     loader_info: ModLoaderInfo,
@@ -91,6 +92,7 @@ impl MinecraftProcessManager {
             LaunchContext {
                 server_dir: config.server_dir.clone(),
                 server_jar: config.server_jar.clone(),
+                mods_dir: config.mods_dir.clone(),
                 installer_cache_dir: config.data_dir.join(".cache").join("installers"),
                 minecraft_version: cfg.minecraft_version,
                 loader_info: cfg.mod_loader.clone(),
@@ -114,10 +116,15 @@ impl MinecraftProcessManager {
             .mod_loader
             .clone()
             .unwrap_or_else(|| ModLoaderInfo::new("vanilla", "", None));
+        let mods_dir = server_dir
+            .parent()
+            .map(|p| p.join("mods"))
+            .unwrap_or_else(|| server_dir.join("mods"));
         Self::new_from_context(
             LaunchContext {
                 server_dir: server_dir.clone(),
                 server_jar: server_dir.join("server.jar"),
+                mods_dir,
                 installer_cache_dir,
                 minecraft_version: config.minecraft_version.clone(),
                 loader_info,
@@ -174,6 +181,16 @@ impl MinecraftProcessManager {
         .await
         .map_err(|e| ProcessError::Install(e.to_string()))?;
 
+        // Reconcile managed mods into server/mods directory before booting JVM.
+        let target_mods_dir = self.context.server_dir.join("mods");
+        let synced_count = sync_mods(&self.context.mods_dir, &target_mods_dir)?;
+        tracing::info!(
+            "Synced {} mod(s) from {:?} to {:?}",
+            synced_count,
+            self.context.mods_dir,
+            target_mods_dir
+        );
+
         // Pin the server to its internal port on loopback only.
         let props_file = self.context.server_dir.join("server.properties");
         let mut props = if props_file.is_file() {
@@ -203,48 +220,44 @@ impl MinecraftProcessManager {
             .split_whitespace()
             .map(|s| s.to_string())
             .collect();
-        let loader = ModLoaderType::from_id(&self.context.loader_info.r#type);
-        if let Some(loader) = loader {
-            if loader.is_forge_like() {
-                // Forge/NeoForge servers launch through the installer-generated
-                // @args file (module path + JVM args + main class). Paths inside
-                // the file are relative to the server dir, which is the CWD.
-                let args_file = installer::find_server_args_file(
-                    &self.context.server_dir,
-                    &self.context.loader_info.version,
+        let loader = ModLoaderType::from_id(&self.context.loader_info.r#type)
+            .unwrap_or(ModLoaderType::Vanilla);
+        if loader.is_forge_like() {
+            // Forge/NeoForge servers launch through the installer-generated
+            // @args file (module path + JVM args + main class). Paths inside
+            // the file are relative to the server dir, which is the CWD.
+            let args_file = installer::find_server_args_file(
+                &self.context.server_dir,
+                &self.context.loader_info.version,
+            )
+            .ok_or_else(|| {
+                ProcessError::Install(
+                    "Forge/NeoForge server args file not found after installation".to_string(),
                 )
-                .ok_or_else(|| {
-                    ProcessError::Install(
-                        "Forge/NeoForge server args file not found after installation".to_string(),
-                    )
-                })?;
-                let rel = args_file
-                    .strip_prefix(&self.context.server_dir)
-                    .unwrap_or(&args_file)
-                    .to_string_lossy()
-                    .into_owned();
-                launch_args.push(format!("@{rel}"));
-            } else if loader == ModLoaderType::Quilt
-                && self
-                    .context
+            })?;
+            let rel = args_file
+                .strip_prefix(&self.context.server_dir)
+                .unwrap_or(&args_file)
+                .to_string_lossy()
+                .into_owned();
+            launch_args.push(format!("@{rel}"));
+        } else if loader == ModLoaderType::Quilt
+            && self
+                .context
+                .server_dir
+                .join("quilt-server-launch.jar")
+                .is_file()
+        {
+            // Quilt servers install to `quilt-server-launch.jar` (unlike
+            // Fabric's combined `server.jar`).
+            launch_args.push("-jar".to_string());
+            launch_args.push(
+                self.context
                     .server_dir
                     .join("quilt-server-launch.jar")
-                    .is_file()
-            {
-                // Quilt servers install to `quilt-server-launch.jar` (unlike
-                // Fabric's combined `server.jar`).
-                launch_args.push("-jar".to_string());
-                launch_args.push(
-                    self.context
-                        .server_dir
-                        .join("quilt-server-launch.jar")
-                        .to_string_lossy()
-                        .into_owned(),
-                );
-            } else {
-                launch_args.push("-jar".to_string());
-                launch_args.push(self.context.server_jar.to_string_lossy().into_owned());
-            }
+                    .to_string_lossy()
+                    .into_owned(),
+            );
         } else {
             if !self.context.server_jar.is_file() {
                 return Err(ProcessError::Io(std::io::Error::new(
@@ -429,9 +442,104 @@ impl MinecraftProcessManager {
     }
 }
 
+/// Reconciles target mods directory (`<server_dir>/mods`) with source mods directory (`<mods_dir>`).
+/// Purges stale files in target and copies missing/modified files from source.
+fn sync_mods(
+    source_mods_dir: &std::path::Path,
+    target_mods_dir: &std::path::Path,
+) -> Result<usize, ProcessError> {
+    std::fs::create_dir_all(target_mods_dir)?;
+
+    let mut source_files = std::collections::HashSet::new();
+
+    if source_mods_dir.is_dir() {
+        let entries = std::fs::read_dir(source_mods_dir)?;
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(filename) = path.file_name() {
+                    source_files.insert(filename.to_os_string());
+                    let target_path = target_mods_dir.join(filename);
+
+                    let needs_copy = if !target_path.is_file() {
+                        true
+                    } else {
+                        let src_len = entry.metadata()?.len();
+                        let tgt_len = std::fs::metadata(&target_path)?.len();
+                        src_len != tgt_len
+                    };
+
+                    if needs_copy {
+                        std::fs::copy(&path, &target_path)?;
+                        tracing::info!("Synced mod file {:?} to server mods directory", filename);
+                    }
+                }
+            }
+        }
+    }
+
+    if target_mods_dir.is_dir() {
+        let entries = std::fs::read_dir(target_mods_dir)?;
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(filename) = path.file_name() {
+                    if !source_files.contains(filename) {
+                        tracing::info!("Purging stale server mod file {:?}", filename);
+                        std::fs::remove_file(&path)?;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(source_files.len())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sync_mods_copies_and_purges_correctly() {
+        let dir = crate::test_util::temp_dir("sync_mods");
+        let src = dir.join("instance_mods");
+        let tgt = dir.join("server_mods");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&tgt).unwrap();
+
+        // 1. Create source mods
+        std::fs::write(src.join("mod_a.jar"), b"mod_a_data_v1").unwrap();
+        std::fs::write(src.join("mod_b.jar"), b"mod_b_data").unwrap();
+
+        // Create stale mod in target
+        std::fs::write(tgt.join("stale_mod.jar"), b"old").unwrap();
+
+        // Sync
+        let count = sync_mods(&src, &tgt).unwrap();
+        assert_eq!(count, 2);
+        assert!(tgt.join("mod_a.jar").is_file());
+        assert!(tgt.join("mod_b.jar").is_file());
+        assert!(!tgt.join("stale_mod.jar").exists());
+
+        // 2. Update a mod file size
+        std::fs::write(src.join("mod_a.jar"), b"mod_a_data_v2_longer").unwrap();
+        sync_mods(&src, &tgt).unwrap();
+        assert_eq!(
+            std::fs::read(tgt.join("mod_a.jar")).unwrap(),
+            b"mod_a_data_v2_longer"
+        );
+
+        // 3. Remove a mod from source
+        std::fs::remove_file(src.join("mod_b.jar")).unwrap();
+        let count2 = sync_mods(&src, &tgt).unwrap();
+        assert_eq!(count2, 1);
+        assert!(!tgt.join("mod_b.jar").exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[tokio::test]
     async fn send_command_when_not_running_fails() {

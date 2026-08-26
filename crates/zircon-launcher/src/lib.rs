@@ -64,6 +64,7 @@ pub fn run() {
             commands::launch_offline_instance,
             commands::list_offline_mods,
             commands::delete_offline_mod,
+            commands::set_offline_mod_enabled,
             commands::add_offline_mod,
             commands::get_active_skin,
             commands::get_skin_head_icon,
@@ -87,6 +88,7 @@ pub fn run() {
             commands::set_active_shaderpack,
             commands::toggle_resourcepack,
             commands::search_modrinth,
+            commands::list_modrinth_versions,
             commands::install_modrinth_mod,
             commands::list_minecraft_versions,
             commands::list_loader_types,
@@ -94,6 +96,8 @@ pub fn run() {
             commands::save_settings,
             commands::get_launcher_logs,
             commands::clear_launcher_logs,
+            commands::get_last_instance_log,
+            commands::clear_last_instance_log,
             commands::check_game_crash,
         ])
         .run(tauri::generate_context!())

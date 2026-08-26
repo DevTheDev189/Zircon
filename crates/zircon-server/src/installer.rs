@@ -64,13 +64,14 @@ impl From<std::io::Error> for InstallError {
 /// for the *configured* loader version for forge/neoforge.
 pub fn is_installed(server_dir: &Path, server_jar: &Path, loader: &ModLoaderInfo) -> bool {
     match ModLoaderType::from_id(&loader.r#type) {
-        Some(t) if t.is_forge_like() => {
+        Some(ModLoaderType::Forge) | Some(ModLoaderType::NeoForge) => {
             find_server_args_file(server_dir, &loader.version).is_some()
         }
         Some(ModLoaderType::Quilt) => {
             server_dir.join("quilt-server-launch.jar").is_file() || server_jar.is_file()
         }
-        _ => server_jar.is_file(),
+        Some(ModLoaderType::Fabric) | Some(ModLoaderType::Vanilla) => server_jar.is_file(),
+        None => false,
     }
 }
 
@@ -83,31 +84,37 @@ pub async fn ensure_server_installed(
     mc_version: &str,
     loader: &ModLoaderInfo,
 ) -> Result<(), InstallError> {
-    let loader_type = ModLoaderType::from_id(&loader.r#type);
+    let loader_type = ModLoaderType::from_id(&loader.r#type).ok_or_else(|| {
+        InstallError::Config(format!(
+            "Invalid mod loader '{}'. Allowed loaders: {}",
+            loader.r#type,
+            ModLoaderType::ALLOWED_IDS.join(", ")
+        ))
+    })?;
     if is_installed(server_dir, server_jar, loader) {
         tracing::info!(
             "Server for {} is already installed",
-            loader_type.map(|t| t.id()).unwrap_or("vanilla")
+            loader_type.id()
         );
     } else {
         tracing::info!(
             "No server installed for loader {} — installing...",
-            loader_type.map(|t| t.id()).unwrap_or("vanilla")
+            loader_type.id()
         );
         match loader_type {
-            Some(ModLoaderType::Fabric) => {
+            ModLoaderType::Fabric => {
                 install_fabric_like(server_jar, mc_version, loader, false).await?
             }
-            Some(ModLoaderType::Quilt) => {
+            ModLoaderType::Quilt => {
                 install_quilt(server_dir, cache_dir, mc_version, loader).await?
             }
-            Some(ModLoaderType::Forge) => {
+            ModLoaderType::Forge => {
                 install_forge_like(server_dir, cache_dir, mc_version, loader, false).await?
             }
-            Some(ModLoaderType::NeoForge) => {
+            ModLoaderType::NeoForge => {
                 install_forge_like(server_dir, cache_dir, mc_version, loader, true).await?
             }
-            _ => install_vanilla(server_jar, mc_version).await?,
+            ModLoaderType::Vanilla => install_vanilla(server_jar, mc_version).await?,
         }
         if !is_installed(server_dir, server_jar, loader) {
             return Err(InstallError::Process(

@@ -205,6 +205,13 @@ pub struct ModEntry {
     /// Human-readable warning when `compatible` is `false`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warning_message: Option<String>,
+    /// Mod version string if known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Whether the mod is currently active. `false` means the JAR is renamed
+    /// `<filename>.disabled` on disk and hidden from the mod loader's scan.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 fn default_true() -> bool {
@@ -238,6 +245,8 @@ impl ModEntry {
             author: None,
             compatible: true,
             warning_message: None,
+            version: None,
+            enabled: true,
         }
     }
 
@@ -306,6 +315,12 @@ pub struct PackEntry {
     /// Short human-readable description of the pack.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Version string of the pack (e.g. "v1.4.2", "r5.1.1").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Minecraft pack_format integer for resource packs (e.g. 15, 34).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pack_format: Option<u32>,
 }
 
 impl PackEntry {
@@ -333,8 +348,11 @@ impl PackEntry {
             icon_url: None,
             author: None,
             description: None,
+            version: None,
+            pack_format: None,
         }
     }
+
 
     /// Display title, falling back to the file name when unset.
     pub fn display_title(&self) -> &str {
@@ -408,12 +426,21 @@ mod tests {
         assert_eq!(Some("modrinth".to_string()), sodium.origin);
         assert_eq!(Some("abc123def456".to_string()), sodium.sha1);
         assert_eq!(512000, sodium.file_size);
+        assert!(sodium.enabled, "new mods default to enabled");
 
         let curse = parsed
             .get_mod_by_filename("custom-mod.jar")
             .expect("custom");
         assert_eq!(987654321, curse.murmur3);
         assert_eq!(Some("curseforge".to_string()), curse.origin);
+    }
+
+    #[test]
+    fn mod_entry_missing_enabled_field_deserializes_as_enabled() {
+        // Simulates a bom.json written before the `enabled` field existed.
+        let json = r#"{"filename":"old-mod.jar","compatible":true}"#;
+        let parsed: ModEntry = serde_json::from_str(json).unwrap();
+        assert!(parsed.enabled);
     }
 
     #[test]
@@ -468,7 +495,7 @@ mod tests {
     #[test]
     fn round_trip_preserves_shaderpacks_and_resourcepacks() {
         let mut bom = BillOfMaterials::new("1.21.4", None, Some("t".to_string()));
-        bom.add_shaderpack(PackEntry::new(
+        let mut sp = PackEntry::new(
             Some("complementary".to_string()),
             "ComplementaryShaders.zip",
             Some("sha1".to_string()),
@@ -476,8 +503,11 @@ mod tests {
             Some("direct".to_string()),
             Some("https://server/files/shaderpacks/ComplementaryShaders.zip".to_string()),
             1024,
-        ));
-        bom.add_resourcepack(PackEntry::new(
+        );
+        sp.version = Some("r5.1.1".to_string());
+        bom.add_shaderpack(sp);
+
+        let mut rp = PackEntry::new(
             Some("vanillatweaks".to_string()),
             "VanillaTweaks.zip",
             Some("sha1".to_string()),
@@ -485,18 +515,28 @@ mod tests {
             Some("direct".to_string()),
             Some("https://server/files/resourcepacks/VanillaTweaks.zip".to_string()),
             2048,
-        ));
+        );
+        rp.version = Some("v1.4.2".to_string());
+        rp.pack_format = Some(34);
+        bom.add_resourcepack(rp);
 
-        let parsed: BillOfMaterials =
-            serde_json::from_str(&serde_json::to_string(&bom).unwrap()).unwrap();
+        let json = serde_json::to_string(&bom).unwrap();
+        assert!(json.contains("\"packFormat\":34"));
+        assert!(json.contains("\"version\":\"v1.4.2\""));
+        assert!(json.contains("\"version\":\"r5.1.1\""));
+
+        let parsed: BillOfMaterials = serde_json::from_str(&json).unwrap();
 
         assert_eq!(1, parsed.shaderpacks.len());
         assert_eq!("ComplementaryShaders.zip", parsed.shaderpacks[0].filename);
+        assert_eq!(Some("r5.1.1".to_string()), parsed.shaderpacks[0].version);
         assert_eq!(
             Some("https://server/files/shaderpacks/ComplementaryShaders.zip".to_string()),
             parsed.shaderpacks[0].download_url
         );
         assert_eq!(1, parsed.resourcepacks.len());
         assert_eq!("VanillaTweaks.zip", parsed.resourcepacks[0].filename);
+        assert_eq!(Some("v1.4.2".to_string()), parsed.resourcepacks[0].version);
+        assert_eq!(Some(34), parsed.resourcepacks[0].pack_format);
     }
 }

@@ -7,7 +7,7 @@ use axum::extract::State;
 use axum::Json;
 
 use serde::Deserialize;
-use zircon_core::model::{InstanceConfig, ModLoaderInfo};
+use zircon_core::model::{InstanceConfig, ModLoaderInfo, ModLoaderType};
 
 use super::app::{ApiError, AppState, RealIp};
 use crate::config::ServerProperties;
@@ -76,7 +76,16 @@ pub async fn update_config(
             bom_updated = true;
         }
         if let Some(loader) = &body.mod_loader {
-            cfg.mod_loader = loader.clone();
+            let loader_enum = ModLoaderType::from_id(&loader.r#type).ok_or_else(|| {
+                ApiError::BadRequest(format!(
+                    "Invalid mod loader '{}'. Allowed loaders: {}",
+                    loader.r#type,
+                    ModLoaderType::ALLOWED_IDS.join(", ")
+                ))
+            })?;
+            let mut normalized_loader = loader.clone();
+            normalized_loader.r#type = loader_enum.id().to_string();
+            cfg.mod_loader = normalized_loader;
             bom_updated = true;
         }
         if let Some(args) = &body.java_args {
@@ -101,6 +110,7 @@ pub async fn update_config(
     if bom_updated {
         // Keep the persisted BOM in sync with the updated config fields before
         // saving, so the two stores can never drift.
+        let updated_cfg = state.config.get_config();
         state.bom.with_bom(|b| {
             if let Some(title) = &body.server_title {
                 b.server_title = Some(title.clone());
@@ -108,8 +118,8 @@ pub async fn update_config(
             if let Some(mc) = &body.minecraft_version {
                 b.minecraft_version = mc.clone();
             }
-            if let Some(loader) = &body.mod_loader {
-                b.mod_loader = Some(loader.clone());
+            if body.mod_loader.is_some() {
+                b.mod_loader = Some(updated_cfg.mod_loader.clone());
             }
         });
         state.bom.save()?;

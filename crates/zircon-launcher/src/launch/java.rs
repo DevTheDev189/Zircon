@@ -291,27 +291,9 @@ impl JavaRuntimeResolver {
 
     fn extract_zip(&self, archive: &Path, target_dir: &Path) -> Result<(), LauncherError> {
         let file = std::fs::File::open(archive)?;
-        let mut zip = zip::ZipArchive::new(file).map_err(zip_error)?;
-        for i in 0..zip.len() {
-            let mut entry = zip.by_index(i).map_err(zip_error)?;
-            let name = entry.name().to_string();
-            // Guard against zip-slip: reject traversal or absolute entry names.
-            if name.contains("..") || Path::new(&name).is_absolute() {
-                return Err(LauncherError::InvalidInput(format!(
-                    "unsafe path in Java runtime archive: {name}"
-                )));
-            }
-            let out_path = target_dir.join(&name);
-            if entry.is_dir() {
-                std::fs::create_dir_all(&out_path)?;
-            } else {
-                if let Some(parent) = out_path.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-                let mut out = std::fs::File::create(&out_path)?;
-                std::io::copy(&mut entry, &mut out)?;
-            }
-        }
+        let guard = zircon_core::archive::ArchiveGuard::from_env();
+        zircon_core::archive::extract_zip(file, target_dir, &guard)
+            .map_err(|e| LauncherError::InvalidInput(e.to_string()))?;
         Ok(())
     }
 
