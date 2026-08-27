@@ -44,6 +44,16 @@ where
     Ok(())
 }
 
+/// Computes the lower-case hex SHA-1 of a byte slice.
+pub fn sha1_bytes(data: &[u8]) -> String {
+    hex::encode(sha1::Sha1::digest(data))
+}
+
+/// Computes the lower-case hex SHA-256 of a byte slice.
+pub fn sha256_bytes(data: &[u8]) -> String {
+    hex::encode(sha2::Sha256::digest(data))
+}
+
 /// Lower-case hex encoding of a byte slice.
 pub fn to_hex(bytes: &[u8]) -> String {
     hex::encode(bytes)

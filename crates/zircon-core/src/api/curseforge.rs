@@ -152,6 +152,22 @@ impl CurseForgeApiClient {
         Ok(parse_data_data(&text))
     }
 
+    /// Fetches metadata for a specific file belonging to a CurseForge mod.
+    pub async fn get_mod_file(&self, mod_id: i64, file_id: i64) -> Result<CurseForgeFile, ApiError> {
+        let text = self
+            .get(&format!("{BASE_URL}/mods/{mod_id}/files/{file_id}"))
+            .await?;
+        let root: serde_json::Value = serde_json::from_str(&text)?;
+        if let Some(file_obj) = root.get("data") {
+            let file: CurseForgeFile = serde_json::from_value(file_obj.clone())?;
+            return Ok(file);
+        }
+        Err(ApiError::Status {
+            status: 404,
+            body: format!("CurseForge file {file_id} for mod {mod_id} not found"),
+        })
+    }
+
     /// Fetches full metadata for a single CurseForge mod by its project ID.
     pub async fn get_mod(&self, mod_id: i64) -> Result<CurseForgeMod, ApiError> {
         let text = self.get(&format!("{BASE_URL}/mods/{mod_id}")).await?;

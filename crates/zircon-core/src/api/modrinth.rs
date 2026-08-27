@@ -146,13 +146,13 @@ impl ModrinthApiClient {
     ) -> Result<Vec<ModrinthVersion>, ApiError> {
         let mut url = format!("{BASE_URL}/project/{}/version", form_encode(project_id));
         let mut filters: Vec<String> = Vec::new();
-        if let Some(v) = mc_version {
+        if let Some(v) = mc_version.filter(|v| !v.trim().is_empty()) {
             filters.push(format!(
                 "game_versions={}",
                 form_encode(&format!("[\"{v}\"]"))
             ));
         }
-        if let Some(l) = loader_type {
+        if let Some(l) = loader_type.filter(|l| !l.trim().is_empty()) {
             filters.push(format!("loaders={}", form_encode(&format!("[\"{l}\"]"))));
         }
         if !filters.is_empty() {
@@ -247,6 +247,10 @@ pub struct ModrinthProject {
     pub author: String,
     #[serde(default)]
     pub downloads: u64,
+    #[serde(default)]
+    pub client_side: Option<String>,
+    #[serde(default)]
+    pub server_side: Option<String>,
 }
 
 /// A specific version/file of a Modrinth project.
@@ -320,6 +324,10 @@ pub struct ModrinthSearchHit {
     pub icon_url: String,
     #[serde(default)]
     pub versions: Vec<String>,
+    #[serde(default)]
+    pub client_side: Option<String>,
+    #[serde(default)]
+    pub server_side: Option<String>,
 }
 
 /// Internal shape of `GET /tag/game_version` and `GET /tag/loader` entries.

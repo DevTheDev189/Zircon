@@ -219,12 +219,12 @@ mod tests {
             "semantically identical BOMs must share one JCS digest"
         );
 
-        // The canonical form is key-sorted lexicographically — "minecraftVersion"
-        // leads, not the struct-declaration order ("schemaVersion" first) that
+        // The canonical form is key-sorted lexicographically — "configs"
+        // leads ('c' < 'm'), not the struct-declaration order ("schemaVersion" first) that
         // plain serde_json emits.
         let canonical = serde_jcs::to_string(&a).unwrap();
         assert!(
-            canonical.starts_with(r#"{"minecraftVersion":"1.20.4","modLoader":"#),
+            canonical.starts_with(r#"{"configs":[],"minecraftVersion":"1.20.4","modLoader":"#),
             "JCS must sort keys lexicographically: {canonical}"
         );
         let struct_order = serde_json::to_string(&a).unwrap();

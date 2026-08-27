@@ -23,11 +23,15 @@ pub struct BillOfMaterials {
     #[serde(default)]
     pub mods: Vec<ModEntry>,
     #[serde(default)]
+    pub configs: Vec<ConfigFileEntry>,
+    #[serde(default)]
     pub shaderpacks: Vec<PackEntry>,
     #[serde(default)]
     pub resourcepacks: Vec<PackEntry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server_title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branding: Option<ServerBranding>,
 
     // --- Cryptographic Attestation Fields ---
     // Set by the server on every disk write (Ed25519): `server_public_key` is
@@ -56,9 +60,11 @@ impl BillOfMaterials {
             minecraft_version: minecraft_version.into(),
             mod_loader,
             mods: Vec::new(),
+            configs: Vec::new(),
             shaderpacks: Vec::new(),
             resourcepacks: Vec::new(),
             server_title,
+            branding: None,
             signature: None,
             server_public_key: None,
         }
@@ -92,6 +98,21 @@ impl BillOfMaterials {
     /// Total size of all mods in bytes.
     pub fn total_size_bytes(&self) -> u64 {
         self.mods.iter().map(|m| m.file_size).sum()
+    }
+
+    pub fn add_config(&mut self, entry: ConfigFileEntry) {
+        self.configs.retain(|c| c.path != entry.path);
+        self.configs.push(entry);
+    }
+
+    pub fn remove_config(&mut self, path: &str) -> bool {
+        let before = self.configs.len();
+        self.configs.retain(|c| c.path != path);
+        self.configs.len() != before
+    }
+
+    pub fn get_config_by_path(&self, path: &str) -> Option<&ConfigFileEntry> {
+        self.configs.iter().find(|c| c.path == path)
     }
 
     pub fn add_shaderpack(&mut self, entry: PackEntry) {
@@ -151,6 +172,21 @@ impl ModLoaderInfo {
     }
 }
 
+/// The runtime environment side for a mod.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ModSide {
+    /// Required/installed on both client and server (content mods, blocks, biomes, items).
+    #[default]
+    Both,
+    /// Client-only (renderers, shaders, HUD, minimaps, audio physics).
+    /// Isolated from the dedicated server's headless classpath.
+    Client,
+    /// Server-only (admin, profiling, chunk pre-gen, rollbacks).
+    /// Excluded from the client launcher's sync BOM.
+    Server,
+}
+
 /// A single mod entry inside a `BillOfMaterials`.
 ///
 /// Every client downloads the mod from `download_url` and verifies it against
@@ -186,6 +222,9 @@ pub struct ModEntry {
     /// File size in bytes (used for download progress reporting).
     #[serde(default)]
     pub file_size: u64,
+    /// Runtime environment side (both / client / server). Defaults to `both`.
+    #[serde(default)]
+    pub side: ModSide,
     // --- Rich metadata (admin UI / search results) ---
     /// Display title, falls back to the file name when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -239,6 +278,7 @@ impl ModEntry {
             origin,
             download_url,
             file_size,
+            side: ModSide::Both,
             title: None,
             description: None,
             icon_url: None,
@@ -248,6 +288,12 @@ impl ModEntry {
             version: None,
             enabled: true,
         }
+    }
+
+    /// Builder helper to set the mod side.
+    pub fn with_side(mut self, side: ModSide) -> Self {
+        self.side = side;
+        self
     }
 
     /// Display title, falling back to the file name when unset.
@@ -371,6 +417,59 @@ impl PackEntry {
             }
         }
         None
+    }
+}
+
+/// A single configuration file entry inside a `BillOfMaterials`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigFileEntry {
+    /// Relative path inside the instance `config/` directory (e.g. "jei/jei-client.ini" or "create-common.toml").
+    pub path: String,
+    /// Lower-case hex SHA-1 digest of the configuration file.
+    pub sha1: String,
+    /// Size of the configuration file in bytes.
+    pub file_size: u64,
+    /// Direct URL where the client can download this config file from the server.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_url: Option<String>,
+}
+
+impl ConfigFileEntry {
+    pub fn new(
+        path: impl Into<String>,
+        sha1: impl Into<String>,
+        file_size: u64,
+        download_url: Option<String>,
+    ) -> Self {
+        Self {
+            path: path.into(),
+            sha1: sha1.into(),
+            file_size,
+            download_url,
+        }
+    }
+}
+
+/// Optional branding assets (custom icon and static or animated banner).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerBranding {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_sha1: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub banner_sha1: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub banner_url: Option<String>,
+    #[serde(default)]
+    pub banner_is_animated: bool,
+}
+
+impl ServerBranding {
+    pub fn is_empty(&self) -> bool {
+        self.icon_sha1.is_none() && self.banner_sha1.is_none()
     }
 }
 
@@ -539,4 +638,81 @@ mod tests {
         assert_eq!(Some("v1.4.2".to_string()), parsed.resourcepacks[0].version);
         assert_eq!(Some(34), parsed.resourcepacks[0].pack_format);
     }
+
+    #[test]
+    fn mod_side_serialization_and_defaults() {
+        let mut entry = ModEntry::new(
+            Some("sodium".to_string()),
+            "sodium.jar",
+            None,
+            0,
+            Some("modrinth".to_string()),
+            None,
+            100,
+        );
+        assert_eq!(ModSide::Both, entry.side);
+
+        entry.side = ModSide::Client;
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("\"side\":\"client\""));
+
+        let parsed: ModEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(ModSide::Client, parsed.side);
+
+        // Omitted side field deserializes to default `both`
+        let legacy_json = r#"{"filename":"legacy.jar","murmur3":0,"fileSize":50}"#;
+        let legacy_entry: ModEntry = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(ModSide::Both, legacy_entry.side);
+    }
+
+    #[test]
+    fn round_trip_preserves_configs() {
+        let mut bom = BillOfMaterials::new("1.21.4", None, Some("t".to_string()));
+        let cfg = ConfigFileEntry::new(
+            "jei/recipe-lookup.toml",
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            128,
+            Some("https://server/files/configs/jei/recipe-lookup.toml".to_string()),
+        );
+        bom.add_config(cfg);
+
+        let json = serde_json::to_string(&bom).unwrap();
+        assert!(json.contains("\"path\":\"jei/recipe-lookup.toml\""));
+        assert!(json.contains("\"sha1\":\"da39a3ee5e6b4b0d3255bfef95601890afd80709\""));
+
+        let parsed: BillOfMaterials = serde_json::from_str(&json).unwrap();
+        assert_eq!(1, parsed.configs.len());
+        assert_eq!("jei/recipe-lookup.toml", parsed.configs[0].path);
+        assert_eq!(
+            Some("https://server/files/configs/jei/recipe-lookup.toml".to_string()),
+            parsed.configs[0].download_url
+        );
+        assert_eq!(128, parsed.configs[0].file_size);
+
+        assert!(bom.remove_config("jei/recipe-lookup.toml"));
+        assert_eq!(0, bom.configs.len());
+    }
+
+    #[test]
+    fn round_trip_preserves_branding() {
+        let mut bom = BillOfMaterials::new("1.21.4", None, Some("Branded Server".to_string()));
+        bom.branding = Some(ServerBranding {
+            icon_sha1: Some("abc123icon".to_string()),
+            banner_sha1: Some("def456banner".to_string()),
+            icon_url: Some("https://server/files/branding/icon".to_string()),
+            banner_url: Some("https://server/files/branding/banner".to_string()),
+            banner_is_animated: true,
+        });
+
+        let json = serde_json::to_string(&bom).unwrap();
+        assert!(json.contains("\"bannerIsAnimated\":true"));
+        assert!(json.contains("\"iconSha1\":\"abc123icon\""));
+
+        let parsed: BillOfMaterials = serde_json::from_str(&json).unwrap();
+        let branding = parsed.branding.expect("branding");
+        assert_eq!(Some("abc123icon".to_string()), branding.icon_sha1);
+        assert_eq!(Some("def456banner".to_string()), branding.banner_sha1);
+        assert!(branding.banner_is_animated);
+    }
 }
+

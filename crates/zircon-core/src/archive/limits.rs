@@ -9,17 +9,26 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 /// Default maximum total uncompressed bytes allowed during extraction (10 GB).
-pub const DEFAULT_MAX_UNCOMPRESSED_BYTES: u64 = 10 * 1024 * 1024 * 1024; // 10,737,418,240 bytes
+/// Used for mod downloads, modpacks, resource packs, and shader packs.
+pub const DEFAULT_MAX_UNCOMPRESSED_BYTES: u64 = 10 * 1024 * 1024 * 1024; // 10,737,418,240 bytes (10 GB)
+
+/// Default maximum total uncompressed bytes allowed during full Minecraft server ZIP import (1 TB).
+/// Full server world regions, playerdata, dimensions, and backups can span hundreds of gigabytes.
+pub const DEFAULT_MAX_SERVER_UNCOMPRESSED_BYTES: u64 = 1024 * 1024 * 1024 * 1024; // 1,099,511,627,776 bytes (1 TB)
 
 /// Default maximum allowed compression ratio (200:1).
 ///
-/// Modpacks often include highly compressible text formats (JSON models,
+/// Modpacks and server files often include highly compressible text formats (JSON models,
 /// language files, configuration files, XML/TOML, and repeating texture patterns).
-/// A 200:1 ratio accommodates legitimate modpack assets while preventing exponential zip-bombs.
+/// A 200:1 ratio accommodates legitimate server assets while preventing exponential zip-bombs.
 pub const DEFAULT_MAX_COMPRESSION_RATIO: u64 = 200;
 
-/// Default maximum allowed file/directory entry count in an archive (50,000).
+/// Default maximum allowed file/directory entry count in a standard mod archive (50,000).
 pub const DEFAULT_MAX_FILE_ENTRIES: usize = 50_000;
+
+/// Default maximum allowed file/directory entry count in a server import archive (2,000,000).
+/// Server world saves with large region folders, POI data, and playerdata files can contain many files.
+pub const DEFAULT_MAX_SERVER_FILE_ENTRIES: usize = 2_000_000;
 
 /// Default maximum allowed recursion depth for nested archives (e.g., zip-in-a-zip) (3).
 pub const DEFAULT_MAX_RECURSION_DEPTH: usize = 3;
@@ -30,11 +39,17 @@ pub const DEFAULT_MAX_METADATA_BYTES: u64 = 2 * 1024 * 1024;
 /// Environment variable for maximum uncompressed bytes.
 pub const ENV_ZIP_MAX_UNCOMPRESSED_BYTES: &str = "ZIP_MAX_UNCOMPRESSED_BYTES";
 
+/// Environment variable for maximum server uncompressed bytes.
+pub const ENV_ZIP_MAX_SERVER_UNCOMPRESSED_BYTES: &str = "ZIP_MAX_SERVER_UNCOMPRESSED_BYTES";
+
 /// Environment variable for maximum compression ratio ceiling.
 pub const ENV_ZIP_MAX_COMPRESSION_RATIO: &str = "ZIP_MAX_COMPRESSION_RATIO";
 
 /// Environment variable for maximum archive file entry count.
 pub const ENV_ZIP_MAX_FILE_ENTRIES: &str = "ZIP_MAX_FILE_ENTRIES";
+
+/// Environment variable for maximum server archive file entry count.
+pub const ENV_ZIP_MAX_SERVER_FILE_ENTRIES: &str = "ZIP_MAX_SERVER_FILE_ENTRIES";
 
 /// Environment variable for maximum nested archive recursion depth.
 pub const ENV_ZIP_MAX_RECURSION_DEPTH: &str = "ZIP_MAX_RECURSION_DEPTH";
@@ -43,13 +58,22 @@ pub const ENV_ZIP_MAX_RECURSION_DEPTH: &str = "ZIP_MAX_RECURSION_DEPTH";
 /// This avoids false positives on tiny files (e.g. empty or 10-byte files that compress to 2 bytes).
 pub const RATIO_ENFORCEMENT_THRESHOLD_BYTES: u64 = 64 * 1024; // 64 KB
 
-/// Returns the configured maximum uncompressed bytes, reading `ZIP_MAX_UNCOMPRESSED_BYTES`
+/// Returns the configured maximum uncompressed bytes for standard mod archives, reading `ZIP_MAX_UNCOMPRESSED_BYTES`
 /// or falling back to [`DEFAULT_MAX_UNCOMPRESSED_BYTES`] (10 GB).
 pub fn max_uncompressed_bytes() -> u64 {
     std::env::var(ENV_ZIP_MAX_UNCOMPRESSED_BYTES)
         .ok()
         .and_then(|val| val.trim().parse::<u64>().ok())
         .unwrap_or(DEFAULT_MAX_UNCOMPRESSED_BYTES)
+}
+
+/// Returns the configured maximum uncompressed bytes for full server imports, reading `ZIP_MAX_SERVER_UNCOMPRESSED_BYTES`
+/// or falling back to [`DEFAULT_MAX_SERVER_UNCOMPRESSED_BYTES`] (1 TB).
+pub fn max_server_uncompressed_bytes() -> u64 {
+    std::env::var(ENV_ZIP_MAX_SERVER_UNCOMPRESSED_BYTES)
+        .ok()
+        .and_then(|val| val.trim().parse::<u64>().ok())
+        .unwrap_or(DEFAULT_MAX_SERVER_UNCOMPRESSED_BYTES)
 }
 
 /// Returns the configured maximum compression ratio, reading `ZIP_MAX_COMPRESSION_RATIO`
@@ -61,13 +85,22 @@ pub fn max_compression_ratio() -> u64 {
         .unwrap_or(DEFAULT_MAX_COMPRESSION_RATIO)
 }
 
-/// Returns the configured maximum file entries, reading `ZIP_MAX_FILE_ENTRIES`
+/// Returns the configured maximum file entries for standard mod archives, reading `ZIP_MAX_FILE_ENTRIES`
 /// or falling back to [`DEFAULT_MAX_FILE_ENTRIES`] (50,000).
 pub fn max_file_entries() -> usize {
     std::env::var(ENV_ZIP_MAX_FILE_ENTRIES)
         .ok()
         .and_then(|val| val.trim().parse::<usize>().ok())
         .unwrap_or(DEFAULT_MAX_FILE_ENTRIES)
+}
+
+/// Returns the configured maximum file entries for full server imports, reading `ZIP_MAX_SERVER_FILE_ENTRIES`
+/// or falling back to [`DEFAULT_MAX_SERVER_FILE_ENTRIES`] (2,000,000).
+pub fn max_server_file_entries() -> usize {
+    std::env::var(ENV_ZIP_MAX_SERVER_FILE_ENTRIES)
+        .ok()
+        .and_then(|val| val.trim().parse::<usize>().ok())
+        .unwrap_or(DEFAULT_MAX_SERVER_FILE_ENTRIES)
 }
 
 /// Returns the configured maximum recursion depth, reading `ZIP_MAX_RECURSION_DEPTH`
@@ -100,12 +133,22 @@ impl Default for ArchiveLimits {
 }
 
 impl ArchiveLimits {
-    /// Loads archive limits dynamically from the environment, using defaults for unset values.
+    /// Loads archive limits dynamically from the environment for standard mod archives (10 GB default).
     pub fn from_env() -> Self {
         Self {
             max_uncompressed_bytes: max_uncompressed_bytes(),
             max_compression_ratio: max_compression_ratio(),
             max_file_entries: max_file_entries(),
+            max_recursion_depth: max_recursion_depth(),
+        }
+    }
+
+    /// Limit profile specialized for complete Minecraft server migrations (1 TB uncompressed limit, 2,000,000 file entries).
+    pub fn for_server_import() -> Self {
+        Self {
+            max_uncompressed_bytes: max_server_uncompressed_bytes(),
+            max_compression_ratio: max_compression_ratio(),
+            max_file_entries: max_server_file_entries(),
             max_recursion_depth: max_recursion_depth(),
         }
     }
@@ -265,6 +308,11 @@ impl ArchiveGuard {
     /// Creates a new guard loading limits dynamically from environment variables.
     pub fn from_env() -> Self {
         Self::new(ArchiveLimits::from_env())
+    }
+
+    /// Creates a new guard configured for complete server migrations (1 TB uncompressed limit, 2,000,000 files).
+    pub fn for_server_import() -> Self {
+        Self::new(ArchiveLimits::for_server_import())
     }
 
     /// Returns the active limits for this guard.

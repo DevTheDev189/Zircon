@@ -6978,9 +6978,10 @@ dependencies = [
 
 [[package]]
 name = "zircon-core"
-version = "0.2.5"
+version = "0.3.3"
 dependencies = [
  "ed25519-dalek",
+ "flate2",
  "hex",
  "lz4_flex",
  "reqwest 0.12.28",
@@ -6990,6 +6991,7 @@ dependencies = [
  "sha1",
  "sha2",
  "tar",
+ "tempfile",
  "tokio",
  "toml 0.8.2",
  "tracing",
@@ -7000,7 +7002,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-launcher"
-version = "0.2.5"
+version = "0.3.3"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -7036,7 +7038,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-server"
-version = "0.2.5"
+version = "0.3.3"
 dependencies = [
  "axum",
  "axum-extra",
@@ -7046,6 +7048,7 @@ dependencies = [
  "dashmap",
  "dotenvy",
  "ed25519-dalek",
+ "flate2",
  "futures-util",
  "getrandom 0.3.4",
  "hex",
@@ -7058,8 +7061,10 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "sha1",
  "sha2",
  "sysinfo",
+ "tempfile",
  "tokio",
  "tokio-util",
  "totp-rs",
