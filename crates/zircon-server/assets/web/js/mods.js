@@ -25,7 +25,7 @@ window.Zircon.mods = {
         const loader = this.selectedInstance.modLoader.type === 'vanilla' ? '' : this.selectedInstance.modLoader.type;
         const q = new URLSearchParams({
             query: this.searchQuery,
-            mcVersion: this.selectedInstance.minecraftVersion,
+            mcVersion: this.searchAllVersions ? '' : (this.selectedInstance.minecraftVersion || ''),
             loader,
             type: this.searchType,
             origin: this.searchProvider
@@ -62,7 +62,11 @@ window.Zircon.mods = {
                     hit.versionOptions = data.files || [];
                     hit.selectedVersionId = hit.versionOptions[0] ? hit.versionOptions[0].id : '';
                 } else {
-                    const q = new URLSearchParams({ projectId: hit.projectId || hit.id, mcVersion: this.selectedInstance.minecraftVersion, loader });
+                    const q = new URLSearchParams({
+                        projectId: hit.projectId || hit.id,
+                        mcVersion: this.searchAllVersions ? '' : (this.selectedInstance.minecraftVersion || ''),
+                        loader
+                    });
                     const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/modrinth/versions?${q}`);
                     hit.versionOptions = data.versions || [];
                     hit.selectedVersionId = hit.versionOptions[0] ? hit.versionOptions[0].id : '';
@@ -295,7 +299,6 @@ window.Zircon.mods = {
         await this.api(`/api/instances/${this.selectedInstance.id}/mods/${encodeURIComponent(filename)}`, { method: 'DELETE' });
         this.loadMods();
     },
-
     // --- Bulk selection & enable/disable ---
 
     toggleModSelected(filename) {
@@ -355,5 +358,24 @@ window.Zircon.mods = {
     },
     dismissModsRestartBanner() {
         this.modsRestartNeeded = false;
+    },
+    async setModSide(filename, side) {
+        if (!this.selectedInstance) return;
+        const prevMods = [...this.installedMods];
+        const mod = this.installedMods.find(m => m.filename === filename);
+        if (mod) {
+            mod.side = side;
+            this.installedMods = [...this.installedMods];
+        }
+        try {
+            await this.api(`/api/instances/${this.selectedInstance.id}/mods/${encodeURIComponent(filename)}/side`, {
+                method: 'PATCH',
+                body: JSON.stringify({ side })
+            });
+        } catch (e) {
+            this.installedMods = prevMods;
+            alert('Failed to update mod environment: ' + e.message);
+            this.loadMods();
+        }
     },
 };

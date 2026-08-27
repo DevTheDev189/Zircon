@@ -30,6 +30,8 @@ window.Zircon.instances = {
         this.playersLoaded = false; // first load of the new instance shows the spinner
         this.loadPlayers();
         this.loadBackups();
+        this.fetchFiles();
+        this.loadBranding();
         this.backupForm = {
             frequency: inst.backupFrequency || 'off',
             time: inst.backupTime || '02:00',
@@ -64,6 +66,216 @@ window.Zircon.instances = {
         } catch (e) {
             alert('Create failed: ' + e.message);
         }
+    },
+    openImportModal() {
+        this.showImportServerModal = true;
+        this.importStep = 1;
+        this.importUploading = false;
+        this.importUploadProgress = 0;
+        this.importUploadLoadedText = '';
+        this.importUploadTotalText = '';
+        this.importUploadSpeed = '';
+        this.importStatusMessage = '';
+        this.importLogs = [];
+        this.importError = '';
+        this.importReport = null;
+        this.importForm = {
+            name: '',
+            mcVersion: '1.21.4',
+            loaderType: 'fabric',
+            loaderVersion: '',
+            ramAuto: true,
+            ramGB: 4,
+            convertDimensions: true,
+            externalPort: null
+        };
+        this.addImportLog('Ready. Select or drop a server .zip archive to begin.');
+    },
+    addImportLog(message) {
+        const now = new Date();
+        const timeStr = now.toTimeString().split(' ')[0];
+        this.importLogs.push(`[${timeStr}] ${message}`);
+        this.$nextTick(() => {
+            const el = document.getElementById('import-log-container');
+            if (el) el.scrollTop = el.scrollHeight;
+        });
+    },
+    formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    handleImportDrop(event) {
+        const files = (event.dataTransfer && event.dataTransfer.files) || (event.target && event.target.files);
+        if (files && files.length > 0) {
+            this.handleZipFileSelect(files[0]);
+        }
+        if (event.target && event.target.value !== undefined) {
+            event.target.value = '';
+        }
+    },
+    async handleZipFileSelect(file) {
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.zip')) {
+            this.importError = 'Please select a valid Minecraft server .zip archive';
+            this.addImportLog('ERROR: Selected file is not a .zip archive');
+            return;
+        }
+        this.importError = '';
+        this.importUploading = true;
+        this.importUploadProgress = 0;
+        this.importUploadLoadedText = '0 MB';
+        this.importUploadTotalText = this.formatFileSize(file.size);
+        this.importUploadSpeed = '0 MB/s';
+        this.importStatusMessage = 'Uploading archive to server staging...';
+
+        this.addImportLog(`Selected archive: "${file.name}" (${this.formatFileSize(file.size)})`);
+        this.addImportLog(`Initiating streaming upload to /api/instances/import/analyze...`);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const xhr = new XMLHttpRequest();
+            const startTime = Date.now();
+            let lastLoaded = 0;
+            let lastTime = startTime;
+
+            const promise = new Promise((resolve, reject) => {
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const now = Date.now();
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        this.importUploadProgress = percent;
+                        this.importUploadLoadedText = this.formatFileSize(e.loaded);
+                        this.importUploadTotalText = this.formatFileSize(e.total);
+
+                        // Calculate upload speed
+                        const timeDiff = (now - lastTime) / 1000;
+                        if (timeDiff >= 0.5) {
+                            const bytesDiff = e.loaded - lastLoaded;
+                            const speed = bytesDiff / timeDiff;
+                            this.importUploadSpeed = this.formatFileSize(speed) + '/s';
+                            lastLoaded = e.loaded;
+                            lastTime = now;
+                        }
+
+                        if (percent >= 100) {
+                            this.importStatusMessage = 'Upload complete! Decompressing & inspecting world NBT on server...';
+                            this.addImportLog('100% Uploaded. Server is unpacking archive and analyzing level.dat & mods...');
+                        }
+                    }
+                });
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            resolve(JSON.parse(xhr.responseText));
+                        } catch (err) {
+                            reject(new Error('Invalid response from server'));
+                        }
+                    } else {
+                        try {
+                            const errObj = JSON.parse(xhr.responseText);
+                            reject(new Error(errObj.error || `Upload failed with status ${xhr.status}`));
+                        } catch {
+                            reject(new Error(xhr.responseText || `Upload failed with status ${xhr.status}`));
+                        }
+                    }
+                });
+                xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+                xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+            });
+
+            const token = localStorage.getItem('zircon_jwt') || this.jwtToken;
+            xhr.open('POST', '/api/instances/import/analyze');
+            if (token) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            }
+            xhr.send(formData);
+
+            const report = await promise;
+            this.importReport = report;
+            this.importForm.name = report.suggestedName || 'Imported Server';
+            if (report.minecraftVersion) {
+                this.importForm.mcVersion = report.minecraftVersion;
+            }
+            if (report.detectedLoader && report.detectedLoader !== 'vanilla') {
+                this.importForm.loaderType = report.detectedLoader;
+            } else if (report.detectedLoader === 'vanilla') {
+                this.importForm.loaderType = 'fabric';
+            }
+            if (report.detectedLoaderVersion) {
+                this.importForm.loaderVersion = report.detectedLoaderVersion;
+            }
+            this.importForm.convertDimensions = !!report.bukkitDimensionsDetected;
+
+            const worldInfo = report.world
+                ? `World "${report.world.levelDat?.levelName || report.world.folderName}" (${report.world.totalChunks} chunks, ${report.world.playerCount} players)`
+                : 'No existing world found';
+            const modCount = report.mods ? report.mods.length : 0;
+            this.addImportLog(`Inspection complete: ${worldInfo}, ${modCount} mods indexed.`);
+            if (report.bukkitDimensionsDetected) {
+                this.addImportLog('Bukkit/Paper multi-folder dimension layout detected (world_nether, world_the_end).');
+            }
+            if (report.downgradeWarning) {
+                this.addImportLog(`WARNING: ${report.downgradeWarning}`);
+            } else {
+                this.addImportLog(`Target version compatibility verified (${report.minecraftVersion || '1.21.4'}).`);
+            }
+
+            this.importStep = 2;
+        } catch (e) {
+            this.importError = e.message || 'Import analysis failed';
+            this.addImportLog(`ERROR: ${this.importError}`);
+        } finally {
+            this.importUploading = false;
+        }
+    },
+    async commitServerImport() {
+        if (!this.importReport) return;
+        this.importUploading = true;
+        this.importError = '';
+        this.addImportLog(`Assembling server instance "${this.importForm.name}" (${this.importForm.loaderType} ${this.importForm.mcVersion})...`);
+        try {
+            const created = await this.api('/api/instances/import/commit', {
+                method: 'POST',
+                body: JSON.stringify({
+                    importId: this.importReport.importId,
+                    name: this.importForm.name,
+                    mcVersion: this.importForm.mcVersion,
+                    loaderType: this.importForm.loaderType,
+                    loaderVersion: this.importForm.loaderVersion,
+                    javaArgs: this.buildJavaArgs(this.importForm),
+                    externalPort: this.importForm.externalPort ? parseInt(this.importForm.externalPort, 10) : null,
+                    convertDimensions: this.importForm.convertDimensions
+                })
+            });
+            this.addImportLog(`Instance created successfully (ID: ${created.id}).`);
+            this.showImportServerModal = false;
+            this.importReport = null;
+            await this.loadInstances();
+            const found = this.instances.find(i => i.id === created.id);
+            if (found) this.selectInstance(found);
+        } catch (e) {
+            this.importError = 'Import commit failed: ' + e.message;
+            this.addImportLog(`ERROR: ${this.importError}`);
+        } finally {
+            this.importUploading = false;
+        }
+    },
+    async cancelServerImport() {
+        if (this.importReport && this.importReport.importId) {
+            try {
+                await this.api(`/api/instances/import/${this.importReport.importId}`, { method: 'DELETE' });
+            } catch { /* ignore */ }
+        }
+        this.showImportServerModal = false;
+        this.importReport = null;
+        this.importStep = 1;
+        this.importError = '';
+        this.importLogs = [];
     },
     async startInstance(inst) {
         inst = inst || this.selectedInstance;

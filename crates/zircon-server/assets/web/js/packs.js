@@ -34,33 +34,76 @@ window.Zircon.packs = {
         }
     },
     async searchPacks(type) {
-        this.packSearchType = type;
-        const provider = type === 'shaderpack' ? (this.shaderSearchProvider || 'modrinth') : (this.texturePackSearchProvider || 'modrinth');
-        const query = type === 'shaderpack' ? this.shaderSearchQuery : this.texturePackSearchQuery;
+        const isShader = type === 'shaderpack';
+        const provider = isShader ? (this.shaderSearchProvider || 'modrinth') : (this.texturePackSearchProvider || 'modrinth');
+        const query = isShader ? this.shaderSearchQuery : this.texturePackSearchQuery;
+        const searchAll = isShader ? this.shaderSearchAllVersions : this.texturePackSearchAllVersions;
         
         let reqType = '';
         if (provider === 'curseforge') {
-            reqType = type === 'shaderpack' ? 'shaderpack' : 'resourcepack';
+            reqType = isShader ? 'shaderpack' : 'resourcepack';
         } else {
-            reqType = type === 'shaderpack' ? 'shader' : 'resourcepack';
+            reqType = isShader ? 'shader' : 'resourcepack';
         }
 
         const q = new URLSearchParams({
             query: query || '',
-            mcVersion: this.selectedInstance.minecraftVersion || '',
+            mcVersion: searchAll ? '' : (this.selectedInstance?.minecraftVersion || ''),
             origin: provider,
             type: reqType
         });
 
-        this.packSearching = true;
+        if (isShader) {
+            this.shaderSearching = true;
+        } else {
+            this.texturePackSearching = true;
+        }
+
         try {
             const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/search?${q.toString()}`);
-            this.packSearchResults = data.hits || [];
+            const hits = data.hits || [];
+            if (isShader) {
+                this.shaderSearchResults = hits;
+            } else {
+                this.texturePackSearchResults = hits;
+            }
+            this.attachPackVersionOptions(hits, type, provider);
         } catch (e) {
             alert('Search failed: ' + e.message);
         } finally {
-            this.packSearching = false;
+            if (isShader) {
+                this.shaderSearching = false;
+            } else {
+                this.texturePackSearching = false;
+            }
         }
+    },
+    async attachPackVersionOptions(hits, type, provider) {
+        const isCurseForge = provider === 'curseforge';
+        const isShader = type === 'shaderpack';
+        const searchAll = isShader ? this.shaderSearchAllVersions : this.texturePackSearchAllVersions;
+        await Promise.all(hits.map(async (hit) => {
+            hit.versionOptions = [];
+            hit.selectedVersionId = '';
+            try {
+                if (isCurseForge || hit.origin === 'curseforge') {
+                    const q = new URLSearchParams({ modId: hit.projectId || hit.id });
+                    const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/curseforge/files?${q}`);
+                    hit.versionOptions = data.files || [];
+                    hit.selectedVersionId = hit.versionOptions[0] ? (hit.versionOptions[0].id || hit.versionOptions[0].fileId) : '';
+                } else {
+                    const q = new URLSearchParams({
+                        projectId: hit.projectId || hit.id,
+                        mcVersion: searchAll ? '' : (this.selectedInstance?.minecraftVersion || '')
+                    });
+                    const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/modrinth/versions?${q}`);
+                    hit.versionOptions = data.versions || [];
+                    hit.selectedVersionId = hit.versionOptions[0] ? (hit.versionOptions[0].id || hit.versionOptions[0].fileId) : '';
+                }
+            } catch (e) {
+                hit.versionsFailed = true;
+            }
+        }));
     },
     async installPack(hit, type) {
         const id = hit.projectId || hit.id;
@@ -68,11 +111,19 @@ window.Zircon.packs = {
         const isCurseForge = provider === 'curseforge' || hit.origin === 'curseforge';
 
         if (isCurseForge) {
+            const fileOpt = (hit.versionOptions || []).find(v => (v.id || v.fileId) === hit.selectedVersionId);
             const rawBase = (hit.websiteUrl || hit.projectUrl || '').replace(/\/$/, '');
             let targetUrl = rawBase;
-            if (!targetUrl) {
+
+            if (rawBase && hit.selectedVersionId) {
+                const fileId = fileOpt ? (fileOpt.fileId || fileOpt.id) : hit.selectedVersionId;
+                targetUrl = `${rawBase}/files/${fileId}`;
+            } else if (!targetUrl) {
                 const categoryPath = type === 'shaderpack' ? 'shaders' : 'texture-packs';
-                if (hit.slug) {
+                if (hit.slug && hit.selectedVersionId) {
+                    const fileId = fileOpt ? (fileOpt.fileId || fileOpt.id) : hit.selectedVersionId;
+                    targetUrl = `https://www.curseforge.com/minecraft/${categoryPath}/${hit.slug}/files/${fileId}`;
+                } else if (hit.slug) {
                     targetUrl = `https://www.curseforge.com/minecraft/${categoryPath}/${hit.slug}`;
                 } else {
                     targetUrl = `https://www.curseforge.com/projects/${id}`;
@@ -93,7 +144,7 @@ window.Zircon.packs = {
                 modTitle: hit.title || hit.name || (type === 'shaderpack' ? 'CurseForge Shaderpack' : 'CurseForge Texture Pack'),
                 modSlug: hit.slug || '',
                 modFileId: hit.selectedVersionId || null,
-                targetFileName: '',
+                targetFileName: fileOpt ? (fileOpt.fileName || fileOpt.filename || '') : '',
                 projectUrl: targetUrl,
                 iconUrl: hit.iconUrl || '',
                 summary: hit.description || hit.summary || '',
@@ -123,9 +174,17 @@ window.Zircon.packs = {
         try {
             await this.api(`/api/instances/${this.selectedInstance.id}/${this.packEndpoint(type)}/install`, {
                 method: 'POST',
-                body: JSON.stringify({ origin: 'modrinth', projectId: id })
+                body: JSON.stringify({
+                    origin: 'modrinth',
+                    projectId: id,
+                    versionId: hit.selectedVersionId || undefined
+                })
             });
-            this.packSearchResults = this.packSearchResults.filter(r => (r.projectId || r.id) !== id);
+            if (type === 'shaderpack') {
+                this.shaderSearchResults = this.shaderSearchResults.filter(r => (r.projectId || r.id) !== id);
+            } else {
+                this.texturePackSearchResults = this.texturePackSearchResults.filter(r => (r.projectId || r.id) !== id);
+            }
             await this.loadShaders();
         } catch (e) {
             alert('Install failed: ' + e.message);

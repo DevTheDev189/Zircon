@@ -21,6 +21,9 @@ const DEFAULT_SERVER_PROPERTIES = {
 window.Zircon = window.Zircon || {};
 window.Zircon.core = {
     async api(path, opts = {}) {
+        if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+            opts.body = JSON.stringify(opts.body);
+        }
         opts.headers = { ...opts.headers, 'Authorization': 'Bearer ' + this.jwtToken, 'Content-Type': 'application/json' };
         const res = await fetch(path, opts);
         if (res.status === 401) {

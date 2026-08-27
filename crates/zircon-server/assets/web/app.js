@@ -23,12 +23,25 @@ createApp({
             activeTab: 'mods',
             showAddServerModal: false,
             newServerForm: { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4 },
+            showImportServerModal: false,
+            importStep: 1,
+            importUploading: false,
+            importUploadProgress: 0,
+            importUploadLoadedText: '',
+            importUploadTotalText: '',
+            importUploadSpeed: '',
+            importStatusMessage: '',
+            importLogs: [],
+            importError: '',
+            importReport: null,
+            importForm: { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4, convertDimensions: true, externalPort: null },
             showProfileModal: false,
             profileForm: { username: 'admin', currentPassword: '', newPassword: '' },
             systemStats: {},
             searchQuery: '',
             searchType: 'mod', // 'mod' or 'modpack'
             searchProvider: 'modrinth', // 'modrinth' or 'curseforge'
+            searchAllVersions: false,
             searching: false,
             searchSeq: 0, // bumped per search so stale responses never clobber newer ones
             searchResults: [],
@@ -52,13 +65,6 @@ createApp({
                 countdownInterval: null
             },
             isDraggingMod: false,
-            recommendedMods: [
-                { projectId: 'sodium', title: 'Sodium', description: 'Modern rendering engine that greatly improves frame rates.', loader: 'fabric' },
-                { projectId: 'lithium', title: 'Lithium', description: 'General-purpose optimization for physics, chunk loading and entity ticking.', loader: 'fabric' },
-                { projectId: 'ferritecore', title: 'FerriteCore', description: 'Memory usage optimizations for Minecraft.', loader: 'both' },
-                { projectId: 'cloth-config', title: 'Cloth Config', description: 'Configuration screen library used by many mods.', loader: 'both' },
-                { projectId: 'appleskin', title: 'AppleSkin', description: 'Adds food value information to tooltips and HUD.', loader: 'both' }
-            ],
             installedMods: [],
             // True while the Installed Mods list is being fetched so the tab can
             // show a spinner instead of a jarring empty/offline flash.
@@ -74,8 +80,12 @@ createApp({
             texturePackSearchQuery: '',
             shaderSearchProvider: 'modrinth', // 'modrinth' or 'curseforge'
             texturePackSearchProvider: 'modrinth', // 'modrinth' or 'curseforge'
+            shaderSearchAllVersions: false,
+            texturePackSearchAllVersions: false,
             packSearchType: 'shaderpack', // 'shaderpack' or 'resourcepack'
             packSearching: false,
+            shaderSearching: false,
+            texturePackSearching: false,
             packSearchResults: [],
             shaderSearchResults: [],
             texturePackSearchResults: [],
@@ -108,13 +118,55 @@ createApp({
             autoScroll: true,
             pollTimer: null,
             idleTicker: null,
-            consoleFilters: { info: true, warnings: true, errors: true }
+            consoleFilters: { info: true, warnings: true, errors: true },
+            fileManager: {
+                files: [],
+                currentPath: '',
+                breadcrumbs: [{ name: 'server', path: '' }],
+                loading: false,
+                error: '',
+                searchQuery: ''
+            },
+            fileClipboard: null,
+            createFileModal: {
+                open: false,
+                isDir: false,
+                name: '',
+                error: '',
+                loading: false
+            },
+            editorModal: {
+                open: false,
+                path: '',
+                name: '',
+                content: '',
+                originalContent: '',
+                size: 0,
+                loading: false,
+                saving: false,
+                saveSuccess: false,
+                error: ''
+            },
+            fileContextMenu: {
+                open: false,
+                x: 0,
+                y: 0,
+                file: null
+            },
+            branding: {
+                hasIcon: false,
+                hasBanner: false,
+                bannerIsAnimated: false,
+                iconUrl: null,
+                bannerUrl: null,
+                loading: false
+            }
         };
     },
     methods: Object.assign({},
         Zircon.core, Zircon.auth, Zircon.instances, Zircon.settings,
         Zircon.mods, Zircon.packs, Zircon.players, Zircon.backups,
-        Zircon.console),
+        Zircon.files, Zircon.branding, Zircon.console),
     created() {
         // Restore a persisted session (js/auth.js) before the login overlay /
         // dashboard decision is made.
@@ -163,12 +215,6 @@ createApp({
         ramSliderMax() {
             const total = this.ramTotalGb;
             return Math.max(4, Math.min(total ? total - 2 : 16, 64));
-        },
-        // Recommended mods filtered to the selected instance's mod loader.
-        filteredRecommendedMods() {
-            if (!this.selectedInstance) return [];
-            const loader = this.selectedInstance.modLoader.type;
-            return this.recommendedMods.filter(r => r.loader === 'both' || r.loader === loader);
         },
         selectedModCount() {
             return Object.keys(this.selectedMods).length;
