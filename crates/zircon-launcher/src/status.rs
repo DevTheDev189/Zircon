@@ -23,6 +23,8 @@ pub struct ServerStatus {
     pub version: String,
     /// Round-trip latency in milliseconds.
     pub ping_ms: u32,
+    /// Server MOTD / description, stripped of legacy formatting codes.
+    pub motd: Option<String>,
 }
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -68,6 +70,8 @@ pub async fn ping_status(host: &str, port: u16) -> Result<ServerStatus, Launcher
         Err(_) => status_rtt_ms,
     };
 
+    let motd = status.description.as_ref().map(|d| d.extract_text()).filter(|s| !s.is_empty());
+
     Ok(ServerStatus {
         online: status.players.online,
         max: status.players.max,
@@ -77,6 +81,7 @@ pub async fn ping_status(host: &str, port: u16) -> Result<ServerStatus, Launcher
             .map(|v| v.name.clone())
             .unwrap_or_default(),
         ping_ms,
+        motd,
     })
 }
 
@@ -204,13 +209,63 @@ fn read_varint(buf: &[u8]) -> Option<(i32, usize)> {
     None
 }
 
-/// Shape of the server-list status JSON (`players`, `version`).
+/// Shape of the server-list status JSON (`players`, `version`, `description`).
 #[derive(Debug, Deserialize, Default)]
 struct StatusJson {
     #[serde(default)]
     players: PlayersJson,
     #[serde(default)]
     version: Option<VersionJson>,
+    #[serde(default)]
+    description: Option<DescriptionJson>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum DescriptionJson {
+    Plain(String),
+    Object {
+        #[serde(default)]
+        text: String,
+        #[serde(default)]
+        extra: Vec<DescriptionExtra>,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+struct DescriptionExtra {
+    #[serde(default)]
+    text: String,
+}
+
+impl DescriptionJson {
+    fn extract_text(&self) -> String {
+        match self {
+            Self::Plain(s) => clean_motd(s),
+            Self::Object { text, extra } => {
+                let mut full = text.clone();
+                for e in extra {
+                    full.push_str(&e.text);
+                }
+                clean_motd(&full)
+            }
+        }
+    }
+}
+
+/// Strips Minecraft `§` formatting/color codes and trims excess whitespace.
+pub fn clean_motd(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut chars = raw.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '§' {
+            // Skip the format/color code character that follows
+            let _ = chars.next();
+        } else {
+            out.push(c);
+        }
+    }
+    out.trim().to_string()
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -287,5 +342,23 @@ mod tests {
         write_varint(&mut frame, json.len() as i32);
         frame.extend_from_slice(json);
         assert!(parse_status_frame(&frame).is_err());
+    }
+
+    #[test]
+    fn clean_motd_strips_color_codes_and_trims() {
+        assert_eq!(clean_motd("§a§lWelcome to §6§lMy Server!§r"), "Welcome to My Server!");
+        assert_eq!(clean_motd("  Hypixel Network  "), "Hypixel Network");
+        assert_eq!(clean_motd("§cOffline §7Server"), "Offline Server");
+    }
+
+    #[test]
+    fn parses_plain_and_object_descriptions() {
+        let json_plain = r#"{"players":{"online":5,"max":20},"description":"§eA Minecraft Server"}"#;
+        let status: StatusJson = serde_json::from_slice(json_plain.as_bytes()).unwrap();
+        assert_eq!(status.description.unwrap().extract_text(), "A Minecraft Server");
+
+        let json_obj = r#"{"players":{"online":5,"max":20},"description":{"text":"Hello ","extra":[{"text":"World!"}]}}"#;
+        let status: StatusJson = serde_json::from_slice(json_obj.as_bytes()).unwrap();
+        assert_eq!(status.description.unwrap().extract_text(), "Hello World!");
     }
 }

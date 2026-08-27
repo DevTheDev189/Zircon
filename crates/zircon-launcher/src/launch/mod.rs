@@ -10,3 +10,4 @@ pub mod java;
 pub mod options;
 pub mod profile;
 pub mod runner;
+pub mod window_tracker;

@@ -1,46 +1,51 @@
 <template>
-  <div class="relative h-full flex flex-col bg-bg text-text">
+  <div class="relative h-full flex flex-col bg-[#070b0f] text-text">
     <!-- Microsoft login overlay (z-above everything) -->
     <LoginOverlay :visible="!session" @logged-in="onLoggedIn" />
     <LaunchOverlay
       :visible="launchOverlayVisible"
       :status="statusText"
       :progress="progress"
+      :running="!!gameStatus?.running"
+      :game-label="gameStatus?.label || ''"
+      :error="launchError"
+      @close="onLaunchOverlayClose"
     />
 
     <div class="flex flex-1 min-h-0">
       <!-- Sidebar -->
       <aside
-        class="w-[230px] min-w-[230px] flex flex-col border-r border-edge bg-[#0a0f14] py-0"
+        class="w-[230px] min-w-[230px] flex flex-col border-r border-slate-800/80 bg-[#0a0f14] py-0"
       >
         <div class="px-4 pt-5 pb-5">
           <img
             :src="zirconTitle"
             alt="Zircon"
-            class="h-9 w-auto select-none"
+            class="h-9 w-auto select-none drop-shadow-[0_0_12px_rgba(71,210,201,0.25)]"
             draggable="false"
           />
-          <div class="text-muted text-[9px] tracking-[0.25em] mt-1.5">LAUNCHER</div>
+          <div class="text-slate-500 text-[9px] tracking-[0.25em] font-bold mt-1.5 uppercase">LAUNCHER</div>
         </div>
 
-        <nav class="px-3 flex flex-col gap-1">
+        <nav class="px-3 flex flex-col gap-1.5">
           <button
             v-for="item in navItems"
             :key="item.key"
-            class="relative flex items-center gap-2.5 text-left px-3.5 py-2.5 rounded-lg text-[13px] font-semibold transition-colors"
+            class="relative flex items-center gap-2.5 text-left px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all"
             :class="
               view === item.key
-                ? 'bg-[#1c2530] text-white'
-                : 'text-muted hover:text-text hover:bg-[#161b22]'
+                ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(71,210,201,0.15)] font-bold'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
             "
             @click="view = item.key"
           >
             <span
               v-if="view === item.key"
-              class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-accent"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-accent shadow-[0_0_8px_#47d2c9]"
             ></span>
             <svg
               class="w-[17px] h-[17px] shrink-0"
+              :class="view === item.key ? 'text-accent' : 'text-slate-400'"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -59,15 +64,15 @@
         <!-- User card -->
         <div class="px-3 pb-4">
           <div
-            class="flex items-center gap-3 bg-card border border-edge rounded-xl p-3 transition-colors hover:border-[#3d444d]"
+            class="z-card flex items-center gap-3 p-3 transition-all hover:border-accent/40"
           >
             <img
               v-if="avatarUrl"
               :src="avatarUrl"
-              class="w-8 h-8 rounded-md image-render-pixel border border-edge"
+              class="w-8 h-8 rounded-lg image-render-pixel border border-slate-700/80 ring-1 ring-accent/30"
               alt="avatar"
             />
-            <div v-else class="w-8 h-8 rounded-md bg-[#21262d] border border-edge"></div>
+            <div v-else class="w-8 h-8 rounded-lg bg-[#1a232f] border border-slate-700"></div>
             <div class="flex-1 min-w-0">
               <div class="text-xs font-bold text-white truncate">
                 {{ session?.username || 'Not signed in' }}
@@ -75,7 +80,7 @@
             </div>
             <button
               v-if="session"
-              class="text-[10px] text-muted hover:text-[#f85149] transition-colors"
+              class="text-[10px] font-semibold text-slate-400 hover:text-[#f87171] transition-colors"
               @click="onLogout"
             >
               Logout
@@ -86,7 +91,7 @@
 
       <!-- Main view -->
       <main
-        class="flex-1 min-w-0 flex flex-col bg-gradient-to-br from-[#0e151d] via-bg to-[#0b1117]"
+        class="flex-1 min-w-0 flex flex-col bg-gradient-to-br from-[#0e1620] via-[#070b0f] to-[#0a1218]"
       >
         <div class="flex-1 min-h-0 overflow-hidden">
           <ServersView
@@ -95,12 +100,14 @@
             :game-status="gameStatus"
             @launching="onLaunching"
             @stopped="onStopped"
+            @error="onLaunchError"
           />
           <OfflineView
             v-else-if="view === 'offline'"
             :session="session"
             @launching="onLaunching"
             @stopped="onStopped"
+            @error="onLaunchError"
           />
           <SkinsView v-else-if="view === 'skins'" :session="session" />
           <SettingsView v-else />
@@ -116,32 +123,28 @@
     <!-- Shader opt-in dialog (server offers shaders, choice not remembered yet) -->
     <div
       v-if="shaderPrompt"
-      class="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center"
+      class="absolute inset-0 z-40 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
       @click.self="respondShaders(false)"
     >
-      <div class="z-card w-[420px] pt-0 overflow-hidden">
-        <div
-          class="h-[3px] bg-gradient-to-r from-accent to-[#1f8f87] -mx-4 -mt-4 mb-4"
-        ></div>
-        <h3 class="text-white font-bold mb-1">Enable shaders?</h3>
-        <p class="text-muted text-sm mb-1">
+      <div class="z-card w-full max-w-[440px] p-6 overflow-hidden shadow-2xl relative border border-slate-700/60 rounded-2xl bg-[#0e1622]">
+        <h3 class="text-white font-bold text-base mb-1">Enable shaders?</h3>
+        <p class="text-slate-300 text-sm mb-1">
           {{ shaderPrompt.server }} offers shaders
-          <span v-if="shaderPrompt.shaderName" class="text-muted">
+          <span v-if="shaderPrompt.shaderName" class="text-cyan-300 font-semibold">
             ({{ shaderPrompt.shaderName }}<span v-if="shaderPrompt.shaderAuthor"> by {{ shaderPrompt.shaderAuthor }}</span>)
           </span>
           .
         </p>
-        <p class="text-muted text-xs mb-4">
-          Shaders look great but use a lot of GPU — disable them if your PC
-          struggles to keep up.
+        <p class="text-slate-400 text-xs mb-4">
+          Shaders look great but use additional GPU resources — you can always adjust this later.
         </p>
-        <label class="flex items-center gap-2 text-sm text-text cursor-pointer mb-4 select-none">
-          <input v-model="shaderRemember" type="checkbox" class="accent-[#47d2c9]" />
-          Remember my choice for this server
+        <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer mb-5 select-none">
+          <input v-model="shaderRemember" type="checkbox" class="zircon-check" />
+          <span>Remember my choice for this server</span>
         </label>
-        <div class="flex justify-end gap-2">
-          <button class="z-btn-ghost" @click="respondShaders(false)">No, thanks</button>
-          <button class="z-btn-accent" @click="respondShaders(true)">Enable Shaders</button>
+        <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80">
+          <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="respondShaders(false)">No, thanks</button>
+          <button class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25" @click="respondShaders(true)">Enable Shaders</button>
         </div>
       </div>
     </div>
@@ -150,31 +153,30 @@
          Ed25519 key than the one pinned on first contact. -->
     <div
       v-if="keyPrompt"
-      class="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center"
+      class="absolute inset-0 z-40 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
       @click.self="respondKeyPrompt(false)"
     >
-      <div class="z-card w-[460px] pt-0 overflow-hidden">
-        <div class="h-[3px] bg-gradient-to-r from-[#f85149] to-[#b62324] -mx-4 -mt-4 mb-4"></div>
-        <h3 class="text-white font-bold mb-1">Server identity changed!</h3>
-        <p class="text-muted text-sm mb-3">
-          <span class="text-[#f85149] font-semibold">{{ keyPrompt.serverAddress }}</span>
+      <div class="z-card w-full max-w-[480px] p-6 overflow-hidden shadow-2xl relative border border-red-500/40 rounded-2xl bg-[#0e1622]">
+        <h3 class="text-white font-bold text-base mb-1 text-red-400">Server identity changed!</h3>
+        <p class="text-slate-300 text-sm mb-3">
+          <span class="text-red-400 font-semibold">{{ keyPrompt.serverAddress }}</span>
           is presenting a <span class="text-white font-semibold">new security key</span>.
           This happens after a server reinstall — or when the server was
-          replaced or is being intercepted by an attacker.
+          replaced or is being intercepted.
         </p>
-        <div class="bg-bg border border-edge rounded-lg p-3 mb-4 font-mono text-[11px] leading-relaxed break-all">
-          <div class="text-muted mb-0.5">Previous key:</div>
-          <div class="text-text">{{ keyPrompt.oldFingerprint }}</div>
-          <div class="text-muted mt-2 mb-0.5">New key:</div>
-          <div class="text-[#f85149]">{{ keyPrompt.newFingerprint }}</div>
+        <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-3.5 mb-4 font-mono text-[11px] leading-relaxed break-all shadow-inner">
+          <div class="text-slate-400 mb-0.5 font-sans font-semibold text-xs">Previous key:</div>
+          <div class="text-slate-300">{{ keyPrompt.oldFingerprint }}</div>
+          <div class="text-slate-400 mt-2.5 mb-0.5 font-sans font-semibold text-xs">New key:</div>
+          <div class="text-red-400 font-bold">{{ keyPrompt.newFingerprint }}</div>
         </div>
-        <p class="text-muted text-xs mb-4">
+        <p class="text-slate-400 text-xs mb-4">
           Only trust the new key if you know the server was legitimately
           reinstalled. Rejecting cancels the launch.
         </p>
-        <div class="flex justify-end gap-2">
-          <button class="z-btn-ghost" @click="respondKeyPrompt(false)">Reject</button>
-          <button class="z-btn-danger" @click="respondKeyPrompt(true)">Trust New Key</button>
+        <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80">
+          <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="respondKeyPrompt(false)">Reject</button>
+          <button class="z-btn-danger text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-red-500/25" @click="respondKeyPrompt(true)">Trust New Key</button>
         </div>
       </div>
     </div>
@@ -190,7 +192,7 @@ import ServersView from './views/ServersView.vue';
 import OfflineView from './views/OfflineView.vue';
 import SkinsView from './views/SkinsView.vue';
 import SettingsView from './views/SettingsView.vue';
-import { api, onGameOutput, onGameStatus, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
+import { api, createDefaultSteveDataUrl, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import zirconTitle from './assets/zircon-title.svg';
@@ -250,6 +252,7 @@ const statusText = ref('');
 const progress = ref(null);
 const busy = ref(false);
 const launchOverlayVisible = ref(false);
+const launchError = ref('');
 const gameStatus = ref(null);
 const gameOutputBuffer = ref([]);
 const shaderPrompt = ref(null);
@@ -271,6 +274,7 @@ onMounted(async () => {
     gameStatus.value = await api.getGameStatus();
     if (gameStatus.value?.running) {
       busy.value = true;
+      launchOverlayVisible.value = true;
       statusText.value = `Game running: ${gameStatus.value.label}`;
     }
   } catch {
@@ -293,16 +297,22 @@ onMounted(async () => {
     }),
     onGameStatus((status) => {
       gameStatus.value = status;
-      launchOverlayVisible.value = false;
       if (status.running) {
         busy.value = true;
+        launchOverlayVisible.value = true;
       } else {
+        launchOverlayVisible.value = false;
         busy.value = false;
         progress.value = null;
       }
     }),
     onSkinUpdated(() => {
       refreshAvatar();
+    }),
+    onGameWindowReady(() => {
+      // Game window is open and active — dismiss launch overlay
+      launchOverlayVisible.value = false;
+      busy.value = false;
     }),
     onShaderRequest((payload) => {
       shaderPrompt.value = payload;
@@ -325,12 +335,6 @@ onMounted(async () => {
 
 // Best-effort launcher self-update: silently checks Cloudflare R2 for a newer
 // signed build and relaunches once it's downloaded and installed.
-//
-// Tauri's `downloadAndInstall` reports *delta* progress: `Started` carries the
-// total content length and each `Progress` event carries `chunkLength`, the
-// bytes received for that chunk. Progress is accumulated here rather than read
-// from a cumulative field (which does not exist and shows NaN / stuck at
-// "Downloading...").
 async function checkLauncherUpdate() {
   try {
     const update = await checkUpdate();
@@ -376,20 +380,23 @@ async function refreshAvatar() {
   } catch {
     avatarUrl.value = '';
   }
-  // No custom skin yet — show the first preset's face as a placeholder.
   try {
-    const bundled = await api.getBundledSkins();
-    const first = bundled[0];
-    if (first) {
-      avatarUrl.value = (await skinFaceDataUrl(first.dataUrl)) || first.dataUrl;
+    const active = await api.getActiveSkin();
+    if (active?.dataUrl) {
+      avatarUrl.value = (await skinFaceDataUrl(active.dataUrl)) || '';
+      if (avatarUrl.value) return;
     }
+  } catch {
+    // fallback
+  }
+  try {
+    const def = createDefaultSteveDataUrl();
+    avatarUrl.value = (await skinFaceDataUrl(def)) || '';
   } catch {
     avatarUrl.value = '';
   }
 }
 
-// Boot / sign-in refresh: pull the player's Minecraft skin so the launcher's
-// active skin (and sidebar avatar) mirror it. Best-effort.
 async function refreshMojangSkin() {
   if (!session.value?.uuid) return;
   try {
@@ -414,7 +421,6 @@ async function onLogout() {
   statusText.value = 'Signed out.';
 }
 
-// Sends the player's shader answer back to the pending launch flow.
 async function respondShaders(enabled) {
   const prompt = shaderPrompt.value;
   if (!prompt) return;
@@ -426,9 +432,6 @@ async function respondShaders(enabled) {
   }
 }
 
-// Sends the player's host-key decision back to the pending launch flow.
-// Accepting re-pins the new key; rejecting (or a closed window) aborts the
-// launch — the Rust side never auto-accepts a key change.
 async function respondKeyPrompt(accepted) {
   const prompt = keyPrompt.value;
   if (!prompt) return;
@@ -440,8 +443,16 @@ async function respondKeyPrompt(accepted) {
   }
 }
 
+function onLaunchOverlayClose() {
+  launchOverlayVisible.value = false;
+  busy.value = false;
+  launchError.value = '';
+  progress.value = null;
+}
+
 function onLaunching() {
   busy.value = true;
+  launchError.value = '';
   launchOverlayVisible.value = true;
   progress.value = null;
 }
@@ -450,6 +461,11 @@ function onStopped() {
   busy.value = false;
   launchOverlayVisible.value = false;
   progress.value = null;
+}
+
+function onLaunchError(err) {
+  busy.value = false;
+  launchError.value = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
 }
 </script>
 

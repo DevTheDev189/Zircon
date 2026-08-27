@@ -1,25 +1,14 @@
 <template>
-  <div ref="container" class="relative w-full h-full overflow-hidden">
-    <canvas ref="canvas" class="w-full h-full block" />
-    <div
-      v-if="!skinLoaded"
-      class="absolute inset-0 flex items-center justify-center text-muted text-sm pointer-events-none"
-    >
-      No skin yet — pick one to preview
-    </div>
+  <div ref="container" class="relative w-full h-full overflow-hidden select-none">
+    <canvas ref="canvas" class="w-full h-full block cursor-grab active:cursor-grabbing" />
   </div>
 </template>
 
 <script setup>
-// WebGL 3D Minecraft player skin renderer built on Three.js — the webview
-// replacement for the JavaFX/LWJGL `Player3DRenderer` (Step 5.3).
-//
-// Two merged BufferGeometries (base + overlay) are built from a data-driven
-// face table so every triangle is wound counter-clockwise when viewed from
-// outside (correct backface culling) and every face samples the correct region
-// of the 64x64 skin atlas with the vanilla unwrap orientation.
+// WebGL 3D Minecraft player skin renderer built on Three.js
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as THREE from 'three';
+import { createDefaultSteveDataUrl } from '../lib/api';
 
 const container = ref(null);
 const canvas = ref(null);
@@ -31,16 +20,16 @@ let camera = null;
 let group = null;
 let material = null;
 let animationId = null;
+let resizeObserver = null;
 let dragging = false;
 let lastX = 0;
 let lastY = 0;
-let yaw = -Math.PI / 6;
-let pitch = -Math.PI / 12;
+let yaw = -Math.PI / 8;
+let pitch = -Math.PI / 16;
+let currentVariant = 'classic';
+let currentSkinUri = null;
 
 // ---- Atlas layouts ---------------------------------------------------------
-// Each face rect is [u, v, w, h] (pixel top-left corner + size) in the 64x64 atlas.
-// Face sizes use the box's own dimensions (front/back sx×sy, right/left sz×sy,
-// top/bottom sx×sz), matching the vanilla box unwrap.
 function faces(base, w, h, d) {
   const [bu, bv] = base;
   return {
@@ -54,24 +43,40 @@ function faces(base, w, h, d) {
 }
 
 const HEAD = { size: [8, 8, 8], center: [0, 28, 0], atlas: faces([0, 0], 8, 8, 8) };
-const HAT = { size: [9, 9, 9], center: [0, 28, 0], atlas: faces([32, 0], 8, 8, 8) };
+const HAT = { size: [8.8, 8.8, 8.8], center: [0, 28, 0], atlas: faces([32, 0], 8, 8, 8) };
 const BODY = { size: [8, 12, 4], center: [0, 18, 0], atlas: faces([16, 16], 8, 12, 4) };
 const JACKET = { size: [8.5, 12.5, 4.5], center: [0, 18, 0], atlas: faces([16, 32], 8, 12, 4) };
+
+// Classic (4px arms)
 const R_ARM = { size: [4, 12, 4], center: [-6, 18, 0], atlas: faces([40, 16], 4, 12, 4) };
 const R_SLEEVE = { size: [4.5, 12.5, 4.5], center: [-6, 18, 0], atlas: faces([40, 32], 4, 12, 4) };
 const L_ARM = { size: [4, 12, 4], center: [6, 18, 0], atlas: faces([32, 48], 4, 12, 4) };
 const L_SLEEVE = { size: [4.5, 12.5, 4.5], center: [6, 18, 0], atlas: faces([48, 48], 4, 12, 4) };
+
+// Slim (3px arms - Alex)
+const R_ARM_SLIM = { size: [3, 12, 4], center: [-5.5, 18, 0], atlas: faces([40, 16], 3, 12, 4) };
+const R_SLEEVE_SLIM = { size: [3.5, 12.5, 4.5], center: [-5.5, 18, 0], atlas: faces([40, 32], 3, 12, 4) };
+const L_ARM_SLIM = { size: [3, 12, 4], center: [5.5, 18, 0], atlas: faces([32, 48], 3, 12, 4) };
+const L_SLEEVE_SLIM = { size: [3.5, 12.5, 4.5], center: [5.5, 18, 0], atlas: faces([48, 48], 3, 12, 4) };
+
 const R_LEG = { size: [4, 12, 4], center: [-2, 6, 0], atlas: faces([0, 16], 4, 12, 4) };
 const R_PANTS = { size: [4.5, 12.5, 4.5], center: [-2, 6, 0], atlas: faces([0, 32], 4, 12, 4) };
 const L_LEG = { size: [4, 12, 4], center: [2, 6, 0], atlas: faces([16, 48], 4, 12, 4) };
 const L_PANTS = { size: [4.5, 12.5, 4.5], center: [2, 6, 0], atlas: faces([0, 48], 4, 12, 4) };
 
-const BASE_BOXES = [HEAD, BODY, R_ARM, L_ARM, R_LEG, L_LEG];
-const OVERLAY_BOXES = [HAT, JACKET, R_SLEEVE, L_SLEEVE, R_PANTS, L_PANTS];
+function getBoxes(variant) {
+  const isSlim = variant === 'slim';
+  const rArm = isSlim ? R_ARM_SLIM : R_ARM;
+  const lArm = isSlim ? L_ARM_SLIM : L_ARM;
+  const rSleeve = isSlim ? R_SLEEVE_SLIM : R_SLEEVE;
+  const lSleeve = isSlim ? L_SLEEVE_SLIM : L_SLEEVE;
+
+  const baseBoxes = [HEAD, BODY, rArm, lArm, R_LEG, L_LEG];
+  const overlayBoxes = [HAT, JACKET, rSleeve, lSleeve, R_PANTS, L_PANTS];
+  return { baseBoxes, overlayBoxes };
+}
 
 // ---- Geometry builder ------------------------------------------------------
-// Writes CCW-from-outside faces into one BufferGeometry. `rects` maps each
-// face key to its [u, v, w, h] atlas rect.
 function buildBoxesInto(builder, boxes) {
   for (const box of boxes) {
     const [Cx, Cy, Cz] = box.center;
@@ -79,8 +84,6 @@ function buildBoxesInto(builder, boxes) {
     const hx = sx / 2, hy = sy / 2, hz = sz / 2;
     const a = box.atlas;
 
-    // Corner order per face: TL, BL, TR, BR (indices 0..3).
-    // Triangle indices: (0,1,2) and (2,1,3) — CCW when viewed from outside.
     const faces = [
       { key: 'front', norm: [0, 0, 1], corners: [[Cx-hx, Cy+hy, Cz+hz], [Cx-hx, Cy-hy, Cz+hz], [Cx+hx, Cy+hy, Cz+hz], [Cx+hx, Cy-hy, Cz+hz]] },
       { key: 'back', norm: [0, 0, -1], corners: [[Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy-hy, Cz-hz], [Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy-hy, Cz-hz]] },
@@ -101,7 +104,6 @@ function buildBoxesInto(builder, boxes) {
       const c = face.corners;
       for (const v of c) builder.positions.push(v[0], v[1], v[2]);
       for (let i = 0; i < 4; i++) builder.normals.push(face.norm[0], face.norm[1], face.norm[2]);
-      // TL->(u0,v0), BL->(u0,v1), TR->(u1,v0), BR->(u1,v1)
       builder.uvs.push(u0, v0, u0, v1, u1, v0, u1, v1);
       builder.indices.push(
         baseIdx, baseIdx + 1, baseIdx + 2,
@@ -111,11 +113,12 @@ function buildBoxesInto(builder, boxes) {
   }
 }
 
-function buildModel() {
+function buildModel(variant = 'classic') {
+  const { baseBoxes, overlayBoxes } = getBoxes(variant);
   const baseBuilder = { positions: [], normals: [], uvs: [], indices: [] };
   const overlayBuilder = { positions: [], normals: [], uvs: [], indices: [] };
-  buildBoxesInto(baseBuilder, BASE_BOXES);
-  buildBoxesInto(overlayBuilder, OVERLAY_BOXES);
+  buildBoxesInto(baseBuilder, baseBoxes);
+  buildBoxesInto(overlayBuilder, overlayBoxes);
 
   const toGeo = (b) => {
     const geo = new THREE.BufferGeometry();
@@ -128,7 +131,7 @@ function buildModel() {
 
   const base = new THREE.Mesh(toGeo(baseBuilder), material);
   const overlay = new THREE.Mesh(toGeo(overlayBuilder), material);
-  overlay.renderOrder = 1; // draw overlays after base
+  overlay.renderOrder = 1;
   base.renderOrder = 0;
   const model = new THREE.Group();
   model.add(base, overlay);
@@ -136,23 +139,26 @@ function buildModel() {
 }
 
 // ---- Texture / skin --------------------------------------------------------
-// Converts legacy 64x32 skins to 64x64 by mirror-copying right limbs into the
-// left limb regions, and cleans up transparent overlay areas via alphaTest.
 function processSkinTexture(image) {
+  if (image.width < 32 || image.height < 32) {
+    return null;
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;
   const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(image, 0, 0);
 
   if (image.width === 64 && image.height === 32) {
-    // Right Leg -> Left Leg.
+    // Convert 64x32 legacy skin to 64x64
     ctx.save();
     ctx.translate(32, 48);
     ctx.scale(-1, 1);
     ctx.drawImage(canvas, 0, 16, 16, 16, -16, 0, 16, 16);
     ctx.restore();
-    // Right Arm -> Left Arm.
+
     ctx.save();
     ctx.translate(48, 48);
     ctx.scale(-1, 1);
@@ -169,20 +175,54 @@ function processSkinTexture(image) {
 }
 
 function applySkin(imageUri) {
-  if (!imageUri) return;
+  const uri = imageUri || createDefaultSteveDataUrl();
+  currentSkinUri = uri;
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
     if (!material) return;
+    const tex = processSkinTexture(img);
+    if (!tex) {
+      applyFallbackSkin();
+      return;
+    }
     if (material.map) material.map.dispose();
-    material.map = processSkinTexture(img);
+    material.map = tex;
     material.needsUpdate = true;
     skinLoaded.value = true;
   };
   img.onerror = () => {
-    skinLoaded.value = false;
+    applyFallbackSkin();
   };
-  img.src = imageUri;
+  img.src = uri;
+}
+
+function applyFallbackSkin() {
+  const fallback = createDefaultSteveDataUrl();
+  const img = new Image();
+  img.onload = () => {
+    if (!material) return;
+    const tex = processSkinTexture(img);
+    if (tex) {
+      if (material.map) material.map.dispose();
+      material.map = tex;
+      material.needsUpdate = true;
+      skinLoaded.value = true;
+    }
+  };
+  img.src = fallback;
+}
+
+function setVariant(variant) {
+  currentVariant = variant || 'classic';
+  if (scene && group) {
+    const rot = { x: group.rotation.x, y: group.rotation.y, z: group.rotation.z };
+    scene.remove(group);
+    group = buildModel(currentVariant);
+    group.scale.setScalar(0.8);
+    group.rotation.set(rot.x, rot.y, rot.z);
+    scene.add(group);
+  }
 }
 
 function updateSkin(imageUri) {
@@ -190,19 +230,14 @@ function updateSkin(imageUri) {
 }
 
 function resetSkin() {
-  skinLoaded.value = false;
-  if (material) {
-    if (material.map) material.map.dispose();
-    material.map = null;
-    material.needsUpdate = true;
-  }
+  applyFallbackSkin();
 }
 
 // ---- Render loop / interaction ---------------------------------------------
 function resize() {
   if (!renderer || !container.value) return;
-  const w = container.value.clientWidth;
-  const h = container.value.clientHeight;
+  const w = container.value.clientWidth || 300;
+  const h = container.value.clientHeight || 400;
   if (w === 0 || h === 0) return;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
@@ -242,7 +277,7 @@ const props = defineProps({
 
 watch(
   () => props.imageUri,
-  (uri) => uri && applySkin(uri)
+  (uri) => applySkin(uri)
 );
 
 watch(
@@ -250,7 +285,7 @@ watch(
   (uri) => uri && applySkin(uri)
 );
 
-defineExpose({ updateSkin, resetSkin });
+defineExpose({ updateSkin, resetSkin, setVariant });
 
 onMounted(() => {
   const mount = container.value;
@@ -271,19 +306,19 @@ onMounted(() => {
   camera.position.set(0, 16, 46);
   camera.lookAt(0, 13, 0);
 
-  // Soft key light + teal rim so the figure reads against the dark background.
-  const key = new THREE.DirectionalLight(0xffffff, 1.5);
+  // Soft key light + luminous cyan rim light
+  const key = new THREE.DirectionalLight(0xffffff, 1.6);
   key.position.set(10, 30, 20);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x9ad7d4, 0.45);
+  const fill = new THREE.DirectionalLight(0x47d2c9, 0.6);
   fill.position.set(-15, 10, -12);
   scene.add(fill);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-  // Soft ground shadow so the figure doesn't float.
+  // Soft ground shadow
   const shadow = new THREE.Mesh(
     new THREE.CircleGeometry(13, 48),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 })
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4 })
   );
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = -0.02;
@@ -296,9 +331,7 @@ onMounted(() => {
     alphaTest: 0.5,
     side: THREE.FrontSide,
   });
-  group = buildModel();
-  // The 32-unit-tall figure is taller than the preview frustum, which clips
-  // the head; scale it to ~80% so it fits with breathing room.
+  group = buildModel(currentVariant);
   group.scale.setScalar(0.8);
   scene.add(group);
   group.rotation.set(pitch, yaw, 0);
@@ -306,10 +339,20 @@ onMounted(() => {
   mount.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
-  window.addEventListener('resize', resize);
 
+  if (window.ResizeObserver && mount) {
+    resizeObserver = new ResizeObserver(() => {
+      resize();
+    });
+    resizeObserver.observe(mount);
+  } else {
+    window.addEventListener('resize', resize);
+  }
+
+  // Load requested skin or default Steve
   if (props.imageUri) applySkin(props.imageUri);
   else if (props.defaultSkinUri) applySkin(props.defaultSkinUri);
+  else applyFallbackSkin();
 
   animate();
 });
@@ -322,6 +365,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onPointerMove);
   window.removeEventListener('pointerup', onPointerUp);
   window.removeEventListener('resize', resize);
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
   if (renderer) {
     renderer.dispose();
     renderer = null;

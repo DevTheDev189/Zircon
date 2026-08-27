@@ -6,57 +6,172 @@
     aria-modal="true"
     aria-labelledby="launch-overlay-title"
   >
-    <div class="launch-shell relative w-full max-w-[560px] overflow-hidden rounded-2xl border border-[#33414a] bg-[#101820] shadow-2xl shadow-black/50">
+    <div class="z-card launch-shell relative w-full max-w-[560px] overflow-hidden rounded-2xl border border-slate-700/60 shadow-2xl shadow-black/60 p-0 bg-[#0e1622]">
       <div class="launch-grid absolute inset-0 pointer-events-none"></div>
       <div class="relative p-6 sm:p-8">
-        <div class="mb-8 flex items-start justify-between gap-4">
+        <div class="mb-6 flex items-start justify-between gap-4">
           <div>
             <img
               :src="zirconTitle"
               alt="Zircon"
-              class="h-10 w-auto max-w-[190px] select-none object-contain object-left"
+              class="h-10 w-auto max-w-[190px] select-none object-contain object-left drop-shadow-[0_0_12px_rgba(71,210,201,0.25)]"
               draggable="false"
             />
-            <p class="mt-2 text-[10px] font-bold uppercase tracking-[0.24em] text-accent/80">Launcher</p>
-            <h2 id="launch-overlay-title" class="mt-1 text-lg font-bold text-white">Preparing Minecraft</h2>
-          </div>
-          <button
-            class="z-btn-ghost shrink-0 text-xs"
-            type="button"
-            title="Stop launching Minecraft"
-            @click="cancelLaunch"
-          >
-            Stop
-          </button>
-        </div>
-
-        <div class="min-h-[142px] border-l-2 border-accent/50 pl-5">
-          <transition name="slide" mode="out-in">
-            <div :key="activeSlide" class="slide-copy">
-              <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#8babb0]">{{ slides[activeSlide].eyebrow }}</p>
-              <h3 class="max-w-[420px] text-2xl font-bold leading-tight text-white">{{ slides[activeSlide].title }}</h3>
-              <p class="mt-3 max-w-[450px] text-sm leading-relaxed text-[#9eafb7]">{{ slides[activeSlide].body }}</p>
+            <div v-if="error" class="mt-3">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[11px] font-bold tracking-wider uppercase shadow-[0_0_10px_rgba(244,63,94,0.2)]">
+                <span class="relative flex h-2 w-2">
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-400"></span>
+                </span>
+                Launch Failed
+              </div>
+              <h2 id="launch-overlay-title" class="mt-1.5 text-2xl font-extrabold text-white tracking-tight">
+                Unable to Start Minecraft
+              </h2>
             </div>
-          </transition>
+            <div v-else-if="running" class="mt-3">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/15 border border-accent/30 text-accent text-[11px] font-bold tracking-wider uppercase shadow-[0_0_10px_rgba(71,210,201,0.2)]">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+                </span>
+                Active Session
+              </div>
+              <h2 id="launch-overlay-title" class="mt-1.5 text-2xl font-extrabold text-white tracking-tight">
+                Minecraft Booted
+              </h2>
+            </div>
+            <div v-else>
+              <p class="mt-2 text-[10px] font-bold uppercase tracking-[0.24em] text-accent/90">Launcher</p>
+              <h2 id="launch-overlay-title" class="mt-1 text-xl font-extrabold text-white tracking-tight">
+                Preparing Minecraft
+              </h2>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="error"
+              class="z-btn-ghost shrink-0 text-xs px-4 py-2 font-semibold border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 rounded-xl"
+              type="button"
+              title="Close dialog"
+              @click="close"
+            >
+              Close
+            </button>
+            <button
+              v-else-if="running"
+              class="z-btn-ghost shrink-0 text-xs text-accent hover:text-white hover:bg-accent/10 border border-accent/30 font-semibold px-4 py-2 rounded-xl"
+              type="button"
+              title="Stop Minecraft"
+              @click="cancelLaunch"
+            >
+              Stop Game
+            </button>
+            <button
+              v-else
+              class="z-btn-ghost shrink-0 text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700/80 hover:border-cyan-400 hover:text-cyan-300"
+              type="button"
+              title="Stop launching Minecraft"
+              @click="cancelLaunch"
+            >
+              Stop
+            </button>
+          </div>
         </div>
 
-        <div class="mt-8">
-          <div class="mb-2 flex items-center justify-between gap-4 text-xs">
-            <span class="min-w-0 truncate font-semibold text-[#d6e2e4]">{{ status || 'Starting Minecraft...' }}</span>
-            <span v-if="progress !== null" class="shrink-0 font-mono text-accent">{{ Math.round(progress * 100) }}%</span>
-            <span v-else class="launch-pulse shrink-0 text-[#789399]">Working</span>
+        <!-- Error details banner when launch fails -->
+        <div
+          v-if="error"
+          class="mb-6 rounded-xl border border-rose-500/30 bg-gradient-to-r from-rose-950/40 via-[#1a0a10]/80 to-slate-900/90 p-4 shadow-lg shadow-black/40 backdrop-blur-sm"
+        >
+          <div class="flex items-start gap-3.5">
+            <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-[0_0_10px_rgba(244,63,94,0.3)] mt-0.5">
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-bold text-rose-300 mb-1">
+                Launch Error Details
+              </p>
+              <p class="text-xs text-slate-300 font-mono break-words leading-relaxed max-h-36 overflow-y-auto pr-1">
+                {{ error }}
+              </p>
+            </div>
           </div>
-          <div class="h-2 overflow-hidden rounded-full bg-[#202d34] ring-1 ring-inset ring-white/5">
-            <div
-              class="h-full rounded-full bg-gradient-to-r from-[#5adfd5] via-accent to-[#2ba89e] transition-[width] duration-500"
-              :class="{ 'launch-indeterminate': progress === null }"
-              :style="{ width: progress === null ? '35%' : `${Math.max(3, Math.round(progress * 100))}%` }"
-            ></div>
-          </div>
-          <div class="mt-3 flex gap-1.5" aria-hidden="true">
-            <span v-for="(_, index) in slides" :key="index" class="h-1 rounded-full transition-all" :class="index === activeSlide ? 'w-6 bg-accent' : 'w-1.5 bg-[#53666c]'" />
+          <div class="mt-4 flex justify-end gap-2.5 pt-3 border-t border-slate-800/80">
+            <button
+              class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl"
+              type="button"
+              @click="close"
+            >
+              Back to Launcher
+            </button>
           </div>
         </div>
+
+        <template v-else>
+          <!-- Prominent background startup disclaimer banner when Minecraft has booted -->
+          <div
+            v-if="running"
+            class="mb-6 rounded-xl border border-accent/30 bg-gradient-to-r from-accent/15 via-[#0a1a20]/90 to-slate-900/90 p-4 shadow-lg shadow-black/40 backdrop-blur-sm"
+          >
+            <div class="flex items-center gap-3.5">
+              <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/20 text-accent border border-accent/40 shadow-[0_0_10px_rgba(71,210,201,0.3)]">
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <p class="text-base sm:text-lg font-bold text-accent tracking-tight leading-snug">
+                It might take a few seconds for the window to open
+              </p>
+            </div>
+          </div>
+
+          <div class="min-h-[135px] border-l-2 border-accent/50 pl-5">
+            <transition name="slide" mode="out-in">
+              <div :key="activeSlide" class="slide-copy">
+                <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80">{{ slides[activeSlide].eyebrow }}</p>
+                <h3 class="max-w-[420px] text-2xl font-bold leading-tight text-white">{{ slides[activeSlide].title }}</h3>
+                <p class="mt-3 max-w-[450px] text-sm leading-relaxed text-[#9eafb7]">{{ slides[activeSlide].body }}</p>
+              </div>
+            </transition>
+          </div>
+
+          <div class="mt-8">
+            <div class="mb-2 flex items-center justify-between gap-4 text-xs">
+              <span v-if="running" class="min-w-0 truncate font-semibold text-accent/90">
+                {{ gameLabel ? `Minecraft running: ${gameLabel}` : 'Minecraft is active' }}
+              </span>
+              <span v-else class="min-w-0 truncate font-semibold text-[#d6e2e4]">
+                {{ status || 'Starting Minecraft...' }}
+              </span>
+
+              <span v-if="running" class="shrink-0 flex items-center gap-1.5 font-mono text-accent font-semibold">
+                <span class="inline-block h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_6px_#47d2c9]"></span>
+                Running
+              </span>
+              <span v-else-if="progress !== null" class="shrink-0 font-mono text-accent font-bold">
+                {{ Math.round(progress * 100) }}%
+              </span>
+              <span v-else class="launch-pulse shrink-0 text-cyan-300/80 font-mono font-medium">Working</span>
+            </div>
+            <div class="h-2.5 overflow-hidden rounded-full bg-slate-950 p-0.5 border border-slate-800">
+              <div
+                v-if="running"
+                class="h-full w-full rounded-full bg-gradient-to-r from-[#5adfd5] via-accent to-[#20b2aa] shadow-[0_0_10px_rgba(71,210,201,0.4)]"
+              ></div>
+              <div
+                v-else
+                class="h-full rounded-full bg-gradient-to-r from-[#5adfd5] via-accent to-[#20b2aa] transition-[width] duration-500 shadow-[0_0_10px_rgba(71,210,201,0.4)]"
+                :class="{ 'launch-indeterminate': progress === null }"
+                :style="{ width: progress === null ? '35%' : `${Math.max(3, Math.round(progress * 100))}%` }"
+              ></div>
+            </div>
+            <div class="mt-3.5 flex gap-1.5" aria-hidden="true">
+              <span v-for="(_, index) in slides" :key="index" class="h-1 rounded-full transition-all duration-300" :class="index === activeSlide ? 'w-6 bg-accent shadow-[0_0_8px_#47d2c9]' : 'w-1.5 bg-slate-700'" />
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -67,11 +182,16 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { api } from '../lib/api';
 import zirconTitle from '../assets/zircon-title.svg';
 
-defineProps({
+const props = defineProps({
   visible: { type: Boolean, default: false },
   status: { type: String, default: '' },
   progress: { type: Number, default: null },
+  running: { type: Boolean, default: false },
+  gameLabel: { type: String, default: '' },
+  error: { type: String, default: '' },
 });
+
+const emit = defineEmits(['close']);
 
 const slides = [
   {
@@ -85,28 +205,53 @@ const slides = [
     body: 'Server identity, mods, and local choices are checked before the game opens so your session starts cleanly.',
   },
   {
+    eyebrow: 'High-Performance Startup',
+    title: 'Maximizing system resources.',
+    body: 'Minecraft is prioritized with high CPU scheduling and preallocated JVM memory for smooth framerates and fast load times.',
+  },
+  {
     eyebrow: 'While you wait',
-    title: 'The first boot can take a little longer.',
-    body: 'Minecraft may be indexing libraries or compiling shaders. Later launches are usually quicker.',
+    title: 'Initializing graphics & mods.',
+    body: 'Minecraft is loading textures, mods, and shaders in the background. The window will open directly in fullscreen.',
   },
 ];
 
 const activeSlide = ref(0);
 let slideTimer;
 
+function handleKeydown(e) {
+  if (e.key === 'Escape' && props.visible) {
+    close();
+  }
+}
+
 onMounted(() => {
   slideTimer = window.setInterval(() => {
     activeSlide.value = (activeSlide.value + 1) % slides.length;
   }, 5200);
+  window.addEventListener('keydown', handleKeydown);
 });
 
-onBeforeUnmount(() => window.clearInterval(slideTimer));
+onBeforeUnmount(() => {
+  window.clearInterval(slideTimer);
+  window.removeEventListener('keydown', handleKeydown);
+});
 
 async function cancelLaunch() {
   try {
     await api.stopGame();
   } catch (error) {
     console.warn('Unable to stop Minecraft:', error);
+  } finally {
+    emit('close');
+  }
+}
+
+function close() {
+  if (!props.error) {
+    cancelLaunch();
+  } else {
+    emit('close');
   }
 }
 </script>

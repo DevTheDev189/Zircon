@@ -4,16 +4,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#0d1117',
-        card: '#161b22',
-        edge: '#30363d',
+        void: '#070b0f',
+        bg: '#070b0f',
+        surface: '#0d1117',
+        card: '#101820',
+        edge: '#263545',
         accent: '#47d2c9',
+        'accent-bright': '#5adfd5',
+        'accent-deep': '#20b2aa',
+        'accent-ink': '#022623',
         muted: '#8b949e',
         text: '#c9d1d9',
-        danger: '#8b2b2b',
+        danger: '#ef4444',
       },
       fontFamily: {
-        sans: ['"Segoe UI"', 'system-ui', 'sans-serif'],
+        sans: ['"Segoe UI"', 'system-ui', '-apple-system', 'sans-serif'],
       },
     },
   },

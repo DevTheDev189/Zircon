@@ -44,6 +44,7 @@ impl MinecraftRunner {
         &self,
         data: &LaunchData,
         session: &SessionData,
+        java_args: Option<&str>,
         game_dir: &Path,
         server_ip: &str,
         server_port: i32,
@@ -54,7 +55,7 @@ impl MinecraftRunner {
             data,
             Some(session),
             None,
-            None,
+            java_args,
             game_dir,
             Some(server_ip),
             Some(server_port),
@@ -152,7 +153,7 @@ impl MinecraftRunner {
             }
         }
         match session {
-            Some(session) => build_online_command(data, session, game_dir, server_ip, server_port),
+            Some(session) => build_online_command(data, session, java_args, game_dir, server_ip, server_port),
             None => match username {
                 Some(name) => build_offline_command(data, name, java_args, game_dir),
                 None => Err(LauncherError::InvalidInput(
@@ -208,6 +209,7 @@ fn validate_mods_dir(game_dir: &Path) -> Result<(), LauncherError> {
 fn build_online_command(
     data: &LaunchData,
     session: &SessionData,
+    java_args: Option<&str>,
     game_dir: &Path,
     server_ip: Option<&str>,
     server_port: Option<i32>,
@@ -234,7 +236,7 @@ fn build_online_command(
     // -p module path, --add-modules/--add-opens/--add-exports, -D system
     // properties such as -DlibraryDirectory and -DignoreList.
     command.extend(data.jvm_args.iter().cloned());
-    command.push("-Xmx4G".to_string());
+    append_jvm_memory_args(&mut command, java_args);
     command.push(format!(
         "-Djava.library.path={}",
         data.natives_dir.display()
@@ -355,14 +357,25 @@ fn java_executable(java_home: &Path) -> PathBuf {
     java_home.join("bin").join(exe)
 }
 
-/// Appends JVM memory/extra args, defaulting to `-Xmx4G` when blank. Mirrors
-/// the Java `addJvmMemoryArgs` (trim + whitespace split, blanks skipped).
+/// Appends JVM memory and GC flags, defaulting to `-Xms4G -Xmx4G -XX:+UseG1GC` when blank.
+/// Ensures -Xms matches -Xmx when not specified, and adds -XX:+UseG1GC by default if no GC is specified.
 fn append_jvm_memory_args(command: &mut Vec<String>, java_args: Option<&str>) {
     let args = match java_args {
         Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-        _ => "-Xmx4G".to_string(),
+        _ => "-Xms4G -Xmx4G -XX:+UseG1GC".to_string(),
     };
-    command.extend(args.split_whitespace().map(str::to_string));
+    let mut tokens: Vec<String> = args.split_whitespace().map(str::to_string).collect();
+    if !tokens.iter().any(|t| t.starts_with("-XX:+Use") || t.starts_with("-XX:-Use")) {
+        tokens.push("-XX:+UseG1GC".to_string());
+    }
+    if !tokens.iter().any(|t| t.to_ascii_lowercase().starts_with("-xms")) {
+        if let Some(xmx) = tokens.iter().find(|t| t.to_ascii_lowercase().starts_with("-xmx")).cloned() {
+            tokens.push(format!("-Xms{}", &xmx[4..]));
+        } else {
+            tokens.push("-Xms4G".to_string());
+        }
+    }
+    command.extend(tokens);
 }
 
 /// Deterministic v3 UUID for an offline player, derived from the
@@ -490,11 +503,18 @@ fn spawn_game(
 ) -> Result<Child, LauncherError> {
     let mut cmd = Command::new(&command[0]);
     #[cfg(target_os = "windows")]
-    cmd.creation_flags(0x08000000);
+    {
+        // 0x08000000 = CREATE_NO_WINDOW (suppress console window)
+        // 0x00000080 = HIGH_PRIORITY_CLASS (Windows priority scheduling for Minecraft process)
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        const HIGH_PRIORITY_CLASS: u32 = 0x00000080;
+        cmd.creation_flags(CREATE_NO_WINDOW | HIGH_PRIORITY_CLASS);
+    }
     // Untrusted mod code runs inside this JVM: scrub the environment so host
     // secrets (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, ...) can never leak into the
     // game process. Keep only what the JVM needs to function.
     cmd.env_clear();
+
     cmd.envs(std::env::vars().filter(|(k, _)| {
         let upper = k.to_ascii_uppercase();
         matches!(
@@ -801,6 +821,43 @@ mod tests {
         assert!(command.iter().any(|a| a == "-Xms2G"));
         assert!(command.iter().any(|a| a == "-Xmx8G"));
         assert!(!command.iter().any(|a| a == "-Xmx4G"));
+    }
+
+    #[test]
+    fn online_launch_applies_optimized_jvm_memory_args() {
+        let data = launch_data();
+        let game_dir = Path::new("/game");
+        let session = session("msa", "tok123");
+
+        // When java_args is None, defaults to -Xms4G -Xmx4G -XX:+UseG1GC
+        let command = MinecraftRunner::build_launch_command(
+            &data,
+            Some(&session),
+            None,
+            None,
+            game_dir,
+            Some("mc.example.com"),
+            Some(25565),
+        )
+        .unwrap();
+        assert!(command.iter().any(|a| a == "-Xms4G"));
+        assert!(command.iter().any(|a| a == "-Xmx4G"));
+        assert!(command.iter().any(|a| a == "-XX:+UseG1GC"));
+
+        // When custom java_args are supplied, they are honored
+        let command_custom = MinecraftRunner::build_launch_command(
+            &data,
+            Some(&session),
+            None,
+            Some("-Xms8G -Xmx8G -XX:+UseG1GC"),
+            game_dir,
+            Some("mc.example.com"),
+            Some(25565),
+        )
+        .unwrap();
+        assert!(command_custom.iter().any(|a| a == "-Xms8G"));
+        assert!(command_custom.iter().any(|a| a == "-Xmx8G"));
+        assert!(command_custom.iter().any(|a| a == "-XX:+UseG1GC"));
     }
 
     #[test]

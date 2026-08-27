@@ -39,18 +39,25 @@ pub struct SavedServer {
 impl SavedServer {
     /// Creates a server entry. HTTPS is enabled by default for remote hosts
     /// (an on-path attacker could otherwise tamper with BOM/mod downloads over
-    /// plaintext HTTP); loopback addresses keep HTTP for local dev/test
-    /// servers without TLS. Use [`with_https`](Self::with_https) to override.
+    /// plaintext HTTP) or whenever the address begins with `https://`. Loopback
+    /// addresses keep HTTP for local dev/test servers without TLS. Use
+    /// [`with_https`](Self::with_https) to override.
     pub fn new(name: impl Into<String>, address: impl Into<String>, last_played: i64) -> Self {
-        let addr = address.into();
-        let (host, _) = parse_server_address(&addr);
+        let raw_addr = address.into();
+        let is_https = raw_addr.trim().to_lowercase().starts_with("https://");
+        let (host, port) = parse_server_address(&raw_addr);
+        let clean_addr = if port == 25565 {
+            host.clone()
+        } else {
+            format!("{host}:{port}")
+        };
         let is_local = is_loopback_host(&host);
 
         Self {
             name: name.into(),
-            address: addr,
+            address: clean_addr,
             last_played,
-            use_https: !is_local, // HTTPS by default for remote hosts
+            use_https: is_https || !is_local, // HTTPS by default for remote hosts or if specified
             pinned_public_key: None,
         }
     }
@@ -230,15 +237,40 @@ pub fn is_loopback_host(host: &str) -> bool {
         || clean.starts_with("127.")
 }
 
-/// Parses `host[:port]` (IPv4, IPv6 `[::1]:25565`, or bare host) into a
-/// `(host, port)` pair; a blank input resolves to `("localhost", 25565)`.
+/// Parses `[scheme://]host[:port][/path]` into a `(host, port)` pair.
+/// Strips `http://` / `https://` schemes, path segments like `/bom` or `/status`,
+/// and handles IPv4, IPv6 literals, and path-embedded ports (`host/25566`).
+/// Blank input resolves to `("localhost", 25565)`.
 /// Port of the Java `MainController.parseServerAddress`.
 pub fn parse_server_address(input: &str) -> (String, u16) {
-    let address = input.trim();
+    let mut address = input.trim();
     if address.is_empty() {
         return ("localhost".to_string(), 25565);
     }
-    if let Some(after_open) = address.strip_prefix('[') {
+    // Strip scheme if present
+    if let Some(rest) = address
+        .strip_prefix("https://")
+        .or_else(|| address.strip_prefix("http://"))
+        .or_else(|| address.strip_prefix("HTTPS://"))
+        .or_else(|| address.strip_prefix("HTTP://"))
+    {
+        address = rest.trim();
+    }
+
+    // Split host/port from URL path (e.g. "mc.winslow.plus/bom" -> host="mc.winslow.plus", path="/bom")
+    let (host_part, path_part) = match address.find('/') {
+        Some(idx) => (&address[..idx], &address[idx..]),
+        None => (address, ""),
+    };
+
+    // If the path starts with a numeric port (e.g. "/25566" or "/25566/bom"), note it
+    let path_port = path_part
+        .trim_start_matches('/')
+        .split('/')
+        .next()
+        .and_then(|seg| seg.parse::<u16>().ok());
+
+    if let Some(after_open) = host_part.strip_prefix('[') {
         // IPv6 literal: [::1] or [::1]:25565
         if let Some(close) = after_open.find(']') {
             let host = &after_open[..close];
@@ -246,16 +278,17 @@ pub fn parse_server_address(input: &str) -> (String, u16) {
             let port = rest
                 .strip_prefix(':')
                 .and_then(|p| p.parse::<u16>().ok())
+                .or(path_port)
                 .unwrap_or(25565);
             return (host.to_string(), port);
         }
     }
-    match address.rsplit_once(':') {
+    match host_part.rsplit_once(':') {
         Some((host, port)) => match port.parse::<u16>() {
             Ok(port) => (host.to_string(), port),
-            Err(_) => (host.to_string(), 25565),
+            Err(_) => (host.to_string(), path_port.unwrap_or(25565)),
         },
-        None => (address.to_string(), 25565),
+        None => (host_part.to_string(), path_port.unwrap_or(25565)),
     }
 }
 
@@ -466,6 +499,26 @@ mod tests {
         assert_eq!(
             ("host".to_string(), 25565),
             parse_server_address("host:notaport")
+        );
+        assert_eq!(
+            ("mc.winslow.plus".to_string(), 25565),
+            parse_server_address("https://mc.winslow.plus/bom")
+        );
+        assert_eq!(
+            ("mc.winslow.plus".to_string(), 25565),
+            parse_server_address("https://mc.winslow.plus")
+        );
+        assert_eq!(
+            ("mc.winslow.plus".to_string(), 25566),
+            parse_server_address("https://mc.winslow.plus:25566/bom")
+        );
+        assert_eq!(
+            ("mc.winslow.plus".to_string(), 25566),
+            parse_server_address("mc.winslow.plus/25566")
+        );
+        assert_eq!(
+            ("127.0.0.1".to_string(), 25566),
+            parse_server_address("http://127.0.0.1:25566/status")
         );
     }
 

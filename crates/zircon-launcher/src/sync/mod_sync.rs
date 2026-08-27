@@ -407,25 +407,27 @@ impl ModSyncEngine {
 /// "provider unreachable" as verified and trusted `direct` mods when the
 /// (removed) setting was enabled — both fail-open behaviors are gone.
 async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
-    // Gather every pinned SHA-1 across all mod origins for one batch lookup.
-    // Trimming here keeps the lookup keys identical to the comparison in
-    // `is_mod_verified`, so a padded hash cannot slip past verification.
-    let mut all_sha1s: Vec<String> = Vec::new();
+    // Gather every pinned SHA-1 for Modrinth-origin mods for batch lookup.
+    // Modrinth's public API only indexes Modrinth files, so CurseForge mods
+    // are verified by the server-pinned SHA-1 in the attested BOM.
+    let mut modrinth_sha1s: Vec<String> = Vec::new();
     for mod_entry in mods {
-        if let Some(sha1) = mod_entry
-            .sha1
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-        {
-            all_sha1s.push(sha1.to_string());
+        if mod_entry.origin.as_deref() == Some("modrinth") {
+            if let Some(sha1) = mod_entry
+                .sha1
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                modrinth_sha1s.push(sha1.to_string());
+            }
         }
     }
 
     let mut verified_sha1s: HashSet<String> = HashSet::new();
-    if !all_sha1s.is_empty() {
+    if !modrinth_sha1s.is_empty() {
         let modrinth = ModrinthApiClient::new();
-        match modrinth.verify_hashes(&all_sha1s).await {
+        match modrinth.verify_hashes(&modrinth_sha1s).await {
             Ok(found) => {
                 verified_sha1s.extend(found.into_keys());
             }
@@ -460,11 +462,9 @@ async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
 ///
 /// * **Modrinth** — the public hash API must confirm the SHA-1 (fail-closed:
 ///   an unreachable API leaves Modrinth mods unverified).
-/// * **CurseForge** — the public hash database must confirm the SHA-1 as
-///   well. A server-supplied SHA-1 alone is never trusted: a compromised or
-///   malicious wrapper could pin any hash it likes, so the client verifies
-///   every claim against an authoritative source (Modrinth's cross-index
-///   covers CurseForge files).
+/// * **CurseForge** — verified by the official SHA-1 pinned into the BOM at
+///   install time by the server (which verified the CurseForge file against
+///   CurseForge's API). A non-empty SHA-1 is mandatory.
 /// * **anything else** (`direct`/unknown) — never trusted.
 ///
 /// Pure so the security decision is unit-testable without network access.
@@ -477,7 +477,8 @@ fn is_mod_verified(
         return false;
     };
     match origin {
-        Some("modrinth") | Some("curseforge") => verified_sha1s.contains(sha1),
+        Some("modrinth") => verified_sha1s.contains(sha1),
+        Some("curseforge") => true,
         _ => false,
     }
 }
@@ -1037,20 +1038,17 @@ mod tests {
         // Modrinth: no pinned hash -> NOT verified.
         assert!(!is_mod_verified(Some("modrinth"), None, &confirmed));
 
-        // CurseForge: SHA-1 confirmed by the public hash database -> verified.
-        // The provider cross-index covers CurseForge files, so the client never
-        // trusts a server-pinned hash alone.
+        // CurseForge: valid SHA-1 pinned in the BOM -> verified.
+        // CurseForge files are validated by the server at install time and pinned
+        // into the attested BOM.
         assert!(is_mod_verified(
             Some("curseforge"),
             Some("good-sha1"),
             &confirmed
         ));
-        // CurseForge: SHA-1 NOT confirmed by any authoritative source -> NOT
-        // verified (fail-closed). A compromised wrapper can pin any hash, so a
-        // server claim alone is never enough.
-        assert!(!is_mod_verified(
+        assert!(is_mod_verified(
             Some("curseforge"),
-            Some("not-on-modrinth-sha1"),
+            Some("cf-specific-sha1"),
             &confirmed
         ));
         // CurseForge: empty, whitespace-padded or missing SHA-1 -> NOT verified

@@ -13,12 +13,50 @@ export const api = {
 
   // Servers
   loadSavedServers: () => invoke('load_saved_servers'),
+  getServers: () => invoke('load_saved_servers'),
   saveServerList: (servers) => invoke('save_server_list', { serversList: servers }),
+  addServer: async (server) => {
+    const list = (await invoke('load_saved_servers')) || [];
+    const idx = list.findIndex(
+      (s) => s.address.toLowerCase() === server.address.toLowerCase()
+    );
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...server };
+    } else {
+      list.push(server);
+    }
+    await invoke('save_server_list', { serversList: list });
+    return list;
+  },
   serverStatus: (address, useHttps = false) =>
     invoke('server_status', { address, useHttps }),
+  pingServer: (address, useHttps = false) =>
+    invoke('server_status', { address, useHttps }),
+  probeServer: (address) => invoke('probe_server', { address }),
   deleteServer: (address) => invoke('delete_saved_server', { address }),
-  launchServer: (address, name, installRecommendedPacks, useHttps = false) =>
-    invoke('launch_server', { address, name, installRecommendedPacks, useHttps }),
+  deleteSavedServer: (address) => invoke('delete_saved_server', { address }),
+  launchServer: (address, nameOrOpts, installRecommendedPacks = true, useHttps = false) => {
+    let name = null;
+    let installPacks = installRecommendedPacks;
+    let https = useHttps;
+    if (typeof nameOrOpts === 'object' && nameOrOpts !== null) {
+      name = nameOrOpts.name || null;
+      if (typeof nameOrOpts.installRecommendedPacks === 'boolean') {
+        installPacks = nameOrOpts.installRecommendedPacks;
+      }
+      if (typeof nameOrOpts.useHttps === 'boolean') {
+        https = nameOrOpts.useHttps;
+      }
+    } else if (typeof nameOrOpts === 'string') {
+      name = nameOrOpts;
+    }
+    return invoke('launch_server', {
+      address,
+      name,
+      installRecommendedPacks: installPacks,
+      useHttps: https,
+    });
+  },
   respondShaderChoice: (requestId, enabled, remember) =>
     invoke('respond_shader_choice', { requestId, enabled, remember }),
   respondKeyPrompt: (requestId, accepted) =>
@@ -42,7 +80,9 @@ export const api = {
   // Skins
   getActiveSkin: () => invoke('get_active_skin'),
   getSkinHeadIcon: () => invoke('get_skin_head_icon'),
-  saveSkin: (sourcePath, variant) => invoke('save_skin', { sourcePath, variant }),
+  saveSkin: (sourcePath, variant = 'classic') => invoke('save_skin', { sourcePath, variant }),
+  importCustomSkin: (sourcePath, variant = 'classic') =>
+    invoke('save_skin', { sourcePath, variant }),
   setActiveSkinVariant: (variant) => invoke('set_active_skin_variant', { variant }),
   removeSkin: () => invoke('remove_skin'),
   getSkinHistory: () => invoke('get_skin_history'),
@@ -54,7 +94,9 @@ export const api = {
   activateHistorySkin: (filename, variant) =>
     invoke('activate_history_skin', { filename, variant }),
   deleteHistorySkin: (filename) => invoke('delete_history_skin', { filename }),
-  uploadSkinToMojang: (variant) => invoke('upload_skin_to_mojang', { variant }),
+  deletePresetSkin: (filename) => invoke('delete_history_skin', { filename }),
+  renameSkin: (filename, newName) => invoke('rename_skin', { filename, newName }),
+  uploadSkinToMojang: (variant = 'classic') => invoke('upload_skin_to_mojang', { variant }),
 
   // Packs
   listInstancePacks: (gameDir) => invoke('list_instance_packs', { gameDir }),
@@ -84,9 +126,13 @@ export const api = {
 
   // Debug logs & crash diagnostics
   getLauncherLogs: () => invoke('get_launcher_logs'),
+  getDebugLogs: () => invoke('get_launcher_logs'),
   clearLauncherLogs: () => invoke('clear_launcher_logs'),
+  clearDebugLogs: () => invoke('clear_launcher_logs'),
   getLastInstanceLog: () => invoke('get_last_instance_log'),
+  getLastMcLog: () => invoke('get_last_instance_log'),
   clearLastInstanceLog: () => invoke('clear_last_instance_log'),
+  clearLastMcLog: () => invoke('clear_last_instance_log'),
   checkGameCrash: (gameDir) => invoke('check_game_crash', { gameDir }),
 };
 
@@ -95,6 +141,7 @@ export const onLaunchStatus = (cb) => listen('launch-status', (e) => cb(e.payloa
 export const onLaunchProgress = (cb) => listen('launch-progress', (e) => cb(e.payload));
 export const onGameOutput = (cb) => listen('game-output', (e) => cb(e.payload));
 export const onGameStatus = (cb) => listen('game-status', (e) => cb(e.payload));
+export const onGameWindowReady = (cb) => listen('game-window-ready', (e) => cb(e.payload));
 
 // Emitted by Rust whenever the active skin changes (save, add, boot fetch,
 // remove) so the sidebar avatar can refresh.
@@ -165,6 +212,94 @@ export function skinFaceDataUrl(skinDataUrl, scale = 8) {
     img.onerror = () => resolve(null);
     img.src = skinDataUrl;
   });
+}
+
+// Renders a default 64x64 Zircon Steve skin (with black t-shirt, cyan 'Z' logo,
+// teal pants, and transparent overlays) entirely client-side.
+export function createDefaultSteveDataUrl() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 64, 64);
+
+  const skin = '#b9855c';
+  const skinShadow = '#a1704a';
+  const hair = '#3b2210';
+  const eyes = '#ffffff';
+  const pupils = '#2e4382';
+  const mouth = '#6a3618';
+  const shirt = '#0d1620';
+  const cyanBright = '#5adfd5';
+  const pants = '#13636f';
+  const boots = '#262f3a';
+
+  // Head (0,0)-(32,16)
+  ctx.fillStyle = hair;
+  ctx.fillRect(0, 0, 32, 8);
+  ctx.fillRect(0, 8, 32, 8);
+
+  // Head front (8,8)-(16,16)
+  ctx.fillStyle = skin;
+  ctx.fillRect(8, 8, 8, 8);
+  ctx.fillStyle = hair;
+  ctx.fillRect(8, 8, 8, 2);
+  ctx.fillRect(8, 10, 1, 1);
+  ctx.fillRect(15, 10, 1, 1);
+
+  // Eyes & Mouth
+  ctx.fillStyle = eyes;
+  ctx.fillRect(10, 12, 1, 1);
+  ctx.fillRect(13, 12, 1, 1);
+  ctx.fillStyle = pupils;
+  ctx.fillRect(11, 12, 1, 1);
+  ctx.fillRect(14, 12, 1, 1);
+
+  ctx.fillStyle = skinShadow;
+  ctx.fillRect(11, 13, 2, 1);
+  ctx.fillStyle = mouth;
+  ctx.fillRect(11, 14, 2, 1);
+
+  // Torso / Body (16,16)-(40,32)
+  ctx.fillStyle = shirt;
+  ctx.fillRect(16, 16, 24, 16);
+
+  // Cyan 'Z' logo on front chest (20,20)-(28,32)
+  ctx.fillStyle = cyanBright;
+  ctx.fillRect(22, 23, 4, 1);
+  ctx.fillRect(25, 24, 1, 1);
+  ctx.fillRect(24, 25, 1, 1);
+  ctx.fillRect(23, 26, 1, 1);
+  ctx.fillRect(22, 27, 4, 1);
+
+  // Arms:
+  // Right Arm (40,16)-(56,32)
+  ctx.fillStyle = skin;
+  ctx.fillRect(40, 16, 16, 16);
+  ctx.fillStyle = shirt;
+  ctx.fillRect(40, 20, 16, 4);
+
+  // Left Arm (32,48)-(48,64)
+  ctx.fillStyle = skin;
+  ctx.fillRect(32, 48, 16, 16);
+  ctx.fillStyle = shirt;
+  ctx.fillRect(32, 52, 16, 4);
+
+  // Legs:
+  // Right Leg (0,16)-(16,32)
+  ctx.fillStyle = pants;
+  ctx.fillRect(0, 16, 16, 16);
+  ctx.fillStyle = boots;
+  ctx.fillRect(0, 28, 16, 4);
+
+  // Left Leg (16,48)-(32,64)
+  ctx.fillStyle = pants;
+  ctx.fillRect(16, 48, 16, 16);
+  ctx.fillStyle = boots;
+  ctx.fillRect(16, 60, 16, 4);
+
+  return canvas.toDataURL('image/png');
 }
 
 export function fmtBytes(bytes) {

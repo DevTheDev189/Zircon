@@ -1,21 +1,21 @@
 <template>
-  <div class="flex items-center gap-3 px-4 py-2 border-t border-edge bg-card">
+  <div class="flex items-center gap-3 px-4 py-2 border-t border-slate-800/80 bg-[#0a0f14]">
     <span
-      class="w-2 h-2 rounded-full shrink-0"
+      class="w-2 h-2 rounded-full shrink-0 shadow-sm"
       :class="dotClass"
       :title="status || 'Ready.'"
     ></span>
-    <div class="flex-1 truncate text-xs" :class="textClass">
+    <div class="flex-1 truncate text-xs font-medium" :class="textClass">
       {{ status || 'Ready.' }}
     </div>
-    <div v-if="busy || progress !== null" class="w-40 h-1.5 bg-bg rounded-full overflow-hidden ring-1 ring-inset ring-edge">
+    <div v-if="busy || progress !== null" class="w-44 h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
       <div
         v-if="busy && progress === null"
-        class="h-full w-1/3 bg-gradient-to-r from-accent to-[#2ba89e] rounded-full animate-indeterminate"
+        class="h-full w-1/3 bg-gradient-to-r from-[#5adfd5] via-accent to-[#20b2aa] rounded-full animate-indeterminate shadow-[0_0_8px_rgba(71,210,201,0.4)]"
       ></div>
       <div
         v-else
-        class="h-full bg-gradient-to-r from-accent to-[#2ba89e] rounded-full transition-all"
+        class="h-full bg-gradient-to-r from-[#5adfd5] via-accent to-[#20b2aa] rounded-full transition-all shadow-[0_0_8px_rgba(71,210,201,0.4)]"
         :style="{ width: `${Math.round((progress ?? 0) * 100)}%` }"
       ></div>
     </div>
@@ -48,10 +48,10 @@ const props = defineProps({
 const isError = computed(() => props.status.toLowerCase().includes('error'));
 
 const dotClass = computed(() => {
-  if (isError.value) return 'bg-[#f85149]';
-  if (props.busy) return 'bg-accent animate-pulse';
-  return 'bg-[#3fb950]';
+  if (isError.value) return 'bg-[#f87171] shadow-[0_0_8px_#f87171]';
+  if (props.busy) return 'bg-accent animate-pulse shadow-[0_0_8px_#47d2c9]';
+  return 'bg-[#4ade80] shadow-[0_0_6px_#4ade80]';
 });
 
-const textClass = computed(() => (isError.value ? 'text-[#f85149]' : 'text-muted'));
+const textClass = computed(() => (isError.value ? 'text-[#f87171]' : (props.busy ? 'text-cyan-300' : 'text-slate-400')));
 </script>

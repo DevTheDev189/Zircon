@@ -2,80 +2,197 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body,
-#app {
-  height: 100%;
-  margin: 0;
-  background-color: #0d1117;
-  color: #c9d1d9;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  overflow: hidden;
-  user-select: none;
-}
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #070b0f;
+  }
+  body {
+    @apply bg-[#070b0f] text-text font-sans antialiased select-none;
+  }
 
-/* Zircon teal scrollbars for the dark theme */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #30363d;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #47d2c9;
+  /* Sleek custom scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(51, 65, 85, 0.45);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(71, 210, 201, 0.4);
+  }
 }
 
 @layer components {
-  .z-card {
-    @apply bg-card border border-edge rounded-xl p-4;
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+  /* 2026 High-Tech Glassmorphism Tokens */
+  .z-card,
+  .z-glass-card,
+  .zircon-glass-card {
+    background: rgba(13, 21, 28, 0.78);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(51, 65, 85, 0.55);
+    border-radius: 0.875rem;
+    padding: 1.25rem;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 8px 32px rgba(0, 0, 0, 0.45);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
+
   .z-btn {
-    @apply px-3 py-1.5 rounded-md text-sm font-semibold cursor-pointer border border-transparent
+    @apply px-3.5 py-1.5 rounded-lg text-sm font-semibold cursor-pointer border border-transparent
       disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50
-      focus-visible:ring-offset-1 focus-visible:ring-offset-card;
+      focus-visible:ring-offset-1 focus-visible:ring-offset-[#0d151c];
   }
-  .z-btn-accent {
-    @apply z-btn bg-gradient-to-br from-[#5adfd5] to-[#2ba89e] text-[#032b28]
-      shadow-md shadow-accent/20 hover:brightness-105 hover:shadow-lg hover:shadow-accent/30
-      active:translate-y-px;
+
+  .z-btn-accent,
+  .zircon-cta-btn {
+    background: linear-gradient(135deg, #5adfd5 0%, #47d2c9 50%, #20b2aa 100%);
+    color: #022623;
+    font-weight: 700;
+    box-shadow: 0 4px 18px rgba(71, 210, 201, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .z-btn-ghost {
-    @apply z-btn bg-[#1c232b] text-accent border-edge/60 hover:bg-[#242c35] hover:border-accent/40;
+  .z-btn-accent:hover:not(:disabled),
+  .zircon-cta-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #7be3dc 0%, #5adfd5 50%, #25b5aa 100%);
+    box-shadow: 0 6px 24px rgba(71, 210, 201, 0.5);
+    transform: translateY(-1px);
   }
+  .z-btn-accent:active:not(:disabled),
+  .zircon-cta-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 2px 10px rgba(71, 210, 201, 0.3);
+  }
+
+  .z-btn-ghost,
+  .z-btn-secondary {
+    background: rgba(28, 37, 48, 0.6);
+    color: #c9d1d9;
+    border: 1px solid rgba(51, 65, 85, 0.6);
+    backdrop-filter: blur(8px);
+  }
+  .z-btn-ghost:hover:not(:disabled),
+  .z-btn-secondary:hover:not(:disabled) {
+    background: rgba(36, 47, 61, 0.8);
+    border-color: rgba(71, 210, 201, 0.45);
+    color: #47d2c9;
+    box-shadow: 0 0 12px rgba(71, 210, 201, 0.15);
+  }
+
   .z-btn-danger {
-    @apply z-btn bg-danger text-white hover:brightness-125;
+    background: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
   }
+  .z-btn-danger:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.32);
+    border-color: #ef4444;
+    color: #ffffff;
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.3);
+  }
+
   .z-input {
-    @apply bg-bg border border-edge rounded-md px-3 py-1.5 text-sm text-text
-      placeholder:text-muted focus:outline-none focus:border-accent focus:ring-2
-      focus:ring-accent/20 w-full transition-shadow;
+    background: #070b0f;
+    border: 1px solid rgba(51, 65, 85, 0.7);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: #e6edf3;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
   }
+  .z-input::placeholder {
+    color: #8b949e;
+  }
+  .z-input:focus {
+    outline: none;
+    border-color: #47d2c9;
+    box-shadow: 0 0 0 2px rgba(71, 210, 201, 0.25);
+  }
+
   .z-label {
-    @apply text-xs text-muted;
+    font-size: 0.75rem;
+    color: #8b949e;
   }
   .z-section {
-    @apply text-sm font-bold text-text tracking-wide;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #f0f6fc;
+    letter-spacing: 0.025em;
   }
+
   .z-toggle {
-    @apply relative inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-edge/60
-      border border-edge cursor-pointer transition-colors duration-150
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50;
+    position: relative;
+    display: inline-flex;
+    height: 1.125rem;
+    width: 2rem;
+    flex-shrink: 0;
+    align-items: center;
+    border-radius: 9999px;
+    background: rgba(33, 44, 56, 0.8);
+    border: 1px solid rgba(51, 65, 85, 0.8);
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+  }
+  .z-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(71, 210, 201, 0.5);
   }
   .z-toggle-on {
-    @apply bg-accent/80 border-accent;
+    background: #47d2c9;
+    border-color: #5adfd5;
+    box-shadow: 0 0 10px rgba(71, 210, 201, 0.4);
   }
   .z-toggle-thumb {
-    @apply inline-block h-2.5 w-2.5 translate-x-0.5 transform rounded-full bg-white
-      shadow transition-transform duration-150;
+    display: inline-block;
+    height: 0.75rem;
+    width: 0.75rem;
+    transform: translateX(2px);
+    border-radius: 9999px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .z-toggle-on .z-toggle-thumb {
-    @apply translate-x-3.5;
+    transform: translateX(1rem);
+    background-color: #022623;
   }
+
+  .zircon-drop-zone {
+    background: radial-gradient(circle at 50% 30%, rgba(71, 210, 201, 0.06), rgba(13, 21, 28, 0.75));
+    border: 2px dashed rgba(71, 210, 201, 0.35);
+    border-radius: 0.75rem;
+    transition: all 0.2s ease-in-out;
+  }
+  .zircon-drop-zone:hover,
+  .zircon-drop-zone.dragging {
+    background: radial-gradient(circle at 50% 30%, rgba(71, 210, 201, 0.14), rgba(13, 21, 28, 0.9));
+    border-color: #47d2c9;
+    box-shadow: 0 0 25px rgba(71, 210, 201, 0.25);
+  }
+
+  .zircon-progress-bar {
+    background: linear-gradient(90deg, #47d2c9, #7be3dc, #47d2c9);
+    background-size: 200% 100%;
+    animation: zircon-shimmer 2s infinite linear;
+    box-shadow: 0 0 12px rgba(71, 210, 201, 0.6);
+  }
+}
+
+@keyframes zircon-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }

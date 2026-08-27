@@ -36,44 +36,67 @@ impl SkinManager {
     /// previous active moves to history and the new skin becomes active.
     pub fn save_skin(source_png: &Path, variant: &str) -> Result<(), LauncherError> {
         let bytes = std::fs::read(source_png)?;
-        Self::set_active_png(&bytes, variant, true)
+        let name = source_png
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "custom_skin.png".to_string());
+        let safe_name = sanitize_filename(&name);
+        Self::set_active_png_with_name(&bytes, variant, Some(&safe_name), true)
     }
 
     /// Archives a skin PNG into the history folder under a timestamped name so
     /// repeated uploads never overwrite each other, writes the arm variant to a
     /// sibling JSON sidecar, then prunes the oldest entries beyond the limit.
     pub fn save_to_history(source_png: &Path, variant: &str) -> Result<(), LauncherError> {
-        std::fs::create_dir_all(skin_history_dir())?;
-        let mut safe_name = source_png
+        let name = source_png
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        safe_name = safe_name
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect();
-        if !safe_name.to_ascii_lowercase().ends_with(".png") {
-            safe_name.push_str(".png");
+            .unwrap_or_else(|| "skin.png".to_string());
+        Self::save_to_history_with_name(source_png, variant, &name)
+    }
+
+    /// Archives a skin PNG into history with an explicit filename in the sidecar.
+    /// If an identical skin already exists in history, it avoids creating a duplicate file.
+    pub fn save_to_history_with_name(
+        source_png: &Path,
+        variant: &str,
+        name: &str,
+    ) -> Result<(), LauncherError> {
+        std::fs::create_dir_all(skin_history_dir())?;
+        let bytes = std::fs::read(source_png)?;
+        if bytes.is_empty() {
+            return Ok(());
         }
+
+        // Avoid adding duplicates if a history skin with the identical bytes already exists
+        let history = Self::get_skin_history();
+        for existing_path in &history {
+            if let Ok(existing_bytes) = std::fs::read(existing_path) {
+                if existing_bytes == bytes {
+                    let variant = normalize_variant(variant);
+                    let safe_name = sanitize_filename(name);
+                    let sidecar = existing_path.with_extension("json");
+                    let _ = std::fs::write(&sidecar, skin_sidecar_json(&variant, Some(&safe_name)));
+                    return Ok(());
+                }
+            }
+        }
+
+        let safe_name = sanitize_filename(name);
         let target = skin_history_dir().join(format!("{}-{safe_name}", now_millis()));
-        std::fs::copy(source_png, &target)?;
+        std::fs::write(&target, &bytes)?;
         let variant = normalize_variant(variant);
         std::fs::write(
             target.with_extension("json"),
-            variant_sidecar_json(&variant),
+            skin_sidecar_json(&variant, Some(&safe_name)),
         )?;
         Self::prune_history();
         Ok(())
     }
 
     /// History skin files ordered by modification time, newest first (empty
-    /// when the history folder does not exist yet).
+    /// when the history folder does not exist yet). Automatically removes any duplicate
+    /// skin entries with identical PNG bytes from disk.
     pub fn get_skin_history() -> Vec<PathBuf> {
         let Ok(entries) = std::fs::read_dir(skin_history_dir()) else {
             return Vec::new();
@@ -85,7 +108,23 @@ impl SkinManager {
             .collect();
         files.sort_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok());
         files.reverse();
-        files
+
+        let mut unique_files: Vec<PathBuf> = Vec::new();
+        let mut seen_bytes: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
+
+        for file in files {
+            if let Ok(bytes) = std::fs::read(&file) {
+                if seen_bytes.insert(bytes) {
+                    unique_files.push(file);
+                } else {
+                    // Automatically clean up duplicate history file and sidecar from disk
+                    let _ = std::fs::remove_file(&file);
+                    let _ = std::fs::remove_file(file.with_extension("json"));
+                }
+            }
+        }
+
+        unique_files
     }
 
     /// Drops the oldest history files beyond [`HISTORY_LIMIT`] (best-effort),
@@ -113,6 +152,12 @@ impl SkinManager {
         active_skin_file()
     }
 
+    /// The display filename recorded for the active custom skin.
+    pub fn active_name() -> String {
+        read_name_sidecar(&active_skin_variant_file())
+            .unwrap_or_else(|| "active_skin.png".to_string())
+    }
+
     /// Deletes the active skin file (missing file is a no-op), including its
     /// variant sidecar.
     pub fn reset_skin() -> Result<(), LauncherError> {
@@ -125,25 +170,54 @@ impl SkinManager {
     }
 
     /// Replaces the active skin with `png` bytes and its arm `variant`.
+    pub fn set_active_png(
+        png: &[u8],
+        variant: &str,
+        push_previous: bool,
+    ) -> Result<(), LauncherError> {
+        Self::set_active_png_with_name(png, variant, None, push_previous)
+    }
+
+    /// Replaces the active skin with `png` bytes, its arm `variant`, and optional `name`.
     /// `push_previous` archives the current active skin into history first
     /// (used by explicit user saves so old skins stay recoverable); boot-time
     /// refreshes pass `false` so every launch does not spam history. Skins that
     /// are byte-identical to the current active are not re-pushed.
-    pub fn set_active_png(
+    pub fn set_active_png_with_name(
         png: &[u8],
         variant: &str,
+        name: Option<&str>,
         push_previous: bool,
     ) -> Result<(), LauncherError> {
         std::fs::create_dir_all(skins_dir())?;
         if push_previous && active_skin_file().is_file() {
             let current = std::fs::read(active_skin_file()).unwrap_or_default();
             if current != png {
-                Self::save_to_history(&active_skin_file(), &Self::active_variant())?;
+                let prev_name = Self::active_name();
+                let prev_variant = Self::active_variant();
+                Self::save_to_history_with_name(
+                    &active_skin_file(),
+                    &prev_variant,
+                    &prev_name,
+                )?;
             }
         }
         std::fs::write(active_skin_file(), png)?;
         let variant = normalize_variant(variant);
-        std::fs::write(active_skin_variant_file(), variant_sidecar_json(&variant))?;
+        let final_name = name
+            .map(sanitize_filename)
+            .or_else(|| {
+                if active_skin_variant_file().is_file() {
+                    read_name_sidecar(&active_skin_variant_file())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "active_skin.png".to_string());
+        std::fs::write(
+            active_skin_variant_file(),
+            skin_sidecar_json(&variant, Some(&final_name)),
+        )?;
         Ok(())
     }
 
@@ -162,10 +236,80 @@ impl SkinManager {
         let source = skin_history_dir().join(filename);
         let bytes = std::fs::read(&source)
             .map_err(|_| LauncherError::NotFound(format!("History skin not found: {filename}")))?;
+        let (recorded_variant, recorded_name) = read_skin_sidecar(&source.with_extension("json"));
         let variant = variant_override
             .map(normalize_variant)
-            .unwrap_or_else(|| Self::variant_of(&source));
-        Self::set_active_png(&bytes, &variant, true)
+            .unwrap_or(recorded_variant);
+        let clean_name = recorded_name.unwrap_or_else(|| {
+            strip_timestamp_prefix(filename).to_string()
+        });
+        Self::set_active_png_with_name(&bytes, &variant, Some(&clean_name), true)
+    }
+
+    /// Renames the active skin (when `history_filename` is `None` or `"active_skin"`)
+    /// or a saved history skin (renaming the PNG and sidecar JSON files).
+    pub fn rename_skin(
+        history_filename: Option<&str>,
+        new_name: &str,
+    ) -> Result<String, LauncherError> {
+        let safe_name = sanitize_filename(new_name);
+        if safe_name.trim().is_empty() {
+            return Err(LauncherError::InvalidInput(
+                "Skin name cannot be empty".to_string(),
+            ));
+        }
+
+        match history_filename {
+            None | Some("active_skin") | Some("active_skin.png") => {
+                if !Self::has_custom_skin() {
+                    return Err(LauncherError::NotFound(
+                        "No active custom skin found to rename".to_string(),
+                    ));
+                }
+                let variant = Self::active_variant();
+                std::fs::write(
+                    active_skin_variant_file(),
+                    skin_sidecar_json(&variant, Some(&safe_name)),
+                )?;
+                Ok(safe_name)
+            }
+            Some(old_file) => {
+                if !is_safe_skin_filename(old_file) {
+                    return Err(LauncherError::InvalidInput(format!(
+                        "Invalid history skin name: {old_file}"
+                    )));
+                }
+                let history_dir = skin_history_dir();
+                let old_png_path = history_dir.join(old_file);
+                if !old_png_path.is_file() {
+                    return Err(LauncherError::NotFound(format!(
+                        "History skin not found: {old_file}"
+                    )));
+                }
+
+                let ts_prefix = extract_timestamp_prefix(old_file);
+                let new_filename = if let Some(ts) = ts_prefix {
+                    format!("{ts}-{safe_name}")
+                } else {
+                    format!("{}-{safe_name}", now_millis())
+                };
+
+                let new_png_path = history_dir.join(&new_filename);
+                let old_json_path = old_png_path.with_extension("json");
+                let new_json_path = new_png_path.with_extension("json");
+
+                let variant = Self::variant_of(&old_png_path);
+
+                std::fs::rename(&old_png_path, &new_png_path)?;
+                let _ = std::fs::remove_file(&old_json_path);
+                std::fs::write(
+                    &new_json_path,
+                    skin_sidecar_json(&variant, Some(&safe_name)),
+                )?;
+
+                Ok(new_filename)
+            }
+        }
     }
 
     /// Deletes a history skin entry (PNG + variant sidecar). Deleting a missing
@@ -206,7 +350,11 @@ impl SkinManager {
             return Ok(());
         }
         let variant = normalize_variant(variant);
-        std::fs::write(active_skin_variant_file(), variant_sidecar_json(&variant))?;
+        let name = Self::active_name();
+        std::fs::write(
+            active_skin_variant_file(),
+            skin_sidecar_json(&variant, Some(&name)),
+        )?;
         Ok(())
     }
 
@@ -288,25 +436,64 @@ fn normalize_variant(variant: &str) -> String {
     }
 }
 
-/// Reads a `{"variant": ...}` sidecar file, defaulting to `classic` when the
+/// Reads a `{"variant": ..., "name": ...}` sidecar file, defaulting to `classic` when the
 /// file is missing or corrupt.
-fn read_variant_sidecar(file: &Path) -> String {
+fn read_skin_sidecar(file: &Path) -> (String, Option<String>) {
     let Ok(text) = std::fs::read_to_string(file) else {
-        return "classic".to_string();
+        return ("classic".to_string(), None);
     };
     match serde_json::from_str::<serde_json::Value>(&text) {
-        Ok(value) => value
-            .get("variant")
-            .and_then(|v| v.as_str())
-            .map(normalize_variant)
-            .unwrap_or_else(|| "classic".to_string()),
-        Err(_) => "classic".to_string(),
+        Ok(value) => {
+            let variant = value
+                .get("variant")
+                .and_then(|v| v.as_str())
+                .map(normalize_variant)
+                .unwrap_or_else(|| "classic".to_string());
+            let name = value
+                .get("name")
+                .and_then(|n| n.as_str())
+                .map(|n| n.to_string());
+            (variant, name)
+        }
+        Err(_) => ("classic".to_string(), None),
     }
 }
 
-/// Serializes a variant sidecar file's contents.
-fn variant_sidecar_json(variant: &str) -> String {
-    serde_json::json!({ "variant": variant }).to_string()
+fn read_variant_sidecar(file: &Path) -> String {
+    read_skin_sidecar(file).0
+}
+
+fn read_name_sidecar(file: &Path) -> Option<String> {
+    read_skin_sidecar(file).1
+}
+
+/// Serializes a variant + name sidecar file's contents.
+fn skin_sidecar_json(variant: &str, name: Option<&str>) -> String {
+    if let Some(n) = name {
+        serde_json::json!({ "variant": variant, "name": n }).to_string()
+    } else {
+        serde_json::json!({ "variant": variant }).to_string()
+    }
+}
+
+fn strip_timestamp_prefix(filename: &str) -> &str {
+    if let Some(pos) = filename.find('-') {
+        let (digits, rest) = filename.split_at(pos);
+        if !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()) {
+            return &rest[1..];
+        }
+    }
+    filename
+}
+
+fn extract_timestamp_prefix(filename: &str) -> Option<&str> {
+    if let Some(pos) = filename.find('-') {
+        let (digits, _) = filename.split_at(pos);
+        if !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()) {
+            return Some(digits);
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------
@@ -483,10 +670,11 @@ fn textures_object(profile: &serde_json::Value) -> Option<serde_json::Value> {
 }
 
 fn sanitize_filename(name: &str) -> String {
-    if name.trim().is_empty() {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
         return "skin.png".to_string();
     }
-    let sanitized: String = name
+    let mut sanitized: String = trimmed
         .chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
@@ -496,7 +684,10 @@ fn sanitize_filename(name: &str) -> String {
             }
         })
         .collect();
-    if sanitized.is_empty() {
+    if !sanitized.to_ascii_lowercase().ends_with(".png") {
+        sanitized.push_str(".png");
+    }
+    if sanitized.trim() == ".png" {
         "skin.png".to_string()
     } else {
         sanitized
@@ -572,17 +763,20 @@ mod tests {
         let png = dir.path().join("history.png");
         let sidecar = png.with_extension("json");
 
-        // Missing sidecar -> classic.
+        // Missing sidecar -> classic, None name.
         assert_eq!("classic", read_variant_sidecar(&sidecar));
+        assert_eq!(None, read_name_sidecar(&sidecar));
 
-        // Corrupt sidecar -> classic.
+        // Corrupt sidecar -> classic, None name.
         std::fs::write(&sidecar, "{nope").unwrap();
         assert_eq!("classic", read_variant_sidecar(&sidecar));
+        assert_eq!(None, read_name_sidecar(&sidecar));
 
         // Slim round-trips; unknown values normalize to classic.
-        std::fs::write(&sidecar, variant_sidecar_json("slim")).unwrap();
+        std::fs::write(&sidecar, skin_sidecar_json("slim", Some("CoolSkin.png"))).unwrap();
         assert_eq!("slim", read_variant_sidecar(&sidecar));
-        std::fs::write(&sidecar, variant_sidecar_json("weird")).unwrap();
+        assert_eq!(Some("CoolSkin.png".to_string()), read_name_sidecar(&sidecar));
+        std::fs::write(&sidecar, skin_sidecar_json("weird", None)).unwrap();
         assert_eq!("classic", read_variant_sidecar(&sidecar));
     }
 
@@ -601,19 +795,7 @@ mod tests {
         let source = dir.path().join("my-skin.png");
         write_skin(&source);
 
-        // Redirect storage into the temp dir by overriding the module paths is
-        // not possible (functions use `paths`), so exercise the pure helpers:
-        let mut safe = "my/skin:1.png".to_string();
-        safe = safe
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect();
+        let safe = sanitize_filename("my/skin:1.png");
         assert_eq!("my_skin_1.png", safe);
         assert!(source.is_file());
     }
@@ -648,5 +830,14 @@ mod tests {
         assert_eq!("skin.png", sanitize_filename(""));
         assert_eq!("my_skin.png", sanitize_filename("my skin.png"));
         assert_eq!("a_b.png", sanitize_filename("a/b.png"));
+        assert_eq!("skin_name.png", sanitize_filename("skin_name"));
+    }
+
+    #[test]
+    fn timestamp_prefix_helpers() {
+        assert_eq!("knight.png", strip_timestamp_prefix("1724719200000-knight.png"));
+        assert_eq!("knight.png", strip_timestamp_prefix("knight.png"));
+        assert_eq!(Some("1724719200000"), extract_timestamp_prefix("1724719200000-knight.png"));
+        assert_eq!(None, extract_timestamp_prefix("knight.png"));
     }
 }

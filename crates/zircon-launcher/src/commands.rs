@@ -48,9 +48,9 @@ fn err_string(e: LauncherError) -> String {
 
 /// A running Minecraft client process.
 pub struct RunningGame {
-    id: u64,
-    label: String,
-    child: Child,
+    pub id: u64,
+    pub label: String,
+    pub child: Child,
 }
 
 /// The player's answer to the shader opt-in prompt (possibly remembered for
@@ -278,6 +278,27 @@ fn server_base_url(host: &str, port: u16, use_https: bool) -> Result<String, Lau
     }
 }
 
+/// Generates fallback candidate base URLs for probing and status calls.
+fn candidate_base_urls(host: &str, port: u16, use_https: bool) -> Vec<String> {
+    let mut urls = Vec::new();
+    if let Ok(url) = server_base_url(host, port, use_https) {
+        urls.push(url);
+    }
+    if use_https {
+        let root = format!("https://{host}");
+        if !urls.contains(&root) {
+            urls.push(root);
+        }
+        if port != 25565 && port != 443 {
+            let direct_port = format!("https://{host}:{port}");
+            if !urls.contains(&direct_port) {
+                urls.push(direct_port);
+            }
+        }
+    }
+    urls
+}
+
 /// Fetches the online status of a server: player count + latency from a
 /// Minecraft status ping, plus the wrapper's public status when one is present.
 /// `use_https` selects the scheme for the wrapper HTTP call.
@@ -289,21 +310,39 @@ pub async fn server_status(
 ) -> Result<Option<ServerStatusInfo>, String> {
     let (host, port) = servers::parse_server_address(&address);
     let url_host = servers::format_host(&host);
-    let base_url = server_base_url(&url_host, port, use_https).map_err(err_string)?;
 
     let (ping, wrapper) = tokio::join!(
         crate::status::ping_status(&host, port),
-        fetch_wrapper_status(&state.http, &base_url),
+        fetch_wrapper_status_candidates(&state.http, &url_host, port, use_https),
     );
 
-    let (online, max, version, running, wakeable) = match (&wrapper, &ping) {
-        (Some(w), _) => (w.online, w.max, w.version.clone(), w.running, w.wakeable),
-        (None, Ok(p)) => (p.online, p.max, p.version.clone(), None, false),
-        (None, Err(_)) => return Ok(None),
+    let (online, max, version, running, wakeable, ping_ms) = match (&ping, &wrapper) {
+        (Ok(p), Some(w)) => {
+            let online = if w.running.unwrap_or(true) { w.online } else { p.online };
+            let max = if w.max > 0 { w.max } else { p.max };
+            let ver = if !p.version.is_empty() { p.version.clone() } else { w.version.clone() };
+            (online, max, ver, Some(true), false, p.ping_ms)
+        }
+        (Ok(p), None) => {
+            (p.online, p.max, p.version.clone(), Some(true), false, p.ping_ms)
+        }
+        (Err(_), Some(w)) => {
+            let is_running = w.running.unwrap_or(false);
+            (
+                if is_running { w.online } else { 0 },
+                w.max,
+                w.version.clone(),
+                Some(is_running),
+                w.wakeable && !is_running,
+                0,
+            )
+        }
+        (Err(_), None) => return Ok(None),
     };
-    let ping_ms = match ping {
-        Ok(p) => p.ping_ms,
-        Err(_) => 0,
+
+    let (waking, ready) = match &wrapper {
+        Some(w) => (w.waking || (w.running.unwrap_or(false) && !w.ready), w.ready),
+        None => (false, ping.is_ok()),
     };
 
     Ok(Some(ServerStatusInfo {
@@ -313,6 +352,8 @@ pub async fn server_status(
         version,
         running,
         wakeable,
+        waking,
+        ready,
     }))
 }
 
@@ -320,7 +361,7 @@ pub async fn server_status(
 /// needs no admin auth. `None` when the server is not a Zircon wrapper.
 async fn fetch_wrapper_status(http: &reqwest::Client, base_url: &str) -> Option<WrapperStatus> {
     let response = tokio::time::timeout(
-        Duration::from_secs(2),
+        Duration::from_secs(3),
         http.get(format!("{base_url}/status")).send(),
     )
     .await
@@ -331,6 +372,20 @@ async fn fetch_wrapper_status(http: &reqwest::Client, base_url: &str) -> Option<
     }
     let body = response.text().await.ok()?;
     serde_json::from_str(&body).ok()
+}
+
+async fn fetch_wrapper_status_candidates(
+    http: &reqwest::Client,
+    host: &str,
+    port: u16,
+    use_https: bool,
+) -> Option<WrapperStatus> {
+    for url in candidate_base_urls(host, port, use_https) {
+        if let Some(status) = fetch_wrapper_status(http, &url).await {
+            return Some(status);
+        }
+    }
+    None
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -348,6 +403,10 @@ struct WrapperStatus {
     /// (admin maintenance) or the wrapper does not report it.
     #[serde(default)]
     wakeable: bool,
+    #[serde(default)]
+    waking: bool,
+    #[serde(default)]
+    ready: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -364,6 +423,151 @@ pub struct ServerStatusInfo {
     /// wake it on the next PLAY; `false` for manual stops and third-party
     /// servers.
     pub wakeable: bool,
+    /// `true` when the server is currently in the process of waking / booting up.
+    pub waking: bool,
+    /// `true` when the server process is booted and ready to accept connections.
+    pub ready: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerProbeResult {
+    pub address: String,
+    pub name: String,
+    pub use_https: bool,
+    pub is_zircon: bool,
+    pub online: u32,
+    pub max: u32,
+    pub ping_ms: u32,
+    pub version: String,
+    pub mod_count: usize,
+    pub shaderpack_count: usize,
+    pub resourcepack_count: usize,
+    pub loader: Option<String>,
+    pub running: Option<bool>,
+    pub wakeable: bool,
+    pub waking: bool,
+    pub ready: bool,
+    pub motd: Option<String>,
+}
+
+/// Probes a server address: concurrently checks Minecraft ping and probes
+/// Zircon HTTP/HTTPS endpoints (/bom and /status). Automatically resolves the
+/// protocol (HTTPS vs HTTP), server title from BOM/MOTD, and modpack details.
+#[tauri::command]
+pub async fn probe_server(
+    state: State<'_, LauncherState>,
+    address: String,
+) -> Result<ServerProbeResult, String> {
+    let clean_addr = address.trim().to_string();
+    let is_explicit_https = clean_addr.to_lowercase().starts_with("https://");
+    let is_explicit_http = clean_addr.to_lowercase().starts_with("http://");
+    let (host, port) = servers::parse_server_address(&clean_addr);
+    let url_host = servers::format_host(&host);
+    let is_local = servers::is_loopback_host(&host);
+
+    let ping_fut = crate::status::ping_status(&host, port);
+
+    let probe_zircon_fut = async {
+        let schemes = if is_explicit_https {
+            vec![true]
+        } else if is_explicit_http {
+            vec![false]
+        } else if is_local {
+            vec![false, true]
+        } else {
+            vec![true, false]
+        };
+
+        for use_https in schemes {
+            for base_url in candidate_base_urls(&url_host, port, use_https) {
+                if let Ok(bom) = fetch_bom(&state.http, &base_url).await {
+                    let wrapper = fetch_wrapper_status(&state.http, &base_url).await;
+                    return (Some(bom), wrapper, use_https);
+                }
+                if let Some(wrapper) = fetch_wrapper_status(&state.http, &base_url).await {
+                    return (None, Some(wrapper), use_https);
+                }
+            }
+        }
+        (None, None, !is_local || is_explicit_https)
+    };
+
+    let (ping_res, (bom, wrapper, use_https)) = tokio::join!(ping_fut, probe_zircon_fut);
+
+    let is_zircon = bom.is_some() || wrapper.is_some();
+
+    let (online, max, version, running, wakeable) = match (&ping_res, &wrapper) {
+        (Ok(p), Some(w)) => {
+            let online = if w.running.unwrap_or(true) { w.online } else { p.online };
+            let max = if w.max > 0 { w.max } else { p.max };
+            let ver = if !p.version.is_empty() { p.version.clone() } else { w.version.clone() };
+            (online, max, ver, Some(true), false)
+        }
+        (Ok(p), None) => (p.online, p.max, p.version.clone(), Some(true), false),
+        (Err(_), Some(w)) => (w.online, w.max, w.version.clone(), w.running, w.wakeable),
+        (Err(_), None) => (0, 0, String::new(), None, false),
+    };
+
+    let (waking, ready) = match &wrapper {
+        Some(w) => (w.waking || (w.running.unwrap_or(false) && !w.ready), w.ready),
+        None => (false, ping_res.is_ok()),
+    };
+
+    let (ping_ms, motd) = match &ping_res {
+        Ok(p) => (p.ping_ms, p.motd.clone()),
+        Err(_) => (0, None),
+    };
+
+    let (mod_count, shaderpack_count, resourcepack_count, loader) = if let Some(ref b) = bom {
+        let loader_str = b.mod_loader.as_ref().map(|l| format!("{:?} {}", l.r#type, l.version));
+        (b.mods.len(), b.shaderpacks.len(), b.resourcepacks.len(), loader_str)
+    } else {
+        (0, 0, 0, None)
+    };
+
+    let canonical_addr = if port == 25565 {
+        host.clone()
+    } else {
+        format!("{host}:{port}")
+    };
+
+    let name = if let Some(title) = bom.as_ref().and_then(|b| b.server_title.as_deref()).filter(|t| !t.trim().is_empty()) {
+        title.trim().to_string()
+    } else if let Some(ref m) = motd {
+        let first_line = m.lines().next().unwrap_or("").trim();
+        if !first_line.is_empty() && first_line.len() <= 40 {
+            first_line.to_string()
+        } else {
+            canonical_addr.clone()
+        }
+    } else {
+        canonical_addr.clone()
+    };
+
+    Ok(ServerProbeResult {
+        address: canonical_addr,
+        name,
+        use_https,
+        is_zircon,
+        online,
+        max,
+        ping_ms,
+        version: if version.is_empty() {
+            bom.as_ref().map(|b| b.minecraft_version.clone()).unwrap_or_default()
+        } else {
+            version
+        },
+        mod_count,
+        shaderpack_count,
+        resourcepack_count,
+        loader,
+        running,
+        wakeable,
+        waking,
+        ready,
+        motd,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +581,9 @@ enum WakeDecision {
     /// No wakeup needed: third-party server (no wrapper) or the Minecraft port
     /// already answers.
     PassThrough,
-    /// The wrapper reports the server running, so an unreachable game port is
+    /// The wrapper reports the server is starting/waking up: wait for boot to complete.
+    WaitForBoot,
+    /// The wrapper reports the server running and ready, so an unreachable game port is
     /// a routing/firewall problem, not a sleep state.
     PortUnreachable,
     /// The server was stopped manually (maintenance mode) and must stay down.
@@ -388,15 +594,19 @@ enum WakeDecision {
 
 /// Classifies a Zircon server's wakeup need from its `/status` and a live
 /// Minecraft-port ping. Third-party servers (no wrapper) and already-answering
-/// servers pass through; a running-but-unreachable server is a port-forwarding
-/// failure; a stopped, non-wakeable server is in maintenance; only a stopped,
-/// wakeable server should be woken.
+/// servers pass through; a waking or booting server waits for boot to finish;
+/// a running-and-ready but unreachable server is a port-forwarding failure;
+/// a stopped, non-wakeable server is in maintenance; only a stopped, wakeable server
+/// should initiate a new wakeup.
 fn wake_decision(wrapper: Option<WrapperStatus>, ping_ok: bool) -> WakeDecision {
     let Some(w) = wrapper else {
         return WakeDecision::PassThrough;
     };
     if ping_ok {
         return WakeDecision::PassThrough;
+    }
+    if w.waking || (w.running.unwrap_or(false) && !w.ready) {
+        return WakeDecision::WaitForBoot;
     }
     if w.running.unwrap_or(false) {
         return WakeDecision::PortUnreachable;
@@ -417,11 +627,12 @@ fn wake_decision(wrapper: Option<WrapperStatus>, ping_ok: bool) -> WakeDecision 
 /// Uses the wrapper's `/status` to distinguish the failure modes so the
 /// launcher fails fast instead of looping:
 ///
-/// 1. Wrapper reports the server **running** but the Minecraft port is
+/// 1. Server is already **waking** / booting → wait for boot to complete.
+/// 2. Wrapper reports the server **running** and ready but the Minecraft port is
 ///    unreachable → the port is closed on the router/firewall; fail immediately.
-/// 2. Wrapper reports it **stopped** and not wakeable (maintenance mode) → fail
+/// 3. Wrapper reports it **stopped** and not wakeable (maintenance mode) → fail
 ///    immediately; the server must stay down.
-/// 3. Wrapper reports it **stopped** but wakeable (idle sleep) → send `/api/wakeup`
+/// 4. Wrapper reports it **stopped** but wakeable (idle sleep) → send `/api/wakeup`
 ///    and wait for the server to finish booting.
 ///
 /// Returns `true` when the target is a Zircon server (wrapper reachable), so
@@ -442,6 +653,11 @@ async fn wake_if_needed(
 
     match wake_decision(wrapper, ping_ok) {
         WakeDecision::PassThrough => return Ok(wrapper_present),
+        WakeDecision::WaitForBoot => {
+            emit_status(app, "Server is waking up, waiting for it to finish booting...");
+            wait_for_online(app, host, port, cancelled).await?;
+            return Ok(wrapper_present);
+        }
         WakeDecision::PortUnreachable => {
             return Err(LauncherError::InvalidInput(format!(
                 "The server is running, but Minecraft port {host}:{port} is \
@@ -567,7 +783,8 @@ pub async fn launch_server(
     install_recommended_packs: bool,
     use_https: bool,
 ) -> Result<(), String> {
-    run_online_flow(
+    crate::launch::window_tracker::set_always_on_top(&app);
+    let res = run_online_flow(
         &app,
         &state,
         &address,
@@ -575,8 +792,11 @@ pub async fn launch_server(
         install_recommended_packs,
         use_https,
     )
-    .await
-    .map_err(err_string)
+    .await;
+    if res.is_err() {
+        crate::launch::window_tracker::clear_always_on_top(&app);
+    }
+    res.map_err(err_string)
 }
 
 async fn run_online_flow(
@@ -635,7 +855,14 @@ async fn run_online_flow(
     let (host, port) = servers::parse_server_address(address);
     // IPv6 literals need square brackets in URLs and quick-play targets.
     let url_host = servers::format_host(&host);
-    let base_url = server_base_url(&url_host, port, use_https)?;
+    let mut base_url = server_base_url(&url_host, port, use_https)?;
+    let candidates = candidate_base_urls(&url_host, port, use_https);
+    for candidate in &candidates {
+        if fetch_wrapper_status(&state.http, candidate).await.is_some() {
+            base_url = candidate.clone();
+            break;
+        }
+    }
     emit_status(app, format!("Server: {base_url}"));
     let game_dir = servers::instance_game_dir(&host, port);
     std::fs::create_dir_all(&game_dir)?;
@@ -675,7 +902,21 @@ async fn run_online_flow(
     };
 
     // --- BOM ---
-    let bom = fetch_bom(&state.http, &base_url).await?;
+    let bom = {
+        let mut bom_res = fetch_bom(&state.http, &base_url).await;
+        if bom_res.is_err() {
+            for candidate in &candidates {
+                if candidate != &base_url {
+                    if let Ok(b) = fetch_bom(&state.http, candidate).await {
+                        base_url = candidate.clone();
+                        bom_res = Ok(b);
+                        break;
+                    }
+                }
+            }
+        }
+        bom_res?
+    };
     ensure_launch_active(&state.launch_cancelled)?;
 
     // --- BOM trust (TOFU pinning + Ed25519 attestation) ---
@@ -901,10 +1142,13 @@ async fn run_online_flow(
     emit_status(app, "Starting Minecraft process...");
     ensure_launch_active(&state.launch_cancelled)?;
     let output = game_output_emitter(app);
+    let memory_gb = state.settings.lock().unwrap().memory_gb;
+    let java_args = format!("-Xms{memory_gb}G -Xmx{memory_gb}G -XX:+UseG1GC");
     let child = MinecraftRunner
         .launch(
             &launch_data,
             &session,
+            Some(&java_args),
             &game_dir,
             &url_host,
             port as i32,
@@ -912,6 +1156,7 @@ async fn run_online_flow(
         )
         .await?;
 
+    let pid = child.id().unwrap_or(0);
     let id = state.next_game_id.fetch_add(1, Ordering::SeqCst);
     *state.running_game.lock().await = Some(RunningGame {
         id,
@@ -919,11 +1164,15 @@ async fn run_online_flow(
         child,
     });
     watch_game(app.clone(), id, format!("{url_host}:{port}"));
+    crate::launch::window_tracker::clear_always_on_top(&app);
+    crate::launch::window_tracker::spawn_window_tracker(app.clone(), id, pid);
 
-    servers::record_played(
-        name.filter(|n| !n.trim().is_empty()).unwrap_or(address),
-        address,
-    );
+    let canonical_name = if let Some(title) = bom.server_title.as_deref().filter(|t| !t.trim().is_empty()) {
+        title.trim()
+    } else {
+        name.filter(|n| !n.trim().is_empty()).unwrap_or(address)
+    };
+    servers::record_played(canonical_name, address);
     emit_status(
         app,
         format!("Game running — connected to {url_host}:{port}"),
@@ -1000,6 +1249,7 @@ fn watch_game(app: AppHandle, id: u64, label: String) {
                     let code = status.code().unwrap_or(-1);
                     guard.take();
                     drop(guard);
+                    crate::launch::window_tracker::clear_always_on_top(&app);
                     let _ = app.emit(
                         "game-status",
                         serde_json::json!({ "running": false, "label": label, "code": code }),
@@ -1010,6 +1260,7 @@ fn watch_game(app: AppHandle, id: u64, label: String) {
                 Ok(None) => {}
                 Err(_) => {
                     guard.take();
+                    crate::launch::window_tracker::clear_always_on_top(&app);
                     return;
                 }
             }
@@ -1021,9 +1272,14 @@ fn watch_game(app: AppHandle, id: u64, label: String) {
 #[tauri::command]
 pub async fn stop_game(app: AppHandle, state: State<'_, LauncherState>) -> Result<(), String> {
     state.launch_cancelled.store(true, Ordering::SeqCst);
+    crate::launch::window_tracker::clear_always_on_top(&app);
     let mut guard = state.running_game.lock().await;
     let Some(mut game) = guard.take() else {
         let _ = app.emit("launch-status", "Launch cancelled.");
+        let _ = app.emit(
+            "game-status",
+            serde_json::json!({ "running": false, "label": "", "code": 0 }),
+        );
         return Ok(());
     };
     let label = game.label.clone();
@@ -1031,6 +1287,7 @@ pub async fn stop_game(app: AppHandle, state: State<'_, LauncherState>) -> Resul
     tauri::async_runtime::spawn(async move {
         let _ = game.child.kill().await;
         let _ = game.child.wait().await;
+        crate::launch::window_tracker::clear_always_on_top(&app2);
         let _ = app2.emit(
             "game-status",
             serde_json::json!({ "running": false, "label": label, "code": 0 }),
@@ -1314,12 +1571,16 @@ pub async fn launch_offline_instance(
     state: State<'_, LauncherState>,
     id: String,
 ) -> Result<(), String> {
+    crate::launch::window_tracker::set_always_on_top(&app);
     let Some(instance) = state.offline.load(&id) else {
+        crate::launch::window_tracker::clear_always_on_top(&app);
         return Err("Instance not found".to_string());
     };
-    run_offline_flow(&app, &state, &instance)
-        .await
-        .map_err(err_string)
+    let res = run_offline_flow(&app, &state, &instance).await;
+    if res.is_err() {
+        crate::launch::window_tracker::clear_always_on_top(&app);
+    }
+    res.map_err(err_string)
 }
 
 async fn run_offline_flow(
@@ -1385,6 +1646,7 @@ async fn run_offline_flow(
         )
         .await?;
 
+    let pid = child.id().unwrap_or(0);
     let id = state.next_game_id.fetch_add(1, Ordering::SeqCst);
     *state.running_game.lock().await = Some(RunningGame {
         id,
@@ -1392,6 +1654,8 @@ async fn run_offline_flow(
         child,
     });
     watch_game(app.clone(), id, instance.name.clone());
+    crate::launch::window_tracker::clear_always_on_top(&app);
+    crate::launch::window_tracker::spawn_window_tracker(app.clone(), id, pid);
 
     let mut updated = instance.clone();
     updated.last_played = chrono::Utc::now().timestamp_millis();
@@ -1408,9 +1672,8 @@ async fn run_offline_flow(
 }
 
 /// Replaces any `-Xmx`/`-Xms` tokens in a Java args string with the Settings
-/// slider value, keeping every other argument (extra JVM flags, GC options...).
-/// `-Xmx` takes the full slider value while `-Xms` is capped at the 2 GB
-/// launcher default, matching the fallback produced for empty args.
+/// slider value, matching `-Xms` to `-Xmx` to prevent dynamic allocation CPU stalls,
+/// keeping every other argument (extra JVM flags, GC options...).
 fn override_heap(java_args: &str, memory_gb: u32) -> String {
     let tokens: Vec<String> = java_args.split_whitespace().map(str::to_string).collect();
     let mut out: Vec<String> = Vec::new();
@@ -1419,14 +1682,19 @@ fn override_heap(java_args: &str, memory_gb: u32) -> String {
         if lower.starts_with("-xmx") {
             out.push(format!("-Xmx{memory_gb}G"));
         } else if lower.starts_with("-xms") {
-            out.push(format!("-Xms{}G", memory_gb.min(2)));
+            out.push(format!("-Xms{memory_gb}G"));
         } else {
             out.push(token);
         }
     }
-    if out.is_empty() {
-        out.push(format!("-Xms{}G", memory_gb.min(2)));
+    if !out.iter().any(|t| t.to_ascii_lowercase().starts_with("-xms")) {
+        out.push(format!("-Xms{memory_gb}G"));
+    }
+    if !out.iter().any(|t| t.to_ascii_lowercase().starts_with("-xmx")) {
         out.push(format!("-Xmx{memory_gb}G"));
+    }
+    if !out.iter().any(|t| t.starts_with("-XX:+Use") || t.starts_with("-XX:-Use")) {
+        out.push("-XX:+UseG1GC".to_string());
     }
     out.join(" ")
 }
@@ -1575,7 +1843,7 @@ pub fn get_active_skin() -> Result<Option<SkinImage>, String> {
     let data_url = SkinManager::png_data_url_of(&path)
         .ok_or_else(|| "Could not read the active skin".to_string())?;
     Ok(Some(SkinImage {
-        name: "active_skin.png".to_string(),
+        name: SkinManager::active_name(),
         data_url,
         variant: SkinManager::active_variant(),
     }))
@@ -1619,6 +1887,18 @@ pub fn remove_skin(app: AppHandle) -> Result<(), String> {
 pub fn set_active_skin_variant(variant: Option<String>) -> Result<(), String> {
     let variant = variant.unwrap_or_else(|| "classic".to_string());
     SkinManager::set_active_variant(&variant).map_err(err_string)
+}
+
+/// Renames the active skin (when filename is None or "active_skin") or a history skin.
+#[tauri::command]
+pub fn rename_skin(
+    app: AppHandle,
+    filename: Option<String>,
+    new_name: String,
+) -> Result<String, String> {
+    let result = SkinManager::rename_skin(filename.as_deref(), &new_name).map_err(err_string)?;
+    emit_skin_updated(&app);
+    Ok(result)
 }
 
 /// History skins, newest first, as data URLs (with their arm variants).
@@ -1677,16 +1957,22 @@ pub async fn fetch_mojang_skin(
         uuid::Uuid::new_v4().simple()
     ));
     std::fs::write(&tmp, &downloaded.png).map_err(|e| e.to_string())?;
-    let save_result = SkinManager::save_skin(&tmp, &downloaded.variant);
-    let _ = std::fs::remove_file(&tmp);
-    save_result.map_err(err_string)?;
     let short = uuid
         .chars()
         .filter(|c| c.is_ascii_hexdigit())
         .take(8)
         .collect::<String>();
+    let mojang_name = format!("mojang-{short}.png");
+    let save_result = SkinManager::set_active_png_with_name(
+        &downloaded.png,
+        &downloaded.variant,
+        Some(&mojang_name),
+        true,
+    );
+    let _ = std::fs::remove_file(&tmp);
+    save_result.map_err(err_string)?;
     Ok(SkinImage {
-        name: format!("mojang-{short}.png"),
+        name: mojang_name,
         data_url: SkinManager::png_data_url(&downloaded.png),
         variant: downloaded.variant,
     })
@@ -1706,10 +1992,22 @@ pub async fn fetch_mojang_skin_active(
         .download(&uuid)
         .await
         .map_err(err_string)?;
-    SkinManager::set_active_png(&downloaded.png, &downloaded.variant, false).map_err(err_string)?;
+    let short = uuid
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .take(8)
+        .collect::<String>();
+    let mojang_name = format!("mojang-{short}.png");
+    SkinManager::set_active_png_with_name(
+        &downloaded.png,
+        &downloaded.variant,
+        Some(&mojang_name),
+        false,
+    )
+    .map_err(err_string)?;
     emit_skin_updated(&app);
     Ok(SkinImage {
-        name: "active_skin.png".to_string(),
+        name: mojang_name,
         data_url: SkinManager::png_data_url(&downloaded.png),
         variant: downloaded.variant,
     })
@@ -2444,19 +2742,19 @@ mod tests {
     #[test]
     fn override_heap_replaces_xmx_and_xms() {
         let args = override_heap("-Xms2G -Xmx4G -XX:+UseG1GC", 8);
-        assert_eq!("-Xms2G -Xmx8G -XX:+UseG1GC", args);
+        assert_eq!("-Xms8G -Xmx8G -XX:+UseG1GC", args);
     }
 
     #[test]
     fn override_heap_defaults_when_blank() {
         let args = override_heap("", 6);
-        assert_eq!("-Xms2G -Xmx6G", args);
+        assert_eq!("-Xms6G -Xmx6G -XX:+UseG1GC", args);
     }
 
     #[test]
     fn override_heap_keeps_other_flags() {
         let args = override_heap("-XX:+UseZGC -Xmx2G", 10);
-        assert_eq!("-XX:+UseZGC -Xmx10G", args);
+        assert_eq!("-XX:+UseZGC -Xmx10G -Xms10G", args);
     }
 
     #[test]
@@ -2465,19 +2763,34 @@ mod tests {
         assert_eq!(WakeDecision::PassThrough, wake_decision(None, false));
         assert_eq!(WakeDecision::PassThrough, wake_decision(None, true));
         // Zircon server already answering → no wake needed.
-        let running = Some(WrapperStatus {
+        let running_ready = Some(WrapperStatus {
             online: 0,
             max: 0,
             version: String::new(),
             running: Some(true),
             wakeable: false,
+            waking: false,
+            ready: true,
         });
         assert_eq!(
             WakeDecision::PassThrough,
-            wake_decision(running.clone(), true)
+            wake_decision(running_ready.clone(), true)
         );
-        // Running but port unreachable → port-forwarding failure.
-        assert_eq!(WakeDecision::PortUnreachable, wake_decision(running, false));
+        // Running and ready but port unreachable → port-forwarding failure.
+        assert_eq!(WakeDecision::PortUnreachable, wake_decision(running_ready, false));
+
+        // Server in waking state → wait for boot to complete.
+        let waking = Some(WrapperStatus {
+            online: 0,
+            max: 0,
+            version: String::new(),
+            running: Some(true),
+            wakeable: false,
+            waking: true,
+            ready: false,
+        });
+        assert_eq!(WakeDecision::WaitForBoot, wake_decision(waking, false));
+
         // Stopped and not wakeable (maintenance) → must stay down.
         let stopped = Some(WrapperStatus {
             online: 0,
@@ -2485,6 +2798,8 @@ mod tests {
             version: String::new(),
             running: Some(false),
             wakeable: false,
+            waking: false,
+            ready: false,
         });
         assert_eq!(WakeDecision::Maintenance, wake_decision(stopped, false));
         // Stopped but wakeable (idle sleep) → wake.
@@ -2494,6 +2809,8 @@ mod tests {
             version: String::new(),
             running: Some(false),
             wakeable: true,
+            waking: false,
+            ready: false,
         });
         assert_eq!(WakeDecision::Wake, wake_decision(asleep, false));
     }

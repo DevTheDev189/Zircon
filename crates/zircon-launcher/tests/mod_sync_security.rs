@@ -22,20 +22,17 @@ fn temp_dir(tag: &str) -> PathBuf {
     dir
 }
 
-/// Must fail sync when the server claims a CurseForge origin for an unknown
-/// SHA-1: the fingerprint alone is never trusted and an unknown hash cannot be
-/// confirmed against the public database, so the sync aborts before anything
-/// is installed. Deterministic regardless of network state — Modrinth either
-/// reports the hash as unknown (fail-closed) or is unreachable (also
-/// fail-closed).
+/// Must fail sync when a CurseForge origin mod has no cryptographic SHA-1
+/// hash: the 32-bit MurmurHash3 fingerprint alone is not collision-resistant
+/// enough to verify a file, so a missing or empty SHA-1 aborts the sync.
 #[tokio::test]
-async fn rejects_unverified_curseforge_origin() {
+async fn rejects_unverified_curseforge_origin_without_sha1() {
     let mut bom = BillOfMaterials::new("1.20.4", None, Some("Test Server".to_string()));
     bom.add_mod(ModEntry::new(
         Some("cf-file-12345".to_string()),
         "mystery-mod.jar",
-        // Deliberately not a hash any public database knows.
-        Some("0000000000000000000000000000000000000000".to_string()),
+        // Missing SHA-1 digest
+        None,
         987654321,
         Some("curseforge".to_string()),
         Some("http://127.0.0.1:1/files/mods/mystery-mod.jar".to_string()),
@@ -54,11 +51,47 @@ async fn rejects_unverified_curseforge_origin() {
 
     assert!(
         result.aborted,
-        "unknown-SHA-1 CurseForge mod must abort the sync"
+        "CurseForge mod without SHA-1 must abort the sync"
     );
     let reason = result.abort_reason.unwrap_or_default();
     assert!(
         reason.contains("mystery-mod.jar"),
+        "abort reason must name the offending mod: {reason}"
+    );
+    let _ = std::fs::remove_dir_all(&game_dir);
+}
+
+/// Direct origin mods are never trusted by the client.
+#[tokio::test]
+async fn rejects_unverified_direct_origin() {
+    let mut bom = BillOfMaterials::new("1.20.4", None, Some("Test Server".to_string()));
+    bom.add_mod(ModEntry::new(
+        Some("direct-12345".to_string()),
+        "untrusted.jar",
+        Some("0123456789abcdef0123456789abcdef01234567".to_string()),
+        987654321,
+        Some("direct".to_string()),
+        Some("http://127.0.0.1:1/files/mods/untrusted.jar".to_string()),
+        1024,
+    ));
+
+    let game_dir = temp_dir("direct");
+    let engine = ModSyncEngine::new();
+    let result = tokio::time::timeout(
+        Duration::from_secs(60),
+        engine.sync_with_bom(&bom, "http://127.0.0.1:1", &game_dir, None),
+    )
+    .await
+    .expect("sync must terminate within the timeout")
+    .expect("sync runs");
+
+    assert!(
+        result.aborted,
+        "direct origin mod must abort the sync"
+    );
+    let reason = result.abort_reason.unwrap_or_default();
+    assert!(
+        reason.contains("untrusted.jar"),
         "abort reason must name the offending mod: {reason}"
     );
     let _ = std::fs::remove_dir_all(&game_dir);
