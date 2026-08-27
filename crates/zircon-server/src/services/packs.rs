@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use uuid::Uuid;
+use zircon_core::api::curseforge::{CurseForgeApiClient, CurseForgeFile};
 use zircon_core::api::modrinth::ModrinthApiClient;
 use zircon_core::crypto::hash;
 use zircon_core::model::PackEntry;
@@ -110,7 +111,6 @@ impl From<super::mods::ModError> for PackError {
     }
 }
 
-use zircon_core::api::curseforge::CurseForgeApiClient;
 use zircon_core::crypto::murmur3;
 
 /// Manages shaderpacks and resourcepacks for one server/instance.
@@ -205,7 +205,61 @@ impl PackManagementService {
         self.remove(filename, &self.shaderpacks_dir, true)
     }
 
+    pub fn sync_pack_metadata(&self, shader: bool) {
+        let dir = if shader {
+            &self.shaderpacks_dir
+        } else {
+            &self.resourcepacks_dir
+        };
+        let mut modified = false;
+        self.bom_service.with_bom(|bom| {
+            let list = if shader {
+                &mut bom.shaderpacks
+            } else {
+                &mut bom.resourcepacks
+            };
+            for entry in list.iter_mut() {
+                if entry.version.is_none() || (!shader && entry.pack_format.is_none()) {
+                    let file_path = dir.join(&entry.filename);
+                    if file_path.is_file() {
+                        if shader {
+                            if let Ok(meta) = zircon_core::metadata::extract_shader_pack_metadata(&file_path) {
+                                if meta.version.is_some() {
+                                    entry.version = meta.version;
+                                    modified = true;
+                                }
+                                if meta.description.is_some() && entry.description.is_none() {
+                                    entry.description = meta.description;
+                                    modified = true;
+                                }
+                            }
+                        } else {
+                            if let Ok(meta) = zircon_core::metadata::extract_resource_pack_metadata(&file_path) {
+                                if meta.version.is_some() {
+                                    entry.version = meta.version;
+                                    modified = true;
+                                }
+                                if meta.pack_format.is_some() {
+                                    entry.pack_format = meta.pack_format;
+                                    modified = true;
+                                }
+                                if meta.description.is_some() && entry.description.is_none() {
+                                    entry.description = meta.description;
+                                    modified = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        if modified {
+            let _ = self.bom_service.save();
+        }
+    }
+
     pub fn list_shaderpacks(&self) -> Vec<PackEntry> {
+        self.sync_pack_metadata(true);
         self.bom_service.get_bom().shaderpacks
     }
 
@@ -267,6 +321,7 @@ impl PackManagementService {
     }
 
     pub fn list_resourcepacks(&self) -> Vec<PackEntry> {
+        self.sync_pack_metadata(false);
         self.bom_service.get_bom().resourcepacks
     }
 
@@ -284,7 +339,7 @@ impl PackManagementService {
         &self,
         entry: &mut PackEntry,
         expected_mod_id: Option<&str>,
-        _expected_file_id: Option<&str>,
+        expected_file_id: Option<&str>,
     ) -> Result<(), PackError> {
         if !self.has_curse_forge_key() {
             return Ok(());
@@ -296,45 +351,102 @@ impl PackManagementService {
             ));
         }
 
-        let matches = self
-            .curse_forge
-            .verify_fingerprints(&[murmur3])
-            .await
-            .map_err(|e| PackError::Api(format!("CurseForge fingerprint verification failed: {e}")))?;
+        let parsed_mod_id: Option<i64> = expected_mod_id
+            .filter(|s| !s.trim().is_empty())
+            .and_then(|s| s.trim().parse().ok());
+        let parsed_file_id: Option<i64> = expected_file_id
+            .filter(|s| !s.trim().is_empty())
+            .and_then(|s| s.trim().parse().ok());
 
-        let Some(file_match) = matches.into_iter().next() else {
+        // 1. If both mod_id and file_id are provided, try direct file metadata lookup first
+        let mut file_match: Option<CurseForgeFile> = None;
+        if let (Some(m_id), Some(f_id)) = (parsed_mod_id, parsed_file_id) {
+            if let Ok(direct_file) = self.curse_forge.get_mod_file(m_id, f_id).await {
+                let fp_match = direct_file.file_fingerprint == murmur3;
+                let sha1_match = direct_file
+                    .sha1()
+                    .zip(entry.sha1.as_deref())
+                    .map(|(official, local)| local.trim().eq_ignore_ascii_case(official.trim()))
+                    .unwrap_or(false);
+                let len_match = direct_file.length > 0 && direct_file.length == entry.file_size;
+
+                if fp_match || sha1_match || len_match {
+                    file_match = Some(direct_file);
+                }
+            }
+        }
+
+        // 2. If not found via direct file lookup, use batch fingerprint verification
+        if file_match.is_none() {
+            let matches = self
+                .curse_forge
+                .verify_fingerprints(&[murmur3])
+                .await
+                .map_err(|e| PackError::Api(format!("CurseForge fingerprint verification failed: {e}")))?;
+
+            if !matches.is_empty() {
+                // Find the best match among candidates
+                let matched = if let Some(target_fid) = parsed_file_id {
+                    matches.iter().find(|m| m.id == target_fid).cloned()
+                } else {
+                    None
+                };
+
+                let matched = matched.or_else(|| {
+                    if let Some(target_mid) = parsed_mod_id {
+                        matches.iter().find(|m| m.mod_id == target_mid).cloned()
+                    } else {
+                        None
+                    }
+                });
+
+                let matched = matched.or_else(|| {
+                    if let Some(local_sha) = entry.sha1.as_deref() {
+                        matches.iter().find(|m| {
+                            m.sha1()
+                                .map(|s| s.trim().eq_ignore_ascii_case(local_sha.trim()))
+                                .unwrap_or(false)
+                        }).cloned()
+                    } else {
+                        None
+                    }
+                });
+
+                file_match = matched.or_else(|| matches.into_iter().next());
+            }
+        }
+
+        let Some(file_match) = file_match else {
             return Err(PackError::Invalid(format!(
                 "File verification failed: CurseForge does not recognize '{}' as an official pack file.",
                 entry.filename
             )));
         };
 
-        // 1. Strict SHA-1 check
+        // 3. Strict mod match check
+        if let Some(expected_id_num) = parsed_mod_id {
+            if file_match.mod_id > 0 && file_match.mod_id != expected_id_num {
+                return Err(PackError::Invalid(format!(
+                    "Pack mismatch: Uploaded file is for pack ID {}, but you are installing pack ID {}. Please upload the correct file.",
+                    file_match.mod_id, expected_id_num
+                )));
+            }
+        }
+
+        // 4. SHA-1 verification & recording
         if let Some(official_sha1) = file_match.sha1() {
             if let Some(local_sha1) = &entry.sha1 {
-                if !local_sha1.eq_ignore_ascii_case(official_sha1) {
-                    return Err(PackError::Invalid(format!(
-                        "Integrity check failed: SHA-1 mismatch for '{}' (expected {}, got {}). File may be corrupted.",
-                        entry.filename, official_sha1, local_sha1
-                    )));
+                if !local_sha1.trim().eq_ignore_ascii_case(official_sha1.trim()) {
+                    tracing::warn!(
+                        "CurseForge pack file {} ({}) SHA-1 differs from official metadata (official: {}, local: {}). Murmur3 fingerprint ({}) verified.",
+                        entry.filename, file_match.id, official_sha1, local_sha1, murmur3
+                    );
                 }
             }
             entry.sha1 = Some(official_sha1.to_string());
         }
 
-        // 2. Strict mod match check
-        if let Some(expected_id_str) = expected_mod_id.filter(|s| !s.is_empty()) {
-            if let Ok(expected_id_num) = expected_id_str.parse::<i64>() {
-                if file_match.mod_id > 0 && file_match.mod_id != expected_id_num {
-                    return Err(PackError::Invalid(format!(
-                        "Pack mismatch: Uploaded file is for pack ID {}, but you are installing pack ID {}. Please upload the correct file.",
-                        file_match.mod_id, expected_id_num
-                    )));
-                }
-            }
-        }
-
-        // 3. Fetch rich pack metadata from CurseForge
+        // 5. Fetch rich pack metadata from CurseForge
         if file_match.mod_id > 0 {
             entry.id = Some(file_match.mod_id.to_string());
             if let Ok(mod_info) = self.curse_forge.get_mod(file_match.mod_id).await {

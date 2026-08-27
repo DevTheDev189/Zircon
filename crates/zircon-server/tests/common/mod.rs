@@ -94,6 +94,14 @@ pub fn test_app_with_limits(max_attempts: u32, max_join_intents: u32) -> Router 
     let backup = Arc::new(BackupService::new(&config.data_dir, instances.clone()));
     let tickets = Arc::new(JoinTicketManager::new());
     let audit = Arc::new(AuditLogger::new(&config.data_dir));
+    let import_service = Arc::new(
+        zircon_server::services::import::ServerImportService::new(
+            &config.data_dir,
+            instances.clone(),
+            None,
+        )
+        .unwrap(),
+    );
 
     let state = AppState {
         config,
@@ -106,6 +114,7 @@ pub fn test_app_with_limits(max_attempts: u32, max_join_intents: u32) -> Router 
         mods,
         packs,
         resolver,
+        import_service,
         tickets,
         curseforge_api_key: String::new(),
         signing_key: None,

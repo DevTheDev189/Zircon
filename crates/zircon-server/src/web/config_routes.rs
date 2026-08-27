@@ -3,7 +3,8 @@
 //!
 //! Port of `com.mcmanager.server.web.controller.ConfigController`.
 
-use axum::extract::State;
+use axum::extract::{Request, State};
+use axum::http::header::HOST;
 use axum::Json;
 
 use serde::Deserialize;
@@ -12,6 +13,7 @@ use zircon_core::model::{InstanceConfig, ModLoaderInfo, ModLoaderType};
 use super::app::{ApiError, AppState, RealIp};
 use crate::config::ServerProperties;
 use crate::instance::ServerInstanceManager;
+use crate::services::resolver::ModServiceResolver;
 use crate::web::controllers::config_helpers::instance_to_map;
 
 #[derive(Debug, Deserialize)]
@@ -158,11 +160,13 @@ pub async fn stop_server(State(state): State<AppState>) -> Json<serde_json::Valu
 /// count, max players, version and running state for the active instance. No
 /// admin token is required, so the launcher can render player counts in its
 /// server list without authenticating.
-pub async fn client_status(State(state): State<AppState>) -> Json<serde_json::Value> {
-    Json(instance_status(
-        &state,
-        state.instances.get_active_instance().as_ref(),
-    ))
+pub async fn client_status(
+    State(state): State<AppState>,
+    request: Request,
+) -> Json<serde_json::Value> {
+    let host = request.headers().get(HOST).and_then(|v| v.to_str().ok());
+    let instance = resolve_instance_for_host(&state, host);
+    Json(instance_status(&state, instance.as_ref()))
 }
 
 /// GET /{port}/status — same as `/status` but for the instance owning the path
@@ -177,15 +181,74 @@ pub async fn client_status_by_port(
     ))
 }
 
-/// Resolves an instance for a path-based `:port`/instance-id reference.
-fn resolve_instance_for_ref(state: &AppState, port_or_id: &str) -> Option<InstanceConfig> {
-    if let Ok(port) = port_or_id.parse::<i32>() {
+/// Resolves an instance for an incoming HTTP request based on its `Host` header:
+/// 1. Port in `Host` header (e.g. `localhost:25566` -> `find_by_external_port` or `find_by_internal_port`).
+/// 2. Hostname match (e.g. `alpha.example.com` or `my-server` -> `find_by_hostname`).
+/// 3. Public port match (e.g. `find_by_external_port(public_port)`).
+/// 4. Fallback to active instance.
+pub(crate) fn resolve_instance_for_host(
+    state: &AppState,
+    host: Option<&str>,
+) -> Option<InstanceConfig> {
+    let host_str = host?.trim();
+    if host_str.is_empty() {
+        return state.instances.get_active_instance();
+    }
+
+    if let Some(port) = ModServiceResolver::host_port(Some(host_str)) {
         if let Some(cfg) = state.instances.find_by_external_port(port) {
             return Some(cfg);
         }
-        return state.instances.find_by_internal_port(port as u16);
+        if let Some(cfg) = state.instances.find_by_internal_port(port as u16) {
+            return Some(cfg);
+        }
     }
-    state.instances.get_instance(port_or_id).ok()
+
+    let bare_host = if host_str.starts_with('[') {
+        if let Some(end) = host_str.find(']') {
+            &host_str[1..end]
+        } else {
+            host_str
+        }
+    } else if let Some(idx) = host_str.rfind(':') {
+        &host_str[..idx]
+    } else {
+        host_str
+    };
+
+    if let Some(cfg) = state.instances.find_by_hostname(bare_host) {
+        return Some(cfg);
+    }
+
+    let public_port = state.config.get_config().public_port;
+    if let Some(cfg) = state.instances.find_by_external_port(public_port) {
+        return Some(cfg);
+    }
+
+    state.instances.get_active_instance()
+}
+
+/// Resolves an instance for a path-based `:port`/instance-id reference.
+pub(crate) fn resolve_instance_for_ref(
+    state: &AppState,
+    port_or_id: &str,
+) -> Option<InstanceConfig> {
+    let clean = port_or_id.trim();
+    if let Ok(port) = clean.parse::<i32>() {
+        if let Some(cfg) = state.instances.find_by_external_port(port) {
+            return Some(cfg);
+        }
+        if let Some(cfg) = state.instances.find_by_internal_port(port as u16) {
+            return Some(cfg);
+        }
+    }
+    if let Ok(cfg) = state.instances.get_instance(clean) {
+        return Some(cfg);
+    }
+    if let Some(cfg) = state.instances.find_by_hostname(clean) {
+        return Some(cfg);
+    }
+    state.instances.get_active_instance()
 }
 
 fn instance_status(state: &AppState, instance: Option<&InstanceConfig>) -> serde_json::Value {
@@ -193,6 +256,9 @@ fn instance_status(state: &AppState, instance: Option<&InstanceConfig>) -> serde
         Some(instance) => {
             let id = instance.id.clone();
             let running = state.instances.is_running(&id);
+            let is_waking = state.instances.is_waking(&id);
+            let is_ready = state.instances.is_server_ready(&id);
+            let waking = is_waking || (running && !is_ready);
             let players = state.instances.get_online_players(&id);
             let max = max_players_from_properties(
                 &state
@@ -206,21 +272,31 @@ fn instance_status(state: &AppState, instance: Option<&InstanceConfig>) -> serde
                 "players": players,
                 "max": max,
                 "running": running,
-                "wakeable": !running && state.instances.wakeable(&id),
+                "wakeable": !running && !is_waking && state.instances.wakeable(&id),
+                "waking": waking,
+                "ready": is_ready,
                 "instanceId": id,
                 "version": instance.minecraft_version,
                 "name": instance.name,
             })
         }
         None => {
-            let players = state.console.player_tracker().get_online_players();
+            let running = state.process_manager.is_running();
+            let players = if running {
+                state.console.player_tracker().get_online_players()
+            } else {
+                Vec::new()
+            };
+            let is_ready = state.console.player_tracker().is_ready();
             let max = max_players_from_properties(&state.config.server_properties_file);
             serde_json::json!({
                 "online": players.len(),
                 "players": players,
                 "max": max,
-                "running": state.process_manager.is_running(),
+                "running": running,
                 "wakeable": false,
+                "waking": running && !is_ready,
+                "ready": is_ready,
                 "version": state.config.get_config().minecraft_version,
                 "name": state.config.get_config().server_title,
             })
@@ -318,15 +394,36 @@ pub async fn wakeup_server(
     };
 
     if state.instances.is_running(&cfg.id) {
-        // Already up — the launcher can reach this state when its status ping
-        // failed transiently (e.g. while the server was still booting). Treat
-        // the wakeup as a keep-alive: restart the idle window so the server
-        // does not shut down under a player who is about to connect.
+        // Already up (or currently booting) — treat the wakeup as a keep-alive:
+        // restart the idle window so the server does not shut down under a player who is about to connect.
         state.instances.defer_idle_shutdown(&cfg.id);
+        let is_ready = state.instances.is_server_ready(&cfg.id);
         return Ok(Json(
-            serde_json::json!({ "ok": true, "alreadyRunning": true, "instanceId": cfg.id }),
+            serde_json::json!({
+                "ok": true,
+                "alreadyRunning": true,
+                "waking": !is_ready,
+                "ready": is_ready,
+                "instanceId": cfg.id,
+                "message": if is_ready { "Server is already running" } else { "Server is currently starting up" }
+            }),
         ));
     }
+
+    if state.instances.is_waking(&cfg.id) {
+        // A concurrent wakeup is already starting this instance: acknowledge the request
+        // so the second client knows the server is booting up and can wait for it.
+        return Ok(Json(
+            serde_json::json!({
+                "ok": true,
+                "waking": true,
+                "ready": false,
+                "instanceId": cfg.id,
+                "message": "Server is currently starting up"
+            }),
+        ));
+    }
+
     if !state.instances.wakeable(&cfg.id) {
         return Err(ApiError::Conflict(format!(
             "Server '{}' is stopped and not in idle/sleep mode — start it from the admin panel.",
@@ -335,7 +432,7 @@ pub async fn wakeup_server(
     }
 
     // Atomically start if not already waking: a duplicate concurrent wakeup
-    // for the same instance is discarded (mark_waking returns false).
+    // for the same instance is collapsed into the existing start attempt.
     if state.instances.mark_waking(&cfg.id) {
         let instances = state.instances.clone();
         let id = cfg.id.clone();
@@ -354,7 +451,13 @@ pub async fn wakeup_server(
     }
 
     Ok(Json(
-        serde_json::json!({ "ok": true, "instanceId": cfg.id }),
+        serde_json::json!({
+            "ok": true,
+            "waking": true,
+            "ready": false,
+            "instanceId": cfg.id,
+            "message": "Server wakeup initiated"
+        }),
     ))
 }
 

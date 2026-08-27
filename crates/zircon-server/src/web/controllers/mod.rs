@@ -3,7 +3,10 @@
 pub mod auth_controller;
 pub mod backup_controller;
 pub mod bom_controller;
+pub mod branding_controller;
 pub mod console_controller;
+pub mod file_controller;
+pub mod import_controller;
 pub mod instance_controller;
 pub mod mod_controller;
 pub mod pack_controller;

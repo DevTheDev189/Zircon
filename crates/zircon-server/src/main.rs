@@ -21,6 +21,7 @@ use zircon_server::process::manager::MinecraftProcessManager;
 use zircon_server::services::backup::BackupService;
 use zircon_server::services::bom::BomService;
 use zircon_server::services::idle_shutdown::IdleShutdownService;
+use zircon_server::services::import::ServerImportService;
 use zircon_server::services::mods::ModManagementService;
 use zircon_server::services::packs::PackManagementService;
 use zircon_server::services::resolver::ModServiceResolver;
@@ -113,6 +114,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // impractical.
     let join_intent_limiter = Arc::new(FixedWindowLimiter::new(Duration::from_secs(60), 30));
     let audit = Arc::new(AuditLogger::new(&config.data_dir));
+    let import_service = Arc::new(ServerImportService::new(
+        &config.data_dir,
+        instances.clone(),
+        Some(signing_key.clone()),
+    )?);
 
     let state = AppState {
         config: config.clone(),
@@ -125,6 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         mods,
         packs,
         resolver,
+        import_service,
         tickets: tickets.clone(),
         curseforge_api_key: config.get_config().curseforge_api_key,
         signing_key: Some(signing_key),

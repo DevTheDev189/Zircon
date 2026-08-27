@@ -222,32 +222,36 @@ impl ServerInstanceManager {
         let pm = {
             let mut inner = self.inner.lock().unwrap();
             if let Some(existing) = inner.active_processes.get(instance_id) {
-                existing.clone()
-            } else {
-                // Each instance gets its own console so its player activity is
-                // tracked separately; every line is forwarded to the shared
-                // console so the WebSocket console keeps working. The per
-                // instance players.json accumulates the ever-joined player log.
-                let inst_console = Arc::new(ConsoleStreamHandler::with_players_file(Some(
-                    self.instance_dir(instance_id).join("players.json"),
-                )));
-                let shared = self.console.clone();
-                inst_console.add_listener(Box::new(move |line| shared.accept(line)));
-
-                let pm = Arc::new(MinecraftProcessManager::for_instance(
-                    Arc::new(config.clone()),
-                    self.instance_dir(instance_id).join("server"),
-                    self.installer_cache_dir.clone(),
-                    inst_console.clone(),
-                ));
-                inner
-                    .player_trackers
-                    .insert(instance_id.to_string(), inst_console.player_tracker_arc());
-                inner
-                    .active_processes
-                    .insert(instance_id.to_string(), pm.clone());
-                pm
+                if existing.is_running() {
+                    return Err(InstanceError::Conflict(format!(
+                        "Instance '{}' is already running",
+                        config.name
+                    )));
+                }
             }
+            // Each instance gets its own fresh console so its player activity is
+            // tracked separately and cleanly; every line is forwarded to the shared
+            // console so the WebSocket console keeps working. The per
+            // instance players.json accumulates the ever-joined player log.
+            let inst_console = Arc::new(ConsoleStreamHandler::with_players_file(Some(
+                self.instance_dir(instance_id).join("players.json"),
+            )));
+            let shared = self.console.clone();
+            inst_console.add_listener(Box::new(move |line| shared.accept(line)));
+
+            let pm = Arc::new(MinecraftProcessManager::for_instance(
+                Arc::new(config.clone()),
+                self.instance_dir(instance_id).join("server"),
+                self.installer_cache_dir.clone(),
+                inst_console.clone(),
+            ));
+            inner
+                .player_trackers
+                .insert(instance_id.to_string(), inst_console.player_tracker_arc());
+            inner
+                .active_processes
+                .insert(instance_id.to_string(), pm.clone());
+            pm
         };
 
         pm.start()
@@ -699,6 +703,11 @@ impl ServerInstanceManager {
     /// failure) so a later wakeup request can try again.
     pub fn unmark_waking(&self, instance_id: &str) {
         self.in_progress_wakes.remove(instance_id);
+    }
+
+    /// Returns `true` when a background wakeup task is actively starting `instance_id`.
+    pub fn is_waking(&self, instance_id: &str) -> bool {
+        self.in_progress_wakes.contains(instance_id)
     }
 
     /// The instant from which idle time should be measured for an instance:

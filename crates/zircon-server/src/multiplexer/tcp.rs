@@ -706,6 +706,7 @@ mod tests {
 
         let main_port = free_port().await;
         let handle = multiplexer.spawn_listener(main_port, None);
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         let mut client = TcpStream::connect(("127.0.0.1", main_port)).await.unwrap();
         client

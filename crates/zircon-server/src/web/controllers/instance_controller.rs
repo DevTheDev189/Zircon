@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use axum::Json;
 
 use serde::Deserialize;
@@ -660,6 +661,18 @@ pub async fn disable_mods(
     Ok(Json(serde_json::json!({ "changed": changed })))
 }
 
+/// PATCH /api/instances/{id}/mods/{filename}/side — update the runtime side of a mod in an instance.
+pub async fn set_mod_side(
+    State(state): State<AppState>,
+    Path((id, filename)): Path<(String, String)>,
+    Json(body): Json<super::mod_controller::SetSideBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    let updated = mods_for(&state, &id)?
+        .set_mod_side(&filename, body.side)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    Ok((StatusCode::OK, Json(views::mod_entry_to_map(&updated))))
+}
+
 /// GET /api/instances/{id}/mods/search
 pub async fn search_mods(
     State(state): State<AppState>,
@@ -1059,7 +1072,7 @@ fn add_ban_offline(
     Ok(())
 }
 
-fn live_instance_map(state: &AppState, config: &InstanceConfig) -> serde_json::Value {
+pub(crate) fn live_instance_map(state: &AppState, config: &InstanceConfig) -> serde_json::Value {
     views::instance_to_map(
         config,
         state.instances.is_running(&config.id),

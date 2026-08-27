@@ -12,18 +12,16 @@ use serde::Deserialize;
 use tokio_util::io::ReaderStream;
 
 use crate::services::mods::ModManagementService;
-use crate::services::resolver::ModServiceResolver;
 use crate::web::app::{ApiError, AppState};
+use crate::web::config_routes::{resolve_instance_for_host, resolve_instance_for_ref};
 use crate::web::views;
 
 /// Resolves the mod service for the instance owning the request port, else the
 /// active instance.
 fn resolve_mods(state: &AppState, headers: &HeaderMap) -> ModManagementService {
     let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
-    if let Some(port) = ModServiceResolver::host_port(host) {
-        if let Some(mods) = state.resolver.mods_by_external_port(port) {
-            return mods;
-        }
+    if let Some(instance) = resolve_instance_for_host(state, host) {
+        return state.resolver.instance_service(&instance).mods;
     }
     state.resolver.mods()
 }
@@ -31,17 +29,8 @@ fn resolve_mods(state: &AppState, headers: &HeaderMap) -> ModManagementService {
 /// Resolves the mod service for a path-based `:port`/instance-id reference
 /// (HTTPS reverse proxies whose `Host` header carries no port).
 fn resolve_mods_for_ref(state: &AppState, port_or_id: &str) -> ModManagementService {
-    if let Ok(port) = port_or_id.parse::<i32>() {
-        if let Some(mods) = state.resolver.mods_by_external_port(port) {
-            return mods;
-        }
-        if let Some(cfg) = state.instances.find_by_internal_port(port as u16) {
-            return state.resolver.instance_service(&cfg).mods;
-        }
-        return state.resolver.mods();
-    }
-    if let Ok(cfg) = state.instances.get_instance(port_or_id) {
-        return state.resolver.instance_service(&cfg).mods;
+    if let Some(instance) = resolve_instance_for_ref(state, port_or_id) {
+        return state.resolver.instance_service(&instance).mods;
     }
     state.resolver.mods()
 }
@@ -151,6 +140,26 @@ pub async fn remove_mod(
         return Err(ApiError::NotFound("Mod not found".to_string()));
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Request body for setting a mod's runtime side.
+#[derive(Debug, Deserialize)]
+pub struct SetSideBody {
+    pub side: zircon_core::model::ModSide,
+}
+
+/// PATCH /api/mods/{filename}/side — update the runtime side (both / client / server) of a mod.
+pub async fn set_mod_side(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(filename): Path<String>,
+    Json(body): Json<SetSideBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    let mods = resolve_mods(&state, &headers);
+    let updated = mods
+        .set_mod_side(&filename, body.side)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    Ok((StatusCode::OK, Json(views::mod_entry_to_map(&updated))))
 }
 
 /// Query params for search / version listing.

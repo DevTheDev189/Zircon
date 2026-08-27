@@ -12,15 +12,13 @@ use axum::response::IntoResponse;
 use tokio_util::io::ReaderStream;
 
 use crate::services::packs::PackManagementService;
-use crate::services::resolver::ModServiceResolver;
 use crate::web::app::{ApiError, AppState};
+use crate::web::config_routes::{resolve_instance_for_host, resolve_instance_for_ref};
 
 fn resolve_packs(state: &AppState, headers: &HeaderMap) -> PackManagementService {
     let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
-    if let Some(port) = ModServiceResolver::host_port(host) {
-        if let Some(packs) = state.resolver.packs_by_external_port(port) {
-            return packs;
-        }
+    if let Some(instance) = resolve_instance_for_host(state, host) {
+        return state.resolver.instance_service(&instance).packs;
     }
     state.resolver.packs()
 }
@@ -28,17 +26,8 @@ fn resolve_packs(state: &AppState, headers: &HeaderMap) -> PackManagementService
 /// Resolves the pack service for a path-based `:port`/instance-id reference
 /// (HTTPS reverse proxies whose `Host` header carries no port).
 fn resolve_packs_for_ref(state: &AppState, port_or_id: &str) -> PackManagementService {
-    if let Ok(port) = port_or_id.parse::<i32>() {
-        if let Some(packs) = state.resolver.packs_by_external_port(port) {
-            return packs;
-        }
-        if let Some(cfg) = state.instances.find_by_internal_port(port as u16) {
-            return state.resolver.instance_service(&cfg).packs;
-        }
-        return state.resolver.packs();
-    }
-    if let Ok(cfg) = state.instances.get_instance(port_or_id) {
-        return state.resolver.instance_service(&cfg).packs;
+    if let Some(instance) = resolve_instance_for_ref(state, port_or_id) {
+        return state.resolver.instance_service(&instance).packs;
     }
     state.resolver.packs()
 }

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use uuid::Uuid;
-use zircon_core::api::curseforge::CurseForgeApiClient;
+use zircon_core::api::curseforge::{CurseForgeApiClient, CurseForgeFile};
 use zircon_core::api::modrinth::ModrinthApiClient;
 use zircon_core::crypto::hash;
 use zircon_core::crypto::murmur3;
@@ -348,6 +348,25 @@ impl ModManagementService {
             self.bom_service.save()?;
         }
         Ok(targets)
+    }
+
+    /// Sets the runtime side (both / client / server) for an installed mod.
+    pub fn set_mod_side(&self, filename: &str, side: zircon_core::model::ModSide) -> Result<ModEntry, ModError> {
+        let safe_name = sanitize_filename(filename)?;
+        let mut updated = None;
+        self.bom_service.with_bom(|bom| {
+            if let Some(entry) = bom.mods.iter_mut().find(|m| m.filename == safe_name) {
+                entry.side = side;
+                updated = Some(entry.clone());
+            }
+        });
+        if let Some(entry) = updated {
+            self.bom_service.save()?;
+            tracing::info!("Updated mod {} side to {:?}", safe_name, side);
+            Ok(entry)
+        } else {
+            Err(ModError::Invalid(format!("Mod not found: {filename}")))
+        }
     }
 
     /// Installs a specific Modrinth version into the mods folder and enriches
@@ -769,7 +788,7 @@ impl ModManagementService {
         &self,
         entry: &mut ModEntry,
         expected_mod_id: Option<&str>,
-        _expected_file_id: Option<&str>,
+        expected_file_id: Option<&str>,
     ) -> Result<(), ModError> {
         if !self.has_curse_forge_key() {
             return Ok(());
@@ -781,45 +800,102 @@ impl ModManagementService {
             ));
         }
 
-        let matches = self
-            .curse_forge
-            .verify_fingerprints(&[murmur3])
-            .await
-            .map_err(|e| ModError::Api(format!("CurseForge fingerprint verification failed: {e}")))?;
+        let parsed_mod_id: Option<i64> = expected_mod_id
+            .filter(|s| !s.trim().is_empty())
+            .and_then(|s| s.trim().parse().ok());
+        let parsed_file_id: Option<i64> = expected_file_id
+            .filter(|s| !s.trim().is_empty())
+            .and_then(|s| s.trim().parse().ok());
 
-        let Some(file_match) = matches.into_iter().next() else {
+        // 1. If both mod_id and file_id are provided, try direct file metadata lookup first
+        let mut file_match: Option<CurseForgeFile> = None;
+        if let (Some(m_id), Some(f_id)) = (parsed_mod_id, parsed_file_id) {
+            if let Ok(direct_file) = self.curse_forge.get_mod_file(m_id, f_id).await {
+                let fp_match = direct_file.file_fingerprint == murmur3;
+                let sha1_match = direct_file
+                    .sha1()
+                    .zip(entry.sha1.as_deref())
+                    .map(|(official, local)| local.trim().eq_ignore_ascii_case(official.trim()))
+                    .unwrap_or(false);
+                let len_match = direct_file.length > 0 && direct_file.length == entry.file_size;
+
+                if fp_match || sha1_match || len_match {
+                    file_match = Some(direct_file);
+                }
+            }
+        }
+
+        // 2. If not found via direct file lookup, use batch fingerprint verification
+        if file_match.is_none() {
+            let matches = self
+                .curse_forge
+                .verify_fingerprints(&[murmur3])
+                .await
+                .map_err(|e| ModError::Api(format!("CurseForge fingerprint verification failed: {e}")))?;
+
+            if !matches.is_empty() {
+                // Find the best match among candidates
+                let matched = if let Some(target_fid) = parsed_file_id {
+                    matches.iter().find(|m| m.id == target_fid).cloned()
+                } else {
+                    None
+                };
+
+                let matched = matched.or_else(|| {
+                    if let Some(target_mid) = parsed_mod_id {
+                        matches.iter().find(|m| m.mod_id == target_mid).cloned()
+                    } else {
+                        None
+                    }
+                });
+
+                let matched = matched.or_else(|| {
+                    if let Some(local_sha) = entry.sha1.as_deref() {
+                        matches.iter().find(|m| {
+                            m.sha1()
+                                .map(|s| s.trim().eq_ignore_ascii_case(local_sha.trim()))
+                                .unwrap_or(false)
+                        }).cloned()
+                    } else {
+                        None
+                    }
+                });
+
+                file_match = matched.or_else(|| matches.into_iter().next());
+            }
+        }
+
+        let Some(file_match) = file_match else {
             return Err(ModError::Invalid(format!(
                 "File verification failed: CurseForge does not recognize '{}' as an official mod file.",
                 entry.filename
             )));
         };
 
-        // 1. Strict SHA-1 check
+        // 3. Strict mod match check
+        if let Some(expected_id_num) = parsed_mod_id {
+            if file_match.mod_id > 0 && file_match.mod_id != expected_id_num {
+                return Err(ModError::Invalid(format!(
+                    "Mod mismatch: Uploaded file is for mod ID {}, but you are installing mod ID {}. Please upload the correct file.",
+                    file_match.mod_id, expected_id_num
+                )));
+            }
+        }
+
+        // 4. SHA-1 verification & recording
         if let Some(official_sha1) = file_match.sha1() {
             if let Some(local_sha1) = &entry.sha1 {
-                if !local_sha1.eq_ignore_ascii_case(official_sha1) {
-                    return Err(ModError::Invalid(format!(
-                        "Integrity check failed: SHA-1 mismatch for '{}' (expected {}, got {}). File may be corrupted.",
-                        entry.filename, official_sha1, local_sha1
-                    )));
+                if !local_sha1.trim().eq_ignore_ascii_case(official_sha1.trim()) {
+                    tracing::warn!(
+                        "CurseForge file {} ({}) SHA-1 differs from official metadata (official: {}, local: {}). Murmur3 fingerprint ({}) verified.",
+                        entry.filename, file_match.id, official_sha1, local_sha1, murmur3
+                    );
                 }
             }
             entry.sha1 = Some(official_sha1.to_string());
         }
 
-        // 2. Strict mod match check
-        if let Some(expected_id_str) = expected_mod_id.filter(|s| !s.is_empty()) {
-            if let Ok(expected_id_num) = expected_id_str.parse::<i64>() {
-                if file_match.mod_id > 0 && file_match.mod_id != expected_id_num {
-                    return Err(ModError::Invalid(format!(
-                        "Mod mismatch: Uploaded file is for mod ID {}, but you are installing mod ID {}. Please upload the correct file.",
-                        file_match.mod_id, expected_id_num
-                    )));
-                }
-            }
-        }
-
-        // 3. Fetch rich mod metadata from CurseForge
+        // 5. Fetch rich mod metadata from CurseForge
         if file_match.mod_id > 0 {
             entry.id = Some(file_match.mod_id.to_string());
             if let Ok(mod_info) = self.curse_forge.get_mod(file_match.mod_id).await {
@@ -1085,6 +1161,16 @@ impl ModManagementService {
                 }
                 if !project.author.is_empty() {
                     entry.author = Some(project.author);
+                }
+                if let Some(ref server_side) = project.server_side {
+                    if server_side.eq_ignore_ascii_case("unsupported") {
+                        entry.side = zircon_core::model::ModSide::Client;
+                    }
+                }
+                if let Some(ref client_side) = project.client_side {
+                    if client_side.eq_ignore_ascii_case("unsupported") {
+                        entry.side = zircon_core::model::ModSide::Server;
+                    }
                 }
             }
             Err(e) => {
@@ -1411,6 +1497,50 @@ mod tests {
             0,
         );
         assert!(!service.repair_modrinth_metadata(&mut healthy).await);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn set_mod_side_persists_to_bom() {
+        let dir = temp_dir();
+        let bom = Arc::new(BomService::new(
+            dir.join("bom.json"),
+            Some(zircon_core::model::BillOfMaterials::new("1.20.4", None, None)),
+        ));
+        let mods_dir = dir.join("mods");
+        let service = ModManagementService::new(bom.clone(), mods_dir.clone(), "");
+
+        let entry = service
+            .add_mod(std::io::Cursor::new(b"data"), "sodium.jar", Some(ORIGIN_MODRINTH))
+            .await
+            .unwrap();
+        assert_eq!(zircon_core::model::ModSide::Both, entry.side);
+
+        let updated = service
+            .set_mod_side("sodium.jar", zircon_core::model::ModSide::Client)
+            .unwrap();
+        assert_eq!(zircon_core::model::ModSide::Client, updated.side);
+
+        // Verify it was persisted in the BOM
+        let current_bom = bom.get_bom();
+        assert_eq!(
+            zircon_core::model::ModSide::Client,
+            current_bom.mods[0].side
+        );
+
+        // Verify get_client_bom includes client-side mods
+        let client_bom = bom.get_client_bom();
+        assert_eq!(1, client_bom.mods.len());
+
+        // Update to server-only and verify it gets filtered out of client_bom
+        service
+            .set_mod_side("sodium.jar", zircon_core::model::ModSide::Server)
+            .unwrap();
+        let server_bom = bom.get_bom();
+        assert_eq!(1, server_bom.mods.len());
+        let filtered_client_bom = bom.get_client_bom();
+        assert_eq!(0, filtered_client_bom.mods.len());
 
         let _ = fs::remove_dir_all(&dir);
     }

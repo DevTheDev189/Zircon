@@ -10,7 +10,7 @@ use axum::extract::{ConnectInfo, DefaultBodyLimit, FromRequestParts, Request};
 use axum::http::{header, StatusCode};
 use axum::middleware;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, patch, post};
 use axum::Router;
 use tower_http::trace::TraceLayer;
 
@@ -24,6 +24,7 @@ use crate::process::console::ConsoleStreamHandler;
 use crate::process::manager::MinecraftProcessManager;
 use crate::services::backup::BackupService;
 use crate::services::bom::BomService;
+use crate::services::import::ServerImportService;
 use crate::services::mods::ModManagementService;
 use crate::services::packs::PackManagementService;
 use crate::services::resolver::ModServiceResolver;
@@ -31,8 +32,9 @@ use crate::tickets::JoinTicketManager;
 
 use super::auth::require_auth;
 use super::controllers::{
-    auth_controller, backup_controller, bom_controller, console_controller, instance_controller,
-    mod_controller, pack_controller, player_controller, stats_controller, system_controller,
+    auth_controller, backup_controller, bom_controller, branding_controller, console_controller,
+    file_controller, import_controller, instance_controller, mod_controller, pack_controller,
+    player_controller, stats_controller, system_controller,
 };
 use super::rate_limit::FixedWindowLimiter;
 
@@ -49,6 +51,7 @@ pub struct AppState {
     pub mods: Arc<ModManagementService>,
     pub packs: PackManagementService,
     pub resolver: Arc<ModServiceResolver>,
+    pub import_service: Arc<ServerImportService>,
     pub tickets: Arc<JoinTicketManager>,
     pub curseforge_api_key: String,
     /// Server-level Ed25519 key for signing per-instance BOMs; shares the pin
@@ -255,7 +258,14 @@ pub fn router(state: AppState) -> Router {
         // Legacy single-server endpoints (serve the active instance's data)
         .route("/api/mods", get(mod_controller::list_mods))
         .route("/api/mods/upload", post(mod_controller::upload_mod))
-        .route("/api/mods/:filename", delete(mod_controller::remove_mod))
+        .route(
+            "/api/mods/:filename",
+            delete(mod_controller::remove_mod),
+        )
+        .route(
+            "/api/mods/:filename/side",
+            patch(mod_controller::set_mod_side),
+        )
         .route("/api/mods/search", get(mod_controller::search_mods))
         .route(
             "/api/mods/modrinth/versions",
@@ -311,6 +321,18 @@ pub fn router(state: AppState) -> Router {
         .route("/api/server/start", post(config_routes::start_server))
         .route("/api/server/stop", post(config_routes::stop_server))
         // Multi-instance API
+        .route(
+            "/api/instances/import/analyze",
+            post(import_controller::analyze_import).layer(DefaultBodyLimit::disable()),
+        )
+        .route(
+            "/api/instances/import/commit",
+            post(import_controller::commit_import),
+        )
+        .route(
+            "/api/instances/import/:import_id",
+            delete(import_controller::cancel_import),
+        )
         .route(
             "/api/instances",
             get(instance_controller::list_instances).post(instance_controller::create_instance),
@@ -401,6 +423,10 @@ pub fn router(state: AppState) -> Router {
             delete(instance_controller::remove_mod),
         )
         .route(
+            "/api/instances/:id/mods/:filename/side",
+            patch(instance_controller::set_mod_side),
+        )
+        .route(
             "/api/instances/:id/mods/search",
             get(instance_controller::search_mods),
         )
@@ -476,6 +502,56 @@ pub fn router(state: AppState) -> Router {
             "/api/instances/:id/backups/:backup_id/restore",
             post(backup_controller::restore_backup),
         )
+        // File Manager & Editor API
+        .route(
+            "/api/instances/:id/files",
+            get(file_controller::list_files),
+        )
+        .route(
+            "/api/instances/:id/files/content",
+            get(file_controller::get_file_content).put(file_controller::save_file_content),
+        )
+        .route(
+            "/api/instances/:id/files/create",
+            post(file_controller::create_file_or_dir),
+        )
+        .route(
+            "/api/instances/:id/files/delete",
+            post(file_controller::delete_file),
+        )
+        .route(
+            "/api/instances/:id/files/copy",
+            post(file_controller::copy_file),
+        )
+        .route(
+            "/api/instances/:id/files/move",
+            post(file_controller::move_file),
+        )
+        .route(
+            "/api/instances/:id/files/upload",
+            post(file_controller::upload_file).layer(DefaultBodyLimit::disable()),
+        )
+        .route(
+            "/api/instances/:id/files/sync-toggle",
+            post(file_controller::toggle_config_sync),
+        )
+        // Branding API
+        .route(
+            "/api/instances/:id/branding",
+            get(branding_controller::get_branding),
+        )
+        .route(
+            "/api/instances/:id/branding/icon",
+            post(branding_controller::upload_icon)
+                .delete(branding_controller::delete_icon)
+                .layer(DefaultBodyLimit::disable()),
+        )
+        .route(
+            "/api/instances/:id/branding/banner",
+            post(branding_controller::upload_banner)
+                .delete(branding_controller::delete_banner)
+                .layer(DefaultBodyLimit::disable()),
+        )
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     // The console WebSocket authenticates with its first message (browsers
@@ -491,12 +567,24 @@ pub fn router(state: AppState) -> Router {
         .route("/bom", get(bom_controller::get_bom))
         .route("/files/mods/:filename", get(mod_controller::download_mod))
         .route(
+            "/files/configs/*path",
+            get(file_controller::download_config),
+        )
+        .route(
             "/files/shaderpacks/:filename",
             get(pack_controller::download_shaderpack),
         )
         .route(
             "/files/resourcepacks/:filename",
             get(pack_controller::download_resourcepack),
+        )
+        .route(
+            "/files/branding/icon",
+            get(branding_controller::download_icon),
+        )
+        .route(
+            "/files/branding/banner",
+            get(branding_controller::download_banner),
         )
         // Path-based port routing: HTTPS reverse proxies cannot carry a port in
         // the Host header (e.g. https://domain.net), so instance ports are
@@ -508,12 +596,24 @@ pub fn router(state: AppState) -> Router {
             get(mod_controller::download_mod_by_port),
         )
         .route(
+            "/:port/files/configs/*path",
+            get(file_controller::download_config_by_port),
+        )
+        .route(
             "/:port/files/shaderpacks/:filename",
             get(pack_controller::download_shaderpack_by_port),
         )
         .route(
             "/:port/files/resourcepacks/:filename",
             get(pack_controller::download_resourcepack_by_port),
+        )
+        .route(
+            "/:port/files/branding/icon",
+            get(branding_controller::download_icon_by_port),
+        )
+        .route(
+            "/:port/files/branding/banner",
+            get(branding_controller::download_banner_by_port),
         );
 
     Router::new()
@@ -554,6 +654,7 @@ fn spa_response(path: &str) -> Response {
         Some((content_type, content)) => (
             [
                 (header::CONTENT_TYPE, content_type),
+                (header::CACHE_CONTROL, "no-cache, must-revalidate"),
                 (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
                 (header::X_FRAME_OPTIONS, "DENY"),
                 (header::REFERRER_POLICY, "no-referrer"),
@@ -622,6 +723,10 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
             "application/javascript; charset=utf-8",
             include_str!("../../assets/web/js/backups.js"),
         ),
+        "/js/branding.js" => (
+            "application/javascript; charset=utf-8",
+            include_str!("../../assets/web/js/branding.js"),
+        ),
         "/js/console.js" => (
             "application/javascript; charset=utf-8",
             include_str!("../../assets/web/js/console.js"),
@@ -629,6 +734,10 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
         "/js/core.js" => (
             "application/javascript; charset=utf-8",
             include_str!("../../assets/web/js/core.js"),
+        ),
+        "/js/files.js" => (
+            "application/javascript; charset=utf-8",
+            include_str!("../../assets/web/js/files.js"),
         ),
         "/js/instances.js" => (
             "application/javascript; charset=utf-8",
@@ -785,6 +894,14 @@ mod tests {
         assert!(
             static_file("/js/render.js").is_some(),
             "precompiled render must be embedded"
+        );
+        assert!(
+            static_file("/js/files.js").is_some(),
+            "files.js must be embedded"
+        );
+        assert!(
+            static_file("/js/branding.js").is_some(),
+            "branding.js must be embedded"
         );
         // The generated render defines ZirconRender and the app uses it.
         let render = include_str!("../../assets/web/js/render.js");

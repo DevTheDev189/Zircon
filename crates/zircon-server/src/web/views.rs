@@ -22,6 +22,7 @@ pub fn mod_entry_to_map(entry: &ModEntry) -> serde_json::Value {
         "description": entry.description.clone().unwrap_or_default(),
         "iconUrl": entry.icon_url.clone().unwrap_or_default(),
         "author": entry.author.clone().unwrap_or_default(),
+        "side": entry.side,
         "compatible": entry.compatible,
         "warningMessage": entry.warning_message.clone().unwrap_or_default(),
         "version": entry.version,

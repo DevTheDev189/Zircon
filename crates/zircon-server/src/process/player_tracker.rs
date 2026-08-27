@@ -217,6 +217,15 @@ impl PlayerTracker {
         *self.last_activity_at.lock().unwrap() = Some(Instant::now());
     }
 
+    /// Resets transient runtime state (online players, ready flag, timestamps)
+    /// when the underlying Minecraft process stops or restarts.
+    pub fn reset(&self) {
+        self.online.lock().unwrap().clear();
+        *self.ready.lock().unwrap() = false;
+        *self.ready_at.lock().unwrap() = None;
+        *self.last_activity_at.lock().unwrap() = None;
+    }
+
     /// Loads a persisted ever-joined log, tolerating a missing or corrupt file.
     pub fn load_history(players_file: &PathBuf) -> Vec<PlayerHistoryEntry> {
         if !players_file.is_file() {

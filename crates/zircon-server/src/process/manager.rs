@@ -182,11 +182,20 @@ impl MinecraftProcessManager {
         .map_err(|e| ProcessError::Install(e.to_string()))?;
 
         // Reconcile managed mods into server/mods directory before booting JVM.
+        // Client-only mods are excluded to protect the dedicated server JVM.
         let target_mods_dir = self.context.server_dir.join("mods");
-        let synced_count = sync_mods(&self.context.mods_dir, &target_mods_dir)?;
+        let bom_path = self
+            .context
+            .mods_dir
+            .parent()
+            .map(|p| p.join("bom.json"))
+            .unwrap_or_else(|| self.context.mods_dir.join("bom.json"));
+        let client_only_mods = get_client_only_mods(&bom_path);
+        let synced_count = sync_mods(&self.context.mods_dir, &target_mods_dir, &client_only_mods)?;
         tracing::info!(
-            "Synced {} mod(s) from {:?} to {:?}",
+            "Synced {} mod(s) (excluded {} client-only) from {:?} to {:?}",
             synced_count,
+            client_only_mods.len(),
             self.context.mods_dir,
             target_mods_dir
         );
@@ -365,6 +374,7 @@ impl MinecraftProcessManager {
             guard.running = false;
             let stop_requested = guard.stop_requested;
             drop(guard);
+            console.player_tracker().reset();
             if stop_requested {
                 console.accept(format!(
                     "[wrapper] Minecraft server stopped (exit code {code})"
@@ -442,11 +452,30 @@ impl MinecraftProcessManager {
     }
 }
 
+/// Reads the BOM file if present to discover which mods are marked as client-only.
+fn get_client_only_mods(bom_path: &std::path::Path) -> std::collections::HashSet<String> {
+    let mut client_only = std::collections::HashSet::new();
+    if bom_path.is_file() {
+        if let Ok(content) = std::fs::read_to_string(bom_path) {
+            if let Ok(bom) = serde_json::from_str::<zircon_core::model::BillOfMaterials>(&content) {
+                for m in bom.mods {
+                    if m.side == zircon_core::model::ModSide::Client {
+                        client_only.insert(m.filename);
+                    }
+                }
+            }
+        }
+    }
+    client_only
+}
+
 /// Reconciles target mods directory (`<server_dir>/mods`) with source mods directory (`<mods_dir>`).
 /// Purges stale files in target and copies missing/modified files from source.
+/// Client-only mods are skipped and purged from target to protect the dedicated server JVM.
 fn sync_mods(
     source_mods_dir: &std::path::Path,
     target_mods_dir: &std::path::Path,
+    client_only_mods: &std::collections::HashSet<String>,
 ) -> Result<usize, ProcessError> {
     std::fs::create_dir_all(target_mods_dir)?;
 
@@ -458,9 +487,15 @@ fn sync_mods(
             let entry = entry?;
             let path = entry.path();
             if path.is_file() {
-                if let Some(filename) = path.file_name() {
-                    source_files.insert(filename.to_os_string());
-                    let target_path = target_mods_dir.join(filename);
+                if let Some(filename_os) = path.file_name() {
+                    let filename = filename_os.to_string_lossy().to_string();
+                    if client_only_mods.contains(&filename) {
+                        tracing::debug!("Skipping client-only mod {:?} for server runtime", filename);
+                        continue;
+                    }
+
+                    source_files.insert(filename_os.to_os_string());
+                    let target_path = target_mods_dir.join(filename_os);
 
                     let needs_copy = if !target_path.is_file() {
                         true
@@ -487,7 +522,7 @@ fn sync_mods(
             if path.is_file() {
                 if let Some(filename) = path.file_name() {
                     if !source_files.contains(filename) {
-                        tracing::info!("Purging stale server mod file {:?}", filename);
+                        tracing::info!("Purging stale/client-only server mod file {:?}", filename);
                         std::fs::remove_file(&path)?;
                     }
                 }
@@ -517,8 +552,9 @@ mod tests {
         // Create stale mod in target
         std::fs::write(tgt.join("stale_mod.jar"), b"old").unwrap();
 
-        // Sync
-        let count = sync_mods(&src, &tgt).unwrap();
+        // Sync with empty client_only
+        let client_only = std::collections::HashSet::new();
+        let count = sync_mods(&src, &tgt, &client_only).unwrap();
         assert_eq!(count, 2);
         assert!(tgt.join("mod_a.jar").is_file());
         assert!(tgt.join("mod_b.jar").is_file());
@@ -526,16 +562,24 @@ mod tests {
 
         // 2. Update a mod file size
         std::fs::write(src.join("mod_a.jar"), b"mod_a_data_v2_longer").unwrap();
-        sync_mods(&src, &tgt).unwrap();
+        sync_mods(&src, &tgt, &client_only).unwrap();
         assert_eq!(
             std::fs::read(tgt.join("mod_a.jar")).unwrap(),
             b"mod_a_data_v2_longer"
         );
 
-        // 3. Remove a mod from source
+        // 3. Exclude a mod via client_only filter
+        let mut client_only_filter = std::collections::HashSet::new();
+        client_only_filter.insert("mod_a.jar".to_string());
+        let count_client = sync_mods(&src, &tgt, &client_only_filter).unwrap();
+        assert_eq!(count_client, 1); // Only mod_b counted
+        assert!(!tgt.join("mod_a.jar").exists()); // Purged from server runtime
+        assert!(tgt.join("mod_b.jar").is_file());
+
+        // 4. Remove a mod from source
         std::fs::remove_file(src.join("mod_b.jar")).unwrap();
-        let count2 = sync_mods(&src, &tgt).unwrap();
-        assert_eq!(count2, 1);
+        let count2 = sync_mods(&src, &tgt, &client_only).unwrap();
+        assert_eq!(count2, 1); // Only mod_a remains in src
         assert!(!tgt.join("mod_b.jar").exists());
 
         let _ = std::fs::remove_dir_all(&dir);

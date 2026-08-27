@@ -52,6 +52,22 @@ impl BomService {
         guard.as_ref().unwrap().clone()
     }
 
+    /// Returns the client-facing BOM: only includes `Both` and `Client` mods
+    /// (filters out `Server`-only mods so clients do not download them).
+    /// Resigns the client BOM if signed.
+    pub fn get_client_bom(&self) -> BillOfMaterials {
+        let mut bom = self.get_bom();
+        bom.mods.retain(|m| m.side != zircon_core::model::ModSide::Server);
+        if let Some(signing_key) = &self.signing_key {
+            let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
+            bom.server_public_key = Some(pubkey_hex);
+            if let Ok(sig) = signing::sign_bom(&bom, signing_key) {
+                bom.signature = Some(sig);
+            }
+        }
+        bom
+    }
+
     /// Mutates the current BOM in place (loading it first).
     pub fn with_bom<R>(&self, f: impl FnOnce(&mut BillOfMaterials) -> R) -> R {
         let mut guard = self.bom.lock().unwrap();
