@@ -241,18 +241,30 @@ impl MicrosoftAuthService {
     /// into the keychain.
     pub fn load_cached(&self) -> Option<SessionData> {
         if self.use_keyring {
-            if let Ok(entry) = Self::keyring_entry() {
+            if let Ok(entry) = Self::keyring_session_entry() {
                 match entry.get_password() {
                     Ok(json) => match serde_json::from_str::<SessionData>(&json) {
-                        Ok(data) if data.is_valid() => return Some(data),
-                        Ok(_) => {
+                        Ok(mut data) => {
+                            // If the refresh token was stored in the dedicated slot, attach it.
+                            if data.refresh_token.is_empty() {
+                                if let Ok(ref_entry) = Self::keyring_refresh_entry() {
+                                    if let Ok(ref_token) = ref_entry.get_password() {
+                                        data.refresh_token = ref_token;
+                                    }
+                                }
+                            }
+                            if data.is_valid() {
+                                return Some(data);
+                            }
                             tracing::warn!("Ignoring invalid session in the OS keychain");
                             let _ = entry.delete_credential();
+                            let _ = Self::keyring_refresh_entry().map(|e| e.delete_credential());
                             return None;
                         }
                         Err(e) => {
                             tracing::warn!("Could not parse the OS keychain session: {e}");
                             let _ = entry.delete_credential();
+                            let _ = Self::keyring_refresh_entry().map(|e| e.delete_credential());
                             return None;
                         }
                     },
@@ -306,28 +318,34 @@ impl MicrosoftAuthService {
     }
 
     /// Persists the session: into the OS keychain when available, otherwise
-    /// into an owner-only cache file. The session holds the Minecraft access
-    /// token and the Microsoft refresh token, so a plaintext copy is avoided
-    /// whenever the platform keychain is present.
+    /// into an owner-only cache file. The session is split across two slots
+    /// (`auth-session` and `auth-refresh`) so neither exceeds the platform
+    /// 2560-character limit on Windows Credential Manager.
     pub fn save(&self, session: &SessionData) -> Result<(), LauncherError> {
         let json = serde_json::to_string(session)?;
         if self.use_keyring {
-            match Self::keyring_entry() {
-                Ok(entry) => match entry.set_password(&json) {
-                    Ok(()) => {
-                        // Keychain is authoritative — drop any legacy plaintext copy.
-                        let _ = std::fs::remove_file(&self.cache_file);
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Could not store the session in the OS keychain ({e}); falling back to a protected cache file"
-                        );
-                    }
-                },
-                Err(e) => {
+            let mut session_without_refresh = session.clone();
+            session_without_refresh.refresh_token.clear();
+            let session_json = serde_json::to_string(&session_without_refresh)?;
+
+            let session_res = Self::keyring_session_entry().and_then(|e| {
+                e.set_password(&session_json)
+                    .map_err(|err| LauncherError::Auth(err.to_string()))
+            });
+            let refresh_res = Self::keyring_refresh_entry().and_then(|e| {
+                e.set_password(&session.refresh_token)
+                    .map_err(|err| LauncherError::Auth(err.to_string()))
+            });
+
+            match (session_res, refresh_res) {
+                (Ok(()), Ok(())) => {
+                    // Keychain is authoritative — drop any plaintext file copy.
+                    let _ = std::fs::remove_file(&self.cache_file);
+                    return Ok(());
+                }
+                (Err(e), _) | (_, Err(e)) => {
                     tracing::warn!(
-                        "Could not access the OS keychain ({e}); falling back to a protected cache file"
+                        "Could not store the session in the OS keychain ({e}); falling back to a protected cache file"
                     );
                 }
             }
@@ -357,7 +375,10 @@ impl MicrosoftAuthService {
     /// error when nothing was stored.
     pub fn clear_cache(&self) -> Result<(), LauncherError> {
         if self.use_keyring {
-            if let Ok(entry) = Self::keyring_entry() {
+            if let Ok(entry) = Self::keyring_session_entry() {
+                let _ = entry.delete_credential();
+            }
+            if let Ok(entry) = Self::keyring_refresh_entry() {
                 let _ = entry.delete_credential();
             }
         }
@@ -368,10 +389,15 @@ impl MicrosoftAuthService {
         }
     }
 
-    /// The keychain entry holding the session JSON. The service name is
-    /// launcher-wide; a single user slot holds the one active session.
-    fn keyring_entry() -> Result<keyring::Entry, LauncherError> {
+    /// The keychain entry holding the session metadata & access token.
+    fn keyring_session_entry() -> Result<keyring::Entry, LauncherError> {
         keyring::Entry::new("zircon-launcher", "auth-session")
+            .map_err(|e| LauncherError::Auth(format!("Could not access the OS keychain: {e}")))
+    }
+
+    /// The keychain entry holding the Microsoft OAuth refresh token.
+    fn keyring_refresh_entry() -> Result<keyring::Entry, LauncherError> {
+        keyring::Entry::new("zircon-launcher", "auth-refresh")
             .map_err(|e| LauncherError::Auth(format!("Could not access the OS keychain: {e}")))
     }
 

@@ -267,6 +267,13 @@ fn instance_status(state: &AppState, instance: Option<&InstanceConfig>) -> serde
                     .join("server")
                     .join("server.properties"),
             );
+            let bom_service = state.resolver.instance_service(instance).bom;
+            let bom = bom_service.get_bom();
+            let branding = bom.branding;
+            let icon_url = branding.as_ref().and_then(|b| b.icon_url.clone());
+            let banner_url = branding.as_ref().and_then(|b| b.banner_url.clone());
+            let banner_is_animated = branding.as_ref().map(|b| b.banner_is_animated).unwrap_or(false);
+
             serde_json::json!({
                 "online": players.len(),
                 "players": players,
@@ -278,6 +285,9 @@ fn instance_status(state: &AppState, instance: Option<&InstanceConfig>) -> serde
                 "instanceId": id,
                 "version": instance.minecraft_version,
                 "name": instance.name,
+                "iconUrl": icon_url,
+                "bannerUrl": banner_url,
+                "bannerIsAnimated": banner_is_animated,
             })
         }
         None => {

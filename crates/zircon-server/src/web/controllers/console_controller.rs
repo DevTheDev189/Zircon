@@ -11,7 +11,7 @@
 //! Port of `com.mcmanager.server.web.controller.ConsoleController`.
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::State;
+use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
@@ -26,6 +26,12 @@ use crate::process::console::ConsoleStreamHandler;
 use crate::process::manager::MinecraftProcessManager;
 use crate::web::app::{ApiError, AppState};
 
+/// Query parameters for the WebSocket console upgrade route.
+#[derive(Debug, serde::Deserialize, Default)]
+pub struct ConsoleQuery {
+    pub instance: Option<String>,
+}
+
 /// WebSocket upgrade route `/api/console`.
 ///
 /// CSWSH defense: the `Origin` header is validated during the HTTP upgrade
@@ -36,12 +42,29 @@ use crate::web::app::{ApiError, AppState};
 /// they still authenticate with their first message.
 pub async fn console_ws(
     State(state): State<AppState>,
+    Query(query): Query<ConsoleQuery>,
     headers: HeaderMap,
     ws: WebSocketUpgrade,
 ) -> Result<impl IntoResponse, ApiError> {
-    // Validate the Origin header during the HTTP upgrade handshake. When it is
-    // present and not trusted, fail closed and audit the attempt (under
-    // ANONYMOUS — no session exists yet).
+    validate_origin_or_error(&headers, &state)?;
+    Ok(ws.on_upgrade(move |socket| handle_console_socket(socket, state, query.instance)))
+}
+
+/// WebSocket upgrade route `/api/instances/:id/console`.
+///
+/// Connects directly to the specified server instance's console.
+pub async fn instance_console_ws(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, ApiError> {
+    validate_origin_or_error(&headers, &state)?;
+    Ok(ws.on_upgrade(move |socket| handle_console_socket(socket, state, Some(id))))
+}
+
+/// Validates the `Origin` header during WebSocket upgrades (CSWSH defense).
+fn validate_origin_or_error(headers: &HeaderMap, state: &AppState) -> Result<(), ApiError> {
     if let Some(origin_header) = headers.get("origin").and_then(|o| o.to_str().ok()) {
         let config = state.config.get_config();
         let is_allowed = is_allowed_origin(origin_header, config.web_port, config.public_port);
@@ -56,8 +79,7 @@ pub async fn console_ws(
             ));
         }
     }
-
-    Ok(ws.on_upgrade(move |socket| handle_console_socket(socket, state)))
+    Ok(())
 }
 
 /// Whether a WebSocket handshake `Origin` is trusted.
@@ -118,7 +140,11 @@ fn is_allowed_origin(origin: &str, web_port: i32, public_port: i32) -> bool {
     is_private
 }
 
-async fn handle_console_socket(socket: WebSocket, state: AppState) {
+async fn handle_console_socket(
+    socket: WebSocket,
+    state: AppState,
+    target_instance_id: Option<String>,
+) {
     let (mut sender, mut receiver) = socket.split();
 
     // The first inbound message must authenticate: "AUTH <jwt>". Nothing is
@@ -144,16 +170,43 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
         return;
     };
 
+    // Determine target console stream handler
+    let target_console: Arc<ConsoleStreamHandler> = if let Some(ref id) = target_instance_id {
+        match state.instances.get_or_create_console(id) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = sender
+                    .send(Message::Text(format!("[wrapper] {e}")))
+                    .await;
+                let _ = sender.close().await;
+                return;
+            }
+        }
+    } else if let Some(active_cfg) = state.instances.get_active_instance() {
+        state
+            .instances
+            .get_or_create_console(&active_cfg.id)
+            .unwrap_or_else(|_| state.console.clone())
+    } else {
+        state.console.clone()
+    };
+
     // Every console action is now attributable to the authenticated admin.
     state.audit.log(
         &user,
         "WS_CONSOLE_CONNECT",
-        "WebSocket console session established",
+        &format!(
+            "WebSocket console session established{}",
+            target_instance_id
+                .as_deref()
+                .map(|id| format!(" for instance {id}"))
+                .unwrap_or_default()
+        ),
     );
-    let mut broadcast_rx = state.console.subscribe();
+    let mut broadcast_rx = target_console.subscribe();
 
     // Replay recent history so the UI is not blank on connect (last 500 lines).
-    for line in state.console.recent_history(500) {
+    for line in target_console.recent_history(500) {
         if sender.send(Message::Text(line)).await.is_err() {
             return;
         }
@@ -183,11 +236,12 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
                     Some(Ok(Message::Text(text))) => {
                         match apply_inbound_message(
                             &state.audit,
-                            &state.console,
+                            &target_console,
                             &state.instances,
                             &state.process_manager,
                             &user,
                             &text,
+                            target_instance_id.as_deref(),
                         )
                         .await
                         {
@@ -203,7 +257,13 @@ async fn handle_console_socket(socket: WebSocket, state: AppState) {
                         state.audit.log(
                             &user,
                             "WS_CONSOLE_DISCONNECT",
-                            "WebSocket console disconnected",
+                            &format!(
+                                "WebSocket console disconnected{}",
+                                target_instance_id
+                                    .as_deref()
+                                    .map(|id| format!(" for instance {id}"))
+                                    .unwrap_or_default()
+                            ),
                         );
                         break;
                     }
@@ -255,6 +315,7 @@ async fn apply_inbound_message(
     process_manager: &MinecraftProcessManager,
     user: &str,
     text: &str,
+    target_instance_id: Option<&str>,
 ) -> InboundResult {
     match classify_inbound(text) {
         InboundAction::Clear => {
@@ -265,13 +326,13 @@ async fn apply_inbound_message(
         InboundAction::Command(command) => {
             audit.log(user, "CONSOLE_COMMAND", &command);
 
-            // Route command to the active instance's process manager when the
-            // wrapper runs in multi-instance mode, falling back to any instance
-            // currently running, then to the legacy process manager. Without
-            // this, inbound console commands reach a process manager that isn't
-            // running in multi-instance mode and are always rejected.
+            // Route command to the specified instance's process manager when
+            // targeted, or active instance's process manager when in multi-instance mode,
+            // falling back to any instance currently running, then to the legacy process manager.
             let target_pm: Option<Arc<MinecraftProcessManager>> =
-                if let Some(active_cfg) = instances.get_active_instance() {
+                if let Some(id) = target_instance_id {
+                    instances.get_process_manager(id)
+                } else if let Some(active_cfg) = instances.get_active_instance() {
                     instances.get_process_manager(&active_cfg.id)
                 } else {
                     instances
@@ -526,6 +587,7 @@ mod tests {
             &process_manager,
             "alice",
             "__CLEAR__",
+            None,
         )
         .await;
         assert_eq!(InboundResult::Notify("__CLEAR__".to_string()), result);
@@ -540,6 +602,7 @@ mod tests {
             &process_manager,
             "alice",
             "say hello",
+            None,
         )
         .await;
         assert!(matches!(result, InboundResult::Notify(_)));
@@ -552,6 +615,7 @@ mod tests {
             &process_manager,
             "alice",
             "  ",
+            None,
         )
         .await;
         assert_eq!(InboundResult::Ok, result);
@@ -563,6 +627,37 @@ mod tests {
             !content.contains("[USER:ADMIN_WS]"),
             "audit entries must carry the real username, not a placeholder"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn instances_have_isolated_consoles() {
+        let dir = temp_dir();
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let instances = Arc::new(ServerInstanceManager::new(&dir, console.clone()).unwrap());
+
+        let inst1 = instances
+            .create_instance("Server1", "1.21.4", "fabric", "0.16.9")
+            .unwrap();
+        let inst2 = instances
+            .create_instance("Server2", "1.21.4", "fabric", "0.16.9")
+            .unwrap();
+
+        let console1 = instances.get_or_create_console(&inst1.id).unwrap();
+        let console2 = instances.get_or_create_console(&inst2.id).unwrap();
+
+        console1.accept("[Server1] Log line 1".to_string());
+        console2.accept("[Server2] Log line 2".to_string());
+
+        let history1 = console1.recent_history(10);
+        let history2 = console2.recent_history(10);
+        let shared_history = console.recent_history(10);
+
+        assert_eq!(vec!["[Server1] Log line 1"], history1);
+        assert_eq!(vec!["[Server2] Log line 2"], history2);
+        // Shared console does not get contaminated with instance logs
+        assert!(shared_history.is_empty());
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

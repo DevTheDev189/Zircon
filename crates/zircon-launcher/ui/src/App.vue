@@ -9,6 +9,7 @@
       :running="!!gameStatus?.running"
       :game-label="gameStatus?.label || ''"
       :error="launchError"
+      :server="launchingServer"
       @close="onLaunchOverlayClose"
     />
 
@@ -258,6 +259,7 @@ const gameOutputBuffer = ref([]);
 const shaderPrompt = ref(null);
 const shaderRemember = ref(false);
 const keyPrompt = ref(null);
+const launchingServer = ref(null);
 
 let unlisten = [];
 
@@ -448,9 +450,11 @@ function onLaunchOverlayClose() {
   busy.value = false;
   launchError.value = '';
   progress.value = null;
+  launchingServer.value = null;
 }
 
-function onLaunching() {
+function onLaunching(server = null) {
+  launchingServer.value = server;
   busy.value = true;
   launchError.value = '';
   launchOverlayVisible.value = true;
@@ -461,6 +465,7 @@ function onStopped() {
   busy.value = false;
   launchOverlayVisible.value = false;
   progress.value = null;
+  launchingServer.value = null;
 }
 
 function onLaunchError(err) {

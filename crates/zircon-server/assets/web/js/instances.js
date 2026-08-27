@@ -2,12 +2,16 @@
 window.Zircon = window.Zircon || {};
 window.Zircon.instances = {
     async loadInstances() {
-        const data = await this.api('/api/instances');
-        this.instances = data.instances || [];
-        if (this.instances.length > 0 && !this.selectedInstance) this.selectInstance(this.instances[0]);
-        if (this.selectedInstance) {
-            const fresh = this.instances.find(i => i.id === this.selectedInstance.id);
-            if (fresh) Object.assign(this.selectedInstance, fresh);
+        try {
+            const data = await this.api('/api/instances');
+            this.instances = data.instances || [];
+            if (this.instances.length > 0 && !this.selectedInstance) this.selectInstance(this.instances[0]);
+            if (this.selectedInstance) {
+                const fresh = this.instances.find(i => i.id === this.selectedInstance.id);
+                if (fresh) Object.assign(this.selectedInstance, fresh);
+            }
+        } catch (e) {
+            // Best-effort during polling or temporary connection drops
         }
     },
     selectInstance(inst) {
@@ -37,6 +41,9 @@ window.Zircon.instances = {
             time: inst.backupTime || '02:00',
             retention: inst.backupRetention || 10
         };
+        if (this.activeTab === 'console') {
+            this.connectConsole();
+        }
         // The Stats view hides the top bar, so picking a server there must
         // also navigate back into the instance pages (mods is the landing tab).
         if (this.activeTab === 'stats') this.activeTab = 'mods';

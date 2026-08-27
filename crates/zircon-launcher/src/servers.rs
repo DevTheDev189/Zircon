@@ -34,6 +34,12 @@ pub struct SavedServer {
     /// key or stops signing its BOM.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pinned_public_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub banner_url: Option<String>,
+    #[serde(default)]
+    pub banner_is_animated: bool,
 }
 
 impl SavedServer {
@@ -59,6 +65,9 @@ impl SavedServer {
             last_played,
             use_https: is_https || !is_local, // HTTPS by default for remote hosts or if specified
             pinned_public_key: None,
+            icon_url: None,
+            banner_url: None,
+            banner_is_animated: false,
         }
     }
 

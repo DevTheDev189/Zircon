@@ -43,12 +43,16 @@ window.Zircon.core = {
     },
     startPolling() {
         if (this.pollTimer) clearInterval(this.pollTimer);
-        this.pollTimer = setInterval(() => {
+        this.pollTimer = setInterval(async () => {
             if (!this.authenticated) return;
-            this.loadInstances();
-            if (this.activeTab === 'stats') this.loadStats();
-            if (this.activeTab === 'players') this.loadPlayers();
-            if (this.activeTab === 'backups') this.loadBackups();
+            try {
+                await this.loadInstances();
+                if (this.activeTab === 'stats') await this.loadStats();
+                if (this.activeTab === 'players') await this.loadPlayers();
+                if (this.activeTab === 'backups') await this.loadBackups();
+            } catch (e) {
+                // Connection or server temporary network error
+            }
         }, 5000);
 
         // Tire the idle-sleep countdown down locally so the badge ticks every

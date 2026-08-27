@@ -104,16 +104,23 @@ impl PlayerTracker {
     }
 
     pub fn on_line(&self, line: &str) {
-        if line.is_empty() {
+        if line.is_empty() || line.starts_with('<') {
             return;
         }
 
-        // Only parse lines from the official Minecraft Server thread. Chat
-        // lines arrive on that thread too, so they are further filtered below.
+        // Extract content after official thread/INFO log prefix (Vanilla, Forge, NeoForge, Fabric, Paper)
         let content = if let Some(idx) = line.find("[Server thread/INFO]: ") {
             &line[idx + 22..]
-        } else if let Some(idx) = line.find("[Server thread/INFO] [minecraft/MinecraftServer]: ") {
-            &line[idx + 50..]
+        } else if let Some(idx) = line.find("[Server thread/INFO] [") {
+            if let Some(close_idx) = line[idx + 22..].find("]: ") {
+                &line[idx + 22 + close_idx + 3..]
+            } else {
+                return;
+            }
+        } else if let Some(idx) = line.find("[main/INFO]: ") {
+            &line[idx + 13..]
+        } else if let Some(idx) = line.find(" [Server thread/INFO]: ") {
+            &line[idx + 23..]
         } else {
             return;
         };

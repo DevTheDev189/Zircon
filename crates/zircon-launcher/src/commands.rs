@@ -340,9 +340,43 @@ pub async fn server_status(
         (Err(_), None) => return Ok(None),
     };
 
+    let is_ping_ok = ping.is_ok();
     let (waking, ready) = match &wrapper {
-        Some(w) => (w.waking || (w.running.unwrap_or(false) && !w.ready), w.ready),
-        None => (false, ping.is_ok()),
+        Some(w) => {
+            let is_ready = w.ready || is_ping_ok;
+            let is_waking = !is_ready && (w.waking || (w.running.unwrap_or(false) && !w.ready));
+            (is_waking, is_ready)
+        }
+        None => (false, is_ping_ok),
+    };
+
+    let (icon_url, banner_url, banner_is_animated) = match &wrapper {
+        Some(w) => {
+            let scheme = if use_https { "https" } else { "http" };
+            let base = if port == 25565 || (use_https && port == 443) {
+                format!("{scheme}://{url_host}")
+            } else if use_https {
+                format!("{scheme}://{url_host}/{port}")
+            } else {
+                format!("{scheme}://{url_host}:{port}")
+            };
+            let icon = w.icon_url.as_ref().map(|u| {
+                if u.starts_with("http://") || u.starts_with("https://") {
+                    u.clone()
+                } else {
+                    format!("{base}{u}")
+                }
+            });
+            let banner = w.banner_url.as_ref().map(|u| {
+                if u.starts_with("http://") || u.starts_with("https://") {
+                    u.clone()
+                } else {
+                    format!("{base}{u}")
+                }
+            });
+            (icon, banner, w.banner_is_animated)
+        }
+        None => (None, None, false),
     };
 
     Ok(Some(ServerStatusInfo {
@@ -354,6 +388,9 @@ pub async fn server_status(
         wakeable,
         waking,
         ready,
+        icon_url,
+        banner_url,
+        banner_is_animated,
     }))
 }
 
@@ -407,6 +444,12 @@ struct WrapperStatus {
     waking: bool,
     #[serde(default)]
     ready: bool,
+    #[serde(default)]
+    icon_url: Option<String>,
+    #[serde(default)]
+    banner_url: Option<String>,
+    #[serde(default)]
+    banner_is_animated: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -427,6 +470,9 @@ pub struct ServerStatusInfo {
     pub waking: bool,
     /// `true` when the server process is booted and ready to accept connections.
     pub ready: bool,
+    pub icon_url: Option<String>,
+    pub banner_url: Option<String>,
+    pub banner_is_animated: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -449,6 +495,9 @@ pub struct ServerProbeResult {
     pub waking: bool,
     pub ready: bool,
     pub motd: Option<String>,
+    pub icon_url: Option<String>,
+    pub banner_url: Option<String>,
+    pub banner_is_animated: bool,
 }
 
 /// Probes a server address: concurrently checks Minecraft ping and probes
@@ -509,9 +558,14 @@ pub async fn probe_server(
         (Err(_), None) => (0, 0, String::new(), None, false),
     };
 
+    let is_ping_ok = ping_res.is_ok();
     let (waking, ready) = match &wrapper {
-        Some(w) => (w.waking || (w.running.unwrap_or(false) && !w.ready), w.ready),
-        None => (false, ping_res.is_ok()),
+        Some(w) => {
+            let is_ready = w.ready || is_ping_ok;
+            let is_waking = !is_ready && (w.waking || (w.running.unwrap_or(false) && !w.ready));
+            (is_waking, is_ready)
+        }
+        None => (false, is_ping_ok),
     };
 
     let (ping_ms, motd) = match &ping_res {
@@ -545,6 +599,44 @@ pub async fn probe_server(
         canonical_addr.clone()
     };
 
+    let (icon_url, banner_url, banner_is_animated) = if let Some(ref b) = bom {
+        if let Some(ref branding) = b.branding {
+            let scheme = if use_https { "https" } else { "http" };
+            let base = if port == 25565 || (use_https && port == 443) {
+                format!("{scheme}://{url_host}")
+            } else if use_https {
+                format!("{scheme}://{url_host}/{port}")
+            } else {
+                format!("{scheme}://{url_host}:{port}")
+            };
+            let icon = branding.icon_url.as_ref().map(|u| {
+                if u.starts_with("http://") || u.starts_with("https://") {
+                    u.clone()
+                } else {
+                    format!("{base}{u}")
+                }
+            });
+            let banner = branding.banner_url.as_ref().map(|u| {
+                if u.starts_with("http://") || u.starts_with("https://") {
+                    u.clone()
+                } else {
+                    format!("{base}{u}")
+                }
+            });
+            (icon, banner, branding.banner_is_animated)
+        } else {
+            (
+                wrapper.as_ref().and_then(|w| w.icon_url.clone()),
+                wrapper.as_ref().and_then(|w| w.banner_url.clone()),
+                wrapper.as_ref().map(|w| w.banner_is_animated).unwrap_or(false),
+            )
+        }
+    } else if let Some(ref w) = wrapper {
+        (w.icon_url.clone(), w.banner_url.clone(), w.banner_is_animated)
+    } else {
+        (None, None, false)
+    };
+
     Ok(ServerProbeResult {
         address: canonical_addr,
         name,
@@ -567,6 +659,9 @@ pub async fn probe_server(
         waking,
         ready,
         motd,
+        icon_url,
+        banner_url,
+        banner_is_animated,
     })
 }
 
@@ -784,19 +879,41 @@ pub async fn launch_server(
     use_https: bool,
 ) -> Result<(), String> {
     crate::launch::window_tracker::set_always_on_top(&app);
-    let res = run_online_flow(
+    state.launch_cancelled.store(false, Ordering::SeqCst);
+
+    let cancel_flag = &state.launch_cancelled;
+    let cancel_watcher = async {
+        while !cancel_flag.load(Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    };
+
+    let launch_future = run_online_flow(
         &app,
         &state,
         &address,
         name.as_deref(),
         install_recommended_packs,
         use_https,
-    )
-    .await;
-    if res.is_err() {
-        crate::launch::window_tracker::clear_always_on_top(&app);
+    );
+
+    tokio::select! {
+        res = launch_future => {
+            if res.is_err() {
+                crate::launch::window_tracker::clear_always_on_top(&app);
+            }
+            res.map_err(err_string)
+        }
+        _ = cancel_watcher => {
+            crate::launch::window_tracker::clear_always_on_top(&app);
+            let _ = app.emit("launch-status", "Launch cancelled.");
+            let _ = app.emit(
+                "game-status",
+                serde_json::json!({ "running": false, "label": "", "code": 0 }),
+            );
+            Err("Launch cancelled by user.".to_string())
+        }
     }
-    res.map_err(err_string)
 }
 
 async fn run_online_flow(
@@ -1576,11 +1693,34 @@ pub async fn launch_offline_instance(
         crate::launch::window_tracker::clear_always_on_top(&app);
         return Err("Instance not found".to_string());
     };
-    let res = run_offline_flow(&app, &state, &instance).await;
-    if res.is_err() {
-        crate::launch::window_tracker::clear_always_on_top(&app);
+    state.launch_cancelled.store(false, Ordering::SeqCst);
+
+    let cancel_flag = &state.launch_cancelled;
+    let cancel_watcher = async {
+        while !cancel_flag.load(Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    };
+
+    let launch_future = run_offline_flow(&app, &state, &instance);
+
+    tokio::select! {
+        res = launch_future => {
+            if res.is_err() {
+                crate::launch::window_tracker::clear_always_on_top(&app);
+            }
+            res.map_err(err_string)
+        }
+        _ = cancel_watcher => {
+            crate::launch::window_tracker::clear_always_on_top(&app);
+            let _ = app.emit("launch-status", "Launch cancelled.");
+            let _ = app.emit(
+                "game-status",
+                serde_json::json!({ "running": false, "label": "", "code": 0 }),
+            );
+            Err("Launch cancelled by user.".to_string())
+        }
     }
-    res.map_err(err_string)
 }
 
 async fn run_offline_flow(
@@ -2771,6 +2911,9 @@ mod tests {
             wakeable: false,
             waking: false,
             ready: true,
+            icon_url: None,
+            banner_url: None,
+            banner_is_animated: false,
         });
         assert_eq!(
             WakeDecision::PassThrough,
@@ -2788,6 +2931,9 @@ mod tests {
             wakeable: false,
             waking: true,
             ready: false,
+            icon_url: None,
+            banner_url: None,
+            banner_is_animated: false,
         });
         assert_eq!(WakeDecision::WaitForBoot, wake_decision(waking, false));
 
@@ -2800,6 +2946,9 @@ mod tests {
             wakeable: false,
             waking: false,
             ready: false,
+            icon_url: None,
+            banner_url: None,
+            banner_is_animated: false,
         });
         assert_eq!(WakeDecision::Maintenance, wake_decision(stopped, false));
         // Stopped but wakeable (idle sleep) → wake.
@@ -2811,6 +2960,9 @@ mod tests {
             wakeable: true,
             waking: false,
             ready: false,
+            icon_url: None,
+            banner_url: None,
+            banner_is_animated: false,
         });
         assert_eq!(WakeDecision::Wake, wake_decision(asleep, false));
     }

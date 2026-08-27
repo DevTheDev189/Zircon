@@ -7,8 +7,22 @@
     aria-labelledby="launch-overlay-title"
   >
     <div class="z-card launch-shell relative w-full max-w-[560px] overflow-hidden rounded-2xl border border-slate-700/60 shadow-2xl shadow-black/60 p-0 bg-[#0e1622]">
+      <!-- 16:9 Hero Wallpaper Mode: Full Modal Backdrop with Vibrant Light Gradient & Soft Blur -->
+      <div
+        v-if="isHeroBanner && !bannerFailed"
+        class="absolute inset-0 overflow-hidden pointer-events-none z-0"
+      >
+        <img
+          :src="server.bannerUrl"
+          class="w-full h-full object-cover opacity-60 transition-opacity duration-300 scale-105"
+          :alt="server.name || 'Hero Backdrop'"
+          @error="bannerFailed = true"
+          @load="onBannerLoad"
+        />
+        <div class="absolute inset-0 bg-gradient-to-br from-[#070b10]/90 via-[#0e1622]/80 to-[#070b10]/85 backdrop-blur-[0.5px]"></div>
+      </div>
       <div class="launch-grid absolute inset-0 pointer-events-none"></div>
-      <div class="relative p-6 sm:p-8">
+      <div class="relative z-10 p-6 sm:p-8">
         <div class="mb-6 flex items-start justify-between gap-4">
           <div>
             <img
@@ -42,7 +56,7 @@
             </div>
             <div v-else>
               <p class="mt-2 text-[10px] font-bold uppercase tracking-[0.24em] text-accent/90">Launcher</p>
-              <h2 id="launch-overlay-title" class="mt-1 text-xl font-extrabold text-white tracking-tight">
+              <h2 id="launch-overlay-title" class="mt-1.5 text-xl font-extrabold text-white tracking-tight">
                 Preparing Minecraft
               </h2>
             </div>
@@ -127,15 +141,29 @@
             </div>
           </div>
 
-          <div class="min-h-[135px] border-l-2 border-accent/50 pl-5">
-            <transition name="slide" mode="out-in">
-              <div :key="activeSlide" class="slide-copy">
-                <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80">{{ slides[activeSlide].eyebrow }}</p>
-                <h3 class="max-w-[420px] text-2xl font-bold leading-tight text-white">{{ slides[activeSlide].title }}</h3>
-                <p class="mt-3 max-w-[450px] text-sm leading-relaxed text-[#9eafb7]">{{ slides[activeSlide].body }}</p>
-              </div>
-            </transition>
-          </div>
+        <!-- Classic 468x60 Banner Mode: Padded, Framed Header with breathing room -->
+        <div
+          v-if="isClassicBanner && !bannerFailed"
+          class="mb-6 w-full py-2.5 px-3 rounded-xl overflow-hidden bg-black/50 border border-slate-700/70 shadow-lg flex items-center justify-center relative z-10"
+        >
+          <img
+            :src="server.bannerUrl"
+            class="max-h-[60px] w-auto max-w-full rounded-md object-contain select-none pointer-events-none"
+            :alt="server.name || 'Server Banner'"
+            @error="bannerFailed = true"
+            @load="onBannerLoad"
+          />
+        </div>
+
+        <div class="min-h-[135px] border-l-2 border-accent/50 pl-5">
+          <transition name="slide" mode="out-in">
+            <div :key="activeSlide" class="slide-copy">
+              <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80">{{ slides[activeSlide].eyebrow }}</p>
+              <h3 class="max-w-[420px] text-2xl font-bold leading-tight text-white">{{ slides[activeSlide].title }}</h3>
+              <p class="mt-3 max-w-[450px] text-sm leading-relaxed text-[#9eafb7]">{{ slides[activeSlide].body }}</p>
+            </div>
+          </transition>
+        </div>
 
           <div class="mt-8">
             <div class="mb-2 flex items-center justify-between gap-4 text-xs">
@@ -178,7 +206,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { api } from '../lib/api';
 import zirconTitle from '../assets/zircon-title.svg';
 
@@ -189,7 +217,35 @@ const props = defineProps({
   running: { type: Boolean, default: false },
   gameLabel: { type: String, default: '' },
   error: { type: String, default: '' },
+  server: { type: Object, default: null },
 });
+
+const bannerFailed = ref(false);
+const bannerType = ref('classic');
+
+function onBannerLoad(event) {
+  const img = event?.target;
+  if (img && img.naturalWidth && img.naturalHeight) {
+    const ratio = img.naturalWidth / img.naturalHeight;
+    bannerType.value = ratio > 2.8 ? 'classic' : 'hero';
+  }
+}
+
+const isHeroBanner = computed(() => {
+  return !!props.server?.bannerUrl && bannerType.value === 'hero';
+});
+
+const isClassicBanner = computed(() => {
+  return !!props.server?.bannerUrl && bannerType.value !== 'hero';
+});
+
+watch(
+  () => props.server,
+  () => {
+    bannerFailed.value = false;
+    bannerType.value = 'classic';
+  }
+);
 
 const emit = defineEmits(['close']);
 

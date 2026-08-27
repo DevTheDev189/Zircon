@@ -49,118 +49,162 @@
         <div
           v-for="server in servers"
           :key="server.address"
-          class="group z-card flex items-center gap-4 p-4 mb-3 transition-all duration-200 hover:border-accent/40 hover:shadow-[0_0_20px_rgba(71,210,201,0.12)]"
+          class="group z-card mb-3 transition-all duration-200 hover:border-accent/40 hover:shadow-[0_0_20px_rgba(71,210,201,0.12)] overflow-hidden p-0 relative"
         >
+          <!-- 16:9 Hero Wallpaper Mode: Full Card Backdrop with Vibrant Light Gradient & Soft Blur -->
           <div
-            class="relative w-11 h-11 rounded-xl bg-gradient-to-br from-[#5adfd5] via-[#47d2c9] to-[#20b2aa] text-[#022623] font-black flex items-center justify-center text-lg shrink-0 shadow-[0_0_12px_rgba(71,210,201,0.3)] select-none"
+            v-if="isHeroBanner(server)"
+            class="absolute inset-0 overflow-hidden pointer-events-none z-0"
           >
-            {{ (server.name || server.address || '?').charAt(0).toUpperCase() }}
-            <span
-              v-if="isThisServerRunning(server.address)"
-              class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#4ade80] ring-2 ring-[#070b0f] animate-pulse shadow-[0_0_6px_#4ade80]"
-              title="Game is running"
-            ></span>
+            <img
+              :src="serverBanner(server)"
+              class="w-full h-full object-cover opacity-80 group-hover:opacity-95 transition-all duration-300 scale-105 group-hover:scale-100"
+              :alt="server.name || 'Hero Backdrop'"
+              @error="onBannerError(server.address)"
+              @load="(e) => onBannerLoad(e, server.address)"
+            />
+            <div class="absolute inset-0 bg-gradient-to-r from-black/60 via-black/35 to-black/55 backdrop-blur-[0.5px]"></div>
           </div>
 
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <div class="text-sm font-bold text-white truncate">{{ server.name }}</div>
-              <span
-                v-if="server.useHttps"
-                class="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30"
-                title="HTTPS Secure"
+          <!-- Classic 468x60 Banner Mode: Padded, Framed Header with breathing room -->
+          <div
+            v-if="isClassicBanner(server)"
+            class="w-full py-2.5 px-3 bg-black/40 border-b border-slate-800/80 flex items-center justify-center relative overflow-hidden"
+          >
+            <img
+              :src="serverBanner(server)"
+              class="max-h-[60px] w-auto max-w-full rounded-md shadow-md select-none pointer-events-none"
+              :alt="server.name || 'Server Banner'"
+              @error="onBannerError(server.address)"
+              @load="(e) => onBannerLoad(e, server.address)"
+            />
+          </div>
+
+          <!-- Server Row Details -->
+          <div class="relative z-10 flex items-center gap-4 p-4">
+            <div
+              class="relative w-11 h-11 rounded-xl bg-slate-900 border border-slate-700/80 overflow-hidden flex items-center justify-center text-lg shrink-0 select-none shadow-[0_0_12px_rgba(71,210,201,0.2)]"
+            >
+              <img
+                v-if="serverIcon(server)"
+                :src="serverIcon(server)"
+                class="w-full h-full object-cover"
+                :alt="server.name || 'Server Icon'"
+                @error="onIconError(server.address)"
+              />
+              <div
+                v-else
+                class="w-full h-full bg-gradient-to-br from-[#5adfd5] via-[#47d2c9] to-[#20b2aa] text-[#022623] font-black flex items-center justify-center text-lg"
               >
-                HTTPS
-              </span>
+                {{ (server.name || server.address || '?').charAt(0).toUpperCase() }}
+              </div>
+              <span
+                v-if="isThisServerRunning(server.address)"
+                class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#4ade80] ring-2 ring-[#070b0f] animate-pulse shadow-[0_0_6px_#4ade80]"
+                title="Game is running"
+              ></span>
             </div>
-            <div class="text-[11px] text-slate-400 truncate flex items-center gap-2 mt-0.5">
-              <span class="truncate font-mono opacity-80">{{ server.address }}</span>
-              <span class="text-slate-700">•</span>
-              <span
-                v-if="statusView(server.address).state === 'checking'"
-                class="shrink-0 text-cyan-300/80 flex items-center gap-1.5"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-accent animate-ping"></span> checking…
-              </span>
-              <span
-                v-else-if="statusView(server.address).state === 'waking'"
-                class="shrink-0 text-amber-300 flex items-center gap-1.5 font-medium"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span> waking up…
-              </span>
-              <template v-else-if="statusView(server.address).state === 'online'">
-                <span class="shrink-0 font-medium text-[#4ade80]">
-                  {{ statusView(server.address).online }}/{{ statusView(server.address).max }} online
+
+            <div class="flex-1 min-w-0 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              <div class="flex items-center gap-2">
+                <div class="text-sm font-bold text-white truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{{ server.name }}</div>
+                <span
+                  v-if="server.useHttps"
+                  class="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30"
+                  title="HTTPS Secure"
+                >
+                  HTTPS
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-400 truncate flex items-center gap-2 mt-0.5">
+                <span class="truncate font-mono opacity-80">{{ server.address }}</span>
+                <span class="text-slate-700">•</span>
+                <span
+                  v-if="statusView(server.address).state === 'checking'"
+                  class="shrink-0 text-cyan-300/80 flex items-center gap-1.5"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-accent animate-ping"></span> checking…
                 </span>
                 <span
-                  class="shrink-0 text-[10px] px-1.5 py-0.2 rounded-md font-mono font-semibold"
-                  :class="pingBadgeClass(statusView(server.address).pingMs)"
+                  v-else-if="statusView(server.address).state === 'waking'"
+                  class="shrink-0 text-amber-300 flex items-center gap-1.5 font-medium"
                 >
-                  {{ statusView(server.address).pingMs }}ms
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span> waking up…
                 </span>
-              </template>
-              <span
-                v-else-if="statusView(server.address).state === 'asleep'"
-                class="shrink-0 font-medium text-amber-400 flex items-center gap-1.5"
-                title="Server is asleep (idle shutdown) — PLAY will wake it automatically"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> asleep (auto-wake)
-              </span>
-              <span v-else class="shrink-0 text-slate-500 flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> offline
-              </span>
+                <template v-else-if="statusView(server.address).state === 'online'">
+                  <span class="shrink-0 font-medium text-[#4ade80]">
+                    {{ statusView(server.address).online }}/{{ statusView(server.address).max }} online
+                  </span>
+                  <span
+                    class="shrink-0 text-[10px] px-1.5 py-0.2 rounded-md font-mono font-semibold"
+                    :class="pingBadgeClass(statusView(server.address).pingMs)"
+                  >
+                    {{ statusView(server.address).pingMs }}ms
+                  </span>
+                </template>
+                <span
+                  v-else-if="statusView(server.address).state === 'asleep'"
+                  class="shrink-0 font-medium text-amber-400 flex items-center gap-1.5"
+                  title="Server is asleep (idle shutdown) — PLAY will wake it automatically"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> asleep (auto-wake)
+                </span>
+                <span v-else class="shrink-0 text-slate-500 flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> offline
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div class="flex items-center gap-2.5">
-            <button
-              v-if="isLaunching(server.address)"
-              class="z-btn-accent flex items-center gap-2 py-1.5 px-4 font-bold tracking-wide rounded-xl"
-              disabled
-            >
-              <span class="inline-block w-3.5 h-3.5 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
-              LAUNCHING
-            </button>
-            <button
-              v-else-if="gameRunning"
-              class="z-btn-ghost font-bold px-4 py-1.5 rounded-xl"
-              :disabled="!isThisServerRunning(server.address)"
-              @click="stopGame"
-            >
-              {{ isThisServerRunning(server.address) ? 'STOP' : 'PLAY' }}
-            </button>
-            <button
-              v-else
-              class="z-btn-accent font-bold px-5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-accent/30 transition-all"
-              @click="playServer(server)"
-            >
-              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              PLAY
-            </button>
-            <button
-              class="text-slate-400 hover:text-[#f87171] transition-colors p-2 rounded-xl hover:bg-red-500/10 shrink-0"
-              :disabled="isLaunching(server.address)"
-              :title="isThisServerRunning(server.address)
-                ? 'Stop the game before removing this server'
-                : 'Remove server and delete its local instance files'"
-              @click="removeServer(server)"
-            >
-              <svg
-                class="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+            <div class="flex items-center gap-2.5">
+              <button
+                v-if="isLaunching(server.address)"
+                class="z-btn-accent flex items-center gap-2 py-1.5 px-4 font-bold tracking-wide rounded-xl"
+                disabled
               >
-                <path d="M3 6h18" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-            </button>
+                <span class="inline-block w-3.5 h-3.5 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
+                LAUNCHING
+              </button>
+              <button
+                v-else-if="gameRunning"
+                class="z-btn-ghost font-bold px-4 py-1.5 rounded-xl"
+                :disabled="!isThisServerRunning(server.address)"
+                @click="stopGame"
+              >
+                {{ isThisServerRunning(server.address) ? 'STOP' : 'PLAY' }}
+              </button>
+              <button
+                v-else
+                class="z-btn-accent font-bold px-5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-accent/30 transition-all"
+                @click="playServer(server)"
+              >
+                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                PLAY
+              </button>
+              <button
+                class="text-slate-400 hover:text-[#f87171] transition-colors p-2 rounded-xl hover:bg-red-500/10 shrink-0"
+                :disabled="isLaunching(server.address)"
+                :title="isThisServerRunning(server.address)
+                  ? 'Stop the game before removing this server'
+                  : 'Remove server and delete its local instance files'"
+                @click="removeServer(server)"
+              >
+                <svg
+                  class="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -286,13 +330,36 @@
             </div>
           </div>
 
-          <div v-else-if="probeResult" class="flex flex-col gap-3">
+          <div v-else-if="probeResult" class="flex flex-col gap-3 overflow-hidden">
+            <!-- Banner Preview in Discovery Card -->
+            <div
+              v-if="probeResult.bannerUrl"
+              class="w-full py-2.5 px-3 rounded-xl overflow-hidden bg-black/50 border border-slate-800 flex items-center justify-center -mt-1"
+            >
+              <img
+                :src="probeResult.bannerUrl"
+                class="max-h-[60px] w-auto max-w-full rounded-md object-contain select-none pointer-events-none"
+                :alt="probeResult.name || 'Server Banner'"
+              />
+            </div>
+
             <!-- Header row: Avatar + Name + Edit -->
             <div class="flex items-center gap-3">
               <div
-                class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5adfd5] via-[#47d2c9] to-[#20b2aa] text-[#022623] font-black flex items-center justify-center text-base shrink-0 shadow-[0_0_12px_rgba(71,210,201,0.3)]"
+                class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 overflow-hidden flex items-center justify-center text-base shrink-0 select-none shadow-[0_0_12px_rgba(71,210,201,0.2)]"
               >
-                {{ (displayServerName || '?').charAt(0).toUpperCase() }}
+                <img
+                  v-if="probeResult.iconUrl"
+                  :src="probeResult.iconUrl"
+                  class="w-full h-full object-cover"
+                  :alt="probeResult.name || 'Server Icon'"
+                />
+                <div
+                  v-else
+                  class="w-full h-full bg-gradient-to-br from-[#5adfd5] via-[#47d2c9] to-[#20b2aa] text-[#022623] font-black flex items-center justify-center text-base"
+                >
+                  {{ (displayServerName || '?').charAt(0).toUpperCase() }}
+                </div>
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5">
@@ -354,13 +421,13 @@
                 class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-400/20"
                 title="HTTPS configured automatically"
               >
-                🔒 HTTPS
+                HTTPS
               </span>
               <span
                 v-else
                 class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-900 text-slate-400 border border-slate-800"
               >
-                🌐 HTTP
+                HTTP
               </span>
 
               <!-- Status Badge -->
@@ -373,15 +440,15 @@
               </span>
               <span
                 v-else-if="probeResult.wakeable"
-                class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-400/30"
+                class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-400/30 flex items-center gap-1.5"
               >
-                🟡 Asleep (Auto-wake on Play)
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Asleep (Auto-wake on Play)
               </span>
               <span
                 v-else
-                class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-900 text-slate-500 border border-slate-800"
+                class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-900 text-slate-500 border border-slate-800 flex items-center gap-1.5"
               >
-                ⚪ Offline
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> Offline
               </span>
 
               <!-- Version / Loader -->
@@ -548,13 +615,16 @@ async function pingOne(address, useHttps = false, isInitial = false) {
       }
       return;
     }
-    const isWaking = res.waking || (res.running === true && res.ready === false);
-    const isOnline = (res.running === true && res.ready !== false) || (res.running == null && (res.pingMs > 0 || res.online > 0));
+    const isOnline = res.ready === true || (res.running === true && !res.waking) || (res.running == null && (res.pingMs > 0 || res.online > 0));
+    const isWaking = res.waking && !isOnline;
     const next = {
       state: isWaking ? 'waking' : (isOnline ? 'online' : (res.wakeable ? 'asleep' : 'offline')),
       online: res.online ?? 0,
       max: res.max ?? 0,
       pingMs: res.pingMs ?? 0,
+      iconUrl: res.iconUrl || null,
+      bannerUrl: res.bannerUrl || null,
+      bannerIsAnimated: !!res.bannerIsAnimated,
     };
     const prev = statusCache.value[address];
     if (
@@ -562,7 +632,9 @@ async function pingOne(address, useHttps = false, isInitial = false) {
       prev.state !== next.state ||
       prev.online !== next.online ||
       prev.max !== next.max ||
-      prev.pingMs !== next.pingMs
+      prev.pingMs !== next.pingMs ||
+      prev.iconUrl !== next.iconUrl ||
+      prev.bannerUrl !== next.bannerUrl
     ) {
       statusCache.value[address] = next;
     }
@@ -576,6 +648,59 @@ async function pingOne(address, useHttps = false, isInitial = false) {
 
 function statusView(address) {
   return statusCache.value[address] || { state: 'offline' };
+}
+
+const failedBanners = ref({});
+const failedIcons = ref({});
+const bannerTypes = ref({});
+
+function onBannerLoad(event, address) {
+  const img = event?.target;
+  if (img && img.naturalWidth && img.naturalHeight) {
+    const ratio = img.naturalWidth / img.naturalHeight;
+    bannerTypes.value[address] = ratio > 2.8 ? 'banner' : 'hero';
+  }
+}
+
+function resolveAssetUrl(url, server) {
+  if (!url || typeof url !== 'string') return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const isHttps = server?.useHttps ?? false;
+  const cleanAddr = (server?.address || '').trim().replace(/^https?:\/\//i, '');
+  if (!cleanAddr) return url;
+  const proto = isHttps ? 'https://' : 'http://';
+  const prefix = url.startsWith('/') ? '' : '/';
+  return `${proto}${cleanAddr}${prefix}${url}`;
+}
+
+function serverBanner(server) {
+  if (failedBanners.value[server.address]) return null;
+  const raw = statusCache.value[server.address]?.bannerUrl || server.bannerUrl || null;
+  return resolveAssetUrl(raw, server);
+}
+
+function isHeroBanner(server) {
+  if (!serverBanner(server)) return false;
+  return bannerTypes.value[server.address] === 'hero';
+}
+
+function isClassicBanner(server) {
+  if (!serverBanner(server)) return false;
+  return bannerTypes.value[server.address] !== 'hero';
+}
+
+function serverIcon(server) {
+  if (failedIcons.value[server.address]) return null;
+  const raw = statusCache.value[server.address]?.iconUrl || server.iconUrl || null;
+  return resolveAssetUrl(raw, server);
+}
+
+function onBannerError(address) {
+  failedBanners.value[address] = true;
+}
+
+function onIconError(address) {
+  failedIcons.value[address] = true;
 }
 
 function pingBadgeClass(ms) {
@@ -598,19 +723,25 @@ function isThisServerRunning(address) {
 async function playServer(server) {
   if (launchingAddress.value) return;
   launchingAddress.value = server.address;
-  emit('launching');
+  emit('launching', {
+    ...server,
+    bannerUrl: serverBanner(server),
+    iconUrl: serverIcon(server),
+  });
   try {
     await api.launchServer(server.address, {
       name: server.name,
       useHttps: server.useHttps,
     });
   } catch (err) {
-    console.error('Launch failed:', err);
     const errMsg = typeof err === 'string' ? err : (err?.message || String(err));
-    emit('error', errMsg);
-    window.dispatchEvent(
-      new CustomEvent('zircon-status', { detail: `Launch error: ${errMsg}` })
-    );
+    if (!errMsg.toLowerCase().includes('cancelled')) {
+      console.error('Launch failed:', err);
+      emit('error', errMsg);
+      window.dispatchEvent(
+        new CustomEvent('zircon-status', { detail: `Launch error: ${errMsg}` })
+      );
+    }
   } finally {
     launchingAddress.value = null;
   }
@@ -724,8 +855,11 @@ async function saveServerOnly() {
   if (!addr) return;
   const name = displayServerName.value;
   const useHttps = !!probeResult.value?.useHttps;
+  const iconUrl = probeResult.value?.iconUrl || null;
+  const bannerUrl = probeResult.value?.bannerUrl || null;
+  const bannerIsAnimated = !!probeResult.value?.bannerIsAnimated;
   try {
-    await api.addServer({ name, address: addr, useHttps });
+    await api.addServer({ name, address: addr, useHttps, iconUrl, bannerUrl, bannerIsAnimated });
     await refreshServers();
     closeAddDialog();
   } catch (err) {
@@ -738,11 +872,14 @@ async function addAndPlay() {
   if (!addr) return;
   const name = displayServerName.value;
   const useHttps = !!probeResult.value?.useHttps;
+  const iconUrl = probeResult.value?.iconUrl || null;
+  const bannerUrl = probeResult.value?.bannerUrl || null;
+  const bannerIsAnimated = !!probeResult.value?.bannerIsAnimated;
   try {
-    await api.addServer({ name, address: addr, useHttps });
+    await api.addServer({ name, address: addr, useHttps, iconUrl, bannerUrl, bannerIsAnimated });
     await refreshServers();
     closeAddDialog();
-    await playServer({ name, address: addr, useHttps });
+    await playServer({ name, address: addr, useHttps, iconUrl, bannerUrl, bannerIsAnimated });
   } catch (err) {
     console.error('Failed to add and play server:', err);
   }

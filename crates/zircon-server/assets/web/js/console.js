@@ -3,12 +3,32 @@ window.Zircon = window.Zircon || {};
 window.Zircon.console = {
         // ---- Console ----
     connectConsole() {
-        if (this.consoleWs) return;
+        const targetId = this.selectedInstance ? this.selectedInstance.id : null;
+
+        // If already connected to this instance's console, do nothing
+        if (this.consoleWs && this.currentConsoleInstanceId === targetId && (this.consoleWs.readyState === WebSocket.OPEN || this.consoleWs.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        // Close any existing console connection
+        if (this.consoleWs) {
+            this.consoleWs.onclose = null;
+            this.consoleWs.close();
+            this.consoleWs = null;
+        }
+
+        this.currentConsoleInstanceId = targetId;
+        this.consoleLines = []; // Clear current lines on switch so old server's lines don't linger
+
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
         // Browsers cannot set headers on WebSocket handshakes, and a token in
         // the URL would leak into access logs and history — so the JWT is sent
         // as the first message and re-validated server-side.
-        this.consoleWs = new WebSocket(`${proto}://${location.host}/api/console`);
+        const url = targetId
+            ? `${proto}://${location.host}/api/instances/${encodeURIComponent(targetId)}/console`
+            : `${proto}://${location.host}/api/console`;
+
+        this.consoleWs = new WebSocket(url);
         this.consoleWs.onopen = () => {
             if (this.jwtToken) this.consoleWs.send('AUTH ' + this.jwtToken);
         };
@@ -24,7 +44,11 @@ window.Zircon.console = {
                 if (box && this.autoScroll) box.scrollTop = box.scrollHeight;
             });
         };
-        this.consoleWs.onclose = () => { this.consoleWs = null; };
+        this.consoleWs.onclose = () => {
+            if (this.currentConsoleInstanceId === targetId) {
+                this.consoleWs = null;
+            }
+        };
     },
     clearConsole() {
         if (this.consoleWs && this.consoleWs.readyState === WebSocket.OPEN) {

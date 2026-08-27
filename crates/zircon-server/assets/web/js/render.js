@@ -570,8 +570,8 @@ const _hoisted_342 = {
   key: 0,
   class: "col-span-2 text-xs text-slate-500 py-2"
 }
-const _hoisted_343 = { class: "mt-8 pt-8 border-t border-slate-800/80" }
-const _hoisted_344 = { class: "grid grid-cols-2 gap-6 items-start" }
+const _hoisted_343 = { class: "mb-6 pb-6 border-b border-slate-800/80" }
+const _hoisted_344 = { class: "grid grid-cols-1 xl:grid-cols-2 gap-4 items-start" }
 const _hoisted_345 = { class: "zircon-glass-card rounded-xl p-5 border border-slate-800/80 flex flex-col gap-4" }
 const _hoisted_346 = { class: "flex items-center justify-between" }
 const _hoisted_347 = {
@@ -609,7 +609,7 @@ const _hoisted_362 = {
   class: "text-slate-500 text-[10px] font-mono"
 }
 const _hoisted_363 = { class: "space-y-3" }
-const _hoisted_364 = { class: "w-full h-24 rounded-xl bg-slate-900 border border-slate-700/80 overflow-hidden relative shadow-lg flex items-center justify-center" }
+const _hoisted_364 = { class: "w-full h-24 rounded-xl bg-slate-900/90 border border-slate-700/80 overflow-hidden relative shadow-lg flex items-center justify-center p-2.5" }
 const _hoisted_365 = ["src"]
 const _hoisted_366 = {
   key: 1,
@@ -2821,6 +2821,118 @@ return function render(_ctx, _cache) {
                                 ]),
                                 _createCommentVNode(" RIGHT: server properties "),
                                 _createElementVNode("div", _hoisted_322, [
+                                _createCommentVNode(" SERVER BRANDING & PERSONALIZATION "),
+                                _createElementVNode("div", _hoisted_343, [
+                                  _cache[112] || (_cache[112] = _createElementVNode("h4", { class: "font-bold text-base text-white mb-1" }, "Server Branding & Personalization", -1 /* CACHED */)),
+                                  _cache[113] || (_cache[113] = _createElementVNode("p", { class: "text-xs text-slate-400 mb-5" }, "Customize your server's visual identity across the admin dashboard and launcher client cards.", -1 /* CACHED */)),
+                                  _createElementVNode("div", _hoisted_344, [
+                                    _createCommentVNode(" Server Icon Box "),
+                                    _createElementVNode("div", _hoisted_345, [
+                                      _createElementVNode("div", _hoisted_346, [
+                                        _cache[108] || (_cache[108] = _createElementVNode("div", null, [
+                                          _createElementVNode("h5", { class: "font-bold text-sm text-white" }, "Server Icon"),
+                                          _createElementVNode("p", { class: "text-[11px] text-slate-400 mt-0.5" }, "128×128 or 64×64 PNG, WebP, JPG (max 2 MiB)")
+                                        ], -1 /* CACHED */)),
+                                        (branding.hasIcon)
+                                          ? (_openBlock(), _createElementBlock("span", _hoisted_347, "Active"))
+                                          : (_openBlock(), _createElementBlock("span", _hoisted_348, "Default"))
+                                      ]),
+                                      _createElementVNode("div", _hoisted_349, [
+                                        _createElementVNode("div", _hoisted_350, [
+                                          (branding.hasIcon)
+                                            ? (_openBlock(), _createElementBlock("img", {
+                                                key: 0,
+                                                src: branding.iconUrl,
+                                                class: "w-full h-full object-cover"
+                                              }, null, 8 /* PROPS */, _hoisted_351))
+                                            : (_openBlock(), _createElementBlock("div", _hoisted_352, _toDisplayString(selectedInstance.name ? selectedInstance.name[0] : 'S'), 1 /* TEXT */))
+                                        ]),
+                                        _createElementVNode("div", _hoisted_353, [
+                                          _cache[109] || (_cache[109] = _createElementVNode("p", { class: "text-xs text-slate-400 leading-relaxed" }, [
+                                            _createTextVNode(" Automatically mirrors to "),
+                                            _createElementVNode("code", { class: "text-cyan-300 text-[11px] bg-slate-900 px-1.5 py-0.5 rounded" }, "server-icon.png"),
+                                            _createTextVNode(" in the server root for vanilla Minecraft multiplayer compatibility. ")
+                                          ], -1 /* CACHED */)),
+                                          _createElementVNode("div", _hoisted_354, [
+                                            _createElementVNode("button", {
+                                              onClick: triggerIconUpload,
+                                              disabled: branding.loading,
+                                              class: "zircon-cta-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition"
+                                            }, _toDisplayString(branding.hasIcon ? 'Change Icon' : 'Upload Icon'), 9 /* TEXT, PROPS */, _hoisted_355),
+                                            (branding.hasIcon)
+                                              ? (_openBlock(), _createElementBlock("button", {
+                                                  key: 0,
+                                                  onClick: removeIcon,
+                                                  disabled: branding.loading,
+                                                  class: "text-red-400 hover:text-red-300 text-xs px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 transition"
+                                                }, " Remove ", 8 /* PROPS */, _hoisted_356))
+                                              : _createCommentVNode("v-if", true)
+                                          ])
+                                        ])
+                                      ]),
+                                      _createElementVNode("input", {
+                                        type: "file",
+                                        id: "server-icon-upload-input",
+                                        accept: ".png,.webp,.jpg,.jpeg",
+                                        onChange: uploadIcon,
+                                        class: "hidden"
+                                      }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_357)
+                                    ]),
+                                    _createCommentVNode(" Server Banner Box "),
+                                    _createElementVNode("div", _hoisted_358, [
+                                      _createElementVNode("div", _hoisted_359, [
+                                        _cache[110] || (_cache[110] = _createElementVNode("div", null, [
+                                          _createElementVNode("h5", { class: "font-bold text-sm text-white" }, "Server Hero Banner"),
+                                          _createElementVNode("p", { class: "text-[11px] text-slate-400 mt-0.5" }, "Supports animated GIF, WebP, PNG, JPG (max 10 MiB)")
+                                        ], -1 /* CACHED */)),
+                                        (branding.hasBanner)
+                                          ? (_openBlock(), _createElementBlock("span", _hoisted_360, [
+                                              (branding.bannerIsAnimated)
+                                                ? (_openBlock(), _createElementBlock("span", _hoisted_361))
+                                                : _createCommentVNode("v-if", true),
+                                              _createTextVNode(" " + _toDisplayString(branding.bannerIsAnimated ? 'GIF Banner' : 'Banner Active'), 1 /* TEXT */)
+                                            ]))
+                                          : (_openBlock(), _createElementBlock("span", _hoisted_362, "None"))
+                                      ]),
+                                      _createElementVNode("div", _hoisted_363, [
+                                        _createElementVNode("div", _hoisted_364, [
+                                          (branding.hasBanner)
+                                            ? (_openBlock(), _createElementBlock("img", {
+                                                key: 0,
+                                                src: branding.bannerUrl,
+                                                class: "max-h-full w-auto max-w-full rounded-md object-contain shadow-md"
+                                              }, null, 8 /* PROPS */, _hoisted_365))
+                                            : (_openBlock(), _createElementBlock("div", _hoisted_366, " No custom banner (Default gradient) "))
+                                        ]),
+                                        _createElementVNode("div", _hoisted_367, [
+                                          _cache[111] || (_cache[111] = _createElementVNode("p", { class: "text-[11px] text-slate-400" }, " Adaptive layout: 468×60 renders as a dedicated top banner bar; 16:9 renders as a hero backdrop. ", -1 /* CACHED */)),
+                                          _createElementVNode("div", _hoisted_368, [
+                                            _createElementVNode("button", {
+                                              onClick: triggerBannerUpload,
+                                              disabled: branding.loading,
+                                              class: "zircon-cta-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition"
+                                            }, _toDisplayString(branding.hasBanner ? 'Change Banner' : 'Upload Banner'), 9 /* TEXT, PROPS */, _hoisted_369),
+                                            (branding.hasBanner)
+                                              ? (_openBlock(), _createElementBlock("button", {
+                                                  key: 0,
+                                                  onClick: removeBanner,
+                                                  disabled: branding.loading,
+                                                  class: "text-red-400 hover:text-red-300 text-xs px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 transition"
+                                                }, " Remove ", 8 /* PROPS */, _hoisted_370))
+                                              : _createCommentVNode("v-if", true)
+                                          ])
+                                        ])
+                                      ]),
+                                      _createElementVNode("input", {
+                                        type: "file",
+                                        id: "server-banner-upload-input",
+                                        accept: ".gif,.webp,.png,.jpg,.jpeg",
+                                        onChange: uploadBanner,
+                                        class: "hidden"
+                                      }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_371)
+                                    ])
+                                  ])
+                                ]),
                                   _createElementVNode("div", null, [
                                     _cache[106] || (_cache[106] = _createElementVNode("h4", { class: "font-bold text-sm text-white mb-1" }, "Server Properties", -1 /* CACHED */)),
                                     _cache[107] || (_cache[107] = _createElementVNode("p", { class: "text-xs text-slate-500 mb-3" }, "Common settings — restart the server to apply changes.", -1 /* CACHED */)),
@@ -2972,118 +3084,6 @@ return function render(_ctx, _cache) {
                                     ])
                                   ])
                                 ]),
-                                _createCommentVNode(" SERVER BRANDING & PERSONALIZATION "),
-                                _createElementVNode("div", _hoisted_343, [
-                                  _cache[112] || (_cache[112] = _createElementVNode("h4", { class: "font-bold text-base text-white mb-1" }, "Server Branding & Personalization", -1 /* CACHED */)),
-                                  _cache[113] || (_cache[113] = _createElementVNode("p", { class: "text-xs text-slate-400 mb-5" }, "Customize your server's visual identity across the admin dashboard and launcher client cards.", -1 /* CACHED */)),
-                                  _createElementVNode("div", _hoisted_344, [
-                                    _createCommentVNode(" Server Icon Box "),
-                                    _createElementVNode("div", _hoisted_345, [
-                                      _createElementVNode("div", _hoisted_346, [
-                                        _cache[108] || (_cache[108] = _createElementVNode("div", null, [
-                                          _createElementVNode("h5", { class: "font-bold text-sm text-white" }, "Server Icon"),
-                                          _createElementVNode("p", { class: "text-[11px] text-slate-400 mt-0.5" }, "128×128 or 64×64 PNG, WebP, JPG (max 2 MiB)")
-                                        ], -1 /* CACHED */)),
-                                        (branding.hasIcon)
-                                          ? (_openBlock(), _createElementBlock("span", _hoisted_347, "Active"))
-                                          : (_openBlock(), _createElementBlock("span", _hoisted_348, "Default"))
-                                      ]),
-                                      _createElementVNode("div", _hoisted_349, [
-                                        _createElementVNode("div", _hoisted_350, [
-                                          (branding.hasIcon)
-                                            ? (_openBlock(), _createElementBlock("img", {
-                                                key: 0,
-                                                src: branding.iconUrl,
-                                                class: "w-full h-full object-cover"
-                                              }, null, 8 /* PROPS */, _hoisted_351))
-                                            : (_openBlock(), _createElementBlock("div", _hoisted_352, _toDisplayString(selectedInstance.name ? selectedInstance.name[0] : 'S'), 1 /* TEXT */))
-                                        ]),
-                                        _createElementVNode("div", _hoisted_353, [
-                                          _cache[109] || (_cache[109] = _createElementVNode("p", { class: "text-xs text-slate-400 leading-relaxed" }, [
-                                            _createTextVNode(" Automatically mirrors to "),
-                                            _createElementVNode("code", { class: "text-cyan-300 text-[11px] bg-slate-900 px-1.5 py-0.5 rounded" }, "server-icon.png"),
-                                            _createTextVNode(" in the server root for vanilla Minecraft multiplayer compatibility. ")
-                                          ], -1 /* CACHED */)),
-                                          _createElementVNode("div", _hoisted_354, [
-                                            _createElementVNode("button", {
-                                              onClick: triggerIconUpload,
-                                              disabled: branding.loading,
-                                              class: "zircon-cta-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition"
-                                            }, _toDisplayString(branding.hasIcon ? 'Change Icon' : 'Upload Icon'), 9 /* TEXT, PROPS */, _hoisted_355),
-                                            (branding.hasIcon)
-                                              ? (_openBlock(), _createElementBlock("button", {
-                                                  key: 0,
-                                                  onClick: removeIcon,
-                                                  disabled: branding.loading,
-                                                  class: "text-red-400 hover:text-red-300 text-xs px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 transition"
-                                                }, " Remove ", 8 /* PROPS */, _hoisted_356))
-                                              : _createCommentVNode("v-if", true)
-                                          ])
-                                        ])
-                                      ]),
-                                      _createElementVNode("input", {
-                                        type: "file",
-                                        id: "server-icon-upload-input",
-                                        accept: ".png,.webp,.jpg,.jpeg",
-                                        onChange: uploadIcon,
-                                        class: "hidden"
-                                      }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_357)
-                                    ]),
-                                    _createCommentVNode(" Server Banner Box "),
-                                    _createElementVNode("div", _hoisted_358, [
-                                      _createElementVNode("div", _hoisted_359, [
-                                        _cache[110] || (_cache[110] = _createElementVNode("div", null, [
-                                          _createElementVNode("h5", { class: "font-bold text-sm text-white" }, "Server Hero Banner"),
-                                          _createElementVNode("p", { class: "text-[11px] text-slate-400 mt-0.5" }, "Supports animated GIF, WebP, PNG, JPG (max 10 MiB)")
-                                        ], -1 /* CACHED */)),
-                                        (branding.hasBanner)
-                                          ? (_openBlock(), _createElementBlock("span", _hoisted_360, [
-                                              (branding.bannerIsAnimated)
-                                                ? (_openBlock(), _createElementBlock("span", _hoisted_361))
-                                                : _createCommentVNode("v-if", true),
-                                              _createTextVNode(" " + _toDisplayString(branding.bannerIsAnimated ? 'GIF Banner' : 'Banner Active'), 1 /* TEXT */)
-                                            ]))
-                                          : (_openBlock(), _createElementBlock("span", _hoisted_362, "None"))
-                                      ]),
-                                      _createElementVNode("div", _hoisted_363, [
-                                        _createElementVNode("div", _hoisted_364, [
-                                          (branding.hasBanner)
-                                            ? (_openBlock(), _createElementBlock("img", {
-                                                key: 0,
-                                                src: branding.bannerUrl,
-                                                class: "w-full h-full object-cover"
-                                              }, null, 8 /* PROPS */, _hoisted_365))
-                                            : (_openBlock(), _createElementBlock("div", _hoisted_366, " No custom banner (Default gradient) "))
-                                        ]),
-                                        _createElementVNode("div", _hoisted_367, [
-                                          _cache[111] || (_cache[111] = _createElementVNode("p", { class: "text-[11px] text-slate-400" }, " Rendered as hero backdrop on launcher cards and details. ", -1 /* CACHED */)),
-                                          _createElementVNode("div", _hoisted_368, [
-                                            _createElementVNode("button", {
-                                              onClick: triggerBannerUpload,
-                                              disabled: branding.loading,
-                                              class: "zircon-cta-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition"
-                                            }, _toDisplayString(branding.hasBanner ? 'Change Banner' : 'Upload Banner'), 9 /* TEXT, PROPS */, _hoisted_369),
-                                            (branding.hasBanner)
-                                              ? (_openBlock(), _createElementBlock("button", {
-                                                  key: 0,
-                                                  onClick: removeBanner,
-                                                  disabled: branding.loading,
-                                                  class: "text-red-400 hover:text-red-300 text-xs px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 transition"
-                                                }, " Remove ", 8 /* PROPS */, _hoisted_370))
-                                              : _createCommentVNode("v-if", true)
-                                          ])
-                                        ])
-                                      ]),
-                                      _createElementVNode("input", {
-                                        type: "file",
-                                        id: "server-banner-upload-input",
-                                        accept: ".gif,.webp,.png,.jpg,.jpeg",
-                                        onChange: uploadBanner,
-                                        class: "hidden"
-                                      }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_371)
-                                    ])
-                                  ])
-                                ])
                               ]))
                             : (_openBlock(), _createElementBlock("p", _hoisted_372, "Select a server instance first."))
                         ]))

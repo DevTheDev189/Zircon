@@ -115,6 +115,7 @@ createApp({
             consoleLines: [],
             command: '',
             consoleWs: null,
+            currentConsoleInstanceId: null,
             autoScroll: true,
             pollTimer: null,
             idleTicker: null,

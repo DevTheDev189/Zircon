@@ -281,10 +281,15 @@ impl TcpMultiplexer {
                                 ip_conns,
                             };
                             if let Err(e) = this.handle_connection(socket, fixed).await {
-                                // Visible at the default log level: a dropped game
-                                // connection is the classic "Failed to Quick Play"
-                                // cause (e.g. backend instance not listening).
-                                tracing::warn!("Connection error on port {port}: {e}");
+                                if e.kind() == std::io::ErrorKind::ConnectionRefused {
+                                    // When a client probes/pings an instance that is currently stopped or sleeping,
+                                    // connection refused to the backend Minecraft port is normal and expected.
+                                    tracing::debug!("Backend server for port {port} is not running (connection refused): {e}");
+                                } else {
+                                    // Visible at the default log level: an unexpected dropped connection
+                                    // or backend failure.
+                                    tracing::warn!("Connection error on port {port}: {e}");
+                                }
                             }
                         });
                     }

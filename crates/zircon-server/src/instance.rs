@@ -85,6 +85,7 @@ struct Inner {
     instance_configs: HashMap<String, InstanceConfig>,
     active_processes: HashMap<String, Arc<MinecraftProcessManager>>,
     player_trackers: HashMap<String, Arc<PlayerTracker>>,
+    consoles: HashMap<String, Arc<ConsoleStreamHandler>>,
     /// The instance whose data the client-facing legacy endpoints serve.
     active_instance_id: Option<String>,
     /// instance_id → expiry of a launcher's "a player is on their way" hold,
@@ -127,6 +128,7 @@ impl ServerInstanceManager {
                 instance_configs: HashMap::new(),
                 active_processes: HashMap::new(),
                 player_trackers: HashMap::new(),
+                consoles: HashMap::new(),
                 active_instance_id: None,
                 pending_join_intents: HashMap::new(),
             }),
@@ -229,15 +231,18 @@ impl ServerInstanceManager {
                     )));
                 }
             }
-            // Each instance gets its own fresh console so its player activity is
-            // tracked separately and cleanly; every line is forwarded to the shared
-            // console so the WebSocket console keeps working. The per
-            // instance players.json accumulates the ever-joined player log.
-            let inst_console = Arc::new(ConsoleStreamHandler::with_players_file(Some(
-                self.instance_dir(instance_id).join("players.json"),
-            )));
-            let shared = self.console.clone();
-            inst_console.add_listener(Box::new(move |line| shared.accept(line)));
+            // Each instance gets its own isolated console stream handler so its
+            // logs and player activity are tracked separately without leaking into
+            // or mixing with other running server instances.
+            let inst_console = inner
+                .consoles
+                .entry(instance_id.to_string())
+                .or_insert_with(|| {
+                    Arc::new(ConsoleStreamHandler::with_players_file(Some(
+                        self.instance_dir(instance_id).join("players.json"),
+                    )))
+                })
+                .clone();
 
             let pm = Arc::new(MinecraftProcessManager::for_instance(
                 Arc::new(config.clone()),
@@ -548,6 +553,7 @@ impl ServerInstanceManager {
                 return Ok(false);
             };
             inner.player_trackers.remove(instance_id);
+            inner.consoles.remove(instance_id);
             inner.pending_join_intents.remove(instance_id);
             config
         };
@@ -805,8 +811,33 @@ impl ServerInstanceManager {
             .cloned()
     }
 
-    /// The shared console every instance's output is forwarded to (also streams
-    /// over the admin WebSocket). Used to surface wrapper-level messages.
+    /// Gets or creates the isolated console stream handler for a specific instance.
+    pub fn get_or_create_console(
+        &self,
+        instance_id: &str,
+    ) -> Result<Arc<ConsoleStreamHandler>, InstanceError> {
+        let mut inner = self.inner.lock().unwrap();
+        if !inner.instance_configs.contains_key(instance_id) {
+            return Err(InstanceError::NotFound(format!(
+                "Instance '{instance_id}' not found"
+            )));
+        }
+        if let Some(console) = inner.consoles.get(instance_id) {
+            return Ok(console.clone());
+        }
+        let inst_console = Arc::new(ConsoleStreamHandler::with_players_file(Some(
+            self.instance_dir(instance_id).join("players.json"),
+        )));
+        inner
+            .player_trackers
+            .insert(instance_id.to_string(), inst_console.player_tracker_arc());
+        inner
+            .consoles
+            .insert(instance_id.to_string(), inst_console.clone());
+        Ok(inst_console)
+    }
+
+    /// The shared console used for wrapper-level messages or single-instance legacy mode.
     pub fn console(&self) -> &Arc<ConsoleStreamHandler> {
         &self.console
     }

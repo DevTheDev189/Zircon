@@ -557,7 +557,12 @@ pub fn router(state: AppState) -> Router {
     // The console WebSocket authenticates with its first message (browsers
     // cannot set headers on the handshake, and a ?token= URL would leak into
     // logs), so it is deliberately NOT covered by the header-auth middleware.
-    let console_router = Router::new().route("/api/console", get(console_controller::console_ws));
+    let console_router = Router::new()
+        .route("/api/console", get(console_controller::console_ws))
+        .route(
+            "/api/instances/:id/console",
+            get(console_controller::instance_console_ws),
+        );
 
     // ----------------------------------------------------------------------
     // Client-facing legacy endpoints (public, outside /api)
@@ -613,6 +618,14 @@ pub fn router(state: AppState) -> Router {
         )
         .route(
             "/:port/files/branding/banner",
+            get(branding_controller::download_banner_by_port),
+        )
+        .route(
+            "/api/instances/:id/branding/icon",
+            get(branding_controller::download_icon_by_port),
+        )
+        .route(
+            "/api/instances/:id/branding/banner",
             get(branding_controller::download_banner_by_port),
         );
 
