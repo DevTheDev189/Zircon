@@ -22,7 +22,16 @@ createApp({
             selectedInstance: null,
             activeTab: 'mods',
             showAddServerModal: false,
-            newServerForm: { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4 },
+            newServerForm: { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4, autoStart: false },
+            minecraftVersions: [],
+            minecraftVersionsLoading: false,
+            newServerLoaderVersions: [],
+            newServerLoaderLoading: false,
+            settingsLoaderVersions: [],
+            settingsLoaderLoading: false,
+            windowsAutostartEnabled: false,
+            windowsAutostartSupported: true,
+            windowsAutostartLoading: false,
             showImportServerModal: false,
             importStep: 1,
             importUploading: false,
@@ -38,6 +47,13 @@ createApp({
             showProfileModal: false,
             profileForm: { username: 'admin', currentPassword: '', newPassword: '' },
             systemStats: {},
+            serverCurrentVersion: '0.3.7',
+            serverUpdateChecking: false,
+            serverUpdateApplying: false,
+            serverUpdateAvailable: false,
+            serverUpdateManifest: null,
+            serverUpdateStatus: '',
+            serverUpdateError: '',
             searchQuery: '',
             searchType: 'mod', // 'mod' or 'modpack'
             searchProvider: 'modrinth', // 'modrinth' or 'curseforge'
@@ -90,6 +106,9 @@ createApp({
             shaderSearchResults: [],
             texturePackSearchResults: [],
             installingPacks: {}, // { [projectId]: true } while an install is in flight
+            serverResourcePack: null,
+            serverPackLoading: false,
+            serverPackUploading: false,
             whitelistEnabled: false,
             whitelistPlayers: [],
             opPlayers: [],
@@ -99,7 +118,7 @@ createApp({
             playersLoaded: false,
             playerForms: { whitelist: '', op: '' },
             banForm: { name: '', reason: '' },
-            settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '', externalPort: null, ramAuto: false, ramGB: 4, extraJvmArgs: '', idleShutdownEnabled: false, idleShutdownMinutes: 5 },
+            settingsForm: { name: '', mcVersion: '', loaderVersion: '', javaArgs: '', externalPort: null, ramAuto: false, ramGB: 4, extraJvmArgs: '', idleShutdownEnabled: false, idleShutdownMinutes: 5, autoStart: false },
             serverProps: {},
             backupForm: { frequency: 'off', time: '02:00', retention: 10 },
             backupsList: [],
@@ -236,10 +255,14 @@ createApp({
                     if (box) box.scrollTop = box.scrollHeight;
                 });
             }
-            if (tab === 'stats') this.loadStats();
+            if (tab === 'stats') {
+                this.loadStats();
+                this.loadAutostartStatus();
+            }
             if (tab === 'players') this.loadPlayers();
             if (tab === 'backups') this.loadBackups();
             if (tab === 'settings') {
+                this.loadMinecraftVersions();
                 this.loadServerProperties();
                 // RAM slider needs the host's total memory for its ceiling.
                 this.loadStats();

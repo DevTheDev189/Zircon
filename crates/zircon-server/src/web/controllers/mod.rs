@@ -14,5 +14,6 @@ pub mod player_controller;
 pub mod stats_controller;
 pub mod system_controller;
 pub mod vanilla_player_files;
+pub mod version_controller;
 
 pub(crate) mod config_helpers;

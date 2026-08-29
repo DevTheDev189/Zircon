@@ -49,6 +49,8 @@ pub fn pack_entry_to_map(entry: &PackEntry, is_shader: bool) -> serde_json::Valu
         "description": entry.description.clone().unwrap_or_default(),
         "version": entry.version,
         "packFormat": entry.pack_format,
+        "serverEnforced": entry.server_enforced.unwrap_or(false),
+        "sanitized": entry.sanitized.unwrap_or(false),
     })
 }
 
@@ -81,6 +83,7 @@ pub fn backup_entry_to_map(entry: &BackupEntry) -> serde_json::Value {
 pub fn instance_to_map(
     instance: &InstanceConfig,
     running: bool,
+    booted: bool,
     player_count: usize,
     online_players: Vec<String>,
     idle_remaining_seconds: Option<u64>,
@@ -105,6 +108,8 @@ pub fn instance_to_map(
         "lastShutdownReason": instance.last_shutdown_reason,
         "wakeable": !running && instance.wakeable(),
         "running": running,
+        "booted": booted,
+        "booting": running && !booted,
         "playerCount": player_count,
         "onlinePlayers": online_players,
         "idleRemainingSeconds": idle_remaining_seconds,

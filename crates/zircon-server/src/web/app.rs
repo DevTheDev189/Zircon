@@ -34,7 +34,7 @@ use super::auth::require_auth;
 use super::controllers::{
     auth_controller, backup_controller, bom_controller, branding_controller, console_controller,
     file_controller, import_controller, instance_controller, mod_controller, pack_controller,
-    player_controller, stats_controller, system_controller,
+    player_controller, stats_controller, system_controller, version_controller,
 };
 use super::rate_limit::FixedWindowLimiter;
 
@@ -52,6 +52,7 @@ pub struct AppState {
     pub packs: PackManagementService,
     pub resolver: Arc<ModServiceResolver>,
     pub import_service: Arc<ServerImportService>,
+    pub versions: Arc<crate::services::versions::VersionService>,
     pub tickets: Arc<JoinTicketManager>,
     pub curseforge_api_key: String,
     /// Server-level Ed25519 key for signing per-instance BOMs; shares the pin
@@ -252,6 +253,19 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/system/update/apply",
             post(system_controller::apply_update),
+        )
+        .route(
+            "/api/system/autostart",
+            get(system_controller::get_autostart).post(system_controller::set_autostart),
+        )
+        // Versions & Loader resolution
+        .route(
+            "/api/versions/minecraft",
+            get(version_controller::get_minecraft_versions),
+        )
+        .route(
+            "/api/versions/loaders",
+            get(version_controller::get_loader_versions),
         )
         // Stats
         .route("/api/stats", get(stats_controller::stats))
@@ -489,6 +503,11 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/instances/:id/resourcepacks/:filename",
             delete(instance_controller::remove_resourcepack),
+        )
+        .route(
+            "/api/instances/:id/resourcepacks/server-pack",
+            get(instance_controller::get_server_resourcepack)
+                .post(instance_controller::set_server_resourcepack),
         )
         .route(
             "/api/instances/:id/backups",

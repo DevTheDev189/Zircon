@@ -4,6 +4,31 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
+const ACTIVE_SKIN_CACHE_KEY = 'zircon_active_skin_cache';
+
+let cachedActiveSkin = (() => {
+  try {
+    const raw = localStorage.getItem(ACTIVE_SKIN_CACHE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+})();
+
+export function getCachedActiveSkin() {
+  return cachedActiveSkin;
+}
+
+export function setCachedActiveSkin(skin) {
+  cachedActiveSkin = skin;
+  try {
+    if (skin) {
+      localStorage.setItem(ACTIVE_SKIN_CACHE_KEY, JSON.stringify(skin));
+    } else {
+      localStorage.removeItem(ACTIVE_SKIN_CACHE_KEY);
+    }
+  } catch {}
+}
+
 export const api = {
   // Auth
   loginMicrosoft: () => invoke('login_microsoft'),
@@ -35,9 +60,9 @@ export const api = {
   probeServer: (address) => invoke('probe_server', { address }),
   deleteServer: (address) => invoke('delete_saved_server', { address }),
   deleteSavedServer: (address) => invoke('delete_saved_server', { address }),
-  launchServer: (address, nameOrOpts, installRecommendedPacks = true, useHttps = false) => {
+  launchServer: (address, nameOrOpts, installRecommendedPacks = false, useHttps = false) => {
     let name = null;
-    let installPacks = installRecommendedPacks;
+    let installPacks = false;
     let https = useHttps;
     if (typeof nameOrOpts === 'object' && nameOrOpts !== null) {
       name = nameOrOpts.name || null;
@@ -49,6 +74,7 @@ export const api = {
       }
     } else if (typeof nameOrOpts === 'string') {
       name = nameOrOpts;
+      installPacks = installRecommendedPacks;
     }
     return invoke('launch_server', {
       address,
@@ -78,21 +104,58 @@ export const api = {
   addOfflineMod: (id, sourcePath) => invoke('add_offline_mod', { id, sourcePath }),
 
   // Skins
-  getActiveSkin: () => invoke('get_active_skin'),
+  getActiveSkin: async () => {
+    const res = await invoke('get_active_skin');
+    if (res && (res.dataUrl || res.data_url)) {
+      setCachedActiveSkin({
+        dataUrl: res.dataUrl || res.data_url,
+        variant: res.variant || 'classic',
+        name: res.name || 'active_skin.png',
+      });
+    } else if (res === null) {
+      setCachedActiveSkin(null);
+    }
+    return res;
+  },
   getSkinHeadIcon: () => invoke('get_skin_head_icon'),
-  saveSkin: (sourcePath, variant = 'classic') => invoke('save_skin', { sourcePath, variant }),
+  saveSkin: async (sourcePath, variant = 'classic') => {
+    const res = await invoke('save_skin', { sourcePath, variant });
+    api.getActiveSkin().catch(() => {});
+    return res;
+  },
   importCustomSkin: (sourcePath, variant = 'classic') =>
-    invoke('save_skin', { sourcePath, variant }),
-  setActiveSkinVariant: (variant) => invoke('set_active_skin_variant', { variant }),
-  removeSkin: () => invoke('remove_skin'),
+    api.saveSkin(sourcePath, variant),
+  setActiveSkinVariant: async (variant) => {
+    const res = await invoke('set_active_skin_variant', { variant });
+    if (cachedActiveSkin) {
+      setCachedActiveSkin({ ...cachedActiveSkin, variant });
+    }
+    return res;
+  },
+  removeSkin: async () => {
+    const res = await invoke('remove_skin');
+    setCachedActiveSkin(null);
+    return res;
+  },
   getSkinHistory: () => invoke('get_skin_history'),
   getBundledSkins: () => invoke('get_bundled_skins'),
-  saveBundledSkin: (key, variant) => invoke('save_bundled_skin', { key, variant }),
+  saveBundledSkin: async (key, variant) => {
+    const res = await invoke('save_bundled_skin', { key, variant });
+    api.getActiveSkin().catch(() => {});
+    return res;
+  },
   fetchMojangSkin: (uuid) => invoke('fetch_mojang_skin', { uuid }),
-  fetchMojangSkinActive: (uuid) => invoke('fetch_mojang_skin_active', { uuid }),
+  fetchMojangSkinActive: async (uuid) => {
+    const res = await invoke('fetch_mojang_skin_active', { uuid });
+    api.getActiveSkin().catch(() => {});
+    return res;
+  },
   fetchMojangSkinPreview: (uuid) => invoke('fetch_mojang_skin_preview', { uuid }),
-  activateHistorySkin: (filename, variant) =>
-    invoke('activate_history_skin', { filename, variant }),
+  activateHistorySkin: async (filename, variant) => {
+    const res = await invoke('activate_history_skin', { filename, variant });
+    api.getActiveSkin().catch(() => {});
+    return res;
+  },
   deleteHistorySkin: (filename) => invoke('delete_history_skin', { filename }),
   deletePresetSkin: (filename) => invoke('delete_history_skin', { filename }),
   renameSkin: (filename, newName) => invoke('rename_skin', { filename, newName }),
@@ -120,9 +183,11 @@ export const api = {
   listLoaderTypes: () => invoke('list_loader_types'),
   openExternalUrl: (url) => invoke('open_external_url', { url }),
 
-  // Settings
+  // Settings & App Info
   getSettings: () => invoke('get_settings'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
+  getLauncherVersion: () => invoke('get_launcher_version'),
+  logDebug: (message) => invoke('log_debug_message', { message }),
 
   // Debug logs & crash diagnostics
   getLauncherLogs: () => invoke('get_launcher_logs'),

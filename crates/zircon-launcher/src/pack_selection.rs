@@ -176,6 +176,11 @@ impl ClientPackManager {
 }
 
 fn copy_in(dir: PathBuf, source: &Path) -> Result<String, LauncherError> {
+    let guard = zircon_core::archive::limits::ArchiveGuard::default();
+    let file = std::fs::File::open(source)?;
+    zircon_core::security::pack_validator::validate_pack_archive(file, &guard)
+        .map_err(|e| LauncherError::Security(format!("Pack failed security audit: {e}")))?;
+
     std::fs::create_dir_all(&dir)?;
     let filename = sanitize_pack_filename(source);
     let target = dir.join(&filename);
@@ -250,7 +255,12 @@ mod tests {
     }
 
     fn write_zip(path: &Path) {
-        std::fs::write(path, b"PK\x03\x04 fake zip").unwrap();
+        let file = std::fs::File::create(path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+        zip.start_file("pack.mcmeta", options).unwrap();
+        std::io::Write::write_all(&mut zip, b"{\"pack\":{\"pack_format\":15,\"description\":\"Test\"}}").unwrap();
+        zip.finish().unwrap();
     }
 
     #[test]
@@ -309,7 +319,7 @@ mod tests {
         let sub = dir.path().join("sub dir");
         std::fs::create_dir_all(&sub).unwrap();
         let source = sub.join("weird!name");
-        std::fs::write(&source, b"x").unwrap();
+        write_zip(&source);
 
         let game = dir.path().join("game2");
         let mut selection = PackSelection::default();

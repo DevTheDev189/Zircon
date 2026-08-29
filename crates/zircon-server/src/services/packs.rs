@@ -329,6 +329,33 @@ impl PackManagementService {
         self.safe_resolve(filename, &self.resourcepacks_dir)
     }
 
+    pub fn set_server_resourcepack(&self, filename: Option<&str>) -> Result<(), PackError> {
+        let mut found = false;
+        self.bom_service.with_bom(|bom| {
+            for pack in &mut bom.resourcepacks {
+                if let Some(target) = filename {
+                    if pack.filename == target {
+                        pack.server_enforced = Some(true);
+                        found = true;
+                    } else {
+                        pack.server_enforced = None;
+                    }
+                } else {
+                    pack.server_enforced = None;
+                }
+            }
+        });
+        if filename.is_some() && !found {
+            return Err(PackError::Invalid(format!("Resource pack '{filename:?}' not found in BOM")));
+        }
+        self.bom_service.save().map_err(PackError::Io)?;
+        Ok(())
+    }
+
+    pub fn get_server_resourcepack(&self) -> Option<PackEntry> {
+        self.bom_service.get_bom().resourcepacks.into_iter().find(|p| p.server_enforced == Some(true))
+    }
+
     // ----------------------------------------------------------------------
     // Shared implementation
     // ----------------------------------------------------------------------
@@ -523,6 +550,20 @@ impl PackManagementService {
         tokio::io::copy(&mut content, &mut out).await?;
         drop(out);
 
+        // Zero-trust security audit: enforce file extension whitelist and zip safety
+        let guard = zircon_core::archive::limits::ArchiveGuard::default();
+        let pack_file = match std::fs::File::open(&target) {
+            Ok(f) => f,
+            Err(e) => {
+                let _ = fs::remove_file(&target);
+                return Err(PackError::Io(e));
+            }
+        };
+        if let Err(e) = zircon_core::security::pack_validator::validate_pack_archive(pack_file, &guard) {
+            let _ = fs::remove_file(&target);
+            return Err(PackError::Invalid(format!("Security validation failed: {e}")));
+        }
+
         let size = match fs::metadata(&target) {
             Ok(m) => m.len(),
             Err(e) => {
@@ -586,6 +627,7 @@ impl PackManagementService {
         );
         entry.version = version;
         entry.pack_format = pack_format;
+        entry.sanitized = Some(true);
         if description.is_some() {
             entry.description = description;
         }
@@ -830,6 +872,18 @@ mod tests {
         crate::test_util::temp_dir("packs")
     }
 
+    fn valid_test_zip() -> Vec<u8> {
+        let mut buffer = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buffer));
+            let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+            zip.start_file("pack.mcmeta", options).unwrap();
+            std::io::Write::write_all(&mut zip, b"{\"pack\":{\"pack_format\":15,\"description\":\"Test\"}}").unwrap();
+            zip.finish().unwrap();
+        }
+        buffer
+    }
+
     #[tokio::test]
     async fn shaderpack_upload_updates_bom() {
         let dir = temp_dir();
@@ -846,7 +900,7 @@ mod tests {
         );
 
         let entry = service
-            .add_shaderpack(std::io::Cursor::new(vec![1, 2, 3]), "CoolShaders.zip", None)
+            .add_shaderpack(std::io::Cursor::new(valid_test_zip()), "CoolShaders.zip", None)
             .await
             .unwrap();
         assert_eq!("CoolShaders.zip", entry.filename);
@@ -855,7 +909,7 @@ mod tests {
 
         // Replace by same name.
         service
-            .add_shaderpack(std::io::Cursor::new(vec![4, 5, 6]), "CoolShaders.zip", None)
+            .add_shaderpack(std::io::Cursor::new(valid_test_zip()), "CoolShaders.zip", None)
             .await
             .unwrap();
         assert_eq!(1, service.list_shaderpacks().len());
@@ -894,7 +948,7 @@ mod tests {
         let service =
             PackManagementService::new(bom, dir.join("shaderpacks"), dir.join("resourcepacks"));
         service
-            .add_resourcepack(std::io::Cursor::new(vec![1]), "VanillaTweaks.zip", None)
+            .add_resourcepack(std::io::Cursor::new(valid_test_zip()), "VanillaTweaks.zip", None)
             .await
             .unwrap();
         assert_eq!(1, service.list_resourcepacks().len());

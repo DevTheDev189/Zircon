@@ -46,16 +46,20 @@ pub async fn get_config(
         "mcPort": cfg.mc_port,
         "autoStartServer": cfg.auto_start_server,
         "curseforgeApiKey": mask_api_key(&cfg.curseforge_api_key),
+        "curseforgeActive": !state.config.effective_curseforge_key().is_empty(),
         "serverProperties": server_properties,
     });
     Ok(Json(value))
 }
 
 /// Masks a secret for display: only the last 4 characters are revealed, so a
-/// configured CurseForge API key never leaves the server in full.
+/// configured CurseForge API key never leaves the server in full. Empty keys return "".
 fn mask_api_key(key: &str) -> String {
     let key = key.trim();
-    if key.is_empty() || key.len() <= 4 {
+    if key.is_empty() {
+        return String::new();
+    }
+    if key.len() <= 4 {
         return "****".to_string();
     }
     format!("****{}", &key[key.len() - 4..])
@@ -269,10 +273,34 @@ fn instance_status(state: &AppState, instance: Option<&InstanceConfig>) -> serde
             );
             let bom_service = state.resolver.instance_service(instance).bom;
             let bom = bom_service.get_bom();
-            let branding = bom.branding;
-            let icon_url = branding.as_ref().and_then(|b| b.icon_url.clone());
-            let banner_url = branding.as_ref().and_then(|b| b.banner_url.clone());
-            let banner_is_animated = branding.as_ref().map(|b| b.banner_is_animated).unwrap_or(false);
+            let branding = bom.branding.as_ref();
+            let icon_url = branding.and_then(|b| {
+                b.icon_url.as_deref().map(|url| {
+                    if let Some(sha) = &b.icon_sha1 {
+                        if !url.contains("?v=") {
+                            format!("{url}?v={sha}")
+                        } else {
+                            url.to_string()
+                        }
+                    } else {
+                        url.to_string()
+                    }
+                })
+            });
+            let banner_url = branding.and_then(|b| {
+                b.banner_url.as_deref().map(|url| {
+                    if let Some(sha) = &b.banner_sha1 {
+                        if !url.contains("?v=") {
+                            format!("{url}?v={sha}")
+                        } else {
+                            url.to_string()
+                        }
+                    } else {
+                        url.to_string()
+                    }
+                })
+            });
+            let banner_is_animated = branding.map(|b| b.banner_is_animated).unwrap_or(false);
 
             serde_json::json!({
                 "online": players.len(),
@@ -333,10 +361,12 @@ pub async fn get_status(State(state): State<AppState>) -> Json<serde_json::Value
     let value = match &instance {
         Some(instance) => {
             let running = state.instances.is_running(&instance.id);
+            let ready = state.instances.is_server_ready(&instance.id);
             let players = state.instances.get_online_players(&instance.id);
             instance_to_map(
                 instance,
                 running,
+                ready,
                 players.len(),
                 players,
                 state.instances.get_idle_remaining_seconds(&instance.id),

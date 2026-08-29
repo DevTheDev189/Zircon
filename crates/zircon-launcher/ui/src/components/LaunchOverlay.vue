@@ -155,20 +155,69 @@
           />
         </div>
 
-        <div class="min-h-[135px] border-l-2 border-accent/50 pl-5">
-          <transition name="slide" mode="out-in">
-            <div :key="activeSlide" class="slide-copy">
-              <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80">{{ slides[activeSlide].eyebrow }}</p>
-              <h3 class="max-w-[420px] text-2xl font-bold leading-tight text-white">{{ slides[activeSlide].title }}</h3>
-              <p class="mt-3 max-w-[450px] text-sm leading-relaxed text-[#9eafb7]">{{ slides[activeSlide].body }}</p>
+        <!-- Shaders Prompt Card (Integrated into Launch Card) -->
+        <transition name="slide" mode="out-in">
+          <div
+            v-if="shaderPrompt"
+            class="my-2 rounded-2xl border border-cyan-500/40 bg-[#0a1824]/95 p-5 shadow-[0_0_30px_rgba(71,210,201,0.15)] backdrop-blur-md relative overflow-hidden text-center"
+          >
+            <div class="mb-4 text-center">
+              <h3 class="text-base font-extrabold text-white tracking-tight">
+                This server offers shaders
+              </h3>
+              <p class="text-xs text-slate-300/80 font-normal leading-relaxed mt-1.5 max-w-[440px] mx-auto">
+                Do you wish to install and use these shaders? If your computer isn't powerful enough, it can result in low fps.
+              </p>
+              <p v-if="shaderPrompt.shaderName" class="text-[11px] text-cyan-300/90 mt-2 font-medium">
+                {{ shaderPrompt.shaderName }}<span v-if="shaderPrompt.shaderAuthor" class="text-slate-400 font-normal"> by {{ shaderPrompt.shaderAuthor }}</span>
+              </p>
             </div>
-          </transition>
-        </div>
+
+            <!-- Choice Action Buttons -->
+            <div class="grid grid-cols-2 gap-3 mb-3.5 max-w-[380px] mx-auto">
+              <button
+                type="button"
+                class="z-btn-ghost py-2.5 px-4 font-bold text-xs rounded-xl border border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500 hover:bg-slate-800/60 transition-all text-center"
+                @click="onShaderSelect(false)"
+              >
+                Reject Shaders
+              </button>
+
+              <button
+                type="button"
+                class="z-btn-accent py-2.5 px-4 font-bold text-xs rounded-xl text-center shadow-md hover:shadow-accent/30 transition-all"
+                @click="onShaderSelect(true)"
+              >
+                Enable Shaders
+              </button>
+            </div>
+
+            <!-- Remember choice checkbox -->
+            <label class="flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-slate-200 cursor-pointer select-none transition-colors">
+              <input v-model="rememberShaderChoice" type="checkbox" class="zircon-check" />
+              <span>Remember my choice for this server</span>
+            </label>
+          </div>
+
+          <!-- Normal Slide Display when not prompting for shaders -->
+          <div v-else class="min-h-[135px] border-l-2 border-accent/50 pl-5">
+            <transition name="slide" mode="out-in">
+              <div :key="activeSlide" class="slide-copy">
+                <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80">{{ slides[activeSlide].eyebrow }}</p>
+                <h3 class="max-w-[420px] text-2xl font-bold leading-tight text-white">{{ slides[activeSlide].title }}</h3>
+                <p class="mt-3 max-w-[450px] text-sm leading-relaxed text-[#9eafb7]">{{ slides[activeSlide].body }}</p>
+              </div>
+            </transition>
+          </div>
+        </transition>
 
           <div class="mt-8">
             <div class="mb-2 flex items-center justify-between gap-4 text-xs">
               <span v-if="running" class="min-w-0 truncate font-semibold text-accent/90">
                 {{ gameLabel ? `Minecraft running: ${gameLabel}` : 'Minecraft is active' }}
+              </span>
+              <span v-else-if="shaderPrompt" class="min-w-0 truncate font-semibold text-cyan-300 animate-pulse">
+                Awaiting your shader preference...
               </span>
               <span v-else class="min-w-0 truncate font-semibold text-[#d6e2e4]">
                 {{ status || 'Starting Minecraft...' }}
@@ -177,6 +226,9 @@
               <span v-if="running" class="shrink-0 flex items-center gap-1.5 font-mono text-accent font-semibold">
                 <span class="inline-block h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_6px_#47d2c9]"></span>
                 Running
+              </span>
+              <span v-else-if="shaderPrompt" class="shrink-0 font-mono text-cyan-300 font-semibold text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40">
+                Action Required
               </span>
               <span v-else-if="progress !== null" class="shrink-0 font-mono text-accent font-bold">
                 {{ Math.round(progress * 100) }}%
@@ -218,10 +270,12 @@ const props = defineProps({
   gameLabel: { type: String, default: '' },
   error: { type: String, default: '' },
   server: { type: Object, default: null },
+  shaderPrompt: { type: Object, default: null },
 });
 
 const bannerFailed = ref(false);
 const bannerType = ref('classic');
+const rememberShaderChoice = ref(false);
 
 function onBannerLoad(event) {
   const img = event?.target;
@@ -240,14 +294,30 @@ const isClassicBanner = computed(() => {
 });
 
 watch(
-  () => props.server,
+  [() => props.server, () => props.server?.bannerUrl],
   () => {
     bannerFailed.value = false;
     bannerType.value = 'classic';
   }
 );
 
-const emit = defineEmits(['close']);
+watch(
+  () => props.shaderPrompt,
+  (prompt) => {
+    if (prompt) {
+      rememberShaderChoice.value = false;
+    }
+  }
+);
+
+const emit = defineEmits(['close', 'shader-choice']);
+
+function onShaderSelect(enabled) {
+  emit('shader-choice', {
+    enabled,
+    remember: rememberShaderChoice.value,
+  });
+}
 
 const slides = [
   {

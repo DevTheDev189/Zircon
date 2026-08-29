@@ -15,7 +15,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use zircon_core::model::{ModLoaderInfo, ModLoaderType};
 use zircon_core::security::ssrf;
 
@@ -28,6 +28,62 @@ const QUILT_META_URL: &str = "https://meta.quiltmc.org/v3";
 const FORGE_MAVEN_BASE: &str = "https://maven.minecraftforge.net/net/minecraftforge/forge/";
 const NEOFORGE_MAVEN_BASE: &str = "https://maven.neoforged.net/releases/net/neoforged/neoforge/";
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+
+const INSTALLED_STATE_FILE: &str = ".zircon_installed.json";
+
+/// Persisted metadata of what is currently installed in the server directory.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InstalledServerState {
+    pub minecraft_version: String,
+    pub loader_type: String,
+    pub loader_version: String,
+}
+
+pub fn read_installed_state(server_dir: &Path) -> Option<InstalledServerState> {
+    let path = server_dir.join(INSTALLED_STATE_FILE);
+    let bytes = fs::read(path).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+pub fn write_installed_state(
+    server_dir: &Path,
+    mc_version: &str,
+    loader: &ModLoaderInfo,
+) -> Result<(), std::io::Error> {
+    let state = InstalledServerState {
+        minecraft_version: mc_version.to_string(),
+        loader_type: loader.r#type.clone(),
+        loader_version: loader.version.clone(),
+    };
+    let path = server_dir.join(INSTALLED_STATE_FILE);
+    let data = serde_json::to_vec_pretty(&state)?;
+    fs::write(path, data)
+}
+
+/// Cleans old server binary artifacts (server.jar, libraries/, launch args, etc.)
+/// while keeping worlds, configs, server.properties, and eula.txt intact.
+pub fn clean_old_server_binaries(server_dir: &Path) {
+    let to_remove = [
+        "server.jar",
+        "quilt-server-launch.jar",
+        "win_args.txt",
+        "unix_args.txt",
+        "run.bat",
+        "run.sh",
+        "user_jvm_args.txt",
+        INSTALLED_STATE_FILE,
+    ];
+    for file_name in to_remove {
+        let file_path = server_dir.join(file_name);
+        if file_path.is_file() {
+            let _ = fs::remove_file(&file_path);
+        }
+    }
+    let libraries = server_dir.join("libraries");
+    if libraries.is_dir() {
+        let _ = fs::remove_dir_all(&libraries);
+    }
+}
 
 /// Errors raised while installing a server.
 #[derive(Debug)]
@@ -59,11 +115,15 @@ impl From<std::io::Error> for InstallError {
     }
 }
 
-/// Returns `true` when the server matching the configured loader is already
-/// installed — a `server.jar` for vanilla/fabric/quilt, or a launch args file
-/// for the *configured* loader version for forge/neoforge.
-pub fn is_installed(server_dir: &Path, server_jar: &Path, loader: &ModLoaderInfo) -> bool {
-    match ModLoaderType::from_id(&loader.r#type) {
+/// Returns `true` when the server matching the configured loader and Minecraft
+/// version is already installed.
+pub fn is_installed(
+    server_dir: &Path,
+    server_jar: &Path,
+    mc_version: &str,
+    loader: &ModLoaderInfo,
+) -> bool {
+    let files_exist = match ModLoaderType::from_id(&loader.r#type) {
         Some(ModLoaderType::Forge) | Some(ModLoaderType::NeoForge) => {
             find_server_args_file(server_dir, &loader.version).is_some()
         }
@@ -72,7 +132,29 @@ pub fn is_installed(server_dir: &Path, server_jar: &Path, loader: &ModLoaderInfo
         }
         Some(ModLoaderType::Fabric) | Some(ModLoaderType::Vanilla) => server_jar.is_file(),
         None => false,
+    };
+    if !files_exist {
+        return false;
     }
+
+    if let Some(state) = read_installed_state(server_dir) {
+        if !state.minecraft_version.trim().is_empty()
+            && !mc_version.trim().is_empty()
+            && state.minecraft_version.trim() != mc_version.trim()
+        {
+            return false;
+        }
+        if !state.loader_type.eq_ignore_ascii_case(&loader.r#type) {
+            return false;
+        }
+        if !loader.version.trim().is_empty()
+            && !state.loader_version.trim().is_empty()
+            && state.loader_version.trim() != loader.version.trim()
+        {
+            return false;
+        }
+    }
+    true
 }
 
 /// Installs the server for the configured loader if it is not already
@@ -91,16 +173,19 @@ pub async fn ensure_server_installed(
             ModLoaderType::ALLOWED_IDS.join(", ")
         ))
     })?;
-    if is_installed(server_dir, server_jar, loader) {
+    if is_installed(server_dir, server_jar, mc_version, loader) {
         tracing::info!(
-            "Server for {} is already installed",
-            loader_type.id()
+            "Server for {} ({}) is already installed",
+            loader_type.id(),
+            mc_version
         );
     } else {
         tracing::info!(
-            "No server installed for loader {} — installing...",
-            loader_type.id()
+            "No server matching loader {} ({}) installed — cleaning old server binaries and installing...",
+            loader_type.id(),
+            mc_version
         );
+        clean_old_server_binaries(server_dir);
         match loader_type {
             ModLoaderType::Fabric => {
                 install_fabric_like(server_jar, mc_version, loader, false).await?
@@ -116,7 +201,8 @@ pub async fn ensure_server_installed(
             }
             ModLoaderType::Vanilla => install_vanilla(server_jar, mc_version).await?,
         }
-        if !is_installed(server_dir, server_jar, loader) {
+        let _ = write_installed_state(server_dir, mc_version, loader);
+        if !is_installed(server_dir, server_jar, mc_version, loader) {
             return Err(InstallError::Process(
                 "Server installation finished but the server is still missing".to_string(),
             ));

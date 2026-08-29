@@ -31,6 +31,55 @@
       </button>
       <p class="z-label mt-2.5 text-cyan-300/90 font-medium">{{ savedAt }}</p>
 
+      <!-- About & Updates -->
+      <div class="mt-8 pt-6 border-t border-slate-800/80">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <h3 class="text-white font-bold text-sm">Zircon Launcher</h3>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Current Version:
+              <span class="inline-block bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded text-[11px] font-mono font-bold ml-1">
+                v{{ launcherVersion || '0.3.7' }}
+              </span>
+            </p>
+          </div>
+          <button
+            class="z-btn-ghost text-[11px] px-3 py-1.5 rounded-lg border border-slate-700/80 hover:border-cyan-400/50 hover:text-cyan-300 flex items-center gap-1.5"
+            :disabled="checkingUpdate || updating"
+            @click="checkForUpdates"
+          >
+            <svg v-if="checkingUpdate" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>{{ checkingUpdate ? 'Checking…' : 'Check for Updates' }}</span>
+          </button>
+        </div>
+
+        <!-- Update Status Message Box -->
+        <div v-if="updateStatusMessage" class="mt-3 p-3 rounded-xl border text-xs" :class="updateStatusClass">
+          <div class="font-semibold">{{ updateStatusMessage }}</div>
+          <div v-if="updateInfo?.notes" class="text-[11px] text-slate-400 mt-1">{{ updateInfo.notes }}</div>
+
+          <!-- Download / Install progress bar -->
+          <div v-if="updating" class="mt-2.5">
+            <div class="w-full bg-[#070b10] h-2 rounded-full overflow-hidden border border-slate-800">
+              <div class="bg-cyan-400 h-full rounded-full transition-all duration-200" :style="{ width: Math.round(updateProgress * 100) + '%' }"></div>
+            </div>
+            <p class="text-[10px] text-cyan-300 font-mono mt-1">{{ Math.round(updateProgress * 100) }}% downloaded</p>
+          </div>
+
+          <div v-if="updateInfo && !updating" class="mt-3 flex justify-end">
+            <button
+              class="z-btn-accent text-xs px-4 py-1.5 rounded-lg font-bold shadow-md hover:shadow-cyan-500/25"
+              @click="installUpdate"
+            >
+              Update &amp; Restart
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Debug logs -->
       <div class="mt-8 pt-6 border-t border-slate-800/80">
         <div class="flex items-center justify-between mb-2">
@@ -124,12 +173,23 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { api, onGameOutput } from '../lib/api';
+import { check as checkUpdate } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 const settings = ref({ memoryGb: 4 });
 const saving = ref(false);
 const savedAt = ref('');
 const logText = ref('');
 const copiedAt = ref('');
+
+// Launcher Version & Updates
+const launcherVersion = ref('');
+const checkingUpdate = ref(false);
+const updating = ref(false);
+const updateProgress = ref(0);
+const updateInfo = ref(null);
+const updateStatusMessage = ref('');
+const updateStatusClass = ref('');
 
 // Minecraft Instance Log state
 const mcLog = ref(null);
@@ -146,6 +206,11 @@ onMounted(async () => {
   } catch {
     // keep defaults
   }
+  try {
+    launcherVersion.value = await api.getLauncherVersion();
+  } catch {
+    launcherVersion.value = '0.3.7';
+  }
   refreshLogs();
   refreshMcLog();
 
@@ -156,6 +221,68 @@ onMounted(async () => {
     }
   });
 });
+
+async function checkForUpdates() {
+  checkingUpdate.value = true;
+  updateStatusMessage.value = '';
+  updateInfo.value = null;
+  updateProgress.value = 0;
+  api.logDebug('Manual launcher update check started...');
+  try {
+    const update = await checkUpdate();
+    if (update?.available) {
+      updateInfo.value = update;
+      updateStatusMessage.value = `Update available: v${update.version} (current: v${update.currentVersion || launcherVersion.value})`;
+      updateStatusClass.value = 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300';
+      api.logDebug(`Manual check: update available -> v${update.version}`);
+    } else {
+      updateStatusMessage.value = `You are on the latest version (v${launcherVersion.value || '0.3.7'}).`;
+      updateStatusClass.value = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300';
+      api.logDebug(`Manual check: up to date (v${launcherVersion.value})`);
+    }
+  } catch (err) {
+    updateStatusMessage.value = `Update check error: ${err?.message || err}`;
+    updateStatusClass.value = 'bg-red-500/10 border-red-500/30 text-red-300';
+    api.logDebug(`Manual check error: ${err?.message || err}`);
+  } finally {
+    checkingUpdate.value = false;
+    refreshLogs();
+  }
+}
+
+async function installUpdate() {
+  if (!updateInfo.value) return;
+  updating.value = true;
+  updateProgress.value = 0;
+  updateStatusMessage.value = `Downloading update v${updateInfo.value.version}...`;
+  api.logDebug(`Starting download of v${updateInfo.value.version}...`);
+  try {
+    let totalBytes = 0;
+    let downloadedBytes = 0;
+    await updateInfo.value.downloadAndInstall((event) => {
+      if (event.event === 'Started') {
+        totalBytes = event.data.contentLength || 0;
+      } else if (event.event === 'Progress') {
+        downloadedBytes += event.data.chunkLength || 0;
+        const percent = totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+        updateProgress.value = percent / 100;
+        updateStatusMessage.value = `Downloading update v${updateInfo.value.version}... ${percent}%`;
+      } else if (event.event === 'Finished') {
+        updateProgress.value = 1;
+        updateStatusMessage.value = 'Update downloaded. Restarting application...';
+        api.logDebug('Launcher update downloaded. Restarting application...');
+      }
+    });
+    refreshLogs();
+    await relaunch();
+  } catch (err) {
+    updating.value = false;
+    updateStatusMessage.value = `Failed to install update: ${err?.message || err}`;
+    updateStatusClass.value = 'bg-red-500/10 border-red-500/30 text-red-300';
+    api.logDebug(`Update install error: ${err?.message || err}`);
+    refreshLogs();
+  }
+}
 
 async function save() {
   saving.value = true;

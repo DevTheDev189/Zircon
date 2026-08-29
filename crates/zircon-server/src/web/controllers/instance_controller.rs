@@ -6,13 +6,14 @@
 use std::sync::Arc;
 
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::Json;
 
 use serde::Deserialize;
 use tokio::time::Duration;
 use zircon_core::model::{BillOfMaterials, InstanceConfig, ModLoaderType};
+use crate::config::ServerProperties;
 
 use super::config_helpers::{
     command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
@@ -67,6 +68,9 @@ pub async fn create_instance(
         loader_enum.id(),
         loader_version.trim(),
     )?;
+    if let Some(auto) = body.auto_start.or(body.auto_start_server) {
+        state.instances.update_auto_start(&created.id, auto)?;
+    }
     if let Some(args) = body
         .java_args
         .as_deref()
@@ -77,9 +81,10 @@ pub async fn create_instance(
             .instances
             .update_instance_config(&created.id, None, Some(args))?;
     }
+    let fresh = state.instances.get_instance(&created.id).unwrap_or(created);
     Ok((
         StatusCode::CREATED,
-        Json(live_instance_map(&state, &created)),
+        Json(live_instance_map(&state, &fresh)),
     ))
 }
 
@@ -969,6 +974,37 @@ pub async fn remove_resourcepack(
     remove_pack(&state, &id, &filename, false).await
 }
 
+/// GET /api/instances/{id}/resourcepacks/server-pack
+pub async fn get_server_resourcepack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let packs = packs_for(&state, &id)?;
+    let active = packs.get_server_resourcepack();
+    let mapped = active.as_ref().map(|p| views::pack_entry_to_map(p, false));
+    Ok(Json(serde_json::json!({
+        "serverResourcePack": mapped,
+    })))
+}
+
+/// POST /api/instances/{id}/resourcepacks/server-pack
+pub async fn set_server_resourcepack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<SetServerPackRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let packs = packs_for(&state, &id)?;
+    packs.set_server_resourcepack(body.filename.as_deref())
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let active = packs.get_server_resourcepack();
+    let mapped = active.as_ref().map(|p| views::pack_entry_to_map(p, false));
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "serverResourcePack": mapped,
+    })))
+}
+
 // --------------------------------------------------------------------------
 // helpers
 // --------------------------------------------------------------------------
@@ -992,14 +1028,7 @@ fn mods_for(state: &AppState, id: &str) -> Result<ModManagementService, ApiError
         )
         .with_signing_key(state.signing_key.clone()),
     );
-    let curseforge_key = {
-        let key = state.config.get_config().curseforge_api_key;
-        if !key.is_empty() {
-            key
-        } else {
-            state.curseforge_api_key.clone()
-        }
-    };
+    let curseforge_key = state.config.effective_curseforge_key();
     Ok(ModManagementService::new(
         bom,
         instance_dir.join("mods"),
@@ -1022,14 +1051,7 @@ fn packs_for(state: &AppState, id: &str) -> Result<PackManagementService, ApiErr
         )
         .with_signing_key(state.signing_key.clone()),
     );
-    let curseforge_key = {
-        let key = state.config.get_config().curseforge_api_key;
-        if !key.is_empty() {
-            key
-        } else {
-            state.curseforge_api_key.clone()
-        }
-    };
+    let curseforge_key = state.config.effective_curseforge_key();
     Ok(PackManagementService::new(
         bom,
         instance_dir.join("shaderpacks"),
@@ -1073,9 +1095,12 @@ fn add_ban_offline(
 }
 
 pub(crate) fn live_instance_map(state: &AppState, config: &InstanceConfig) -> serde_json::Value {
+    let running = state.instances.is_running(&config.id);
+    let ready = state.instances.is_server_ready(&config.id);
     views::instance_to_map(
         config,
-        state.instances.is_running(&config.id),
+        running,
+        ready,
         state.instances.get_online_player_count(&config.id),
         state.instances.get_online_players(&config.id),
         state.instances.get_idle_remaining_seconds(&config.id),
@@ -1227,6 +1252,9 @@ pub struct CreateRequest {
     pub mc_version: Option<String>,
     pub loader_type: Option<String>,
     pub loader_version: Option<String>,
+    pub auto_start: Option<bool>,
+    #[serde(alias = "autoStartServer")]
+    pub auto_start_server: Option<bool>,
     /// Optional initial JVM args (e.g. the RAM slider's heap flags). When
     /// absent/blank the instance keeps the wrapper default (-Xms2G -Xmx4G).
     pub java_args: Option<String>,
@@ -1304,4 +1332,10 @@ pub struct EulaRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ServerPropertiesRequest {
     pub properties: Option<std::collections::BTreeMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetServerPackRequest {
+    pub filename: Option<String>,
 }

@@ -20,6 +20,7 @@ pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
     "media.forgecdn.net",
     "maven.neoforged.net",
     "maven.minecraftforge.net",
+    "files.minecraftforge.net",
     "meta.fabricmc.net",
     "maven.fabricmc.net",
     "meta.quiltmc.org",

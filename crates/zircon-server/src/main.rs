@@ -18,6 +18,7 @@ use zircon_server::instance::ServerInstanceManager;
 use zircon_server::multiplexer::tcp::TcpMultiplexer;
 use zircon_server::process::console::ConsoleStreamHandler;
 use zircon_server::process::manager::MinecraftProcessManager;
+use zircon_server::services::autostart;
 use zircon_server::services::backup::BackupService;
 use zircon_server::services::bom::BomService;
 use zircon_server::services::idle_shutdown::IdleShutdownService;
@@ -26,7 +27,9 @@ use zircon_server::services::mods::ModManagementService;
 use zircon_server::services::packs::PackManagementService;
 use zircon_server::services::resolver::ModServiceResolver;
 use zircon_server::services::scheduler::BackupSchedulerService;
+use zircon_server::services::versions::VersionService;
 use zircon_server::tickets::JoinTicketManager;
+use zircon_server::updater::{ServerUpdater, CURRENT_SERVER_VERSION};
 use zircon_server::web::app::AppState;
 use zircon_server::web::rate_limit::FixedWindowLimiter;
 use zircon_server::web::router;
@@ -34,6 +37,27 @@ use zircon_server::web::router;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--install-startup" || a == "--enable-startup") {
+        match autostart::enable_autostart() {
+            Ok(()) => println!("Successfully enabled Zircon Server on Windows startup."),
+            Err(e) => eprintln!("Failed to enable Windows startup: {e}"),
+        }
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--uninstall-startup" || a == "--disable-startup") {
+        match autostart::disable_autostart() {
+            Ok(()) => println!("Successfully disabled Zircon Server on Windows startup."),
+            Err(e) => eprintln!("Failed to disable Windows startup: {e}"),
+        }
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--startup-status") {
+        let enabled = autostart::is_autostart_enabled();
+        println!("Windows startup status: {}", if enabled { "ENABLED" } else { "DISABLED" });
+        return Ok(());
+    }
 
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -43,9 +67,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let config = Arc::new(ConfigService::load()?);
-    let cf_key = config.get_config().curseforge_api_key;
+    let cf_key = config.effective_curseforge_key();
     if !cf_key.is_empty() {
-        tracing::info!("CurseForge API integration active (key configured)");
+        tracing::info!("CurseForge API integration active");
     } else {
         tracing::warn!("No CurseForge API key configured (CurseForge search disabled)");
     }
@@ -77,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mods = Arc::new(ModManagementService::new(
         bom.clone(),
         config.mods_dir.clone(),
-        &config.get_config().curseforge_api_key,
+        &cf_key,
     ));
     let packs = PackManagementService::new(
         bom.clone(),
@@ -89,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         bom.clone(),
         mods.clone(),
         packs.clone(),
-        &config.get_config().curseforge_api_key,
+        &cf_key,
         Some(signing_key.clone()),
     ));
 
@@ -120,6 +144,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(signing_key.clone()),
     )?);
 
+    let versions = Arc::new(VersionService::new());
+
     let state = AppState {
         config: config.clone(),
         auth,
@@ -132,8 +158,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         packs,
         resolver,
         import_service,
+        versions,
         tickets: tickets.clone(),
-        curseforge_api_key: config.get_config().curseforge_api_key,
+        curseforge_api_key: cf_key,
         signing_key: Some(signing_key),
         sessions: sessions.clone(),
         login_limiter: login_limiter.clone(),
@@ -166,9 +193,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     instances.set_port_binding_listener(multiplexer.clone());
     multiplexer.start()?;
 
+    // Multi-instance auto-start: boot any instance configured to start on boot
+    for instance in instances.list_instances() {
+        if instance.auto_start {
+            tracing::info!(
+                "Auto-starting instance '{}' ({}) on wrapper boot...",
+                instance.name,
+                instance.id
+            );
+            let inst_manager = instances.clone();
+            let inst_id = instance.id.clone();
+            tokio::spawn(async move {
+                if let Err(e) = inst_manager.start_instance(&inst_id).await {
+                    tracing::error!("Auto-start failed for instance {inst_id}: {e}");
+                }
+            });
+        }
+    }
+
     if config.get_config().auto_start_server {
         if let Err(e) = process_manager_start(&state).await {
-            tracing::warn!("Auto-start failed: {e}");
+            tracing::warn!("Legacy auto-start failed: {e}");
         }
     }
 
@@ -194,6 +239,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.get_config().public_port,
         config.data_dir.display()
     );
+
+    // Non-blocking bootup check for new server updates
+    tokio::spawn(async {
+        let updater = ServerUpdater::new();
+        match updater.check_update().await {
+            Ok(Some(manifest)) => {
+                tracing::info!(
+                    "New Zircon Server release available: v{} (running v{}). Update via System Stats in the web dashboard.",
+                    manifest.version,
+                    CURRENT_SERVER_VERSION
+                );
+            }
+            Ok(None) => {
+                tracing::info!("Zircon Server is up to date (v{}).", CURRENT_SERVER_VERSION);
+            }
+            Err(e) => {
+                tracing::debug!("Server update check skipped/failed: {e}");
+            }
+        }
+    });
 
     // Shutdown on Ctrl-C / terminate.
     shutdown_signal().await;

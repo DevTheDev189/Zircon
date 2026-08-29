@@ -155,8 +155,22 @@ impl PackSyncEngine {
                 continue;
             }
             let target = dir.join(&pack.filename);
+            let guard = zircon_core::archive::limits::ArchiveGuard::default();
             if HashVerifier::matches_pack(&target, pack) {
-                continue;
+                // Verify local cached file passes zero-trust security audit
+                let is_safe = match std::fs::File::open(&target) {
+                    Ok(f) => zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok(),
+                    Err(_) => false,
+                };
+                if is_safe {
+                    continue;
+                } else {
+                    let _ = std::fs::remove_file(&target);
+                    warn!(
+                        "Existing pack '{}' failed security audit and was purged",
+                        pack.filename
+                    );
+                }
             }
             emit_status(listener, &format!("Downloading {}...", pack.filename));
             let url = format!("{base}{url_prefix}{}", url_encode(&pack.filename));
@@ -165,7 +179,19 @@ impl PackSyncEngine {
                     // The downloaded archive must match the hash pinned in the
                     // BOM; a server serving something else is discarded.
                     if HashVerifier::matches_pack(&target, pack) {
-                        downloaded.push(pack.filename.clone());
+                        let is_safe = match std::fs::File::open(&target) {
+                            Ok(f) => zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok(),
+                            Err(_) => false,
+                        };
+                        if is_safe {
+                            downloaded.push(pack.filename.clone());
+                        } else {
+                            let _ = std::fs::remove_file(&target);
+                            warn!(
+                                "Pack '{}' failed client-side security whitelist audit and was discarded",
+                                pack.filename
+                            );
+                        }
                     } else {
                         let _ = std::fs::remove_file(&target);
                         warn!(

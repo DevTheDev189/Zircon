@@ -256,7 +256,7 @@
     <div class="w-[420px] min-w-[340px] z-card flex flex-col p-4 bg-[#0e1622]/90 border border-slate-800/80">
       <span class="z-label mb-2 text-center font-bold tracking-wider uppercase text-[10px] text-accent/80">3D Player Preview</span>
       <div class="flex-1 min-h-0 rounded-xl overflow-hidden bg-[#070b10] border border-slate-800/80 relative shadow-inner">
-        <Player3DPreview :image-uri="previewSkin" />
+        <Player3DPreview :image-uri="previewSkin" :variant="previewVariant" />
       </div>
     </div>
 
@@ -334,11 +334,11 @@
             <!-- Banner Preview in Discovery Card -->
             <div
               v-if="probeResult.bannerUrl"
-              class="w-full py-2.5 px-3 rounded-xl overflow-hidden bg-black/50 border border-slate-800 flex items-center justify-center -mt-1"
+              class="w-full h-20 rounded-xl overflow-hidden border border-slate-800 relative -mt-1 shadow-md bg-slate-900"
             >
               <img
                 :src="probeResult.bannerUrl"
-                class="max-h-[60px] w-auto max-w-full rounded-md object-contain select-none pointer-events-none"
+                class="w-full h-full object-cover select-none pointer-events-none"
                 :alt="probeResult.name || 'Server Banner'"
               />
             </div>
@@ -498,7 +498,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Player3DPreview from '../components/Player3DPreview.vue';
-import { api, onSkinUpdated } from '../lib/api';
+import { api, getCachedActiveSkin, onSkinUpdated } from '../lib/api';
 
 const emit = defineEmits(['launching', 'stopped', 'error']);
 
@@ -507,8 +507,10 @@ const props = defineProps({
   gameStatus: { type: Object, default: null },
 });
 
+const initialSkin = getCachedActiveSkin();
 const servers = ref([]);
-const previewSkin = ref(null);
+const previewSkin = ref(initialSkin?.dataUrl || null);
+const previewVariant = ref(initialSkin?.variant || 'classic');
 const launchingAddress = ref(null);
 
 // Add Server dialog state
@@ -585,12 +587,14 @@ async function refreshPreviewSkin() {
     const active = await api.getActiveSkin();
     if (active && (active.dataUrl || active.data_url)) {
       previewSkin.value = active.dataUrl || active.data_url;
+      previewVariant.value = active.variant || 'classic';
       return;
     }
   } catch (err) {
     console.warn('Failed to load active skin for 3D preview:', err);
   }
   previewSkin.value = null;
+  previewVariant.value = 'classic';
 }
 
 function refreshAllStatuses(isInitial = false) {
@@ -627,6 +631,13 @@ async function pingOne(address, useHttps = false, isInitial = false) {
       bannerIsAnimated: !!res.bannerIsAnimated,
     };
     const prev = statusCache.value[address];
+    if (prev?.bannerUrl !== next.bannerUrl) {
+      delete failedBanners.value[address];
+      delete bannerTypes.value[address];
+    }
+    if (prev?.iconUrl !== next.iconUrl) {
+      delete failedIcons.value[address];
+    }
     if (
       !prev ||
       prev.state !== next.state ||
@@ -634,7 +645,8 @@ async function pingOne(address, useHttps = false, isInitial = false) {
       prev.max !== next.max ||
       prev.pingMs !== next.pingMs ||
       prev.iconUrl !== next.iconUrl ||
-      prev.bannerUrl !== next.bannerUrl
+      prev.bannerUrl !== next.bannerUrl ||
+      prev.bannerIsAnimated !== next.bannerIsAnimated
     ) {
       statusCache.value[address] = next;
     }

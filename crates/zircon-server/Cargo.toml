@@ -1,6 +1,6 @@
 [package]
 name = "zircon-server"
-version = "0.3.3"
+version = "0.3.7"
 edition = "2021"
 description = "Zircon server manager daemon: process supervisor, TCP multiplexer, backup engine, Axum admin API"
 license = "MIT"
@@ -37,6 +37,7 @@ sha1.workspace = true
 sha2.workspace = true
 flate2.workspace = true
 hex.workspace = true
+image.workspace = true
 # Ed25519 for BOM attestation (same version/features as zircon-core).
 ed25519-dalek = { version = "2.1", default-features = false, features = ["std", "rand_core"] }
 # CSPRNG for generating the persistent BOM signing key (ed25519-dalek's

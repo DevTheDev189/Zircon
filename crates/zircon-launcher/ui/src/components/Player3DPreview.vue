@@ -1,18 +1,29 @@
 <template>
   <div ref="container" class="relative w-full h-full overflow-hidden select-none">
-    <canvas ref="canvas" class="w-full h-full block cursor-grab active:cursor-grabbing" />
+    <canvas
+      ref="canvas"
+      class="w-full h-full block cursor-grab active:cursor-grabbing transition-opacity duration-300"
+      :class="isReady ? 'opacity-100' : 'opacity-0'"
+    />
   </div>
 </template>
 
 <script setup>
 // WebGL 3D Minecraft player skin renderer built on Three.js
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as THREE from 'three';
-import { createDefaultSteveDataUrl } from '../lib/api';
+import { createDefaultSteveDataUrl, getCachedActiveSkin } from '../lib/api';
+
+const props = defineProps({
+  imageUri: { type: String, default: null },
+  defaultSkinUri: { type: String, default: null },
+  variant: { type: String, default: 'classic' },
+});
 
 const container = ref(null);
 const canvas = ref(null);
 const skinLoaded = ref(false);
+const isReady = ref(false);
 
 let renderer = null;
 let scene = null;
@@ -28,6 +39,10 @@ let yaw = -Math.PI / 8;
 let pitch = -Math.PI / 16;
 let currentVariant = 'classic';
 let currentSkinUri = null;
+let loadRequestId = 0;
+
+// In-memory cache of decoded 64x64 skin canvases to allow instant synchronous texture application
+const skinCanvasCache = new Map();
 
 // ---- Atlas layouts ---------------------------------------------------------
 function faces(base, w, h, d) {
@@ -139,15 +154,15 @@ function buildModel(variant = 'classic') {
 }
 
 // ---- Texture / skin --------------------------------------------------------
-function processSkinTexture(image) {
+function createSkinCanvas(image) {
   if (image.width < 32 || image.height < 32) {
     return null;
   }
 
-  const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
+  const cvs = document.createElement('canvas');
+  cvs.width = 64;
+  cvs.height = 64;
+  const ctx = cvs.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(image, 0, 0);
 
@@ -156,17 +171,21 @@ function processSkinTexture(image) {
     ctx.save();
     ctx.translate(32, 48);
     ctx.scale(-1, 1);
-    ctx.drawImage(canvas, 0, 16, 16, 16, -16, 0, 16, 16);
+    ctx.drawImage(cvs, 0, 16, 16, 16, -16, 0, 16, 16);
     ctx.restore();
 
     ctx.save();
     ctx.translate(48, 48);
     ctx.scale(-1, 1);
-    ctx.drawImage(canvas, 40, 16, 16, 16, -16, 0, 16, 16);
+    ctx.drawImage(cvs, 40, 16, 16, 16, -16, 0, 16, 16);
     ctx.restore();
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
+  return cvs;
+}
+
+function makeTextureFromCanvas(cvs) {
+  const texture = new THREE.CanvasTexture(cvs);
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
   texture.generateMipmaps = false;
@@ -174,24 +193,45 @@ function processSkinTexture(image) {
   return texture;
 }
 
+function applySkinCanvas(cvs) {
+  if (!material || !cvs) return;
+  const tex = makeTextureFromCanvas(cvs);
+  if (material.map) material.map.dispose();
+  material.map = tex;
+  material.needsUpdate = true;
+  skinLoaded.value = true;
+  isReady.value = true;
+}
+
 function applySkin(imageUri) {
-  const uri = imageUri || createDefaultSteveDataUrl();
+  const uri =
+    imageUri ||
+    props.defaultSkinUri ||
+    getCachedActiveSkin()?.dataUrl ||
+    createDefaultSteveDataUrl();
   currentSkinUri = uri;
+
+  // If already cached, apply synchronously without delay or flicker
+  if (skinCanvasCache.has(uri)) {
+    applySkinCanvas(skinCanvasCache.get(uri));
+    return;
+  }
+
+  const requestId = ++loadRequestId;
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
-    if (!material) return;
-    const tex = processSkinTexture(img);
-    if (!tex) {
+    if (requestId !== loadRequestId) return;
+    const cvs = createSkinCanvas(img);
+    if (cvs) {
+      skinCanvasCache.set(uri, cvs);
+      applySkinCanvas(cvs);
+    } else {
       applyFallbackSkin();
-      return;
     }
-    if (material.map) material.map.dispose();
-    material.map = tex;
-    material.needsUpdate = true;
-    skinLoaded.value = true;
   };
   img.onerror = () => {
+    if (requestId !== loadRequestId) return;
     applyFallbackSkin();
   };
   img.src = uri;
@@ -199,15 +239,16 @@ function applySkin(imageUri) {
 
 function applyFallbackSkin() {
   const fallback = createDefaultSteveDataUrl();
+  if (skinCanvasCache.has(fallback)) {
+    applySkinCanvas(skinCanvasCache.get(fallback));
+    return;
+  }
   const img = new Image();
   img.onload = () => {
-    if (!material) return;
-    const tex = processSkinTexture(img);
-    if (tex) {
-      if (material.map) material.map.dispose();
-      material.map = tex;
-      material.needsUpdate = true;
-      skinLoaded.value = true;
+    const cvs = createSkinCanvas(img);
+    if (cvs) {
+      skinCanvasCache.set(fallback, cvs);
+      applySkinCanvas(cvs);
     }
   };
   img.src = fallback;
@@ -247,7 +288,9 @@ function resize() {
 function animate() {
   animationId = requestAnimationFrame(animate);
   if (group) group.rotation.set(pitch, yaw, 0);
-  renderer.render(scene, camera);
+  if (renderer && scene && camera) {
+    renderer.render(scene, camera);
+  }
 }
 
 function onPointerDown(e) {
@@ -270,19 +313,23 @@ function onPointerUp() {
   dragging = false;
 }
 
-const props = defineProps({
-  imageUri: { type: String, default: null },
-  defaultSkinUri: { type: String, default: null },
-});
-
 watch(
   () => props.imageUri,
-  (uri) => applySkin(uri)
+  (uri) => {
+    if (uri) applySkin(uri);
+  }
 );
 
 watch(
   () => props.defaultSkinUri,
   (uri) => uri && applySkin(uri)
+);
+
+watch(
+  () => props.variant,
+  (v) => {
+    if (v && v !== currentVariant) setVariant(v);
+  }
 );
 
 defineExpose({ updateSkin, resetSkin, setVariant });
@@ -291,6 +338,8 @@ onMounted(() => {
   const mount = container.value;
   const w = mount.clientWidth || 360;
   const h = mount.clientHeight || 440;
+
+  currentVariant = props.variant || 'classic';
 
   renderer = new THREE.WebGLRenderer({
     canvas: canvas.value,
@@ -349,12 +398,14 @@ onMounted(() => {
     window.addEventListener('resize', resize);
   }
 
-  // Load requested skin or default Steve
-  if (props.imageUri) applySkin(props.imageUri);
-  else if (props.defaultSkinUri) applySkin(props.defaultSkinUri);
-  else applyFallbackSkin();
+  // Load requested skin, cached active skin, or default Steve
+  applySkin(props.imageUri || props.defaultSkinUri);
 
   animate();
+});
+
+onActivated(() => {
+  resize();
 });
 
 onBeforeUnmount(() => {

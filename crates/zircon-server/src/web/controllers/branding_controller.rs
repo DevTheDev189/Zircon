@@ -140,14 +140,25 @@ pub async fn get_branding(
 
     let branding = bom.branding.unwrap_or_default();
 
+    let icon_url = branding
+        .icon_sha1
+        .as_ref()
+        .map(|sha| format!("/files/branding/icon?v={sha}"))
+        .unwrap_or_else(|| "/files/branding/icon".to_string());
+    let banner_url = branding
+        .banner_sha1
+        .as_ref()
+        .map(|sha| format!("/files/branding/banner?v={sha}"))
+        .unwrap_or_else(|| "/files/branding/banner".to_string());
+
     Ok(Json(BrandingStatus {
         has_icon: icon_file.is_some(),
         has_banner: banner_file.is_some(),
         banner_is_animated: branding.banner_is_animated,
         icon_sha1: branding.icon_sha1,
         banner_sha1: branding.banner_sha1,
-        icon_url: format!("/files/branding/icon"),
-        banner_url: format!("/files/branding/banner"),
+        icon_url,
+        banner_url,
     }))
 }
 
@@ -198,19 +209,24 @@ pub async fn upload_icon(
     let target_file = branding_dir.join(format!("icon.{}", format.extension()));
     fs::write(&target_file, &bytes)?;
 
-    // If PNG, also mirror to server/server-icon.png for vanilla Minecraft server list queries
-    if format == ImageFormat::Png {
-        let _ = fs::write(server_dir.join("server-icon.png"), &bytes);
+    // Mirror an exact 64x64 PNG to server/server-icon.png for vanilla Minecraft server list queries
+    if let Ok(img) = image::load_from_memory(&bytes) {
+        let resized = img.resize_exact(64, 64, image::imageops::FilterType::Lanczos3);
+        let mut png_buf = std::io::Cursor::new(Vec::new());
+        if resized.write_to(&mut png_buf, image::ImageFormat::Png).is_ok() {
+            let _ = fs::write(server_dir.join("server-icon.png"), png_buf.into_inner());
+        }
     }
 
     let sha1 = sha1_bytes(&bytes);
+    let icon_url = format!("/files/branding/icon?v={sha1}");
 
     // Update BOM
     let bom_service = get_bom_service(&state, &id)?;
     bom_service.with_bom(|bom| {
         let mut branding = bom.branding.clone().unwrap_or_default();
         branding.icon_sha1 = Some(sha1.clone());
-        branding.icon_url = Some("/files/branding/icon".to_string());
+        branding.icon_url = Some(icon_url.clone());
         bom.branding = Some(branding);
     });
     bom_service.save()?;
@@ -225,7 +241,7 @@ pub async fn upload_icon(
         "success": true,
         "sha1": sha1,
         "format": format.extension(),
-        "url": "/files/branding/icon"
+        "url": icon_url
     })))
 }
 
@@ -277,13 +293,14 @@ pub async fn upload_banner(
     fs::write(&target_file, &bytes)?;
 
     let sha1 = sha1_bytes(&bytes);
+    let banner_url = format!("/files/branding/banner?v={sha1}");
 
     // Update BOM
     let bom_service = get_bom_service(&state, &id)?;
     bom_service.with_bom(|bom| {
         let mut branding = bom.branding.clone().unwrap_or_default();
         branding.banner_sha1 = Some(sha1.clone());
-        branding.banner_url = Some("/files/branding/banner".to_string());
+        branding.banner_url = Some(banner_url.clone());
         branding.banner_is_animated = is_animated;
         bom.branding = Some(branding);
     });
@@ -300,7 +317,7 @@ pub async fn upload_banner(
         "sha1": sha1,
         "isAnimated": is_animated,
         "format": format.extension(),
-        "url": "/files/branding/banner"
+        "url": banner_url
     })))
 }
 
@@ -497,5 +514,29 @@ mod tests {
 
         let random_txt = b"Hello world this is not an image";
         assert_eq!(detect_image_format(random_txt), None);
+    }
+
+    #[test]
+    fn resizes_image_to_64x64_png() {
+        let img = image::RgbaImage::new(128, 128);
+        let mut raw_png = std::io::Cursor::new(Vec::new());
+        img.write_to(&mut raw_png, image::ImageFormat::Png).unwrap();
+        let bytes = raw_png.into_inner();
+
+        let loaded = image::load_from_memory(&bytes).expect("must decode");
+        assert_eq!(loaded.width(), 128);
+        assert_eq!(loaded.height(), 128);
+
+        let resized = loaded.resize_exact(64, 64, image::imageops::FilterType::Lanczos3);
+        assert_eq!(resized.width(), 64);
+        assert_eq!(resized.height(), 64);
+
+        let mut out_png = std::io::Cursor::new(Vec::new());
+        resized.write_to(&mut out_png, image::ImageFormat::Png).expect("must encode");
+        let encoded_bytes = out_png.into_inner();
+
+        let verify_img = image::load_from_memory(&encoded_bytes).expect("must re-decode");
+        assert_eq!(verify_img.width(), 64);
+        assert_eq!(verify_img.height(), 64);
     }
 }

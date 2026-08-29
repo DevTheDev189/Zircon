@@ -43,6 +43,7 @@ pub fn sanitize_command_param(param: Option<&str>) -> String {
 pub fn instance_to_map(
     instance: &InstanceConfig,
     running: bool,
+    booted: bool,
     player_count: usize,
     online_players: Vec<String>,
     idle_remaining_seconds: Option<u64>,
@@ -50,6 +51,7 @@ pub fn instance_to_map(
     view_instance_to_map(
         instance,
         running,
+        booted,
         player_count,
         online_players,
         idle_remaining_seconds,

@@ -12,6 +12,7 @@ pub mod installer;
 pub mod instance;
 pub mod multiplexer;
 pub mod process;
+pub mod security;
 pub mod services;
 pub mod stats;
 pub mod tickets;

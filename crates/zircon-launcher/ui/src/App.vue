@@ -10,6 +10,8 @@
       :game-label="gameStatus?.label || ''"
       :error="launchError"
       :server="launchingServer"
+      :shader-prompt="shaderPrompt"
+      @shader-choice="onShaderChoice"
       @close="onLaunchOverlayClose"
     />
 
@@ -95,23 +97,25 @@
         class="flex-1 min-w-0 flex flex-col bg-gradient-to-br from-[#0e1620] via-[#070b0f] to-[#0a1218]"
       >
         <div class="flex-1 min-h-0 overflow-hidden">
-          <ServersView
-            v-if="view === 'servers'"
-            :session="session"
-            :game-status="gameStatus"
-            @launching="onLaunching"
-            @stopped="onStopped"
-            @error="onLaunchError"
-          />
-          <OfflineView
-            v-else-if="view === 'offline'"
-            :session="session"
-            @launching="onLaunching"
-            @stopped="onStopped"
-            @error="onLaunchError"
-          />
-          <SkinsView v-else-if="view === 'skins'" :session="session" />
-          <SettingsView v-else />
+          <KeepAlive>
+            <ServersView
+              v-if="view === 'servers'"
+              :session="session"
+              :game-status="gameStatus"
+              @launching="onLaunching"
+              @stopped="onStopped"
+              @error="onLaunchError"
+            />
+            <OfflineView
+              v-else-if="view === 'offline'"
+              :session="session"
+              @launching="onLaunching"
+              @stopped="onStopped"
+              @error="onLaunchError"
+            />
+            <SkinsView v-else-if="view === 'skins'" :session="session" />
+            <SettingsView v-else-if="view === 'settings'" />
+          </KeepAlive>
         </div>
         <StatusBar
           :status="statusText"
@@ -119,35 +123,6 @@
           :busy="busy"
         />
       </main>
-    </div>
-
-    <!-- Shader opt-in dialog (server offers shaders, choice not remembered yet) -->
-    <div
-      v-if="shaderPrompt"
-      class="absolute inset-0 z-40 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="respondShaders(false)"
-    >
-      <div class="z-card w-full max-w-[440px] p-6 overflow-hidden shadow-2xl relative border border-slate-700/60 rounded-2xl bg-[#0e1622]">
-        <h3 class="text-white font-bold text-base mb-1">Enable shaders?</h3>
-        <p class="text-slate-300 text-sm mb-1">
-          {{ shaderPrompt.server }} offers shaders
-          <span v-if="shaderPrompt.shaderName" class="text-cyan-300 font-semibold">
-            ({{ shaderPrompt.shaderName }}<span v-if="shaderPrompt.shaderAuthor"> by {{ shaderPrompt.shaderAuthor }}</span>)
-          </span>
-          .
-        </p>
-        <p class="text-slate-400 text-xs mb-4">
-          Shaders look great but use additional GPU resources — you can always adjust this later.
-        </p>
-        <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer mb-5 select-none">
-          <input v-model="shaderRemember" type="checkbox" class="zircon-check" />
-          <span>Remember my choice for this server</span>
-        </label>
-        <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80">
-          <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="respondShaders(false)">No, thanks</button>
-          <button class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25" @click="respondShaders(true)">Enable Shaders</button>
-        </div>
-      </div>
     </div>
 
     <!-- Host-key rotation dialog (TOFU): the server presents a different
@@ -270,6 +245,7 @@ onMounted(async () => {
   } catch {
     session.value = null;
   }
+  api.getActiveSkin().catch(() => {});
   refreshAvatar();
   refreshMojangSkin();
   try {
@@ -339,8 +315,10 @@ onMounted(async () => {
 // signed build and relaunches once it's downloaded and installed.
 async function checkLauncherUpdate() {
   try {
+    api.logDebug('Checking for launcher updates from update feed...');
     const update = await checkUpdate();
     if (update?.available) {
+      api.logDebug(`Launcher update available: v${update.version} (current: v${update.currentVersion})`);
       let totalBytes = 0;
       let downloadedBytes = 0;
       statusText.value = `Downloading launcher update ${update.version}...`;
@@ -349,6 +327,7 @@ async function checkLauncherUpdate() {
         if (event.event === 'Started') {
           totalBytes = event.data.contentLength || 0;
           statusText.value = `Downloading launcher update ${update.version}...`;
+          api.logDebug(`Launcher update download started (${totalBytes} bytes)`);
         } else if (event.event === 'Progress') {
           downloadedBytes += event.data.chunkLength || 0;
           const percent =
@@ -360,13 +339,17 @@ async function checkLauncherUpdate() {
         } else if (event.event === 'Finished') {
           progress.value = 1;
           statusText.value = 'Update downloaded. Restarting...';
+          api.logDebug('Launcher update downloaded. Restarting application...');
         }
       });
       await relaunch();
+    } else {
+      api.logDebug('Launcher is on the latest version.');
     }
   } catch (err) {
     statusText.value = '';
     progress.value = null;
+    api.logDebug(`Launcher update check failed: ${err}`);
     console.warn('Launcher update check failed:', err);
   }
 }
@@ -423,12 +406,12 @@ async function onLogout() {
   statusText.value = 'Signed out.';
 }
 
-async function respondShaders(enabled) {
+async function onShaderChoice({ enabled, remember }) {
   const prompt = shaderPrompt.value;
   if (!prompt) return;
   shaderPrompt.value = null;
   try {
-    await api.respondShaderChoice(prompt.requestId, enabled, shaderRemember.value);
+    await api.respondShaderChoice(prompt.requestId, enabled, !!remember);
   } catch {
     // The launch flow falls back to "no shaders" if it never hears back.
   }

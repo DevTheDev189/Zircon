@@ -16,7 +16,7 @@
 
       <!-- 3D Canvas Container -->
       <div class="flex-1 min-h-0 rounded-xl overflow-hidden bg-[#070b10] border border-slate-800/80 relative shadow-inner">
-        <Player3DPreview ref="previewRef" :image-uri="previewUrl" />
+        <Player3DPreview ref="previewRef" :image-uri="previewUrl" :variant="variant" />
       </div>
 
       <!-- Controls below Preview -->
@@ -243,18 +243,19 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import Player3DPreview from '../components/Player3DPreview.vue';
-import { api, createDefaultSteveDataUrl, onSkinUpdated, pickFile, PNG_FILTER, skinFaceDataUrl } from '../lib/api';
+import { api, createDefaultSteveDataUrl, getCachedActiveSkin, onSkinUpdated, pickFile, PNG_FILTER, skinFaceDataUrl } from '../lib/api';
 
 const props = defineProps({
   session: { type: Object, default: null },
 });
 
+const initialSkin = getCachedActiveSkin();
 const previewRef = ref(null);
-const previewUrl = ref(null);
+const previewUrl = ref(initialSkin?.dataUrl || null);
 const skins = ref([]);
 const statusText = ref('');
-const variant = ref('classic');
-const selectedSkinId = ref(null);
+const variant = ref(initialSkin?.variant || 'classic');
+const selectedSkinId = ref(initialSkin ? 'active_skin' : null);
 const saving = ref(false);
 const syncingMojang = ref(false);
 

@@ -213,8 +213,12 @@ impl ModManagementService {
         }
 
         self.bom_service.with_bom(|bom| {
-            bom.mods.retain(|m| m.filename != safe_name);
+            bom.mods.retain(|m| {
+                m.filename != safe_name
+                    && !(entry.id.is_some() && entry.id == m.id && entry.origin == m.origin)
+            });
             bom.mods.push(entry.clone());
+            bom.deduplicate_mods();
         });
         self.bom_service.save()?;
         tracing::info!(
@@ -397,6 +401,18 @@ impl ModManagementService {
                 "No installable Modrinth version found for project {project_id}"
             )));
         };
+        // If an older file for this project exists under a different filename, clean it up
+        let existing = self.bom_service.get_bom().mods.into_iter().find(|m| {
+            m.origin.as_deref() == Some(ORIGIN_MODRINTH) && m.id.as_deref() == Some(project_id)
+        });
+        if let Some(old) = existing {
+            if old.filename != file.filename {
+                let _ = fs::remove_file(self.mods_dir.join(&old.filename));
+                let _ = fs::remove_file(self.mods_dir.join(format!("{}.disabled", old.filename)));
+                self.bom_service.with_bom(|bom| bom.mods.retain(|m| m.filename != old.filename));
+            }
+        }
+
         let mut entry = self
             .install_from_url(&file.url, &file.filename, ORIGIN_MODRINTH)
             .await?;
@@ -435,6 +451,21 @@ impl ModManagementService {
             return Err(ModError::Invalid(
                 "CurseForge file has no direct download URL".to_string(),
             ));
+        }
+
+        // Clean up older file for this CurseForge mod if present
+        let cf_mod_id_str = mod_id.to_string();
+        let cf_file_id_str = file_id.to_string();
+        let existing = self.bom_service.get_bom().mods.into_iter().find(|m| {
+            m.origin.as_deref() == Some(ORIGIN_CURSEFORGE)
+                && (m.id.as_deref() == Some(&cf_mod_id_str) || m.id.as_deref() == Some(&cf_file_id_str))
+        });
+        if let Some(old) = existing {
+            if old.filename != file.file_name {
+                let _ = fs::remove_file(self.mods_dir.join(&old.filename));
+                let _ = fs::remove_file(self.mods_dir.join(format!("{}.disabled", old.filename)));
+                self.bom_service.with_bom(|bom| bom.mods.retain(|m| m.filename != old.filename));
+            }
         }
 
         // Extract the pinned metadata before moving fields into the entry.
@@ -582,6 +613,7 @@ impl ModManagementService {
             if let Some(loader) = bom.mod_loader.as_mut() {
                 loader.version = new_loader_version.to_string();
             }
+            bom.deduplicate_mods();
         });
 
         let mut summary = ModSyncSummary::default();
@@ -606,6 +638,19 @@ impl ModManagementService {
                                 if old_file.is_file() {
                                     let _ = fs::remove_file(&old_file);
                                 }
+                                let old_disabled = self.mods_dir.join(format!("{}.disabled", mod_entry.filename));
+                                if old_disabled.is_file() {
+                                    let _ = fs::remove_file(&old_disabled);
+                                }
+
+                                self.bom_service.with_bom(|bom| {
+                                    bom.mods.retain(|m| {
+                                        m.filename != mod_entry.filename
+                                            && m.filename != primary.filename
+                                            && !(mod_entry.id.is_some() && mod_entry.id == m.id && mod_entry.origin == m.origin)
+                                    });
+                                });
+
                                 match self
                                     .install_from_url(
                                         &primary.url,
@@ -634,8 +679,8 @@ impl ModManagementService {
                                             let active =
                                                 self.mods_dir.join(&new_entry.filename);
                                             let disabled = self.mods_dir.join(format!(
-                                                "{}.disabled",
-                                                new_entry.filename
+                                                 "{}.disabled",
+                                                 new_entry.filename
                                             ));
                                             if active.is_file() {
                                                 let _ = fs::rename(&active, &disabled);
@@ -643,8 +688,13 @@ impl ModManagementService {
                                         }
 
                                         self.bom_service.with_bom(|bom| {
-                                            bom.mods.retain(|m| m.filename != mod_entry.filename);
+                                            bom.mods.retain(|m| {
+                                                m.filename != mod_entry.filename
+                                                    && m.filename != new_entry.filename
+                                                    && !(new_entry.id.is_some() && new_entry.id == m.id && new_entry.origin == m.origin)
+                                            });
                                             bom.mods.push(new_entry.clone());
+                                            bom.deduplicate_mods();
                                         });
                                         found_compatible = true;
                                         summary.updated_count += 1;
@@ -667,17 +717,90 @@ impl ModManagementService {
                         );
                     }
                 }
+            } else if origin.eq_ignore_ascii_case(ORIGIN_CURSEFORGE) && mod_entry.id.is_some() && self.has_curse_forge_key() {
+                if let Ok(cf_mod_id) = mod_entry.id.as_deref().unwrap_or("").parse::<i64>() {
+                    match self.curse_forge.list_mod_files(cf_mod_id).await {
+                        Ok(files) => {
+                            let matched = files.into_iter().find(|f| {
+                                let match_mc = f.game_versions.iter().any(|v| v == new_mc_version);
+                                let match_loader = loader_type == "vanilla"
+                                    || f.game_versions.iter().any(|v| v.eq_ignore_ascii_case(loader_type));
+                                match_mc && match_loader
+                            });
+                            if let Some(chosen_file) = matched {
+                                if !chosen_file.download_url.is_empty() && !chosen_file.file_name.is_empty() {
+                                    let old_file = self.mods_dir.join(&mod_entry.filename);
+                                    if old_file.is_file() {
+                                        let _ = fs::remove_file(&old_file);
+                                    }
+                                    let old_disabled = self.mods_dir.join(format!("{}.disabled", mod_entry.filename));
+                                    if old_disabled.is_file() {
+                                        let _ = fs::remove_file(&old_disabled);
+                                    }
+
+                                    self.bom_service.with_bom(|bom| {
+                                        bom.mods.retain(|m| {
+                                            m.filename != mod_entry.filename
+                                                && m.filename != chosen_file.file_name
+                                                && !(mod_entry.id.is_some() && mod_entry.id == m.id && mod_entry.origin == m.origin)
+                                        });
+                                    });
+
+                                    match self.install_from_url(&chosen_file.download_url, &chosen_file.file_name, ORIGIN_CURSEFORGE).await {
+                                        Ok(mut new_entry) => {
+                                            new_entry.id = mod_entry.id.clone();
+                                            new_entry.title = mod_entry.title.clone();
+                                            new_entry.icon_url = mod_entry.icon_url.clone();
+                                            new_entry.author = mod_entry.author.clone();
+                                            new_entry.description = mod_entry.description.clone();
+                                            new_entry.compatible = true;
+                                            new_entry.warning_message = None;
+                                            new_entry.enabled = mod_entry.enabled;
+
+                                            if !new_entry.enabled {
+                                                let active = self.mods_dir.join(&new_entry.filename);
+                                                let disabled = self.mods_dir.join(format!("{}.disabled", new_entry.filename));
+                                                if active.is_file() {
+                                                    let _ = fs::rename(&active, &disabled);
+                                                }
+                                            }
+
+                                            self.bom_service.with_bom(|bom| {
+                                                bom.mods.retain(|m| {
+                                                    m.filename != mod_entry.filename
+                                                        && m.filename != new_entry.filename
+                                                        && !(new_entry.id.is_some() && new_entry.id == m.id && new_entry.origin == m.origin)
+                                                });
+                                                bom.mods.push(new_entry.clone());
+                                                bom.deduplicate_mods();
+                                            });
+                                            found_compatible = true;
+                                            summary.updated_count += 1;
+                                            summary.updated_mods.push(new_entry.filename.clone());
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!("Auto-update failed for CurseForge mod {}: {e}", mod_entry.filename);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Auto-update check failed for CurseForge mod {}: {e}", mod_entry.filename);
+                        }
+                    }
+                }
             }
 
             if !found_compatible {
                 self.bom_service.with_bom(|bom| {
-                    if let Some(mod_entry) = bom
+                    if let Some(entry) = bom
                         .mods
                         .iter_mut()
                         .find(|m| m.filename == mod_entry.filename)
                     {
-                        mod_entry.compatible = false;
-                        mod_entry.warning_message = Some(format!(
+                        entry.compatible = false;
+                        entry.warning_message = Some(format!(
                             "Unverified for MC {new_mc_version} ({loader_type})"
                         ));
                     }
@@ -687,7 +810,33 @@ impl ModManagementService {
             }
         }
 
+        self.bom_service.with_bom(|bom| {
+            bom.deduplicate_mods();
+        });
         self.bom_service.save()?;
+
+        // Clean up any orphaned mod files on disk in mods_dir that are not in the BOM
+        if let Ok(entries) = fs::read_dir(&self.mods_dir) {
+            let valid_names: std::collections::HashSet<String> = self
+                .bom_service
+                .get_bom()
+                .mods
+                .into_iter()
+                .map(|m| m.filename.to_ascii_lowercase())
+                .collect();
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    let name = path.file_name().unwrap_or_default().to_string_lossy();
+                    let base_name = name.strip_suffix(".disabled").unwrap_or(&name);
+                    if base_name.ends_with(".jar") && !valid_names.contains(&base_name.to_ascii_lowercase()) {
+                        tracing::info!("Purging orphaned mod file on disk: {}", name);
+                        let _ = fs::remove_file(&path);
+                    }
+                }
+            }
+        }
+
         tracing::info!(
             "Version sync for MC {new_mc_version} / {loader_type}: {} updated, {} incompatible",
             summary.updated_count,
@@ -703,13 +852,6 @@ impl ModManagementService {
 
     /// Lists mods, opportunistically backfilling provider metadata (icon,
     /// title, real Modrinth project id) for legacy entries that were persisted
-    /// before enrichment was written back to the BOM. Network round-trips only
-    /// happen for entries that actually need repair; the repairs run in parallel
-    /// (bounded concurrency) so a single offline incident cannot block the whole
-    /// list. Once repaired, the enriched metadata is cached back into `bom.json`
-    /// so subsequent loads require zero external requests.
-    /// Lists mods, opportunistically backfilling provider metadata (icon,
-    /// title, real project id) for legacy entries that were persisted
     /// before enrichment was written back to the BOM. Network round-trips only
     /// happen for entries that actually need repair; the repairs run in parallel
     /// (bounded concurrency) so a single offline incident cannot block the whole
@@ -765,6 +907,7 @@ impl ModManagementService {
         if changed {
             self.bom_service.with_bom(|bom| {
                 bom.mods = updated.clone();
+                bom.deduplicate_mods();
             });
             let _ = self.bom_service.save();
         }
@@ -775,8 +918,12 @@ impl ModManagementService {
     /// persists it, so provider metadata (id, icon, title) survives restarts.
     fn persist_entry(&self, entry: &ModEntry) -> std::io::Result<()> {
         self.bom_service.with_bom(|bom| {
-            bom.mods.retain(|m| m.filename != entry.filename);
+            bom.mods.retain(|m| {
+                m.filename != entry.filename
+                    && !(entry.id.is_some() && entry.id == m.id && entry.origin == m.origin)
+            });
             bom.mods.push(entry.clone());
+            bom.deduplicate_mods();
         });
         self.bom_service.save()
     }

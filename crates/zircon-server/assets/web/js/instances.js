@@ -27,8 +27,10 @@ window.Zircon.instances = {
             ramGB: parsed.gb,
             extraJvmArgs: parsed.extra,
             idleShutdownEnabled: !!inst.idleShutdownEnabled,
-            idleShutdownMinutes: inst.idleShutdownMinutes || 5
+            idleShutdownMinutes: inst.idleShutdownMinutes || 5,
+            autoStart: !!inst.autoStart
         };
+        this.loadSettingsLoaderVersions();
         this.loadMods();
         this.loadServerProperties();
         this.playersLoaded = false; // first load of the new instance shows the spinner
@@ -55,6 +57,11 @@ window.Zircon.instances = {
             Object.assign(this.selectedInstance, data);
         } catch (e) { /* instance may have been deleted */ }
     },
+    async openAddServerModal() {
+        this.showAddServerModal = true;
+        await this.loadMinecraftVersions();
+        await this.onNewServerVersionOrLoaderChange();
+    },
     async createNewServer() {
         try {
             await this.api('/api/instances', {
@@ -64,11 +71,12 @@ window.Zircon.instances = {
                     mcVersion: this.newServerForm.mcVersion,
                     loaderType: this.newServerForm.loaderType,
                     loaderVersion: this.newServerForm.loaderVersion,
-                    javaArgs: this.buildJavaArgs(this.newServerForm)
+                    javaArgs: this.buildJavaArgs(this.newServerForm),
+                    autoStart: !!this.newServerForm.autoStart
                 })
             });
             this.showAddServerModal = false;
-            this.newServerForm = { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4 };
+            this.newServerForm = { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4, autoStart: false };
             await this.loadInstances();
         } catch (e) {
             alert('Create failed: ' + e.message);
@@ -374,13 +382,132 @@ window.Zircon.instances = {
                     // 0 / blank leaves the player-facing port unchanged.
                     externalPort: Number(this.settingsForm.externalPort) || 0,
                     idleShutdownEnabled: !!this.settingsForm.idleShutdownEnabled,
-                    idleShutdownMinutes: Number(this.settingsForm.idleShutdownMinutes) || 5
+                    idleShutdownMinutes: Number(this.settingsForm.idleShutdownMinutes) || 5,
+                    autoStart: !!this.settingsForm.autoStart
                 })
             });
             alert(`Instance updated! ${res.updatedCount || 0} mods auto-updated, ${res.incompatibleCount || 0} flagged incompatible.`);
             await this.loadInstances();
             await this.loadMods();
         } catch (e) { alert('Update failed: ' + e.message); }
+    },
+
+    async loadMinecraftVersions() {
+        if (this.minecraftVersions && this.minecraftVersions.length > 0) return;
+        this.minecraftVersionsLoading = true;
+        try {
+            const data = await this.api('/api/versions/minecraft');
+            this.minecraftVersions = data.versions || [];
+        } catch (e) {
+            this.minecraftVersions = [
+                { id: '1.21.4' }, { id: '1.21.3' }, { id: '1.21.1' }, { id: '1.21' },
+                { id: '1.20.6' }, { id: '1.20.4' }, { id: '1.20.2' }, { id: '1.20.1' },
+                { id: '1.19.4' }, { id: '1.19.2' }, { id: '1.18.2' }, { id: '1.16.5' }, { id: '1.12.2' }
+            ];
+        } finally {
+            this.minecraftVersionsLoading = false;
+        }
+    },
+
+    async onNewServerVersionOrLoaderChange() {
+        const mc = this.newServerForm.mcVersion;
+        const loader = this.newServerForm.loaderType;
+        if (!mc || !loader) return;
+        if (loader === 'vanilla') {
+            this.newServerLoaderVersions = [];
+            this.newServerForm.loaderVersion = '';
+            return;
+        }
+        this.newServerLoaderLoading = true;
+        try {
+            const data = await this.api(`/api/versions/loaders?loader=${encodeURIComponent(loader)}&mcVersion=${encodeURIComponent(mc)}`);
+            this.newServerLoaderVersions = data.versions || [];
+            if (data.recommended) {
+                this.newServerForm.loaderVersion = data.recommended;
+            } else if (this.newServerLoaderVersions.length > 0) {
+                this.newServerForm.loaderVersion = this.newServerLoaderVersions[0];
+            } else {
+                this.newServerForm.loaderVersion = '';
+            }
+        } catch (e) {
+            this.newServerLoaderVersions = [];
+        } finally {
+            this.newServerLoaderLoading = false;
+        }
+    },
+
+    async loadSettingsLoaderVersions() {
+        if (!this.selectedInstance) return;
+        const mc = this.settingsForm.mcVersion;
+        const loader = this.selectedInstance.modLoader?.type || 'fabric';
+        if (!mc || loader === 'vanilla') {
+            this.settingsLoaderVersions = [];
+            return;
+        }
+        this.settingsLoaderLoading = true;
+        try {
+            const data = await this.api(`/api/versions/loaders?loader=${encodeURIComponent(loader)}&mcVersion=${encodeURIComponent(mc)}`);
+            this.settingsLoaderVersions = data.versions || [];
+            if (!this.settingsForm.loaderVersion && data.recommended) {
+                this.settingsForm.loaderVersion = data.recommended;
+            }
+        } catch (e) {
+            this.settingsLoaderVersions = [];
+        } finally {
+            this.settingsLoaderLoading = false;
+        }
+    },
+
+    async onSettingsMinecraftVersionChange() {
+        if (!this.selectedInstance) return;
+        const mc = this.settingsForm.mcVersion;
+        const loader = this.selectedInstance.modLoader?.type || 'fabric';
+        if (!mc || loader === 'vanilla') {
+            this.settingsLoaderVersions = [];
+            this.settingsForm.loaderVersion = '';
+            return;
+        }
+        this.settingsLoaderLoading = true;
+        try {
+            const data = await this.api(`/api/versions/loaders?loader=${encodeURIComponent(loader)}&mcVersion=${encodeURIComponent(mc)}`);
+            this.settingsLoaderVersions = data.versions || [];
+            if (data.recommended) {
+                this.settingsForm.loaderVersion = data.recommended;
+            } else if (this.settingsLoaderVersions.length > 0) {
+                this.settingsForm.loaderVersion = this.settingsLoaderVersions[0];
+            }
+        } catch (e) {
+            this.settingsLoaderVersions = [];
+        } finally {
+            this.settingsLoaderLoading = false;
+        }
+    },
+
+    async loadAutostartStatus() {
+        try {
+            const data = await this.api('/api/system/autostart');
+            this.windowsAutostartEnabled = !!data.enabled;
+            this.windowsAutostartSupported = data.supported !== false;
+        } catch (e) {
+            // ignore
+        }
+    },
+
+    async toggleWindowsAutostart() {
+        if (this.windowsAutostartLoading) return;
+        this.windowsAutostartLoading = true;
+        try {
+            const next = !this.windowsAutostartEnabled;
+            const data = await this.api('/api/system/autostart', {
+                method: 'POST',
+                body: JSON.stringify({ enabled: next })
+            });
+            this.windowsAutostartEnabled = !!data.enabled;
+        } catch (e) {
+            alert('Failed to update Windows startup settings: ' + e.message);
+        } finally {
+            this.windowsAutostartLoading = false;
+        }
     },
 
     // Splits a JVM args string into {auto, gb, extra} so the RAM slider can

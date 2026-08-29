@@ -25,23 +25,66 @@ pub fn create_disconnect_packet(json_message: &str) -> Vec<u8> {
 }
 
 /// The in-game message shown when a connection is rejected by the join gate.
-pub fn build_custom_error_message() -> &'static str {
-    r#"{
-  "text": "⚡ Zircon Client Required\n\n",
-  "color": "red",
-  "bold": true,
-  "extra": [
-    {
-      "text": "You must use the official Zircon Launcher to join this server.\n\n",
-      "color": "gray",
-      "bold": false
-    },
-    {
-      "text": "Launch the game using your Zircon client to auto-sync mods and connect.",
-      "color": "gold"
-    }
-  ]
-}"#
+pub fn build_custom_error_message(server_url: &str) -> String {
+    let clean_url = server_url.trim();
+    let display_url = if clean_url.is_empty() {
+        "this server's address"
+    } else {
+        clean_url
+    };
+
+    let payload = serde_json::json!({
+        "text": "⚡ Zircon Client Required\n\n",
+        "color": "red",
+        "bold": true,
+        "extra": [
+            {
+                "text": "You must use the official Zircon Launcher to join this server.\n\n",
+                "color": "gray",
+                "bold": false
+            },
+            {
+                "text": "How to connect:\n",
+                "color": "gold",
+                "bold": true
+            },
+            {
+                "text": "1. Download the Zircon Launcher at ",
+                "color": "white",
+                "bold": false
+            },
+            {
+                "text": "https://zirconmc.net/downloads.html\n",
+                "color": "aqua",
+                "underlined": true,
+                "bold": false
+            },
+            {
+                "text": "2. Log in with your Microsoft account\n",
+                "color": "white",
+                "bold": false
+            },
+            {
+                "text": "3. Add ",
+                "color": "white",
+                "bold": false
+            },
+            {
+                "text": display_url,
+                "color": "gold",
+                "bold": true
+            },
+            {
+                "text": " in the UI and click PLAY",
+                "color": "white",
+                "bold": false
+            }
+        ]
+    });
+
+    serde_json::to_string(&payload).unwrap_or_else(|_| {
+        r#"{"text":"⚡ Zircon Client Required\n\nDownload at https://zirconmc.net/downloads.html","color":"red"}"#.to_string()
+    })
 }
 
 #[cfg(test)]
@@ -67,8 +110,10 @@ mod tests {
     }
 
     #[test]
-    fn error_message_contains_zircon_requirement() {
-        let message = build_custom_error_message();
+    fn error_message_contains_zircon_requirement_and_instructions() {
+        let message = build_custom_error_message("mc.zirconmc.net");
         assert!(message.contains("Zircon Client Required"));
+        assert!(message.contains("https://zirconmc.net/downloads.html"));
+        assert!(message.contains("mc.zirconmc.net"));
     }
 }

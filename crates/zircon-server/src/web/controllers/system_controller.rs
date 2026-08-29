@@ -62,3 +62,34 @@ pub async fn apply_update(
         json!({ "ok": true, "message": "Server updated. Restarting..." }),
     ))
 }
+
+#[derive(serde::Deserialize)]
+pub struct SetAutostartRequest {
+    pub enabled: bool,
+}
+
+/// GET /api/system/autostart — checks if Windows OS boot startup is enabled.
+pub async fn get_autostart() -> Result<Json<serde_json::Value>, ApiError> {
+    let enabled = crate::services::autostart::is_autostart_enabled();
+    Ok(Json(json!({
+        "enabled": enabled,
+        "supported": cfg!(target_os = "windows")
+    })))
+}
+
+/// POST /api/system/autostart — enables or disables Windows OS boot startup.
+pub async fn set_autostart(
+    Json(body): Json<SetAutostartRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if body.enabled {
+        crate::services::autostart::enable_autostart().map_err(ApiError::Internal)?;
+    } else {
+        crate::services::autostart::disable_autostart().map_err(ApiError::Internal)?;
+    }
+    let enabled = crate::services::autostart::is_autostart_enabled();
+    Ok(Json(json!({
+        "enabled": enabled,
+        "supported": cfg!(target_os = "windows")
+    })))
+}
+

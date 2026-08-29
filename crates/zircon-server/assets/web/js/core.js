@@ -91,4 +91,48 @@ window.Zircon.core = {
         const remain = s % 60;
         return `${m}m ${remain < 10 ? '0' : ''}${remain}s`;
     },
+    async checkServerUpdate() {
+        this.serverUpdateChecking = true;
+        this.serverUpdateStatus = 'checking';
+        this.serverUpdateError = '';
+        try {
+            const data = await this.api('/api/system/update/check');
+            this.serverCurrentVersion = data.currentVersion || '0.3.7';
+            if (data.updateAvailable && data.manifest) {
+                this.serverUpdateAvailable = true;
+                this.serverUpdateManifest = data.manifest;
+                this.serverUpdateStatus = 'available';
+            } else {
+                this.serverUpdateAvailable = false;
+                this.serverUpdateManifest = null;
+                this.serverUpdateStatus = 'up-to-date';
+            }
+        } catch (e) {
+            this.serverUpdateStatus = 'error';
+            this.serverUpdateError = e.message || String(e);
+        } finally {
+            this.serverUpdateChecking = false;
+        }
+    },
+    async applyServerUpdate() {
+        if (!confirm('Applying this update will stop all running Minecraft server instances, update the Zircon Server executable, and restart the server daemon. Proceed?')) {
+            return;
+        }
+        this.serverUpdateApplying = true;
+        this.serverUpdateStatus = 'applying';
+        this.serverUpdateError = '';
+        try {
+            const res = await this.api('/api/system/update/apply', { method: 'POST' });
+            this.serverUpdateStatus = 'restarting';
+            alert(res.message || 'Server updated. Restarting daemon...');
+            setTimeout(() => {
+                window.location.reload();
+            }, 4000);
+        } catch (e) {
+            this.serverUpdateApplying = false;
+            this.serverUpdateStatus = 'error';
+            this.serverUpdateError = e.message || String(e);
+            alert('Update failed: ' + (e.message || e));
+        }
+    },
 };

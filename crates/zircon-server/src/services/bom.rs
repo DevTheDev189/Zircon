@@ -95,19 +95,26 @@ impl BomService {
                     serde_json::from_str::<BillOfMaterials>(&content)
                         .map_err(|e| std::io::Error::other(e.to_string()))
                 }) {
-                Ok(parsed) => {
+                Ok(mut parsed) => {
+                    let before_dedup = parsed.mods.len();
+                    parsed.deduplicate_mods();
+                    if parsed.mods.len() != before_dedup {
+                        tracing::info!(
+                            "Cleaned {} duplicate mod(s) from BOM on load",
+                            before_dedup - parsed.mods.len()
+                        );
+                    }
                     tracing::info!(
                         "Loaded BOM: {} mods for MC {}",
                         parsed.mods.len(),
                         parsed.minecraft_version
                     );
-                    // Self-heal legacy unsigned BOM files: attach the
-                    // attestation fields on first load so deployments that
-                    // predate BOM signing become signed without any admin
-                    // action (launchers with a pinned key reject unsigned BOMs).
-                    if self.signing_key.is_some() && parsed.signature.is_none() {
+                    // Self-heal legacy unsigned BOM files or freshly deduplicated BOMs:
+                    if (self.signing_key.is_some() && parsed.signature.is_none())
+                        || parsed.mods.len() != before_dedup
+                    {
                         if let Err(e) = self.save_bom(&parsed) {
-                            tracing::warn!("Could not sign existing BOM on load: {e}");
+                            tracing::warn!("Could not save/sign sanitized BOM on load: {e}");
                         }
                     }
                     return parsed;
@@ -122,10 +129,12 @@ impl BomService {
         }
         match &self.default_bom {
             Some(default) => {
-                if let Err(e) = self.save_bom(default) {
+                let mut sanitized = default.clone();
+                sanitized.deduplicate_mods();
+                if let Err(e) = self.save_bom(&sanitized) {
                     tracing::warn!("Could not write default BOM: {e}");
                 }
-                default.clone()
+                sanitized
             }
             None => {
                 tracing::warn!("No default BOM configured for {}", self.bom_file.display());
@@ -140,6 +149,7 @@ impl BomService {
         // digest strips both attestation fields, so the order is irrelevant to
         // the signature, and launchers recompute it identically.
         let mut signed_bom = bom.clone();
+        signed_bom.deduplicate_mods();
         if let Some(signing_key) = &self.signing_key {
             let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
             signed_bom.server_public_key = Some(pubkey_hex);

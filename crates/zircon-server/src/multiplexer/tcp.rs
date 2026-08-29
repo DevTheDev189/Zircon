@@ -370,6 +370,7 @@ impl TcpMultiplexer {
                         // valid one-time join ticket registered by the launcher
                         // right before launch.
                         if handshake.next_state == 2 {
+                            let server_url = handshake.hostname.split('\0').next().unwrap_or("").trim();
                             match detector::parse_login_start_username(&buf) {
                                 ParseResult::Incomplete => continue, // Login Start not fully buffered yet
                                 ParseResult::NotMatch => {
@@ -377,9 +378,8 @@ impl TcpMultiplexer {
                                     // Login Start frames instead of proxying a
                                     // vanilla client straight to the backend.
                                     tracing::warn!("Rejecting unparseable Login Start frame");
-                                    let packet = disconnect::create_disconnect_packet(
-                                        disconnect::build_custom_error_message(),
-                                    );
+                                    let error_msg = disconnect::build_custom_error_message(server_url);
+                                    let packet = disconnect::create_disconnect_packet(&error_msg);
                                     let _ = client.write_all(&packet).await;
                                     let _ = client.shutdown().await;
                                     return Ok(None);
@@ -389,9 +389,8 @@ impl TcpMultiplexer {
                                         tracing::info!(
                                             "Rejected connection for '{username}' — no active Zircon join ticket"
                                         );
-                                        let packet = disconnect::create_disconnect_packet(
-                                            disconnect::build_custom_error_message(),
-                                        );
+                                        let error_msg = disconnect::build_custom_error_message(server_url);
+                                        let packet = disconnect::create_disconnect_packet(&error_msg);
                                         let _ = client.write_all(&packet).await;
                                         let _ = client.shutdown().await;
                                         return Ok(None);

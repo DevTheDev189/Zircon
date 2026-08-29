@@ -1102,14 +1102,85 @@ async fn run_online_flow(
         servers::record_played(title.trim(), address);
     }
 
-    // --- pack sync ---
+    // --- pack selection & shader opt-in ---
     let mut selection = PackSelection::load(&game_dir);
+
+    // Shader opt-in: when the server offers shaders and the player has not
+    // remembered a choice for this server yet, ask before installing/downloading
+    // them (the answer can be remembered for future connections). People without
+    // powerful GPUs can decline. The popup appears even when a shaderpack was
+    // previously active, so nobody gets shaders applied without being asked.
+    if !bom.shaderpacks.is_empty() {
+        if install_recommended_packs {
+            // Programmatic callers can opt in without the dialog.
+            apply_shader_choice(&mut selection, &bom, true);
+        } else if selection.remember_shaders_choice {
+            // The player answered before — reuse the remembered answer.
+            let auto_enabled = selection.shaders_auto_enabled;
+            apply_shader_choice(&mut selection, &bom, auto_enabled);
+        } else {
+            emit_status(
+                app,
+                format!("{} offers shaders — asking player...", url_host),
+            );
+            let request_id = state.next_shader_request_id.fetch_add(1, Ordering::SeqCst);
+            let (tx, rx) = tokio::sync::oneshot::channel::<ShaderChoice>();
+            state.shader_requests.lock().await.insert(request_id, tx);
+            let shader_title = bom
+                .shaderpacks
+                .first()
+                .and_then(|p| p.title.clone())
+                .or_else(|| bom.shaderpacks.first().map(|p| p.filename.clone()))
+                .unwrap_or_default();
+            let shader_author = bom
+                .shaderpacks
+                .first()
+                .and_then(|p| p.author.clone())
+                .unwrap_or_default();
+            let _ = app.emit(
+                "shader-request",
+                serde_json::json!({
+                    "requestId": request_id,
+                    "server": format!("{url_host}:{port}"),
+                    "shaderName": shader_title,
+                    "shaderAuthor": shader_author,
+                }),
+            );
+            // Wait for the webview's answer; a closed window or a long pause
+            // falls back to "no shaders".
+            let choice = match tokio::time::timeout(Duration::from_secs(120), rx).await {
+                Ok(Ok(choice)) => choice,
+                _ => ShaderChoice {
+                    enabled: false,
+                    remember: false,
+                },
+            };
+            if choice.remember {
+                selection.remember_shaders_choice = true;
+                selection.shaders_auto_enabled = choice.enabled;
+            }
+            apply_shader_choice(&mut selection, &bom, choice.enabled);
+        }
+        selection.save(&game_dir);
+    }
+
+    // --- pack sync ---
     emit_status(app, "Checking server shaderpacks & texture packs...");
     let pack_listener = UiPackListener { app: app.clone() };
+
+    // Only download server shaderpacks if shaders are enabled by the player.
+    let effective_bom = if selection.shaders_enabled {
+        bom.clone()
+    } else {
+        let mut b = bom.clone();
+        b.shaderpacks.clear();
+        b
+    };
+
     state
         .pack_sync
         .sync(
-            &bom,
+            &effective_bom,
             &base_url,
             &game_dir,
             &selection
@@ -1132,72 +1203,38 @@ async fn run_online_flow(
             selection.active_shaderpack = None;
         }
     }
+
+    // Ensure all server-provided resourcepacks present on disk that pass zero-trust validation are enabled
+    let guard = zircon_core::archive::limits::ArchiveGuard::default();
+    for pack in &bom.resourcepacks {
+        let file_path = game_dir.join("resourcepacks").join(&pack.filename);
+        if file_path.is_file() {
+            let is_safe = match std::fs::File::open(&file_path) {
+                Ok(f) => zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok(),
+                Err(_) => false,
+            };
+            if is_safe {
+                if pack.server_enforced == Some(true) {
+                    selection.active_resourcepacks.retain(|n| n != &pack.filename);
+                    selection.active_resourcepacks.insert(0, pack.filename.clone());
+                } else if !selection.active_resourcepacks.contains(&pack.filename) {
+                    selection.active_resourcepacks.push(pack.filename.clone());
+                }
+            } else {
+                let _ = std::fs::remove_file(&file_path);
+                selection.active_resourcepacks.retain(|n| n != &pack.filename);
+            }
+        }
+    }
+
     let present: Vec<String> = selection
         .active_resourcepacks
         .iter()
         .filter(|name| game_dir.join("resourcepacks").join(name).is_file())
         .cloned()
         .collect();
-    if present.len() != selection.active_resourcepacks.len() {
-        selection.active_resourcepacks = present;
-    }
+    selection.active_resourcepacks = present;
     selection.save(&game_dir);
-
-    // Shader opt-in: when the server offers shaders and the player has not
-    // remembered a choice for this server yet, ask once (the answer can be
-    // remembered for future connections). People without powerful GPUs can
-    // decline. The popup appears even when a shaderpack was previously active,
-    // so nobody gets shaders applied without being asked.
-    if !bom.shaderpacks.is_empty() {
-        if install_recommended_packs {
-            // Programmatic callers can opt in without the dialog.
-            apply_shader_choice(&mut selection, &bom, true);
-        } else if selection.remember_shaders_choice {
-            // The player answered before — reuse the remembered answer.
-            let auto_enabled = selection.shaders_auto_enabled;
-            apply_shader_choice(&mut selection, &bom, auto_enabled);
-        } else {
-            emit_status(
-                app,
-                format!("{} offers shaders — asking player...", url_host),
-            );
-            let request_id = state.next_shader_request_id.fetch_add(1, Ordering::SeqCst);
-            let (tx, rx) = tokio::sync::oneshot::channel::<ShaderChoice>();
-            state.shader_requests.lock().await.insert(request_id, tx);
-            let _ = app.emit(
-                "shader-request",
-                serde_json::json!({
-                    "requestId": request_id,
-                    "server": format!("{url_host}:{port}"),
-                    "shaderName": bom
-                        .shaderpacks
-                        .first()
-                        .map(|p| p.filename.clone())
-                        .unwrap_or_default(),
-                    "shaderAuthor": bom
-                        .shaderpacks
-                        .first()
-                        .and_then(|p| p.author.clone())
-                        .unwrap_or_default(),
-                }),
-            );
-            // Wait for the webview's answer; a closed window or a long pause
-            // falls back to "no shaders".
-            let choice = match tokio::time::timeout(Duration::from_secs(120), rx).await {
-                Ok(Ok(choice)) => choice,
-                _ => ShaderChoice {
-                    enabled: false,
-                    remember: false,
-                },
-            };
-            if choice.remember {
-                selection.remember_shaders_choice = true;
-                selection.shaders_auto_enabled = choice.enabled;
-            }
-            apply_shader_choice(&mut selection, &bom, choice.enabled);
-        }
-        selection.save(&game_dir);
-    }
 
     // --- classpath / Java ---
     emit_status(
@@ -2753,6 +2790,18 @@ pub fn clear_launcher_logs() -> Result<(), String> {
     let mut guard = buffer.lock().map_err(|e| e.to_string())?;
     guard.clear();
     Ok(())
+}
+
+/// Returns the running launcher release version.
+#[tauri::command]
+pub fn get_launcher_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+/// Logs a message directly into the launcher's tracing pipeline and in-memory debug log buffer.
+#[tauri::command]
+pub fn log_debug_message(message: String) {
+    tracing::info!(target: "zircon_launcher::ui", "{message}");
 }
 
 #[derive(Debug, Clone, Serialize)]

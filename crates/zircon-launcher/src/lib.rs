@@ -96,6 +96,8 @@ pub fn run() {
             commands::list_loader_types,
             commands::get_settings,
             commands::save_settings,
+            commands::get_launcher_version,
+            commands::log_debug_message,
             commands::get_launcher_logs,
             commands::clear_launcher_logs,
             commands::get_last_instance_log,

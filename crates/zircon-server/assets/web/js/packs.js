@@ -32,6 +32,12 @@ window.Zircon.packs = {
         } catch (e) {
             this.resourcepacks = [];
         }
+        try {
+            const srp = await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks/server-pack`);
+            this.serverResourcePack = srp.serverResourcePack || null;
+        } catch (e) {
+            this.serverResourcePack = null;
+        }
     },
     async searchPacks(type) {
         const isShader = type === 'shaderpack';
@@ -202,15 +208,76 @@ window.Zircon.packs = {
             const form = new FormData();
             form.append('file', file);
             try {
-                await fetch(`/api/instances/${this.selectedInstance.id}/${this.packEndpoint(type)}/upload`, {
+                const res = await fetch(`/api/instances/${this.selectedInstance.id}/${this.packEndpoint(type)}/upload`, {
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer ' + this.jwtToken },
                     body: form
                 });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || ('Upload failed with HTTP ' + res.status));
+                }
             } catch (e) {
                 alert('Upload failed for ' + file.name + ': ' + e.message);
             }
         }
         this.loadShaders();
+    },
+    async toggleServerResourcePack(pack) {
+        if (!this.selectedInstance) return;
+        const isCurrent = this.serverResourcePack && this.serverResourcePack.filename === pack.filename;
+        const targetFilename = isCurrent ? null : pack.filename;
+        this.serverPackLoading = true;
+        try {
+            await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks/server-pack`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filename: targetFilename
+                })
+            });
+            await this.loadShaders();
+        } catch (e) {
+            alert('Failed to update server resource pack: ' + e.message);
+        } finally {
+            this.serverPackLoading = false;
+        }
+    },
+    async handleDirectServerPackUpload(event) {
+        const files = Array.from(event.target?.files || event.dataTransfer?.files || []).filter(f => f.name.toLowerCase().endsWith('.zip'));
+        if (!files.length) return;
+        this.serverPackUploading = true;
+        try {
+            for (const file of files) {
+                const form = new FormData();
+                form.append('file', file);
+                try {
+                    const res = await fetch(`/api/instances/${this.selectedInstance.id}/resourcepacks/upload`, {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + this.jwtToken },
+                        body: form
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error || ('Upload failed with HTTP ' + res.status));
+                    }
+                    const data = await res.json();
+                    const packFilename = data.filename || data.pack?.filename;
+                    if (packFilename) {
+                        await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks/server-pack`, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                filename: packFilename
+                            })
+                        });
+                    }
+                } catch (e) {
+                    alert('Upload rejected for ' + file.name + ': ' + e.message);
+                }
+            }
+            await this.loadShaders();
+        } finally {
+            this.serverPackUploading = false;
+            if (event.target) event.target.value = '';
+        }
     },
 };

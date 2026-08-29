@@ -69,6 +69,26 @@ impl Default for ServerConfig {
 }
 
 impl ServerConfig {
+    /// Returns the active CurseForge API key. Resolution hierarchy:
+    /// 1. Explicitly configured key in `config.json` (if non-empty).
+    /// 2. Environment variable `CURSEFORGE_API_KEY` or `MC_MANAGER_CURSEFORGE_API_KEY` (if set).
+    /// 3. Embedded obfuscated fallback key compiled into the binary.
+    pub fn effective_curseforge_key(&self) -> String {
+        let trimmed = self.curseforge_api_key.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+        if let Ok(key) = std::env::var("CURSEFORGE_API_KEY")
+            .or_else(|_| std::env::var("MC_MANAGER_CURSEFORGE_API_KEY"))
+        {
+            let env_trimmed = key.trim().trim_matches('"').trim_matches('\'').to_string();
+            if !env_trimmed.is_empty() {
+                return env_trimmed;
+            }
+        }
+        crate::security::obfuscation::embedded_curseforge_key()
+    }
+
     fn apply_defaults(&mut self) {
         if self.server_title.is_empty() {
             self.server_title = "My Minecraft Server".to_string();
@@ -86,16 +106,6 @@ impl ServerConfig {
         }
         if self.java_args.is_empty() {
             self.java_args = "-Xms2G -Xmx4G".to_string();
-        }
-        if self.curseforge_api_key.is_empty() {
-            if let Ok(key) = std::env::var("CURSEFORGE_API_KEY")
-                .or_else(|_| std::env::var("MC_MANAGER_CURSEFORGE_API_KEY"))
-            {
-                let trimmed = key.trim().trim_matches('"').trim_matches('\'').to_string();
-                if !trimmed.is_empty() {
-                    self.curseforge_api_key = trimmed;
-                }
-            }
         }
     }
 }
@@ -194,6 +204,10 @@ impl ConfigService {
         props.save(&self.server_properties_file)
     }
 
+    pub fn effective_curseforge_key(&self) -> String {
+        self.config.lock().unwrap().effective_curseforge_key()
+    }
+
     /// Loads (or generates on first use) the persistent Ed25519 signing key
     /// stored at `<data_dir>/server_signing.key`, and caches it in memory.
     ///
@@ -246,7 +260,8 @@ fn load_config(config_file: &Path) -> std::io::Result<ServerConfig> {
             }
         }
     }
-    let fresh = ServerConfig::default();
+    let mut fresh = ServerConfig::default();
+    fresh.apply_defaults();
     if let Err(e) = save_json(config_file, &fresh) {
         tracing::warn!("Could not write default config: {e}");
     }
@@ -427,5 +442,17 @@ mod tests {
         assert!(hex::decode(hex_part).is_ok());
         assert_eq!(hex::encode(key1.to_bytes()), hex_part);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn effective_curseforge_key_falls_back_to_embedded_when_empty() {
+        let mut cfg = ServerConfig::default();
+        cfg.curseforge_api_key = String::new();
+        let key = cfg.effective_curseforge_key();
+        assert!(!key.is_empty(), "Fallback key must not be empty");
+        assert!(key.starts_with("$2a$10$"));
+
+        cfg.curseforge_api_key = "custom-key-123".to_string();
+        assert_eq!("custom-key-123", cfg.effective_curseforge_key());
     }
 }

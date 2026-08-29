@@ -71,7 +71,40 @@ impl BillOfMaterials {
     }
 
     pub fn add_mod(&mut self, entry: ModEntry) {
+        self.mods.retain(|m| {
+            m.filename != entry.filename
+                && !(entry.id.is_some() && entry.id == m.id && entry.origin == m.origin)
+        });
         self.mods.push(entry);
+    }
+
+    /// Deduplicates mods by filename and project ID (origin + id), retaining
+    /// the most recently added / updated entry and preserving stable order.
+    pub fn deduplicate_mods(&mut self) {
+        let mut seen_filenames = std::collections::HashSet::new();
+        let mut seen_projects = std::collections::HashSet::new();
+        let mut unique_mods = Vec::new();
+
+        for entry in self.mods.iter().rev() {
+            let file_key = entry.filename.to_ascii_lowercase();
+            if seen_filenames.contains(&file_key) {
+                continue;
+            }
+            if let (Some(origin), Some(id)) = (&entry.origin, &entry.id) {
+                let id_trimmed = id.trim();
+                if !id_trimmed.is_empty() {
+                    let proj_key = format!("{}:{}", origin.to_ascii_lowercase(), id_trimmed.to_ascii_lowercase());
+                    if seen_projects.contains(&proj_key) {
+                        continue;
+                    }
+                    seen_projects.insert(proj_key);
+                }
+            }
+            seen_filenames.insert(file_key);
+            unique_mods.push(entry.clone());
+        }
+        unique_mods.reverse();
+        self.mods = unique_mods;
     }
 
     pub fn remove_mod(&mut self, filename: &str) -> bool {
@@ -367,6 +400,12 @@ pub struct PackEntry {
     /// Minecraft pack_format integer for resource packs (e.g. 15, 34).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pack_format: Option<u32>,
+    /// Whether this resourcepack is server-enforced / active by default for players.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_enforced: Option<bool>,
+    /// Whether the pack has been verified and sanitized against the security whitelist.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sanitized: Option<bool>,
 }
 
 impl PackEntry {
@@ -396,6 +435,8 @@ impl PackEntry {
             description: None,
             version: None,
             pack_format: None,
+            server_enforced: None,
+            sanitized: None,
         }
     }
 
@@ -713,6 +754,54 @@ mod tests {
         assert_eq!(Some("abc123icon".to_string()), branding.icon_sha1);
         assert_eq!(Some("def456banner".to_string()), branding.banner_sha1);
         assert!(branding.banner_is_animated);
+    }
+
+    #[test]
+    fn test_deduplicate_mods() {
+        let mut bom = BillOfMaterials::new("1.21.4", None, None);
+        bom.mods.push(ModEntry::new(
+            Some("sodium".to_string()),
+            "sodium-0.5.8.jar",
+            Some("sha1_old".to_string()),
+            0,
+            Some("modrinth".to_string()),
+            None,
+            100,
+        ));
+        bom.mods.push(ModEntry::new(
+            Some("sodium".to_string()),
+            "sodium-0.6.0.jar",
+            Some("sha1_new".to_string()),
+            0,
+            Some("modrinth".to_string()),
+            None,
+            200,
+        ));
+        bom.mods.push(ModEntry::new(
+            Some("iris".to_string()),
+            "iris-1.7.0.jar",
+            Some("sha1_iris".to_string()),
+            0,
+            Some("modrinth".to_string()),
+            None,
+            300,
+        ));
+        // Duplicate by filename
+        bom.mods.push(ModEntry::new(
+            None,
+            "iris-1.7.0.jar",
+            Some("sha1_iris".to_string()),
+            0,
+            Some("direct".to_string()),
+            None,
+            300,
+        ));
+
+        assert_eq!(4, bom.mods.len());
+        bom.deduplicate_mods();
+        assert_eq!(2, bom.mods.len());
+        assert_eq!("sodium-0.6.0.jar", bom.mods[0].filename);
+        assert_eq!("iris-1.7.0.jar", bom.mods[1].filename);
     }
 }
 
