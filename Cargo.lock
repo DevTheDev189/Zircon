@@ -6978,7 +6978,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-core"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "ed25519-dalek",
  "flate2",
@@ -7002,7 +7002,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-launcher"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -7038,7 +7038,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-server"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "axum",
  "axum-extra",

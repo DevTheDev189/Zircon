@@ -273,6 +273,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/mods", get(mod_controller::list_mods))
         .route("/api/mods/upload", post(mod_controller::upload_mod))
         .route(
+            "/api/mods/upload-server",
+            post(mod_controller::upload_server_mod),
+        )
+        .route(
             "/api/mods/:filename",
             delete(mod_controller::remove_mod),
         )
@@ -431,6 +435,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/instances/:id/mods/upload",
             post(instance_controller::upload_mod),
+        )
+        .route(
+            "/api/instances/:id/mods/upload-server",
+            post(instance_controller::upload_server_mod),
         )
         .route(
             "/api/instances/:id/mods/:filename",

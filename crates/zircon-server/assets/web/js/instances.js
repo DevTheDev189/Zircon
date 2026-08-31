@@ -320,6 +320,7 @@ window.Zircon.instances = {
     async restartInstance(inst) {
         inst = inst || this.selectedInstance;
         if (!inst) return;
+        this.modsRestartNeeded = false;
         try {
             await this.api(`/api/instances/${inst.id}/restart`, { method: 'POST' });
             alert(`Server "${inst.name}" is restarting...`);

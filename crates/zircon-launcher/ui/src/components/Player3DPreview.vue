@@ -154,31 +154,67 @@ function buildModel(variant = 'classic') {
 }
 
 // ---- Texture / skin --------------------------------------------------------
+function copyFlipped(ctx, sx, sy, sw, sh, dx, dy) {
+  ctx.save();
+  ctx.translate(dx + sw, dy);
+  ctx.scale(-1, 1);
+  ctx.drawImage(ctx.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+  ctx.restore();
+}
+
+function isAreaTransparent(ctx, x, y, w, h) {
+  try {
+    const imgData = ctx.getImageData(x, y, w, h).data;
+    for (let i = 3; i < imgData.length; i += 4) {
+      if (imgData[i] > 10) return false;
+    }
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+function mirrorLegacyLimb(ctx, isArm) {
+  if (isArm) {
+    // Right Arm (40, 16) -> Left Arm (32, 48)
+    copyFlipped(ctx, 44, 16, 4, 4, 36, 48); // Top
+    copyFlipped(ctx, 48, 16, 4, 4, 40, 48); // Bottom
+    copyFlipped(ctx, 48, 20, 4, 12, 32, 52); // Inside
+    copyFlipped(ctx, 44, 20, 4, 12, 36, 52); // Front
+    copyFlipped(ctx, 40, 20, 4, 12, 40, 52); // Outside
+    copyFlipped(ctx, 52, 20, 4, 12, 44, 52); // Back
+  } else {
+    // Right Leg (0, 16) -> Left Leg (16, 48)
+    copyFlipped(ctx, 4, 16, 4, 4, 20, 48); // Top
+    copyFlipped(ctx, 8, 16, 4, 4, 24, 48); // Bottom
+    copyFlipped(ctx, 8, 20, 4, 12, 16, 52); // Inside
+    copyFlipped(ctx, 4, 20, 4, 12, 20, 52); // Front
+    copyFlipped(ctx, 0, 20, 4, 12, 24, 52); // Outside
+    copyFlipped(ctx, 12, 20, 4, 12, 28, 52); // Back
+  }
+}
+
 function createSkinCanvas(image) {
-  if (image.width < 32 || image.height < 32) {
+  if (!image || image.width < 32 || image.height < 32) {
     return null;
   }
 
   const cvs = document.createElement('canvas');
   cvs.width = 64;
   cvs.height = 64;
-  const ctx = cvs.getContext('2d');
+  const ctx = cvs.getContext('2d', { willReadFrequently: true });
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(image, 0, 0);
 
-  if (image.width === 64 && image.height === 32) {
-    // Convert 64x32 legacy skin to 64x64
-    ctx.save();
-    ctx.translate(32, 48);
-    ctx.scale(-1, 1);
-    ctx.drawImage(cvs, 0, 16, 16, 16, -16, 0, 16, 16);
-    ctx.restore();
+  const isLegacy64x32 = image.height === 32 || image.height < 64;
+  const isLeftLegEmpty = isLegacy64x32 || isAreaTransparent(ctx, 16, 48, 16, 16);
+  const isLeftArmEmpty = isLegacy64x32 || isAreaTransparent(ctx, 32, 48, 16, 16);
 
-    ctx.save();
-    ctx.translate(48, 48);
-    ctx.scale(-1, 1);
-    ctx.drawImage(cvs, 40, 16, 16, 16, -16, 0, 16, 16);
-    ctx.restore();
+  if (isLeftLegEmpty) {
+    mirrorLegacyLimb(ctx, false);
+  }
+  if (isLeftArmEmpty) {
+    mirrorLegacyLimb(ctx, true);
   }
 
   return cvs;

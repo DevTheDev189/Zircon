@@ -171,6 +171,96 @@
     background-color: #022623;
   }
 
+  /* Form checkboxes (mirroring web-app zircon-check): transparent blend with dark glass,
+     subtle slate border, brand cyan fill on check, dark checkmark icon */
+  .zircon-check,
+  input[type="checkbox"].zircon-check,
+  input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    background-color: transparent;
+    border: 1px solid rgba(71, 85, 105, 0.8); /* slate-600 */
+    border-radius: 4px;
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .zircon-check:hover,
+  input[type="checkbox"].zircon-check:hover,
+  input[type="checkbox"]:hover {
+    border-color: rgba(71, 210, 201, 0.5);
+  }
+  .zircon-check:checked,
+  input[type="checkbox"].zircon-check:checked,
+  input[type="checkbox"]:checked {
+    background-color: #47d2c9; /* brand zircon cyan */
+    border-color: #47d2c9;
+    box-shadow: 0 0 8px rgba(71, 210, 201, 0.4);
+  }
+  .zircon-check:checked::after,
+  input[type="checkbox"].zircon-check:checked::after,
+  input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border: solid #022623;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .zircon-check:focus-visible,
+  input[type="checkbox"].zircon-check:focus-visible,
+  input[type="checkbox"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(71, 210, 201, 0.5);
+  }
+
+  /* Segmented Pill Selector (matching web app 3-way mod-side / tab bar) */
+  .z-segmented-track {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    border-radius: 9999px;
+    background-color: #141e2c;
+    border: 1px solid rgba(51, 65, 85, 0.7);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    gap: 3px;
+  }
+  .z-segmented-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 14px;
+    font-size: 12px;
+    line-height: 16px;
+    border-radius: 9999px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #94a3b8;
+    background-color: transparent;
+    border: none;
+  }
+  .z-segmented-pill:hover:not(.active) {
+    color: #f1f5f9;
+    background-color: rgba(51, 65, 85, 0.5);
+  }
+  .z-segmented-pill.active {
+    background-color: #47d2c9 !important;
+    color: #022623 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 0 14px rgba(71, 210, 201, 0.45);
+    outline: 1px solid #7be3dc;
+  }
+
   .zircon-drop-zone {
     background: radial-gradient(circle at 50% 30%, rgba(71, 210, 201, 0.06), rgba(13, 21, 28, 0.75));
     border: 2px dashed rgba(71, 210, 201, 0.35);

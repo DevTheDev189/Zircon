@@ -6,14 +6,13 @@
 use std::sync::Arc;
 
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 
 use serde::Deserialize;
 use tokio::time::Duration;
 use zircon_core::model::{BillOfMaterials, InstanceConfig, ModLoaderType};
-use crate::config::ServerProperties;
 
 use super::config_helpers::{
     command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
@@ -608,8 +607,15 @@ pub async fn upload_mod(
             "No file uploaded (form field 'file')".to_string(),
         ));
     };
+    let mods = mods_for(&state, &id)?;
+    if params.server_only == Some(true)
+        || params.origin.as_deref() == Some(crate::services::mods::ORIGIN_SERVER_CUSTOM)
+    {
+        let entry = mods.add_server_mod(std::io::Cursor::new(bytes), &filename).await?;
+        return Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))));
+    }
     let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
-    let entry = mods_for(&state, &id)?
+    let entry = mods
         .add_mod_with_metadata(
             std::io::Cursor::new(bytes),
             &filename,
@@ -620,6 +626,23 @@ pub async fn upload_mod(
             params.expected_file_id.as_deref(),
             params.project_url.as_deref(),
         )
+        .await?;
+    Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
+}
+
+/// POST /api/instances/{id}/mods/upload-server (multipart, field "file") — add a custom server-side JAR strictly excluded from BOM.
+pub async fn upload_server_mod(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let Some((filename, bytes)) = super::mod_controller::take_upload(&mut multipart).await? else {
+        return Err(ApiError::BadRequest(
+            "No file uploaded (form field 'file')".to_string(),
+        ));
+    };
+    let entry = mods_for(&state, &id)?
+        .add_server_mod(std::io::Cursor::new(bytes), &filename)
         .await?;
     Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
 }

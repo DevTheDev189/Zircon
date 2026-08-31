@@ -276,6 +276,60 @@ window.Zircon.mods = {
         this.curseforgeDropModal.uploadSuccess = false;
         this.curseforgeDropModal.error = '';
     },
+    triggerServerModUpload() {
+        const input = document.getElementById('server-mod-upload-input');
+        if (input) input.click();
+    },
+    async handleServerModSelect(event) {
+        const files = event.target.files;
+        if (!files || !files.length) return;
+        for (const file of files) {
+            await this.uploadCustomServerMod(file);
+        }
+        event.target.value = '';
+    },
+    async handleServerModDrop(event) {
+        event.preventDefault();
+        this.isDraggingServerMod = false;
+        const files = event.dataTransfer ? event.dataTransfer.files : event.target.files;
+        if (!files || !files.length) return;
+        for (const file of files) {
+            await this.uploadCustomServerMod(file);
+        }
+    },
+    async uploadCustomServerMod(file) {
+        if (!this.selectedInstance) return;
+        if (!file.name.toLowerCase().endsWith('.jar')) {
+            this.serverModUpload.error = 'Only .jar mod files are supported for server-side mods';
+            return;
+        }
+        this.serverModUpload.uploading = true;
+        this.serverModUpload.error = '';
+        this.serverModUpload.successMessage = '';
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await fetch(`/api/instances/${this.selectedInstance.id}/mods/upload-server`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.jwtToken}`
+                },
+                body: formData
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => ({}));
+                throw new Error(errJson.error || errJson.message || `Upload failed with status ${res.status}`);
+            }
+            const uploadedEntry = await res.json().catch(() => ({}));
+            this.serverModUpload.uploading = false;
+            this.serverModUpload.successMessage = `Installed server-side mod: ${uploadedEntry.title || file.name} (${uploadedEntry.version || 'v1.0'})`;
+            this.modsRestartNeeded = true;
+            await this.loadMods();
+        } catch (e) {
+            this.serverModUpload.uploading = false;
+            this.serverModUpload.error = e.message;
+        }
+    },
     isModInstalled(rec) {
         // Mods installed via generic search or upload are matched by id or title
         const id = rec.projectId || rec.id;

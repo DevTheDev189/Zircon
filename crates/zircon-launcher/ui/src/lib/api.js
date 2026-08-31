@@ -1,8 +1,6 @@
-// Thin typed wrappers over the Tauri IPC surface exposed by
-// `crates/zircon-launcher/src/commands.rs`. Argument keys use the camelCase
-// form Tauri maps onto the Rust snake_case parameters automatically.
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import * as THREE from 'three';
 
 const ACTIVE_SKIN_CACHE_KEY = 'zircon_active_skin_cache';
 
@@ -92,8 +90,30 @@ export const api = {
 
   // Offline instances
   listOfflineInstances: () => invoke('list_offline_instances'),
-  createOfflineInstance: (name, mcVersion, loaderType, loaderVersion) =>
-    invoke('create_offline_instance', { name, mcVersion, loaderType, loaderVersion }),
+  createOfflineInstance: (optionsOrName, mcVersion, loaderType, loaderVersion) => {
+    if (typeof optionsOrName === 'object' && optionsOrName !== null) {
+      const {
+        name,
+        minecraftVersion,
+        mcVersion: mcVer,
+        modLoader,
+        loaderType: lType,
+        loaderVersion: lVer,
+      } = optionsOrName;
+      return invoke('create_offline_instance', {
+        name: name || '',
+        mcVersion: minecraftVersion || mcVer || '',
+        loaderType: lType || modLoader?.type || 'fabric',
+        loaderVersion: lVer !== undefined ? lVer : (modLoader?.version || ''),
+      });
+    }
+    return invoke('create_offline_instance', {
+      name: optionsOrName || '',
+      mcVersion: mcVersion || '',
+      loaderType: loaderType || 'fabric',
+      loaderVersion: loaderVersion || '',
+    });
+  },
   deleteOfflineInstance: (id) => invoke('delete_offline_instance', { id }),
   getOfflineInstanceDir: (id) => invoke('get_offline_instance_dir', { id }),
   launchOfflineInstance: (id) => invoke('launch_offline_instance', { id }),
@@ -101,7 +121,10 @@ export const api = {
   deleteOfflineMod: (id, filename) => invoke('delete_offline_mod', { id, filename }),
   setOfflineModEnabled: (id, filename, enabled) =>
     invoke('set_offline_mod_enabled', { id, filename, enabled }),
-  addOfflineMod: (id, sourcePath) => invoke('add_offline_mod', { id, sourcePath }),
+  addOfflineMod: (id, sourcePath) => invoke('import_offline_mod_file', { id, sourcePath }),
+  importOfflineModFile: (id, sourcePath) => invoke('import_offline_mod_file', { id, sourcePath }),
+  importOfflineModBytes: (id, filename, bytes) =>
+    invoke('import_offline_mod_bytes', { id, filename, bytes }),
 
   // Skins
   getActiveSkin: async () => {
@@ -151,6 +174,14 @@ export const api = {
     return res;
   },
   fetchMojangSkinPreview: (uuid) => invoke('fetch_mojang_skin_preview', { uuid }),
+  fetchSkinByUsername: (username) => invoke('fetch_skin_by_username', { username }),
+  fetchCommunitySkins: (page) => invoke('fetch_community_skins', { page }),
+  fetchSkinByUrl: (url, name) => invoke('fetch_skin_by_url', { url, name }),
+  saveSkinBytes: async (name, bytes, variant = 'classic') => {
+    const res = await invoke('save_skin_bytes', { name, bytes, variant });
+    api.getActiveSkin().catch(() => {});
+    return res;
+  },
   activateHistorySkin: async (filename, variant) => {
     const res = await invoke('activate_history_skin', { filename, variant });
     api.getActiveSkin().catch(() => {});
@@ -166,26 +197,50 @@ export const api = {
   listInstancePacksDetailed: (gameDir) => invoke('list_instance_packs_detailed', { gameDir }),
   addLocalPack: (gameDir, sourcePath, kind) =>
     invoke('add_local_pack', { gameDir, sourcePath, kind }),
+  importInstancePack: (gameDir, kind, sourcePath) =>
+    invoke('import_instance_pack', { gameDir, kind, sourcePath }),
+  importInstancePackBytes: (gameDir, kind, filename, bytes) =>
+    invoke('import_instance_pack_bytes', { gameDir, kind, filename, bytes }),
   removeLocalPack: (gameDir, kind, filename) =>
     invoke('remove_local_pack', { gameDir, kind, filename }),
   setActiveShaderpack: (gameDir, filename) =>
     invoke('set_active_shaderpack', { gameDir, filename }),
+  setActiveResourcepacks: (gameDir, filenames) =>
+    invoke('set_active_resourcepacks', { gameDir, filenames }),
   toggleResourcepack: (gameDir, filename) =>
     invoke('toggle_resourcepack', { gameDir, filename }),
 
-  // Modrinth
-  searchModrinth: (instanceId, query) => invoke('search_modrinth', { instanceId, query }),
-  listModrinthVersions: (instanceId, projectId) =>
-    invoke('list_modrinth_versions', { instanceId, projectId }),
+  // Unified Mod & Pack Discovery (Modrinth & CurseForge)
+  searchMods: (instanceId, query, origin = 'modrinth', projectType = 'mod', allVersions = false) =>
+    invoke('search_mods', { instanceId, query, origin, projectType, allVersions }),
+  searchModrinthMods: (query, mcVersion, loader) =>
+    invoke('search_mods', { instanceId: '', query, origin: 'modrinth', projectType: 'mod', allVersions: true }),
+  searchModrinth: (instanceId, query, projectType = 'mod', allVersions = false) =>
+    invoke('search_mods', { instanceId, query, origin: 'modrinth', projectType, allVersions }),
+  listModVersions: (instanceId, projectId, origin = 'modrinth', allVersions = false) =>
+    invoke('list_mod_versions', { instanceId, projectId, origin, allVersions }),
+  getModrinthVersions: (projectId, mcVersion, loader) =>
+    invoke('list_mod_versions', { instanceId: '', projectId, origin: 'modrinth', allVersions: true }),
+  listModrinthVersions: (instanceId, projectId, allVersions = false) =>
+    invoke('list_mod_versions', { instanceId, projectId, origin: 'modrinth', allVersions }),
+  installModrinthPack: (instanceId, projectId, versionId = null, projectType = 'mod') =>
+    invoke('install_modrinth_pack', { instanceId, projectId, versionId, projectType }),
   installModrinthMod: (instanceId, projectId, versionId = null) =>
-    invoke('install_modrinth_mod', { instanceId, projectId, versionId }),
+    invoke('install_modrinth_pack', { instanceId, projectId, versionId, projectType: 'mod' }),
+  installModrinthVersion: (instanceId, versionId, projectType = 'mod') =>
+    invoke('install_modrinth_pack', { instanceId, projectId: '', versionId, projectType }),
   listMinecraftVersions: () => invoke('list_minecraft_versions'),
+  getMinecraftVersions: (snapshots = false) => invoke('get_minecraft_versions', { snapshots }),
   listLoaderTypes: () => invoke('list_loader_types'),
-  openExternalUrl: (url) => invoke('open_external_url', { url }),
+  getLoaderVersions: (loader, mcVersion) => invoke('get_loader_versions', { loader, mcVersion }),
+  getLauncherMetadata: () => invoke('get_launcher_metadata'),
+  openExternalUrl: (url) => invoke('open_browser_url', { url }),
+  openBrowserUrl: (url) => invoke('open_browser_url', { url }),
 
   // Settings & App Info
   getSettings: () => invoke('get_settings'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
+  showMainWindow: () => invoke('show_main_window'),
   getLauncherVersion: () => invoke('get_launcher_version'),
   logDebug: (message) => invoke('log_debug_message', { message }),
 
@@ -279,92 +334,12 @@ export function skinFaceDataUrl(skinDataUrl, scale = 8) {
   });
 }
 
-// Renders a default 64x64 Zircon Steve skin (with black t-shirt, cyan 'Z' logo,
-// teal pants, and transparent overlays) entirely client-side.
+// Canonical 64x64 Zircon-Steve Skin (Official Zircon character)
+export const ZIRCON_STEVE_DATA_URL =
+  'data:image/png;base64,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';
+
 export function createDefaultSteveDataUrl() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, 64, 64);
-
-  const skin = '#b9855c';
-  const skinShadow = '#a1704a';
-  const hair = '#3b2210';
-  const eyes = '#ffffff';
-  const pupils = '#2e4382';
-  const mouth = '#6a3618';
-  const shirt = '#0d1620';
-  const cyanBright = '#5adfd5';
-  const pants = '#13636f';
-  const boots = '#262f3a';
-
-  // Head (0,0)-(32,16)
-  ctx.fillStyle = hair;
-  ctx.fillRect(0, 0, 32, 8);
-  ctx.fillRect(0, 8, 32, 8);
-
-  // Head front (8,8)-(16,16)
-  ctx.fillStyle = skin;
-  ctx.fillRect(8, 8, 8, 8);
-  ctx.fillStyle = hair;
-  ctx.fillRect(8, 8, 8, 2);
-  ctx.fillRect(8, 10, 1, 1);
-  ctx.fillRect(15, 10, 1, 1);
-
-  // Eyes & Mouth
-  ctx.fillStyle = eyes;
-  ctx.fillRect(10, 12, 1, 1);
-  ctx.fillRect(13, 12, 1, 1);
-  ctx.fillStyle = pupils;
-  ctx.fillRect(11, 12, 1, 1);
-  ctx.fillRect(14, 12, 1, 1);
-
-  ctx.fillStyle = skinShadow;
-  ctx.fillRect(11, 13, 2, 1);
-  ctx.fillStyle = mouth;
-  ctx.fillRect(11, 14, 2, 1);
-
-  // Torso / Body (16,16)-(40,32)
-  ctx.fillStyle = shirt;
-  ctx.fillRect(16, 16, 24, 16);
-
-  // Cyan 'Z' logo on front chest (20,20)-(28,32)
-  ctx.fillStyle = cyanBright;
-  ctx.fillRect(22, 23, 4, 1);
-  ctx.fillRect(25, 24, 1, 1);
-  ctx.fillRect(24, 25, 1, 1);
-  ctx.fillRect(23, 26, 1, 1);
-  ctx.fillRect(22, 27, 4, 1);
-
-  // Arms:
-  // Right Arm (40,16)-(56,32)
-  ctx.fillStyle = skin;
-  ctx.fillRect(40, 16, 16, 16);
-  ctx.fillStyle = shirt;
-  ctx.fillRect(40, 20, 16, 4);
-
-  // Left Arm (32,48)-(48,64)
-  ctx.fillStyle = skin;
-  ctx.fillRect(32, 48, 16, 16);
-  ctx.fillStyle = shirt;
-  ctx.fillRect(32, 52, 16, 4);
-
-  // Legs:
-  // Right Leg (0,16)-(16,32)
-  ctx.fillStyle = pants;
-  ctx.fillRect(0, 16, 16, 16);
-  ctx.fillStyle = boots;
-  ctx.fillRect(0, 28, 16, 4);
-
-  // Left Leg (16,48)-(32,64)
-  ctx.fillStyle = pants;
-  ctx.fillRect(16, 48, 16, 16);
-  ctx.fillStyle = boots;
-  ctx.fillRect(16, 60, 16, 4);
-
-  return canvas.toDataURL('image/png');
+  return ZIRCON_STEVE_DATA_URL;
 }
 
 export function fmtBytes(bytes) {
@@ -377,4 +352,237 @@ export function fmtBytes(bytes) {
     i += 1;
   }
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+// ---- 3D Isometric Skin Render Engine ---------------------------------------
+function copyFlipped(ctx, sx, sy, sw, sh, dx, dy) {
+  ctx.save();
+  ctx.translate(dx + sw, dy);
+  ctx.scale(-1, 1);
+  ctx.drawImage(ctx.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+  ctx.restore();
+}
+
+function isAreaTransparent(ctx, x, y, w, h) {
+  try {
+    const imgData = ctx.getImageData(x, y, w, h).data;
+    for (let i = 3; i < imgData.length; i += 4) {
+      if (imgData[i] > 10) return false;
+    }
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+function mirrorLegacyLimb(ctx, isArm) {
+  if (isArm) {
+    copyFlipped(ctx, 44, 16, 4, 4, 36, 48); // Top
+    copyFlipped(ctx, 48, 16, 4, 4, 40, 48); // Bottom
+    copyFlipped(ctx, 48, 20, 4, 12, 32, 52); // Inside
+    copyFlipped(ctx, 44, 20, 4, 12, 36, 52); // Front
+    copyFlipped(ctx, 40, 20, 4, 12, 40, 52); // Outside
+    copyFlipped(ctx, 52, 20, 4, 12, 44, 52); // Back
+  } else {
+    copyFlipped(ctx, 4, 16, 4, 4, 20, 48); // Top
+    copyFlipped(ctx, 8, 16, 4, 4, 24, 48); // Bottom
+    copyFlipped(ctx, 8, 20, 4, 12, 16, 52); // Inside
+    copyFlipped(ctx, 4, 20, 4, 12, 20, 52); // Front
+    copyFlipped(ctx, 0, 20, 4, 12, 24, 52); // Outside
+    copyFlipped(ctx, 12, 20, 4, 12, 28, 52); // Back
+  }
+}
+
+export function processSkinCanvas(image) {
+  if (!image || image.width < 32 || image.height < 32) return null;
+  const cvs = document.createElement('canvas');
+  cvs.width = 64;
+  cvs.height = 64;
+  const ctx = cvs.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(image, 0, 0);
+
+  const isLegacy64x32 = image.height === 32 || image.height < 64;
+  const isLeftLegEmpty = isLegacy64x32 || isAreaTransparent(ctx, 16, 48, 16, 16);
+  const isLeftArmEmpty = isLegacy64x32 || isAreaTransparent(ctx, 32, 48, 16, 16);
+
+  if (isLeftLegEmpty) mirrorLegacyLimb(ctx, false);
+  if (isLeftArmEmpty) mirrorLegacyLimb(ctx, true);
+
+  return cvs;
+}
+
+function faces(base, w, h, d) {
+  const [bu, bv] = base;
+  return {
+    front: [bu + d, bv + d, w, h],
+    back: [bu + d + w + d, bv + d, w, h],
+    right: [bu, bv + d, d, h],
+    left: [bu + d + w, bv + d, d, h],
+    top: [bu + d, bv, w, d],
+    bottom: [bu + d + w, bv, w, d],
+  };
+}
+
+const HEAD = { size: [8, 8, 8], center: [0, 28, 0], atlas: faces([0, 0], 8, 8, 8) };
+const HAT = { size: [8.8, 8.8, 8.8], center: [0, 28, 0], atlas: faces([32, 0], 8, 8, 8) };
+const BODY = { size: [8, 12, 4], center: [0, 18, 0], atlas: faces([16, 16], 8, 12, 4) };
+const JACKET = { size: [8.5, 12.5, 4.5], center: [0, 18, 0], atlas: faces([16, 32], 8, 12, 4) };
+const R_ARM = { size: [4, 12, 4], center: [-6, 18, 0], atlas: faces([40, 16], 4, 12, 4) };
+const R_SLEEVE = { size: [4.5, 12.5, 4.5], center: [-6, 18, 0], atlas: faces([40, 32], 4, 12, 4) };
+const L_ARM = { size: [4, 12, 4], center: [6, 18, 0], atlas: faces([32, 48], 4, 12, 4) };
+const L_SLEEVE = { size: [4.5, 12.5, 4.5], center: [6, 18, 0], atlas: faces([48, 48], 4, 12, 4) };
+const R_ARM_SLIM = { size: [3, 12, 4], center: [-5.5, 18, 0], atlas: faces([40, 16], 3, 12, 4) };
+const R_SLEEVE_SLIM = { size: [3.5, 12.5, 4.5], center: [-5.5, 18, 0], atlas: faces([40, 32], 3, 12, 4) };
+const L_ARM_SLIM = { size: [3, 12, 4], center: [5.5, 18, 0], atlas: faces([32, 48], 3, 12, 4) };
+const L_SLEEVE_SLIM = { size: [3.5, 12.5, 4.5], center: [5.5, 18, 0], atlas: faces([48, 48], 3, 12, 4) };
+const R_LEG = { size: [4, 12, 4], center: [-2, 6, 0], atlas: faces([0, 16], 4, 12, 4) };
+const R_PANTS = { size: [4.5, 12.5, 4.5], center: [-2, 6, 0], atlas: faces([0, 32], 4, 12, 4) };
+const L_LEG = { size: [4, 12, 4], center: [2, 6, 0], atlas: faces([16, 48], 4, 12, 4) };
+const L_PANTS = { size: [4.5, 12.5, 4.5], center: [2, 6, 0], atlas: faces([0, 48], 4, 12, 4) };
+
+function getModelBoxes(variant) {
+  const isSlim = variant === 'slim';
+  const rArm = isSlim ? R_ARM_SLIM : R_ARM;
+  const lArm = isSlim ? L_ARM_SLIM : L_ARM;
+  const rSleeve = isSlim ? R_SLEEVE_SLIM : R_SLEEVE;
+  const lSleeve = isSlim ? L_SLEEVE_SLIM : L_SLEEVE;
+  const baseBoxes = [HEAD, BODY, rArm, lArm, R_LEG, L_LEG];
+  const overlayBoxes = [HAT, JACKET, rSleeve, lSleeve, R_PANTS, L_PANTS];
+  return { baseBoxes, overlayBoxes };
+}
+
+function buildBoxesIntoGeo(builder, boxes) {
+  for (const box of boxes) {
+    const [Cx, Cy, Cz] = box.center;
+    const [sx, sy, sz] = box.size;
+    const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+    const a = box.atlas;
+    const facesList = [
+      { key: 'front', norm: [0, 0, 1], corners: [[Cx-hx, Cy+hy, Cz+hz], [Cx-hx, Cy-hy, Cz+hz], [Cx+hx, Cy+hy, Cz+hz], [Cx+hx, Cy-hy, Cz+hz]] },
+      { key: 'back', norm: [0, 0, -1], corners: [[Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy-hy, Cz-hz], [Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy-hy, Cz-hz]] },
+      { key: 'right', norm: [-1, 0, 0], corners: [[Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy-hy, Cz-hz], [Cx-hx, Cy+hy, Cz+hz], [Cx-hx, Cy-hy, Cz+hz]] },
+      { key: 'left', norm: [1, 0, 0], corners: [[Cx+hx, Cy+hy, Cz+hz], [Cx+hx, Cy-hy, Cz+hz], [Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy-hy, Cz-hz]] },
+      { key: 'top', norm: [0, 1, 0], corners: [[Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy+hy, Cz+hz], [Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy+hy, Cz+hz]] },
+      { key: 'bottom', norm: [0, -1, 0], corners: [[Cx-hx, Cy-hy, Cz+hz], [Cx-hx, Cy-hy, Cz-hz], [Cx+hx, Cy-hy, Cz+hz], [Cx+hx, Cy-hy, Cz-hz]] },
+    ];
+    for (const f of facesList) {
+      const r = a[f.key];
+      const u0 = r[0] / 64;
+      const u1 = (r[0] + r[2]) / 64;
+      const v0 = 1.0 - r[1] / 64;
+      const v1 = 1.0 - (r[1] + r[3]) / 64;
+      const baseIdx = builder.positions.length / 3;
+      for (const v of f.corners) builder.positions.push(v[0], v[1], v[2]);
+      for (let i = 0; i < 4; i++) builder.normals.push(f.norm[0], f.norm[1], f.norm[2]);
+      builder.uvs.push(u0, v0, u0, v1, u1, v0, u1, v1);
+      builder.indices.push(
+        baseIdx, baseIdx + 1, baseIdx + 2,
+        baseIdx + 2, baseIdx + 1, baseIdx + 3
+      );
+    }
+  }
+}
+
+let offscreenCtx = null;
+
+export async function renderSkinIsometric3D(skinDataUrl, variant = 'classic') {
+  return new Promise((resolve) => {
+    if (!skinDataUrl) return resolve(null);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        if (!offscreenCtx) {
+          const canvas = document.createElement('canvas');
+          canvas.width = 160;
+          canvas.height = 220;
+          const renderer = new THREE.WebGLRenderer({
+            canvas,
+            alpha: true,
+            antialias: true,
+            preserveDrawingBuffer: true,
+          });
+          renderer.setSize(160, 220, false);
+          renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+          const scene = new THREE.Scene();
+          const camera = new THREE.PerspectiveCamera(38, 160 / 220, 0.1, 100);
+          camera.position.set(0, 16, 44);
+          camera.lookAt(0, 13, 0);
+
+          const key = new THREE.DirectionalLight(0xffffff, 1.8);
+          key.position.set(10, 30, 20);
+          scene.add(key);
+
+          const fill = new THREE.DirectionalLight(0x47d2c9, 0.6);
+          fill.position.set(-15, 10, -12);
+          scene.add(fill);
+
+          scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+          const material = new THREE.MeshLambertMaterial({
+            color: 0xffffff,
+            transparent: true,
+            alphaTest: 0.5,
+            side: THREE.FrontSide,
+          });
+
+          offscreenCtx = { canvas, renderer, scene, camera, material };
+        }
+
+        const { canvas, renderer, scene, camera, material } = offscreenCtx;
+        const cvs = processSkinCanvas(img);
+        if (!cvs) return resolve(null);
+
+        const tex = new THREE.CanvasTexture(cvs);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        tex.generateMipmaps = false;
+        tex.colorSpace = THREE.SRGBColorSpace;
+
+        material.map = tex;
+        material.needsUpdate = true;
+
+        // Clear existing model
+        const toRemove = scene.children.filter((c) => c.isGroup);
+        toRemove.forEach((c) => scene.remove(c));
+
+        const { baseBoxes, overlayBoxes } = getModelBoxes(variant);
+        const baseBuilder = { positions: [], normals: [], uvs: [], indices: [] };
+        const overlayBuilder = { positions: [], normals: [], uvs: [], indices: [] };
+        buildBoxesIntoGeo(baseBuilder, baseBoxes);
+        buildBoxesIntoGeo(overlayBuilder, overlayBoxes);
+
+        const toGeo = (b) => {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));
+          geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.normals, 3));
+          geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uvs, 2));
+          geo.setIndex(b.indices);
+          return geo;
+        };
+
+        const base = new THREE.Mesh(toGeo(baseBuilder), material);
+        const overlay = new THREE.Mesh(toGeo(overlayBuilder), material);
+        overlay.renderOrder = 1;
+        base.renderOrder = 0;
+        const group = new THREE.Group();
+        group.add(base, overlay);
+        group.scale.setScalar(0.76);
+        group.rotation.set(-0.1, -0.35, 0); // Gentle 3D front-isometric angle
+        scene.add(group);
+
+        renderer.render(scene, camera);
+        const renderedUri = canvas.toDataURL('image/png');
+        tex.dispose();
+        resolve(renderedUri);
+      } catch (err) {
+        console.error('Failed to render 3D isometric skin:', err);
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = skinDataUrl;
+  });
 }

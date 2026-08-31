@@ -52,6 +52,20 @@
           }}
         </button>
 
+        <!-- Save Library/Cloned Skin to Gallery Button -->
+        <button
+          v-if="selectedSkin?.isLibrary"
+          class="z-btn-ghost w-full py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5"
+          @click="saveLibrarySkinToGallery"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+          Save to My Skins
+        </button>
+
         <!-- Delete History Skin Button -->
         <button
           v-if="canDelete"
@@ -68,34 +82,33 @@
       </p>
     </div>
 
-    <!-- Right: Saved Skins & Gallery Grid -->
+    <!-- Right: Tabs + Skins Grid -->
     <div class="flex-1 min-w-0 flex flex-col">
-      <!-- Section Header -->
-      <div class="flex items-center justify-between mb-3.5">
-        <div class="flex items-center gap-2.5">
-          <span class="text-white font-bold text-base">Saved Skins</span>
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono">
-            {{ skins.length }}
-          </span>
+      <!-- Top Navigation & Controls Bar -->
+      <div class="flex items-center justify-between mb-3.5 flex-wrap gap-2">
+        <!-- Segmented Tab Switcher -->
+        <div class="z-segmented-track">
+          <button
+            type="button"
+            class="z-segmented-pill"
+            :class="{ 'active': activeTab === 'saved' }"
+            @click="activeTab = 'saved'"
+          >
+            Saved Skins ({{ skins.length }})
+          </button>
+          <button
+            type="button"
+            class="z-segmented-pill"
+            :class="{ 'active': activeTab === 'library' }"
+            @click="onSelectLibraryTab"
+          >
+            Browse Library
+          </button>
         </div>
 
         <div class="flex items-center gap-2">
           <button
-            v-if="session?.uuid"
-            class="z-btn-ghost text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 hover:text-cyan-300"
-            title="Download current skin from your Minecraft account"
-            :disabled="syncingMojang"
-            @click="syncMojangSkin"
-          >
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {{ syncingMojang ? 'Syncing…' : 'Sync Mojang Skin' }}
-          </button>
-
-          <button
+            v-if="activeTab === 'saved'"
             class="z-btn-accent text-xs px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5"
             @click="addSkin"
           >
@@ -108,41 +121,41 @@
 
           <button
             class="z-btn-ghost text-xs px-2.5 py-1.5 rounded-xl font-semibold"
-            title="Refresh skin list"
-            @click="refreshGallery"
+            :title="activeTab === 'saved' ? 'Refresh saved skins' : 'Refresh library'"
+            @click="activeTab === 'saved' ? refreshGallery() : reloadCurrentCommunityPage()"
           >
             ⟳
           </button>
         </div>
       </div>
 
-      <!-- Gallery Grid -->
-      <div class="flex-1 min-h-0 overflow-y-auto pr-1">
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+      <!-- TAB 1: SAVED SKINS -->
+      <div v-if="activeTab === 'saved'" class="flex-1 min-h-0 overflow-y-auto pr-1">
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4.5">
           <!-- Add Skin Tile -->
           <button
-            class="zircon-drop-zone p-4 text-center transition-all flex flex-col items-center justify-center min-h-[160px] gap-2.5 cursor-pointer group"
+            class="zircon-drop-zone p-5 text-center transition-all flex flex-col items-center justify-center min-h-[220px] gap-3 cursor-pointer group rounded-2xl"
             title="Import a custom Minecraft skin (.png)"
             @click="addSkin"
           >
-            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(71,210,201,0.15)]">
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shadow-[0_0_16px_rgba(71,210,201,0.18)]">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </div>
-            <div class="text-xs font-bold text-cyan-300">Import Skin</div>
-            <span class="text-[10px] text-slate-500 font-mono">64x64 PNG</span>
+            <div class="text-xs font-bold text-cyan-300">Import Custom Skin</div>
+            <span class="text-[10px] text-slate-500 font-mono">64x64 PNG file</span>
           </button>
 
-          <!-- Skin Tiles -->
+          <!-- Skin Tiles with 3D Isometric Previews -->
           <div
             v-for="skin in skins"
             :key="skin.id"
-            class="relative z-card p-3 flex flex-col justify-between cursor-pointer transition-all duration-200 group"
+            class="relative z-card p-3.5 flex flex-col justify-between cursor-pointer transition-all duration-200 group rounded-2xl min-h-[220px]"
             :class="
               isSelected(skin)
-                ? 'border-cyan-400 ring-1 ring-cyan-400/60 shadow-[0_0_16px_rgba(71,210,201,0.25)] bg-[#111c29]'
+                ? 'border-cyan-400 ring-1 ring-cyan-400/60 shadow-[0_0_20px_rgba(71,210,201,0.25)] bg-[#111c29]'
                 : 'border-slate-800/80 bg-[#0e1722]/80 hover:border-slate-700 hover:bg-[#121d2b]'
             "
             @click="selectSkin(skin)"
@@ -151,17 +164,26 @@
             <div class="flex items-center justify-between mb-2">
               <span
                 v-if="skin.isActive"
-                class="text-[9px] font-black text-[#022623] bg-gradient-to-r from-[#5adfd5] to-[#47d2c9] rounded px-1.5 py-0.5 shadow-[0_0_8px_rgba(71,210,201,0.4)]"
+                class="text-[9px] font-black text-[#022623] bg-gradient-to-r from-[#5adfd5] to-[#47d2c9] rounded px-2 py-0.5 shadow-[0_0_8px_rgba(71,210,201,0.4)]"
               >
                 ACTIVE
               </span>
-              <span v-else class="text-[9px] font-mono text-slate-500 capitalize">
+              <span
+                v-else-if="skin.isPreset"
+                class="text-[9px] font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-500/40 rounded px-1.5 py-0.5"
+              >
+                DEFAULT
+              </span>
+              <span
+                v-else
+                class="text-[9px] font-mono text-slate-500 uppercase px-1.5 py-0.5 bg-slate-900 rounded border border-slate-800"
+              >
                 {{ skin.variant || 'classic' }}
               </span>
 
               <button
-                v-if="!skin.isActive"
-                class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 p-1 rounded transition-opacity"
+                v-if="!skin.isActive && skin.filename"
+                class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-0.5 rounded transition-opacity"
                 title="Delete this skin"
                 @click.stop="deleteSingleSkin(skin)"
               >
@@ -172,11 +194,11 @@
               </button>
             </div>
 
-            <!-- Skin Face Preview Box -->
-            <div class="bg-[#070b10] rounded-xl p-3 mb-2.5 border border-slate-800/80 flex items-center justify-center">
+            <!-- 3D Isometric Character Preview Box -->
+            <div class="bg-[#070b10] rounded-xl p-2 mb-2.5 border border-slate-800/80 flex items-center justify-center min-h-[135px]">
               <img
-                :src="skin.faceUrl || skin.dataUrl"
-                class="w-16 h-16 image-render-pixel object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                :src="skin.renderUrl || skin.dataUrl"
+                class="h-32 object-contain drop-shadow-[0_4px_14px_rgba(0,0,0,0.65)]"
                 alt=""
               />
             </div>
@@ -211,6 +233,7 @@
                   {{ skin.label }}
                 </div>
                 <button
+                  v-if="!skin.isPreset"
                   class="opacity-0 group-hover/name:opacity-100 text-slate-400 hover:text-cyan-300 p-0.5 rounded transition-opacity shrink-0"
                   title="Rename filename"
                 >
@@ -232,7 +255,121 @@
           </div>
           <div class="text-white font-bold text-sm">No custom skins saved yet</div>
           <div class="text-slate-400 text-xs max-w-xs">
-            Import a PNG skin file or sync your official Minecraft skin using the buttons above.
+            Import a PNG skin file or select from the Browse Library tab above.
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: BROWSE LIBRARY (Clone by Username & Community Skins) -->
+      <div v-else-if="activeTab === 'library'" class="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-4">
+        <!-- 1. Clone by Minecraft Username -->
+        <div class="bg-[#070b10] border border-slate-800/90 rounded-2xl p-4.5 shadow-inner">
+          <div class="z-section mb-1 text-white font-bold text-sm">Clone Player Skin by Username</div>
+          <p class="text-xs text-slate-400 mb-3">
+            Enter any Minecraft player or creator's username to look up and clone their active skin directly.
+          </p>
+          <div class="flex gap-2.5">
+            <input
+              v-model="cloneUsername"
+              class="z-input flex-1 text-xs"
+              placeholder="e.g. Notch, Jeb_, Technoblade, MumboJumbo..."
+              @keydown.enter="cloneSkinByUsername"
+            />
+            <button
+              class="z-btn-accent text-xs px-5 py-2.5 rounded-xl font-bold shrink-0 shadow-md hover:shadow-cyan-500/25"
+              :disabled="cloning || !cloneUsername.trim()"
+              @click="cloneSkinByUsername"
+            >
+              <span v-if="cloning" class="inline-flex items-center gap-1.5">
+                <span class="inline-block w-3 h-3 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
+                Fetching…
+              </span>
+              <span v-else>Grab Skin</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Community Skin Library from MineSkin V2 -->
+        <div class="bg-[#070b10] border border-slate-800/90 rounded-2xl p-4.5 shadow-inner">
+          <div class="flex items-center justify-between mb-3.5 flex-wrap gap-2">
+            <div>
+              <div class="z-section text-white font-bold text-sm">Community Skin Library</div>
+              <p class="text-xs text-slate-400 mt-0.5">Explore live public Minecraft community skins.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                class="z-btn-ghost text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1"
+                :disabled="communityLoading || currentPageIndex <= 0"
+                @click="onPrevPage"
+              >
+                ← Prev
+              </button>
+              <span class="text-xs font-mono text-cyan-300 font-bold bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-800">
+                Page {{ currentPageIndex + 1 }}
+              </span>
+              <button
+                class="z-btn-ghost text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1"
+                :disabled="communityLoading || !nextCursor"
+                @click="onNextPage"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading State -->
+          <div v-if="communityLoading" class="py-16 text-center text-slate-400 text-xs flex flex-col items-center gap-3">
+            <span class="inline-block w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
+            <span>Loading community skins…</span>
+          </div>
+
+          <!-- Error / Empty State -->
+          <div v-else-if="communitySkins.length === 0" class="py-12 text-center text-slate-400 text-xs">
+            No community skins available right now. You can clone any skin above by typing a player username!
+          </div>
+
+          <!-- Community Grid with 3D Isometric Previews -->
+          <div v-else class="grid grid-cols-2 lg:grid-cols-3 gap-4.5">
+            <div
+              v-for="skin in communitySkins"
+              :key="skin.id"
+              class="relative z-card p-3.5 flex flex-col justify-between cursor-pointer transition-all duration-200 group border-slate-800/80 bg-[#0e1722]/80 hover:border-cyan-500/60 hover:bg-[#121d2b] rounded-2xl min-h-[220px]"
+              :class="{
+                'border-cyan-400 ring-1 ring-cyan-400/60 shadow-[0_0_20px_rgba(71,210,201,0.25)] bg-[#111c29]': isSelected(skin)
+              }"
+              @click="selectCommunitySkin(skin)"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[9px] font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-500/40 rounded px-2 py-0.5">
+                  Community
+                </span>
+                <span class="text-[9px] font-mono text-slate-400 uppercase px-2 py-0.5 bg-slate-900 rounded border border-slate-800">
+                  {{ skin.variant || 'classic' }}
+                </span>
+              </div>
+
+              <!-- 3D Isometric Character Render Box -->
+              <div class="bg-[#070b10] rounded-xl p-2 mb-2.5 border border-slate-800/80 flex items-center justify-center min-h-[135px]">
+                <img
+                  :src="skin.renderUrl || skin.textureUrl"
+                  class="h-32 object-contain drop-shadow-[0_4px_14px_rgba(0,0,0,0.65)]"
+                  alt=""
+                />
+              </div>
+
+              <!-- Skin Details & Select -->
+              <div class="flex items-center justify-between gap-1.5">
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-bold text-white truncate" :title="skin.name">{{ skin.name }}</div>
+                </div>
+                <button
+                  class="z-btn-ghost text-[10px] px-2.5 py-1 rounded-xl font-bold shrink-0 hover:text-cyan-300"
+                  @click.stop="selectCommunitySkin(skin)"
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -243,7 +380,15 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import Player3DPreview from '../components/Player3DPreview.vue';
-import { api, createDefaultSteveDataUrl, getCachedActiveSkin, onSkinUpdated, pickFile, PNG_FILTER, skinFaceDataUrl } from '../lib/api';
+import {
+  api,
+  createDefaultSteveDataUrl,
+  getCachedActiveSkin,
+  onSkinUpdated,
+  pickFile,
+  PNG_FILTER,
+  renderSkinIsometric3D,
+} from '../lib/api';
 
 const props = defineProps({
   session: { type: Object, default: null },
@@ -256,21 +401,30 @@ const skins = ref([]);
 const statusText = ref('');
 const variant = ref(initialSkin?.variant || 'classic');
 const selectedSkinId = ref(initialSkin ? 'active_skin' : null);
+const selectedSkin = ref(null);
 const saving = ref(false);
-const syncingMojang = ref(false);
+const activeTab = ref('saved'); // 'saved' | 'library'
 
+// Username cloning
+const cloneUsername = ref('');
+const cloning = ref(false);
+
+// Community Library API with cursor-based pagination
+const communitySkins = ref([]);
+const cursorStack = ref([null]); // stack of cursor tokens for previous/next navigation
+const currentPageIndex = ref(0);
+const nextCursor = ref(null);
+const communityLoading = ref(false);
+
+// Inline rename
 const editingSkinId = ref(null);
 const editingName = ref('');
 
 let unlistenSkin = null;
 
-const selectedSkin = computed(() => {
-  return skins.value.find((s) => s.id === selectedSkinId.value) || null;
-});
-
 const canDelete = computed(() => {
   if (!selectedSkin.value) return false;
-  return !selectedSkin.value.isActive && selectedSkin.value.filename;
+  return !selectedSkin.value.isActive && !selectedSkin.value.isLibrary && selectedSkin.value.filename;
 });
 
 function isSelected(skin) {
@@ -295,13 +449,80 @@ watch(
   }
 );
 
+function onSelectLibraryTab() {
+  activeTab.value = 'library';
+  if (communitySkins.value.length === 0 && !communityLoading.value) {
+    cursorStack.value = [null];
+    currentPageIndex.value = 0;
+    loadCommunitySkins(null);
+  }
+}
+
+function reloadCurrentCommunityPage() {
+  const currentCursor = cursorStack.value[currentPageIndex.value] || null;
+  loadCommunitySkins(currentCursor);
+}
+
+function onNextPage() {
+  if (!nextCursor.value || communityLoading.value) return;
+  currentPageIndex.value++;
+  cursorStack.value[currentPageIndex.value] = nextCursor.value;
+  loadCommunitySkins(nextCursor.value);
+}
+
+function onPrevPage() {
+  if (currentPageIndex.value <= 0 || communityLoading.value) return;
+  currentPageIndex.value--;
+  const prevCursor = cursorStack.value[currentPageIndex.value] || null;
+  loadCommunitySkins(prevCursor);
+}
+
+async function loadCommunitySkins(afterCursor = null) {
+  communityLoading.value = true;
+  try {
+    const res = await api.fetchCommunitySkins(afterCursor);
+    if (res && Array.isArray(res.skins)) {
+      nextCursor.value = res.nextAfter || null;
+      // Pre-compute 3D isometric character body renders for all cards
+      const enriched = await Promise.all(
+        res.skins.map(async (s) => {
+          let render = null;
+          try {
+            render = await renderSkinIsometric3D(s.textureUrl, s.variant || 'classic');
+          } catch {
+            render = s.textureUrl;
+          }
+          return {
+            ...s,
+            renderUrl: render,
+            isLibrary: true,
+          };
+        })
+      );
+      communitySkins.value = enriched;
+    }
+  } catch (err) {
+    console.error('Failed to load community skins:', err);
+    statusText.value = `Failed to load community skins: ${err}`;
+  } finally {
+    communityLoading.value = false;
+  }
+}
+
 async function refreshGallery() {
   try {
     const rawList = [];
     const seenDataUrls = new Set();
 
-    // 1. Fetch current active skin
-    const active = await api.getActiveSkin();
+    // 1. Fetch current active skin (auto-pull from Mojang if logged in and not yet cached)
+    let active = await api.getActiveSkin();
+    if ((!active || !active.dataUrl) && props.session?.uuid) {
+      try {
+        active = await api.fetchMojangSkinActive(props.session.uuid);
+      } catch (e) {
+        console.warn('Failed to auto-pull Mojang skin:', e);
+      }
+    }
     let hasActive = false;
     if (active && active.dataUrl) {
       hasActive = true;
@@ -341,92 +562,121 @@ async function refreshGallery() {
       });
     }
 
-    // If no custom skin exists at all, provide the default Zircon Steve preset
-    if (rawList.length === 0) {
-      const defaultDataUrl = createDefaultSteveDataUrl();
+    // Always include Zircon-Steve as a built-in default character option
+    const defaultDataUrl = createDefaultSteveDataUrl();
+    if (!seenDataUrls.has(defaultDataUrl)) {
       rawList.push({
         id: 'default_steve',
-        label: 'Zircon Steve.png',
+        label: 'Zircon-Steve.png',
         filename: null,
         dataUrl: defaultDataUrl,
         variant: 'classic',
-        isActive: true,
+        isActive: rawList.length === 0,
+        isPreset: true,
       });
     }
 
-    // Pre-render 2D front face thumbnails
+    // Pre-render 3D isometric character body renders for each skin card
     const enriched = await Promise.all(
       rawList.map(async (skin) => {
-        let face = null;
+        let render = null;
         try {
-          face = await skinFaceDataUrl(skin.dataUrl);
+          render = await renderSkinIsometric3D(skin.dataUrl, skin.variant || 'classic');
         } catch {
-          face = null;
+          render = skin.dataUrl;
         }
-        return {
-          ...skin,
-          faceUrl: face || skin.dataUrl,
-        };
+        return { ...skin, renderUrl: render };
       })
     );
 
     skins.value = enriched;
 
-    // Pick selected skin
-    const currentActive = enriched.find((s) => s.isActive);
-    if (currentActive && (!selectedSkinId.value || selectedSkinId.value === 'active_skin')) {
-      selectSkin(currentActive);
-    } else if (enriched.length && !selectedSkin.value) {
-      selectSkin(enriched[0]);
+    // Maintain selection or default to active
+    if (!selectedSkinId.value || !skins.value.some((s) => s.id === selectedSkinId.value)) {
+      const activeItem = skins.value.find((s) => s.isActive) || skins.value[0];
+      if (activeItem) {
+        selectSkin(activeItem);
+      }
     }
   } catch (err) {
-    console.warn('Failed to load skins gallery:', err);
+    console.error('Failed to refresh skins gallery:', err);
+    statusText.value = `Error loading skins: ${err}`;
   }
 }
 
 function selectSkin(skin) {
   selectedSkinId.value = skin.id;
+  selectedSkin.value = skin;
   previewUrl.value = skin.dataUrl;
   variant.value = skin.variant || 'classic';
-  if (previewRef.value) {
-    previewRef.value.setVariant(variant.value);
-  }
   statusText.value = '';
 }
 
+async function selectCommunitySkin(skin) {
+  selectedSkinId.value = skin.id;
+  statusText.value = `Loading '${skin.name}' for preview…`;
+  try {
+    const fetched = await api.fetchSkinByUrl(skin.textureUrl, skin.name);
+    if (fetched && fetched.dataUrl) {
+      const item = {
+        id: skin.id,
+        label: `${skin.name}.png`,
+        dataUrl: fetched.dataUrl,
+        variant: skin.variant || 'classic',
+        isLibrary: true,
+      };
+      selectedSkin.value = item;
+      previewUrl.value = fetched.dataUrl;
+      variant.value = skin.variant || 'classic';
+      statusText.value = `Selected '${skin.name}'. Click 'Apply & Sync' or 'Save to My Skins'.`;
+    }
+  } catch (err) {
+    console.error('Failed to fetch community skin for preview:', err);
+    statusText.value = `Failed to preview skin: ${err}`;
+  }
+}
+
 async function onVariantChange() {
-  if (previewRef.value) {
-    previewRef.value.setVariant(variant.value);
+  if (selectedSkin.value) {
+    selectedSkin.value.variant = variant.value;
   }
   if (selectedSkin.value?.isActive) {
     try {
       await api.setActiveSkinVariant(variant.value);
-      statusText.value = `Model set to ${variant.value === 'slim' ? 'Slim (Alex)' : 'Classic (Steve)'}.`;
+      statusText.value = `Model variant updated to ${variant.value}`;
     } catch (err) {
-      console.warn('Failed to update skin variant:', err);
+      console.error('Failed to update variant:', err);
     }
   }
 }
 
 async function saveAction() {
-  if (!previewUrl.value || !selectedSkin.value) return;
+  if (!previewUrl.value) return;
   saving.value = true;
-  const isOnline = !!props.session?.username;
-  statusText.value = isOnline ? 'Applying skin & syncing to Minecraft…' : 'Applying skin…';
+  statusText.value = 'Applying skin…';
   try {
-    if (selectedSkin.value.filename) {
+    const isMojangUser = !!props.session?.username;
+
+    if (selectedSkin.value?.isLibrary || selectedSkin.value?.isPreset) {
+      // Save preset/library/cloned skin to history & active
+      const bytes = dataUrlToBytes(previewUrl.value);
+      await api.saveSkinBytes(selectedSkin.value.label || 'zircon_steve.png', bytes, variant.value);
+    } else if (selectedSkin.value?.filename && !selectedSkin.value.isActive) {
+      // Activate history skin
       await api.activateHistorySkin(selectedSkin.value.filename, variant.value);
-    } else {
+    } else if (selectedSkin.value?.isActive) {
       await api.setActiveSkinVariant(variant.value);
     }
 
-    if (isOnline) {
+    // Sync to Mojang if logged in
+    if (isMojangUser) {
+      statusText.value = 'Syncing skin to Mojang account…';
       try {
         await api.uploadSkinToMojang(variant.value);
-        statusText.value = 'Skin applied & synced to your Minecraft account!';
+        statusText.value = 'Skin successfully applied & synced to Minecraft!';
       } catch (uploadErr) {
-        console.warn('Skin applied locally but Mojang upload failed:', uploadErr);
-        statusText.value = `Skin applied locally, but Minecraft sync failed: ${uploadErr}`;
+        console.warn('Mojang skin upload failed:', uploadErr);
+        statusText.value = `Applied locally (Mojang sync notice: ${uploadErr})`;
       }
     } else {
       statusText.value = 'Skin applied locally (sign in to sync to Minecraft)';
@@ -440,19 +690,50 @@ async function saveAction() {
   }
 }
 
-async function syncMojangSkin() {
-  if (!props.session?.uuid) return;
-  syncingMojang.value = true;
-  statusText.value = 'Downloading skin from Mojang…';
+async function saveLibrarySkinToGallery() {
+  if (!previewUrl.value || !selectedSkin.value) return;
   try {
-    await api.fetchMojangSkin(props.session.uuid);
-    statusText.value = 'Downloaded skin from Mojang!';
+    statusText.value = 'Saving to your skin gallery…';
+    const bytes = dataUrlToBytes(previewUrl.value);
+    const skinName = selectedSkin.value.label || 'custom_skin.png';
+    await api.saveSkinBytes(skinName, bytes, variant.value);
+    statusText.value = `Saved '${skinName}' to your skin gallery!`;
     await refreshGallery();
+    activeTab.value = 'saved';
   } catch (err) {
-    console.error('Failed to sync skin from Mojang:', err);
-    statusText.value = `Sync failed: ${err}`;
+    console.error('Failed to save library skin:', err);
+    statusText.value = `Error saving skin: ${err}`;
+  }
+}
+
+async function cloneSkinByUsername() {
+  const username = cloneUsername.value.trim();
+  if (!username) return;
+  cloning.value = true;
+  statusText.value = `Fetching skin for '${username}'…`;
+  try {
+    const skin = await api.fetchSkinByUsername(username);
+    if (skin && skin.dataUrl) {
+      const render = await renderSkinIsometric3D(skin.dataUrl, skin.variant || 'classic');
+      const clonedItem = {
+        id: `cloned_${username}_${Date.now()}`,
+        label: `${username}.png`,
+        dataUrl: skin.dataUrl,
+        renderUrl: render || skin.dataUrl,
+        variant: skin.variant || 'classic',
+        isLibrary: true,
+      };
+      selectedSkinId.value = clonedItem.id;
+      selectedSkin.value = clonedItem;
+      previewUrl.value = skin.dataUrl;
+      variant.value = skin.variant || 'classic';
+      statusText.value = `Cloned skin for '${username}'! Click 'Apply & Sync' or 'Save to My Skins'.`;
+    }
+  } catch (err) {
+    console.error('Failed to clone skin:', err);
+    statusText.value = `Could not find skin for '${username}' (${err})`;
   } finally {
-    syncingMojang.value = false;
+    cloning.value = false;
   }
 }
 
@@ -511,7 +792,7 @@ async function deleteAction() {
 }
 
 async function deleteSingleSkin(skin) {
-  if (!skin.filename || skin.isActive) return;
+  if (!skin.filename || skin.isActive || skin.isLibrary) return;
   try {
     await api.deleteHistorySkin(skin.filename);
     selectedSkinId.value = null;
@@ -522,6 +803,16 @@ async function deleteSingleSkin(skin) {
     statusText.value = `Error deleting skin: ${err}`;
   }
 }
+
+function dataUrlToBytes(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return Array.from(bytes);
+}
 </script>
 
 <style scoped>
@@ -529,4 +820,3 @@ async function deleteSingleSkin(skin) {
   image-rendering: pixelated;
 }
 </style>
-

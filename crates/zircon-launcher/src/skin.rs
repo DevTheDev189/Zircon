@@ -578,6 +578,89 @@ impl MojangSkinService {
         Ok(DownloadedSkin { png, variant })
     }
 
+    /// Looks up a Minecraft username to resolve its UUID, then downloads the player's current skin.
+    /// Uses official Mojang API with automatic high-availability Crafthead edge fallback.
+    pub async fn download_by_username(&self, username: &str) -> Result<DownloadedSkin, LauncherError> {
+        let clean_name = username.trim();
+        if clean_name.is_empty() {
+            return Err(LauncherError::InvalidInput("Username cannot be empty".to_string()));
+        }
+
+        // 1. Try official Mojang API
+        let url = format!("https://api.mojang.com/users/profiles/minecraft/{clean_name}");
+        if let Ok(response) = self.http.get(&url).send().await {
+            let status = response.status().as_u16();
+            if status == 200 {
+                if let Ok(profile) = response.json::<serde_json::Value>().await {
+                    if let Some(uuid) = profile.get("id").and_then(|id| id.as_str()) {
+                        if let Ok(skin) = self.download(uuid).await {
+                            return Ok(skin);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. High-availability fallback via Crafthead edge CDN
+        let crafthead_url = format!("https://crafthead.net/skin/{clean_name}");
+        if let Ok(resp) = self.http.get(&crafthead_url).send().await {
+            if resp.status().as_u16() == 200 {
+                if let Ok(bytes) = resp.bytes().await {
+                    let png = bytes.to_vec();
+                    if png.len() > 100 {
+                        let mut variant = "classic".to_string();
+                        let profile_url = format!("https://crafthead.net/profile/{clean_name}");
+                        if let Ok(prof_resp) = self.http.get(&profile_url).send().await {
+                            if let Ok(prof_json) = prof_resp.json::<serde_json::Value>().await {
+                                if let Some(v) = prof_json.get("skin_model").and_then(|m| m.as_str()) {
+                                    variant = v.to_string();
+                                }
+                            }
+                        }
+                        return Ok(DownloadedSkin { png, variant });
+                    }
+                }
+            }
+        }
+
+        Err(LauncherError::NotFound(format!("Player '{clean_name}' not found")))
+    }
+
+    /// Downloads any public Minecraft skin PNG by URL (e.g. textures.minecraft.net or crafthead)
+    pub async fn download_skin_url(&self, url: &str) -> Result<DownloadedSkin, LauncherError> {
+        let clean_url = url.trim().replace("http://", "https://");
+        let response = self.http.get(&clean_url).send().await?;
+        let status = response.status().as_u16();
+        if status != 200 {
+            return Err(LauncherError::Http { status, url: clean_url });
+        }
+        let png = response.bytes().await?.to_vec();
+        Ok(DownloadedSkin {
+            png,
+            variant: "classic".to_string(),
+        })
+    }
+
+    /// Queries the MineSkin V2 public gallery with optional cursor token for pagination.
+    pub async fn fetch_mineskin_v2_gallery(&self, after: Option<&str>) -> Result<serde_json::Value, LauncherError> {
+        let url = if let Some(cursor) = after {
+            if !cursor.trim().is_empty() {
+                format!("https://api.mineskin.org/v2/skins?size=16&after={}", cursor.trim())
+            } else {
+                "https://api.mineskin.org/v2/skins?size=16".to_string()
+            }
+        } else {
+            "https://api.mineskin.org/v2/skins?size=16".to_string()
+        };
+        let response = self.http.get(&url).send().await?;
+        let status = response.status().as_u16();
+        if status != 200 {
+            return Err(LauncherError::Http { status, url });
+        }
+        let json: serde_json::Value = response.json().await?;
+        Ok(json)
+    }
+
     /// Uploads a local PNG as the player's new Minecraft skin via
     /// `multipart/form-data` (fields `variant` + `file`).
     pub async fn upload(

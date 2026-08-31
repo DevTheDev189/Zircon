@@ -229,6 +229,7 @@ impl TcpMultiplexer {
                 };
                 match accepted {
                     Ok((socket, _)) => {
+                        let _ = socket.set_nodelay(true);
                         // Socket-exhaustion defense: cap concurrently accepted
                         // connections per source IP and globally so a flood
                         // cannot exhaust file descriptors (EMFILE) or crowd out
@@ -482,6 +483,13 @@ impl TcpMultiplexer {
                 )
             })?;
         let mut client = client;
+
+        // Disable Nagle's algorithm on both legs of the proxy so small game packets
+        // (movement, combat, clicks, position updates) are sent immediately with
+        // sub-millisecond latency and zero packet-coalescing delays.
+        let _ = client.set_nodelay(true);
+        let _ = backend.set_nodelay(true);
+
         let mut to_write = initial;
         if port == self.web_port {
             if let Ok(peer) = client.peer_addr() {

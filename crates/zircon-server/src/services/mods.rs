@@ -22,6 +22,7 @@ use crate::instance::ModSyncSummary;
 pub const ORIGIN_MODRINTH: &str = "modrinth";
 pub const ORIGIN_CURSEFORGE: &str = "curseforge";
 pub const ORIGIN_DIRECT: &str = "direct";
+pub const ORIGIN_SERVER_CUSTOM: &str = "server_custom";
 
 /// Errors raised by the mod management service.
 #[derive(Debug)]
@@ -229,6 +230,81 @@ impl ModManagementService {
         Ok(entry)
     }
 
+    /// Ingests an uploaded custom server-side JAR into the mods folder without adding it
+    /// to the BOM. Custom server mods run strictly on the server and are NEVER published
+    /// to the client-facing Bill of Materials (BOM) or distributed to client launchers.
+    pub async fn add_server_mod<R: tokio::io::AsyncRead + Unpin>(
+        &self,
+        mut content: R,
+        filename: &str,
+    ) -> Result<ModEntry, ModError> {
+        let safe_name = sanitize_filename(filename)?;
+        if !safe_name.to_ascii_lowercase().ends_with(".jar") {
+            return Err(ModError::Invalid("File must be a .jar archive".to_string()));
+        }
+        let target = self.mods_dir.join(&safe_name);
+        fs::create_dir_all(&self.mods_dir)?;
+
+        let mut out = tokio::fs::File::create(&target).await?;
+        tokio::io::copy(&mut content, &mut out).await?;
+        drop(out);
+
+        let size = match fs::metadata(&target) {
+            Ok(m) => m.len(),
+            Err(e) => {
+                let _ = fs::remove_file(&target);
+                return Err(ModError::Io(e));
+            }
+        };
+
+        let sha1 = match hash::sha1_file(&target).await {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = fs::remove_file(&target);
+                return Err(ModError::Io(e));
+            }
+        };
+
+        let murmur3_value = murmur3::curse_forge_fingerprint_of_file(&target).unwrap_or(0);
+
+        let mut entry = ModEntry::new(
+            Some(Uuid::new_v4().to_string()),
+            safe_name.clone(),
+            Some(sha1),
+            murmur3_value,
+            Some(ORIGIN_SERVER_CUSTOM.to_string()),
+            None,
+            size,
+        );
+        entry.side = zircon_core::model::ModSide::Server;
+
+        if let Ok(meta) = zircon_core::metadata::extractor::extract(&target) {
+            if !meta.name.is_empty() {
+                entry.title = Some(meta.name);
+            }
+            if !meta.description.is_empty() {
+                entry.description = Some(meta.description);
+            }
+            if !meta.author.is_empty() {
+                entry.author = Some(meta.author);
+            }
+            if !meta.version.is_empty() {
+                entry.version = Some(meta.version);
+            }
+        }
+        if entry.title.is_none() {
+            entry.title = Some(safe_name.strip_suffix(".jar").unwrap_or(&safe_name).to_string());
+        }
+
+        // NOTE: Strictly server-side: intentionally NOT added to self.bom_service.
+        tracing::info!(
+            "Added custom server-side mod {} ({} bytes, strictly server-only, excluded from BOM)",
+            safe_name,
+            size
+        );
+        Ok(entry)
+    }
+
     /// Downloads a file from a URL directly into the mods folder (mod CDN installs).
     pub async fn install_from_url(
         &self,
@@ -360,6 +436,9 @@ impl ModManagementService {
         let mut updated = None;
         self.bom_service.with_bom(|bom| {
             if let Some(entry) = bom.mods.iter_mut().find(|m| m.filename == safe_name) {
+                if entry.origin.as_deref() == Some(ORIGIN_SERVER_CUSTOM) && side != zircon_core::model::ModSide::Server {
+                    return;
+                }
                 entry.side = side;
                 updated = Some(entry.clone());
             }
@@ -369,6 +448,26 @@ impl ModManagementService {
             tracing::info!("Updated mod {} side to {:?}", safe_name, side);
             Ok(entry)
         } else {
+            // Check if it's a custom server-side mod on disk (not in BOM)
+            if let Some((_path, enabled)) = self.resolve_variant(&safe_name) {
+                if side != zircon_core::model::ModSide::Server {
+                    return Err(ModError::Invalid(
+                        "Custom server-side mods cannot be shared with clients as they are unverified".to_string()
+                    ));
+                }
+                let mut custom_entry = ModEntry::new(
+                    Some(format!("server-{}", safe_name)),
+                    safe_name.clone(),
+                    None,
+                    0,
+                    Some(ORIGIN_SERVER_CUSTOM.to_string()),
+                    None,
+                    0,
+                );
+                custom_entry.side = zircon_core::model::ModSide::Server;
+                custom_entry.enabled = enabled;
+                return Ok(custom_entry);
+            }
             Err(ModError::Invalid(format!("Mod not found: {filename}")))
         }
     }
@@ -815,7 +914,7 @@ impl ModManagementService {
         });
         self.bom_service.save()?;
 
-        // Clean up any orphaned mod files on disk in mods_dir that are not in the BOM
+        // Clean up any orphaned files on disk in mods_dir that are neither in the BOM nor valid custom server mods
         if let Ok(entries) = fs::read_dir(&self.mods_dir) {
             let valid_names: std::collections::HashSet<String> = self
                 .bom_service
@@ -830,8 +929,11 @@ impl ModManagementService {
                     let name = path.file_name().unwrap_or_default().to_string_lossy();
                     let base_name = name.strip_suffix(".disabled").unwrap_or(&name);
                     if base_name.ends_with(".jar") && !valid_names.contains(&base_name.to_ascii_lowercase()) {
-                        tracing::info!("Purging orphaned mod file on disk: {}", name);
-                        let _ = fs::remove_file(&path);
+                        // Keep valid JAR archives as custom server mods
+                        if zircon_core::metadata::extractor::extract(&path).is_err() {
+                            tracing::info!("Purging invalid/orphaned mod file on disk: {}", name);
+                            let _ = fs::remove_file(&path);
+                        }
                     }
                 }
             }
@@ -845,9 +947,74 @@ impl ModManagementService {
         Ok(summary)
     }
 
-    /// Lists every mod currently present in the BOM.
+    /// Discovers any custom server-side mod JARs on disk in `mods_dir` that are not listed in the BOM.
+    pub fn discover_custom_server_mods(&self, known_bom_mods: &[ModEntry]) -> Vec<ModEntry> {
+        let mut custom_mods = Vec::new();
+        if let Ok(entries) = fs::read_dir(&self.mods_dir) {
+            let bom_filenames: std::collections::HashSet<String> = known_bom_mods
+                .iter()
+                .map(|m| m.filename.to_ascii_lowercase())
+                .collect();
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+                    let (base_name, enabled) = if let Some(stripped) = file_name.strip_suffix(".disabled") {
+                        (stripped.to_string(), false)
+                    } else {
+                        (file_name.to_string(), true)
+                    };
+                    if base_name.to_ascii_lowercase().ends_with(".jar")
+                        && !bom_filenames.contains(&base_name.to_ascii_lowercase())
+                    {
+                        let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                        let mut custom_entry = ModEntry::new(
+                            Some(format!("server-{}", base_name)),
+                            base_name.clone(),
+                            None,
+                            0,
+                            Some(ORIGIN_SERVER_CUSTOM.to_string()),
+                            None,
+                            size,
+                        );
+                        custom_entry.side = zircon_core::model::ModSide::Server;
+                        custom_entry.enabled = enabled;
+                        if let Ok(meta) = zircon_core::metadata::extractor::extract(&path) {
+                            if !meta.name.is_empty() {
+                                custom_entry.title = Some(meta.name);
+                            }
+                            if !meta.description.is_empty() {
+                                custom_entry.description = Some(meta.description);
+                            }
+                            if !meta.author.is_empty() {
+                                custom_entry.author = Some(meta.author);
+                            }
+                            if !meta.version.is_empty() {
+                                custom_entry.version = Some(meta.version);
+                            }
+                        }
+                        if custom_entry.title.is_none() {
+                            custom_entry.title = Some(
+                                base_name
+                                    .strip_suffix(".jar")
+                                    .unwrap_or(&base_name)
+                                    .to_string(),
+                            );
+                        }
+                        custom_mods.push(custom_entry);
+                    }
+                }
+            }
+        }
+        custom_mods
+    }
+
+    /// Lists every mod currently installed (BOM mods + custom server-side mods).
     pub fn list_mods(&self) -> Vec<ModEntry> {
-        self.bom_service.get_bom().mods
+        let mut mods = self.bom_service.get_bom().mods;
+        let custom = self.discover_custom_server_mods(&mods);
+        mods.extend(custom);
+        mods
     }
 
     /// Lists mods, opportunistically backfilling provider metadata (icon,
@@ -872,46 +1039,51 @@ impl ModManagementService {
                 && m.icon_url.is_none()
                 && m.murmur3 > 0)
         });
-        if !needs_repair {
-            return mods;
-        }
+        let mut result = if !needs_repair {
+            mods
+        } else {
+            // Parallelize the repair work with bounded concurrency, then reorder
+            // back by the original index so callers see a stable list.
+            use futures_util::stream::{self, StreamExt};
+            let results: Vec<(usize, ModEntry, bool)> = stream::iter(mods.into_iter().enumerate())
+                .map(|(idx, mut entry)| {
+                    let this = self.clone();
+                    async move {
+                        let changed = if entry.origin.as_deref() == Some(ORIGIN_CURSEFORGE) {
+                            this.enrich_curseforge_metadata(&mut entry).await
+                        } else {
+                            this.repair_modrinth_metadata(&mut entry).await
+                        };
+                        (idx, entry, changed)
+                    }
+                })
+                .buffer_unordered(8)
+                .collect()
+                .await;
 
-        // Parallelize the repair work with bounded concurrency, then reorder
-        // back by the original index so callers see a stable list.
-        use futures_util::stream::{self, StreamExt};
-        let results: Vec<(usize, ModEntry, bool)> = stream::iter(mods.into_iter().enumerate())
-            .map(|(idx, mut entry)| {
-                let this = self.clone();
-                async move {
-                    let changed = if entry.origin.as_deref() == Some(ORIGIN_CURSEFORGE) {
-                        this.enrich_curseforge_metadata(&mut entry).await
-                    } else {
-                        this.repair_modrinth_metadata(&mut entry).await
-                    };
-                    (idx, entry, changed)
+            let mut updated = vec![ModEntry::default(); results.len()];
+            let mut changed = false;
+            for (idx, entry, entry_changed) in results {
+                if entry_changed {
+                    changed = true;
                 }
-            })
-            .buffer_unordered(8)
-            .collect()
-            .await;
-
-        let mut updated = vec![ModEntry::default(); results.len()];
-        let mut changed = false;
-        for (idx, entry, entry_changed) in results {
-            if entry_changed {
-                changed = true;
+                updated[idx] = entry;
             }
-            updated[idx] = entry;
-        }
 
-        if changed {
-            self.bom_service.with_bom(|bom| {
-                bom.mods = updated.clone();
-                bom.deduplicate_mods();
-            });
-            let _ = self.bom_service.save();
-        }
-        updated
+            if changed {
+                self.bom_service.with_bom(|bom| {
+                    bom.mods = updated.clone();
+                    bom.deduplicate_mods();
+                });
+                let _ = self.bom_service.save();
+            }
+            updated
+        };
+
+        // Attach custom server-side mods
+        let custom = self.discover_custom_server_mods(&result);
+        result.extend(custom);
+        result
     }
 
     /// Replaces the BOM entry for `entry.filename` with this entry and

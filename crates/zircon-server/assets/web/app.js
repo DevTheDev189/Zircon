@@ -81,6 +81,12 @@ createApp({
                 countdownInterval: null
             },
             isDraggingMod: false,
+            isDraggingServerMod: false,
+            serverModUpload: {
+                uploading: false,
+                successMessage: '',
+                error: ''
+            },
             installedMods: [],
             // True while the Installed Mods list is being fetched so the tab can
             // show a spinner instead of a jarring empty/offline flash.

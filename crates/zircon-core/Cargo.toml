@@ -1,6 +1,6 @@
 [package]
 name = "zircon-core"
-version = "0.3.7"
+version = "0.3.8"
 edition = "2021"
 description = "Shared domain for Zircon: models, hashes, archives, mod metadata, provider API clients"
 license = "MIT"
@@ -20,7 +20,7 @@ reqwest.workspace = true
 url.workspace = true
 uuid.workspace = true
 tracing.workspace = true
-tokio = { workspace = true, features = ["fs", "io-util"] }
+tokio = { workspace = true, features = ["fs", "io-util", "sync"] }
 # Ed25519 for BOM attestation: the server signs the canonical BOM digest on
 # every save; the launcher pins the server public key (TOFU) and verifies.
 ed25519-dalek = { version = "2.1", default-features = false, features = ["std", "rand_core"] }

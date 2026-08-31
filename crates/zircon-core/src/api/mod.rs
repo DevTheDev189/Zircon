@@ -2,6 +2,7 @@
 
 pub mod curseforge;
 pub mod modrinth;
+pub mod versions;
 
 use std::fmt;
 

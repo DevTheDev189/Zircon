@@ -1,7 +1,7 @@
 <template>
   <div class="relative h-full flex flex-col bg-[#070b0f] text-text">
-    <!-- Microsoft login overlay (z-above everything) -->
-    <LoginOverlay :visible="!session" @logged-in="onLoggedIn" />
+    <!-- Microsoft login overlay (z-above everything) only visible if auth check is complete and no session exists -->
+    <LoginOverlay :visible="!authChecking && !session" @logged-in="onLoggedIn" />
     <LaunchOverlay
       :visible="launchOverlayVisible"
       :status="statusText"
@@ -161,6 +161,7 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import LoginOverlay from './components/LoginOverlay.vue';
 import LaunchOverlay from './components/LaunchOverlay.vue';
 import StatusBar from './components/StatusBar.vue';
@@ -223,6 +224,7 @@ const navItems = [
 
 const view = ref('servers');
 const session = ref(null);
+const authChecking = ref(true);
 const avatarUrl = ref('');
 const statusText = ref('');
 const progress = ref(null);
@@ -239,12 +241,26 @@ const launchingServer = ref(null);
 let unlisten = [];
 
 onMounted(async () => {
-  // Auth restore (silent refresh when expired).
+  // Auth restore (silent refresh when expired) before showing login overlay or opening window.
   try {
     session.value = await api.getCachedSession();
-  } catch {
+  } catch (err) {
+    console.warn('Failed to restore cached session:', err);
     session.value = null;
+  } finally {
+    authChecking.value = false;
   }
+
+  // Reveal window once auth check has settled so login overlay doesn't flash preemptively
+  try {
+    const win = getCurrentWindow();
+    await win.show();
+    await win.setFocus();
+  } catch (err) {
+    console.warn('Native window.show() failed, falling back to backend command:', err);
+    await api.showMainWindow().catch(() => {});
+  }
+
   api.getActiveSkin().catch(() => {});
   refreshAvatar();
   refreshMojangSkin();

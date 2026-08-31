@@ -113,8 +113,15 @@ pub async fn upload_mod(
             "No file uploaded (form field 'file')".to_string(),
         ));
     };
+    let mods = resolve_mods(&state, &headers);
+    if params.server_only == Some(true)
+        || params.origin.as_deref() == Some(crate::services::mods::ORIGIN_SERVER_CUSTOM)
+    {
+        let entry = mods.add_server_mod(std::io::Cursor::new(bytes), &filename).await?;
+        return Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))));
+    }
     let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
-    let entry = resolve_mods(&state, &headers)
+    let entry = mods
         .add_mod_with_metadata(
             std::io::Cursor::new(bytes),
             &filename,
@@ -125,6 +132,23 @@ pub async fn upload_mod(
             params.expected_file_id.as_deref(),
             params.project_url.as_deref(),
         )
+        .await?;
+    Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
+}
+
+/// POST /api/mods/upload-server (multipart, field "file") — add a custom server-side JAR strictly excluded from BOM.
+pub async fn upload_server_mod(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let Some((filename, bytes)) = take_upload(&mut multipart).await? else {
+        return Err(ApiError::BadRequest(
+            "No file uploaded (form field 'file')".to_string(),
+        ));
+    };
+    let entry = resolve_mods(&state, &headers)
+        .add_server_mod(std::io::Cursor::new(bytes), &filename)
         .await?;
     Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
 }
@@ -185,6 +209,7 @@ pub struct OriginParam {
     pub title: Option<String>,
     pub mod_id: Option<String>,
     pub project_url: Option<String>,
+    pub server_only: Option<bool>,
 }
 
 /// GET /api/mods/search?query=&mcVersion=&loader=&origin= — search Modrinth/CurseForge.

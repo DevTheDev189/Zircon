@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Mutex as StdMutex;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::process::Child;
 use tokio::sync::Mutex as AsyncMutex;
 
+use zircon_core::api::curseforge::CurseForgeApiClient;
 use zircon_core::api::modrinth::{ModrinthApiClient, ModrinthSearchHit};
 use zircon_core::crypto::signing;
 use zircon_core::model::{BillOfMaterials, ModLoaderInfo, ModLoaderType};
@@ -69,8 +70,10 @@ pub struct LauncherState {
     pub sync_engine: ModSyncEngine,
     pub pack_sync: PackSyncEngine,
     pub modrinth: ModrinthApiClient,
+    pub curse_forge: CurseForgeApiClient,
     pub mojang_skin: MojangSkinService,
     pub offline: OfflineInstanceManager,
+    pub versions: Arc<zircon_core::api::versions::VersionService>,
     /// Plain client for BOM fetches, join-intent registration and downloads.
     pub http: reqwest::Client,
     pub running_game: AsyncMutex<Option<RunningGame>>,
@@ -99,15 +102,22 @@ impl LauncherState {
             .redirect(reqwest::redirect::Policy::limited(10))
             .build()
             .expect("failed to build launcher HTTP client");
+        let auth = MicrosoftAuthService::new();
+        let initial_session = auth.load_cached().filter(|s| !s.is_expired());
+        let curse_forge_key = std::env::var("CURSEFORGE_API_KEY")
+            .or_else(|_| std::env::var("MC_MANAGER_CURSEFORGE_API_KEY"))
+            .unwrap_or_default();
         Self {
-            auth: MicrosoftAuthService::new(),
-            session: AsyncMutex::new(None),
+            auth,
+            session: AsyncMutex::new(initial_session),
             classpath: MinecraftClasspathBuilder::new_default(),
             sync_engine: ModSyncEngine::new(),
             pack_sync: PackSyncEngine::new(),
             modrinth: ModrinthApiClient::new(),
+            curse_forge: CurseForgeApiClient::new(curse_forge_key),
             mojang_skin: MojangSkinService::new(),
             offline: OfflineInstanceManager::new_default(),
+            versions: Arc::new(zircon_core::api::versions::VersionService::new()),
             http,
             running_game: AsyncMutex::new(None),
             launch_cancelled: AtomicBool::new(false),
@@ -1684,11 +1694,12 @@ pub fn create_offline_instance(
     name: String,
     mc_version: String,
     loader_type: String,
-    loader_version: String,
+    loader_version: Option<String>,
 ) -> Result<OfflineInstance, String> {
+    let loader_ver = loader_version.as_deref().unwrap_or("");
     state
         .offline
-        .create(&name, &mc_version, &loader_type, &loader_version)
+        .create(&name, &mc_version, &loader_type, loader_ver)
         .map_err(err_string)
 }
 
@@ -2228,6 +2239,160 @@ pub async fn fetch_mojang_skin_preview(
     })
 }
 
+/// Downloads a player's current skin by Minecraft username for preview or cloning.
+/// Does not mutate the active skin or history.
+#[tauri::command]
+pub async fn fetch_skin_by_username(
+    state: State<'_, LauncherState>,
+    username: String,
+) -> Result<SkinImage, String> {
+    let downloaded = state
+        .mojang_skin
+        .download_by_username(&username)
+        .await
+        .map_err(err_string)?;
+    Ok(SkinImage {
+        name: format!("{username}.png"),
+        data_url: SkinManager::png_data_url(&downloaded.png),
+        variant: downloaded.variant,
+    })
+}
+
+/// Saves raw PNG bytes as a new skin, setting it as active and recording to history.
+#[tauri::command]
+pub fn save_skin_bytes(
+    app: AppHandle,
+    name: String,
+    bytes: Vec<u8>,
+    variant: Option<String>,
+) -> Result<SkinImage, String> {
+    let variant = variant.unwrap_or_else(|| "classic".to_string());
+    let safe_name = if name.trim().is_empty() {
+        "skin.png".to_string()
+    } else {
+        name
+    };
+    SkinManager::set_active_png_with_name(&bytes, &variant, Some(&safe_name), true)
+        .map_err(err_string)?;
+    emit_skin_updated(&app);
+    Ok(SkinImage {
+        name: safe_name,
+        data_url: SkinManager::png_data_url(&bytes),
+        variant,
+    })
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GallerySkinItem {
+    pub id: String,
+    pub name: String,
+    pub texture_url: String,
+    pub variant: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryResponse {
+    pub current_after: Option<String>,
+    pub next_after: Option<String>,
+    pub skins: Vec<GallerySkinItem>,
+}
+
+/// Queries community skins from the public MineSkin V2 gallery.
+#[tauri::command]
+pub async fn fetch_community_skins(
+    state: State<'_, LauncherState>,
+    after: Option<String>,
+) -> Result<GalleryResponse, String> {
+    let gallery_data = state
+        .mojang_skin
+        .fetch_mineskin_v2_gallery(after.as_deref())
+        .await
+        .map_err(err_string)?;
+
+    let mut skins = Vec::new();
+    if let Some(list) = gallery_data.get("skins").and_then(|s| s.as_array()) {
+        for s in list {
+            let id = s
+                .get("uuid")
+                .and_then(|u| u.as_str())
+                .or_else(|| s.get("shortId").and_then(|s| s.as_str()))
+                .unwrap_or_default()
+                .to_string();
+            let texture_hash = s.get("texture").and_then(|t| t.as_str()).unwrap_or_default();
+            if !texture_hash.is_empty() {
+                let url = format!("https://textures.minecraft.net/texture/{texture_hash}");
+                let name = s
+                    .get("name")
+                    .and_then(|n| n.as_str())
+                    .filter(|n| !n.trim().is_empty())
+                    .map(|n| n.to_string())
+                    .unwrap_or_else(|| {
+                        if let Some(short_id) = s.get("shortId").and_then(|s| s.as_str()).filter(|s| !s.is_empty()) {
+                            format!("Skin #{short_id}")
+                        } else if id.len() >= 6 {
+                            format!("Skin #{}", &id[..6])
+                        } else {
+                            "Community Skin".to_string()
+                        }
+                    });
+                let variant = s
+                    .get("model")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("classic")
+                    .to_string();
+                skins.push(GallerySkinItem {
+                    id,
+                    name,
+                    texture_url: url,
+                    variant,
+                });
+            }
+        }
+    }
+
+    let next_after = gallery_data
+        .get("pagination")
+        .and_then(|p| p.get("next"))
+        .and_then(|n| n.get("after"))
+        .and_then(|a| a.as_str())
+        .map(|s| s.to_string());
+
+    let current_after = gallery_data
+        .get("pagination")
+        .and_then(|p| p.get("current"))
+        .and_then(|c| c.get("after"))
+        .and_then(|a| a.as_str())
+        .map(|s| s.to_string());
+
+    Ok(GalleryResponse {
+        current_after,
+        next_after,
+        skins,
+    })
+}
+
+/// Downloads any public skin URL and converts it to a base64 DataURL for preview.
+#[tauri::command]
+pub async fn fetch_skin_by_url(
+    state: State<'_, LauncherState>,
+    url: String,
+    name: Option<String>,
+) -> Result<SkinImage, String> {
+    let downloaded = state
+        .mojang_skin
+        .download_skin_url(&url)
+        .await
+        .map_err(err_string)?;
+    let skin_name = name.unwrap_or_else(|| "community_skin.png".to_string());
+    Ok(SkinImage {
+        name: skin_name,
+        data_url: SkinManager::png_data_url(&downloaded.png),
+        variant: downloaded.variant,
+    })
+}
+
 /// Uploads the active skin to Mojang using the signed-in Minecraft session.
 /// `variant` is `classic` (default) or `slim`.
 #[tauri::command]
@@ -2545,12 +2710,443 @@ pub fn toggle_resourcepack(game_dir: String, filename: String) -> Result<bool, S
     Ok(true)
 }
 
+/// Sets the active ordered list of resourcepacks in the instance.
+#[tauri::command]
+pub fn set_active_resourcepacks(
+    game_dir: String,
+    filenames: Vec<String>,
+) -> Result<(), String> {
+    let dir = PathBuf::from(&game_dir);
+    let mut selection = PackSelection::load(&dir);
+    selection.active_resourcepacks = filenames;
+    selection.save(&dir);
+    Ok(())
+}
+
+/// Imports a local pack archive into the instance (`shader` -> `shaderpacks`, `resource` -> `resourcepacks`).
+#[tauri::command]
+pub fn import_instance_pack(
+    game_dir: String,
+    kind: String,
+    source_path: String,
+) -> Result<String, String> {
+    add_local_pack(game_dir, source_path, kind)
+}
+
+/// Imports raw bytes for a pack archive (.zip) into shaderpacks or resourcepacks with zero validation barrier.
+#[tauri::command]
+pub async fn import_instance_pack_bytes(
+    game_dir: String,
+    kind: String,
+    filename: String,
+    bytes: Vec<u8>,
+) -> Result<String, String> {
+    let safe_filename = Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid filename".to_string())?;
+    let dir = PathBuf::from(&game_dir);
+    let target_dir = match kind.as_str() {
+        "shader" | "shaderpack" => dir.join("shaderpacks"),
+        "resource" | "resourcepack" => dir.join("resourcepacks"),
+        _ => return Err(format!("Unknown pack kind: {kind}")),
+    };
+    tokio::fs::create_dir_all(&target_dir)
+        .await
+        .map_err(|e| e.to_string())?;
+    let dest = target_dir.join(safe_filename);
+    tokio::fs::write(&dest, bytes)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(safe_filename.to_string())
+}
+
+/// Imports a local mod file into an offline instance's `mods/` directory.
+#[tauri::command]
+pub fn import_offline_mod_file(
+    state: State<'_, LauncherState>,
+    id: String,
+    source_path: String,
+) -> Result<String, String> {
+    let Some(instance) = state.offline.load(&id) else {
+        return Err("Instance not found".to_string());
+    };
+    let src = Path::new(&source_path);
+    if !src.is_file() {
+        return Err("Source file not found".to_string());
+    }
+    let filename = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid filename".to_string())?;
+    let mods_dir = state.offline.mods_dir(&instance);
+    std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+    let dest = mods_dir.join(filename);
+    std::fs::copy(src, dest).map_err(|e| e.to_string())?;
+    Ok(filename.to_string())
+}
+
+/// Imports raw bytes for a mod file (.jar) into an offline instance's `mods/` directory.
+#[tauri::command]
+pub async fn import_offline_mod_bytes(
+    state: State<'_, LauncherState>,
+    id: String,
+    filename: String,
+    bytes: Vec<u8>,
+) -> Result<String, String> {
+    let Some(instance) = state.offline.load(&id) else {
+        return Err("Instance not found".to_string());
+    };
+    let safe_filename = Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid filename".to_string())?;
+    let mods_dir = state.offline.mods_dir(&instance);
+    tokio::fs::create_dir_all(&mods_dir)
+        .await
+        .map_err(|e| e.to_string())?;
+    let dest = mods_dir.join(safe_filename);
+    tokio::fs::write(&dest, bytes)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(safe_filename.to_string())
+}
+
 // ---------------------------------------------------------------------------
-// Modrinth
+// Mod & Pack Discovery (Modrinth & CurseForge)
 // ---------------------------------------------------------------------------
 
+/// Unified search hit structure returned to the Vue UI for both Modrinth and CurseForge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnifiedSearchHit {
+    pub id: String,
+    pub project_id: String,
+    pub title: String,
+    pub name: String,
+    pub slug: String,
+    pub description: String,
+    pub summary: String,
+    pub author: String,
+    pub icon_url: Option<String>,
+    pub downloads: u64,
+    pub download_count: u64,
+    pub project_url: String,
+    pub website_url: String,
+    pub origin: String,
+}
+
+/// Unified version option structure for the version dropdown picker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnifiedVersionOption {
+    pub id: String,
+    pub project_id: Option<String>,
+    pub name: String,
+    pub version_number: String,
+    pub file_name: Option<String>,
+    pub download_url: Option<String>,
+    pub file_size: Option<u64>,
+}
+
+/// Searches Modrinth or CurseForge for mods, shaders, or resource packs.
+#[tauri::command]
+pub async fn search_mods(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    query: String,
+    origin: Option<String>,
+    project_type: Option<String>,
+    all_versions: Option<bool>,
+) -> Result<Vec<UnifiedSearchHit>, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let mc_ver = if all_versions.unwrap_or(false) {
+        None
+    } else {
+        Some(instance.minecraft_version.as_str())
+    };
+    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
+        None
+    } else {
+        Some(instance.mod_loader.r#type.as_str())
+    };
+    let p_type = project_type.as_deref().unwrap_or("mod");
+    let provider = origin.as_deref().unwrap_or("modrinth");
+
+    if provider.eq_ignore_ascii_case("curseforge") {
+        let hits = state
+            .curse_forge
+            .search_mods_with_type(&query, mc_ver, loader, Some(p_type))
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let category_path = match p_type {
+            "shader" | "shaderpack" | "shaders" => "shaders",
+            "resourcepack" | "resource" | "texturepack" => "texture-packs",
+            "modpack" | "modpacks" => "modpacks",
+            _ => "mc-mods",
+        };
+
+        let mapped = hits
+            .into_iter()
+            .map(|m| {
+                let icon_url = m
+                    .logo
+                    .as_ref()
+                    .map(|l| {
+                        if !l.thumbnail_url.is_empty() {
+                            l.thumbnail_url.clone()
+                        } else {
+                            l.url.clone()
+                        }
+                    })
+                    .filter(|u| !u.is_empty());
+                let website_url = m
+                    .links
+                    .as_ref()
+                    .and_then(|l| l.website_url.clone())
+                    .filter(|u| !u.is_empty())
+                    .unwrap_or_else(|| {
+                        if !m.slug.is_empty() {
+                            format!(
+                                "https://www.curseforge.com/minecraft/{category_path}/{}",
+                                m.slug
+                            )
+                        } else {
+                            format!("https://www.curseforge.com/projects/{}", m.id)
+                        }
+                    });
+                let author = m.authors_string();
+                UnifiedSearchHit {
+                    id: m.id.to_string(),
+                    project_id: m.id.to_string(),
+                    title: m.name.clone(),
+                    name: m.name.clone(),
+                    slug: m.slug,
+                    description: m.summary.clone(),
+                    summary: m.summary,
+                    author,
+                    icon_url,
+                    downloads: m.download_count,
+                    download_count: m.download_count,
+                    project_url: website_url.clone(),
+                    website_url,
+                    origin: "curseforge".to_string(),
+                }
+            })
+            .collect();
+        Ok(mapped)
+    } else {
+        let modrinth_type = match p_type {
+            "shader" | "shaderpack" | "shaders" => "shader",
+            "resourcepack" | "resource" | "texturepack" => "resourcepack",
+            "modpack" | "modpacks" => "modpack",
+            _ => "mod",
+        };
+        let hits = state
+            .modrinth
+            .search_mods_with_type(&query, mc_ver, loader, Some(modrinth_type))
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let mapped = hits
+            .into_iter()
+            .map(|h| {
+                let slug_or_id = if !h.slug.trim().is_empty() {
+                    &h.slug
+                } else {
+                    &h.project_id
+                };
+                UnifiedSearchHit {
+                    id: h.project_id.clone(),
+                    project_id: h.project_id.clone(),
+                    title: h.title.clone(),
+                    name: h.title.clone(),
+                    slug: h.slug.clone(),
+                    description: h.description.clone(),
+                    summary: h.description,
+                    author: h.author,
+                    icon_url: if h.icon_url.trim().is_empty() {
+                        None
+                    } else {
+                        Some(h.icon_url)
+                    },
+                    downloads: h.downloads,
+                    download_count: h.downloads,
+                    project_url: format!("https://modrinth.com/project/{slug_or_id}"),
+                    website_url: format!("https://modrinth.com/project/{slug_or_id}"),
+                    origin: "modrinth".to_string(),
+                }
+            })
+            .collect();
+        Ok(mapped)
+    }
+}
+
+/// Lists published versions or files for a project matching the instance.
+#[tauri::command]
+pub async fn list_mod_versions(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    project_id: String,
+    origin: Option<String>,
+    all_versions: Option<bool>,
+) -> Result<Vec<UnifiedVersionOption>, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let mc_ver = if all_versions.unwrap_or(false) {
+        None
+    } else {
+        Some(instance.minecraft_version.as_str())
+    };
+    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
+        None
+    } else {
+        Some(instance.mod_loader.r#type.as_str())
+    };
+    let provider = origin.as_deref().unwrap_or("modrinth");
+
+    if provider.eq_ignore_ascii_case("curseforge") {
+        let mod_id: i64 = project_id
+            .parse()
+            .map_err(|_| "Invalid CurseForge project ID".to_string())?;
+        let files = state
+            .curse_forge
+            .list_mod_files(mod_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        let mapped = files
+            .into_iter()
+            .map(|f| UnifiedVersionOption {
+                id: f.id.to_string(),
+                project_id: Some(project_id.clone()),
+                name: f.display_name.clone(),
+                version_number: f.display_name,
+                file_name: Some(f.file_name),
+                download_url: if f.download_url.trim().is_empty() {
+                    None
+                } else {
+                    Some(f.download_url)
+                },
+                file_size: Some(f.length),
+            })
+            .collect();
+        Ok(mapped)
+    } else {
+        let versions = state
+            .modrinth
+            .list_project_versions(&project_id, mc_ver, loader)
+            .await
+            .map_err(|e| e.to_string())?;
+        let mapped = versions
+            .into_iter()
+            .map(|v| {
+                let file = v.primary_file().cloned();
+                UnifiedVersionOption {
+                    id: v.id,
+                    project_id: Some(v.project_id),
+                    name: if !v.version_number.is_empty() {
+                        v.version_number.clone()
+                    } else {
+                        v.name.clone()
+                    },
+                    version_number: v.version_number,
+                    file_name: file.as_ref().map(|f| f.filename.clone()),
+                    download_url: file.as_ref().map(|f| f.url.clone()),
+                    file_size: file.as_ref().map(|f| f.size),
+                }
+            })
+            .collect();
+        Ok(mapped)
+    }
+}
+
+/// Downloads a project file from Modrinth into the instance (mods, shaderpacks, or resourcepacks).
+#[tauri::command]
+pub async fn install_modrinth_pack(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    project_id: String,
+    version_id: Option<String>,
+    project_type: Option<String>,
+) -> Result<String, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
+        None
+    } else {
+        Some(instance.mod_loader.r#type.as_str())
+    };
+    let versions = state
+        .modrinth
+        .list_project_versions(
+            &project_id,
+            Some(&instance.minecraft_version),
+            loader,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let version = if let Some(ref vid) = version_id {
+        versions.into_iter().find(|v| &v.id == vid).ok_or_else(|| {
+            format!(
+                "Version '{}' not found for Minecraft {}",
+                vid, instance.minecraft_version
+            )
+        })?
+    } else {
+        versions.into_iter().next().ok_or_else(|| {
+            format!(
+                "No compatible version found for Minecraft {}",
+                instance.minecraft_version
+            )
+        })?
+    };
+
+    let file = version
+        .primary_file()
+        .ok_or_else(|| "This project has no downloadable file".to_string())?;
+
+    let p_type = project_type.as_deref().unwrap_or("mod");
+    let ext = match p_type {
+        "shader" | "shaderpack" | "resourcepack" | "resource" => ".zip",
+        _ => ".jar",
+    };
+
+    let filename = if file.filename.trim().is_empty() {
+        format!("{}{}", version.project_id, ext)
+    } else {
+        file.filename.clone()
+    };
+
+    let safe_filename = std::path::Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid file name".to_string())?;
+
+    let instance_dir = state.offline.instance_dir(&instance.id);
+    let target_dir = match p_type {
+        "shader" | "shaderpack" => instance_dir.join("shaderpacks"),
+        "resourcepack" | "resource" | "texturepack" => instance_dir.join("resourcepacks"),
+        _ => state.offline.mods_dir(&instance),
+    };
+
+    tokio::fs::create_dir_all(&target_dir)
+        .await
+        .map_err(|e| e.to_string())?;
+    let dest = target_dir.join(safe_filename);
+    download_file(&state.http, &file.url, &dest, file.sha1())
+        .await
+        .map_err(err_string)?;
+    Ok(safe_filename.to_string())
+}
+
 /// Searches Modrinth for mods compatible with an offline instance's Minecraft
-/// version + loader.
+/// version + loader. (Preserved for compatibility)
 #[tauri::command]
 pub async fn search_modrinth(
     state: State<'_, LauncherState>,
@@ -2579,7 +3175,7 @@ pub async fn search_modrinth(
 }
 
 /// Lists published Modrinth versions for a project matching an offline instance's
-/// Minecraft version + loader.
+/// Minecraft version + loader. (Preserved for compatibility)
 #[tauri::command]
 pub async fn list_modrinth_versions(
     state: State<'_, LauncherState>,
@@ -2615,60 +3211,7 @@ pub async fn install_modrinth_mod(
     project_id: String,
     version_id: Option<String>,
 ) -> Result<String, String> {
-    let Some(instance) = state.offline.load(&instance_id) else {
-        return Err("Instance not found".to_string());
-    };
-    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
-        None
-    } else {
-        Some(instance.mod_loader.r#type.as_str())
-    };
-    let versions = state
-        .modrinth
-        .list_project_versions(
-            &project_id,
-            Some(&instance.minecraft_version),
-            loader,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let version = if let Some(ref vid) = version_id {
-        versions.into_iter().find(|v| &v.id == vid).ok_or_else(|| {
-            format!(
-                "Version '{}' not found or incompatible with Minecraft {} + {} loader",
-                vid, instance.minecraft_version, instance.mod_loader.r#type
-            )
-        })?
-    } else {
-        versions.into_iter().next().ok_or_else(|| {
-            format!(
-                "No version of this mod supports Minecraft {} + {} loader",
-                instance.minecraft_version, instance.mod_loader.r#type
-            )
-        })?
-    };
-
-    let file = version
-        .primary_file()
-        .ok_or_else(|| "This mod has no downloadable file".to_string())?;
-    let filename = if file.filename.trim().is_empty() {
-        format!("{}.jar", version.project_id)
-    } else {
-        file.filename.clone()
-    };
-
-    // Prevent directory traversal from remote filenames.
-    let safe_filename = std::path::Path::new(&filename)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| "Invalid file name".to_string())?;
-
-    let dest = state.offline.mods_dir(&instance).join(safe_filename);
-    download_file(&state.http, &file.url, &dest, file.sha1())
-        .await
-        .map_err(err_string)?;
-    Ok(safe_filename.to_string())
+    install_modrinth_pack(state, instance_id, project_id, version_id, Some("mod".to_string())).await
 }
 
 async fn download_file(
@@ -2715,17 +3258,66 @@ async fn download_file(
     Ok(())
 }
 
-/// Minecraft versions known to Modrinth (release only), for the instance
-/// creation dropdown.
+/// Minecraft versions (release only) fetched from the official Mojang version manifest,
+/// falling back to Modrinth game versions if unreachable.
 #[tauri::command]
 pub async fn list_minecraft_versions(
     state: State<'_, LauncherState>,
 ) -> Result<Vec<String>, String> {
-    state
-        .modrinth
-        .list_game_versions()
-        .await
-        .map_err(|e| e.to_string())
+    match state.versions.get_minecraft_versions(false).await {
+        Ok(versions) => Ok(versions.into_iter().map(|v: zircon_core::api::versions::MinecraftVersionInfo| v.id).collect()),
+        Err(_) => state
+            .modrinth
+            .list_game_versions()
+            .await
+            .map_err(|e| e.to_string()),
+    }
+}
+
+/// Full Minecraft version metadata objects from Mojang manifest.
+#[tauri::command]
+pub async fn get_minecraft_versions(
+    state: State<'_, LauncherState>,
+    snapshots: Option<bool>,
+) -> Result<Vec<zircon_core::api::versions::MinecraftVersionInfo>, String> {
+    let include_snapshots = snapshots.unwrap_or(false);
+    state.versions.get_minecraft_versions(include_snapshots).await
+}
+
+/// Loader versions and recommended build for a given loader type and Minecraft version.
+#[tauri::command]
+pub async fn get_loader_versions(
+    state: State<'_, LauncherState>,
+    loader: String,
+    mc_version: String,
+) -> Result<zircon_core::api::versions::LoaderVersionResult, String> {
+    state.versions.get_loader_versions(&loader, &mc_version).await
+}
+
+/// Metadata payload containing available Minecraft release versions and loader types.
+#[tauri::command]
+pub async fn get_launcher_metadata(
+    state: State<'_, LauncherState>,
+) -> Result<serde_json::Value, String> {
+    let mc_versions: Vec<String> = match state.versions.get_minecraft_versions(false).await {
+        Ok(versions) => versions.into_iter().map(|v: zircon_core::api::versions::MinecraftVersionInfo| v.id).collect(),
+        Err(_) => state
+            .modrinth
+            .list_game_versions()
+            .await
+            .unwrap_or_else(|_| vec!["1.21.4".to_string(), "1.20.4".to_string(), "1.19.4".to_string()]),
+    };
+    let loader_types = vec![
+        "fabric".to_string(),
+        "quilt".to_string(),
+        "forge".to_string(),
+        "neoforge".to_string(),
+        "vanilla".to_string(),
+    ];
+    Ok(serde_json::json!({
+        "minecraftVersions": mc_versions,
+        "loaderTypes": loader_types,
+    }))
 }
 
 /// Loader types for the instance creation dropdown:
@@ -2746,6 +3338,14 @@ pub async fn list_loader_types(state: State<'_, LauncherState>) -> Result<Vec<St
     }
     loaders.retain(|l| ModLoaderType::from_id(l).is_some());
     Ok(loaders)
+}
+
+/// Shows and focuses the main launcher window once frontend initialization is complete.
+#[tauri::command]
+pub fn show_main_window(window: tauri::Window) -> Result<(), String> {
+    window.show().map_err(|e| e.to_string())?;
+    let _ = window.set_focus();
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -2796,6 +3396,15 @@ pub fn clear_launcher_logs() -> Result<(), String> {
 #[tauri::command]
 pub fn get_launcher_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
+}
+
+/// Opens an external URL in the user's default browser.
+#[tauri::command]
+pub fn open_browser_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Invalid URL protocol".to_string());
+    }
+    open::that(&url).map_err(|e| format!("Could not open browser: {e}"))
 }
 
 /// Logs a message directly into the launcher's tracing pipeline and in-memory debug log buffer.

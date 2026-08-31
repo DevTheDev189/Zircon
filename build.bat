@@ -26,7 +26,16 @@ if errorlevel 1 (
 )
 
 echo.
-echo === [1/3] Building server release exe ===
+echo === [1/3] Building server release exe (with embedded CurseForge integration) ===
+if exist "%~dp0.env" (
+    for /f "usebackq tokens=1,* delims==" %%a in ("%~dp0.env") do (
+        if "%%a"=="CURSEFORGE_API_KEY" (
+            set "CURSEFORGE_API_KEY=%%b"
+            set "CURSEFORGE_API_KEY=!CURSEFORGE_API_KEY:"=!"
+            set "CURSEFORGE_API_KEY=!CURSEFORGE_API_KEY:'=!"
+        )
+    )
+)
 cargo build --release -p zircon-server
 if errorlevel 1 (
     echo FAILED: server release build
