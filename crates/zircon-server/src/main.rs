@@ -1,0 +1,299 @@
+//! Entry point of the server manager: wires up configuration, admin auth, the
+//! multi-instance engine, the mod/BOM services, the Minecraft subprocess
+//! manager, the Axum admin API and the TCP protocol multiplexer on the public
+//! port.
+//!
+//! Port of `com.mcmanager.server.Main`.
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use tokio::net::TcpListener;
+use zircon_server::audit::AuditLogger;
+use zircon_server::auth::auth_service::AuthService;
+use zircon_server::auth::jwt;
+use zircon_server::auth::sessions::SessionRegistry;
+use zircon_server::config::ConfigService;
+use zircon_server::instance::ServerInstanceManager;
+use zircon_server::multiplexer::tcp::TcpMultiplexer;
+use zircon_server::process::console::ConsoleStreamHandler;
+use zircon_server::process::manager::MinecraftProcessManager;
+use zircon_server::services::autostart;
+use zircon_server::services::backup::BackupService;
+use zircon_server::services::bom::BomService;
+use zircon_server::services::idle_shutdown::IdleShutdownService;
+use zircon_server::services::import::ServerImportService;
+use zircon_server::services::mods::ModManagementService;
+use zircon_server::services::packs::PackManagementService;
+use zircon_server::services::resolver::ModServiceResolver;
+use zircon_server::services::scheduler::BackupSchedulerService;
+use zircon_server::services::versions::VersionService;
+use zircon_server::tickets::JoinTicketManager;
+use zircon_server::updater::{ServerUpdater, CURRENT_SERVER_VERSION};
+use zircon_server::web::app::AppState;
+use zircon_server::web::rate_limit::FixedWindowLimiter;
+use zircon_server::web::router;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::dotenv().ok();
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--install-startup" || a == "--enable-startup") {
+        match autostart::enable_autostart() {
+            Ok(()) => println!("Successfully enabled Zircon Server on Windows startup."),
+            Err(e) => eprintln!("Failed to enable Windows startup: {e}"),
+        }
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--uninstall-startup" || a == "--disable-startup") {
+        match autostart::disable_autostart() {
+            Ok(()) => println!("Successfully disabled Zircon Server on Windows startup."),
+            Err(e) => eprintln!("Failed to disable Windows startup: {e}"),
+        }
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--startup-status") {
+        let enabled = autostart::is_autostart_enabled();
+        println!("Windows startup status: {}", if enabled { "ENABLED" } else { "DISABLED" });
+        return Ok(());
+    }
+
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,zircon_server=info")),
+        )
+        .init();
+
+    let config = Arc::new(ConfigService::load()?);
+    let cf_key = config.effective_curseforge_key();
+    if !cf_key.is_empty() {
+        tracing::info!("CurseForge API integration active");
+    } else {
+        tracing::warn!("No CurseForge API key configured (CurseForge search disabled)");
+    }
+
+    // Admin auth: creates users.json + a random initial admin password on first
+    // run (printed to stdout) and the JWT signing secret.
+    let auth = Arc::new(AuthService::initialize(&config.data_dir)?);
+    jwt::initialize(&config.data_dir)?;
+
+    let console = Arc::new(ConsoleStreamHandler::new());
+    let process_manager = Arc::new(MinecraftProcessManager::legacy(
+        config.clone(),
+        console.clone(),
+    ));
+
+    // Persistent Ed25519 key used to sign every BOM write (generated on first
+    // run, cached in memory); launchers pin the matching public key via TOFU.
+    let signing_key = config.load_or_create_signing_key()?;
+
+    // Multi-instance engine (isolated <data>/instances/<id>/ dirs).
+    let instances = Arc::new(
+        ServerInstanceManager::new(&config.data_dir, console.clone())?
+            .with_signing_key(Some(signing_key.clone())),
+    );
+
+    let bom = Arc::new(
+        BomService::new(config.bom_file.clone(), None).with_signing_key(Some(signing_key.clone())),
+    );
+    let mods = Arc::new(ModManagementService::new(
+        bom.clone(),
+        config.mods_dir.clone(),
+        &cf_key,
+    ));
+    let packs = PackManagementService::new(
+        bom.clone(),
+        config.data_dir.join("shaderpacks"),
+        config.data_dir.join("resourcepacks"),
+    );
+    let resolver = Arc::new(ModServiceResolver::new(
+        instances.clone(),
+        bom.clone(),
+        mods.clone(),
+        packs.clone(),
+        &cf_key,
+        Some(signing_key.clone()),
+    ));
+
+    // LZ4-compressed backups + the automatic scheduler.
+    let backup = Arc::new(BackupService::new(&config.data_dir, instances.clone()));
+    let scheduler = BackupSchedulerService::new(instances.clone(), backup.clone());
+    let scheduler_handle = scheduler.start();
+
+    // Idle shutdown: gracefully sleep instances nobody is playing on.
+    let idle_shutdown = IdleShutdownService::new(instances.clone());
+    let idle_shutdown_handle = idle_shutdown.start();
+
+    let tickets = Arc::new(JoinTicketManager::new());
+
+    // Auth hardening: server-side session revocation + a global cap on failed
+    // login attempts (15 min window, 10 attempts) + an append-only audit log.
+    let sessions = Arc::new(SessionRegistry::new());
+    let login_limiter = Arc::new(FixedWindowLimiter::new(Duration::from_secs(15 * 60), 10));
+    // Public join-intent registrations (1 min window, 30 per real client IP):
+    // the launcher heartbeats roughly every 30s, so this comfortably covers
+    // legit players behind a shared NAT while making ticket-store floods
+    // impractical.
+    let join_intent_limiter = Arc::new(FixedWindowLimiter::new(Duration::from_secs(60), 30));
+    let audit = Arc::new(AuditLogger::new(&config.data_dir));
+    let import_service = Arc::new(ServerImportService::new(
+        &config.data_dir,
+        instances.clone(),
+        Some(signing_key.clone()),
+    )?);
+
+    let versions = Arc::new(VersionService::new());
+
+    let state = AppState {
+        config: config.clone(),
+        auth,
+        instances: instances.clone(),
+        console: console.clone(),
+        process_manager,
+        backup,
+        bom,
+        mods,
+        packs,
+        resolver,
+        import_service,
+        versions,
+        tickets: tickets.clone(),
+        curseforge_api_key: cf_key,
+        signing_key: Some(signing_key),
+        sessions: sessions.clone(),
+        login_limiter: login_limiter.clone(),
+        join_intent_limiter: join_intent_limiter.clone(),
+        audit,
+    };
+
+    // Axum admin API (binds 127.0.0.1:<webPort>; reachable through the
+    // multiplexer's public port too). ConnectInfo is needed so auth handlers
+    // can key rate limits on the client address.
+    let app = router(state.clone());
+    let web_port = config.get_config().web_port;
+    let listener = TcpListener::bind(("127.0.0.1", web_port as u16)).await?;
+    tracing::info!("Admin web server listening on 127.0.0.1:{web_port}");
+    let web_handle = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .expect("axum server failed");
+    });
+
+    // Tokio TCP multiplexer on the public port + per-instance player ports.
+    let multiplexer = Arc::new(TcpMultiplexer::new(
+        config.clone(),
+        Some(instances.clone()),
+        tickets.clone(),
+    ));
+    instances.set_port_binding_listener(multiplexer.clone());
+    multiplexer.start()?;
+
+    // Multi-instance auto-start: boot any instance configured to start on boot
+    for instance in instances.list_instances() {
+        if instance.auto_start {
+            tracing::info!(
+                "Auto-starting instance '{}' ({}) on wrapper boot...",
+                instance.name,
+                instance.id
+            );
+            let inst_manager = instances.clone();
+            let inst_id = instance.id.clone();
+            tokio::spawn(async move {
+                if let Err(e) = inst_manager.start_instance(&inst_id).await {
+                    tracing::error!("Auto-start failed for instance {inst_id}: {e}");
+                }
+            });
+        }
+    }
+
+    if config.get_config().auto_start_server {
+        if let Err(e) = process_manager_start(&state).await {
+            tracing::warn!("Legacy auto-start failed: {e}");
+        }
+    }
+
+    // Security housekeeping: periodically drop expired join tickets, sessions
+    // and rate-limiter state so abuse cannot grow memory forever.
+    let housekeeping_tickets = tickets.clone();
+    let housekeeping_sessions = sessions.clone();
+    let housekeeping_limiter = login_limiter.clone();
+    let housekeeping_join_limiter = join_intent_limiter.clone();
+    let housekeeping = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(120));
+        loop {
+            interval.tick().await;
+            housekeeping_tickets.purge_expired();
+            housekeeping_sessions.purge_expired();
+            housekeeping_limiter.purge_expired();
+            housekeeping_join_limiter.purge_expired();
+        }
+    });
+
+    tracing::info!(
+        "Server manager ready. Public port: {}, data dir: {}",
+        config.get_config().public_port,
+        config.data_dir.display()
+    );
+
+    // Non-blocking bootup check for new server updates
+    tokio::spawn(async {
+        let updater = ServerUpdater::new();
+        match updater.check_update().await {
+            Ok(Some(manifest)) => {
+                tracing::info!(
+                    "New Zircon Server release available: v{} (running v{}). Update via System Stats in the web dashboard.",
+                    manifest.version,
+                    CURRENT_SERVER_VERSION
+                );
+            }
+            Ok(None) => {
+                tracing::info!("Zircon Server is up to date (v{}).", CURRENT_SERVER_VERSION);
+            }
+            Err(e) => {
+                tracing::debug!("Server update check skipped/failed: {e}");
+            }
+        }
+    });
+
+    // Shutdown on Ctrl-C / terminate.
+    shutdown_signal().await;
+
+    tracing::info!("Shutting down...");
+    scheduler_handle.abort();
+    idle_shutdown_handle.abort();
+    housekeeping.abort();
+    multiplexer.stop();
+    web_handle.abort();
+    for instance in instances.list_instances() {
+        instances.stop_instance(&instance.id).await;
+    }
+    Ok(())
+}
+
+async fn process_manager_start(state: &AppState) -> Result<(), String> {
+    state
+        .process_manager
+        .start()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(unix)]
+async fn shutdown_signal() {
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("failed to install terminate handler");
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {}
+        _ = terminate.recv() => {}
+    }
+}
+
+#[cfg(not(unix))]
+async fn shutdown_signal() {
+    let _ = tokio::signal::ctrl_c().await;
+}

@@ -1,0 +1,1486 @@
+//! Multi-instance REST controller: instance CRUD, start/stop/restart, EULA,
+//! `server.properties`, per-instance players, mods, packs and backups.
+//!
+//! Port of `com.mcmanager.server.web.controller.InstanceController`.
+
+use std::sync::Arc;
+
+use axum::extract::{Multipart, Path, Query, State};
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::Json;
+
+use serde::Deserialize;
+use tokio::time::Duration;
+use zircon_core::model::{BillOfMaterials, InstanceConfig, ModLoaderType}; // z0
+
+use super::config_helpers::{
+    command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
+    PlayerActionRequest,
+};
+use super::vanilla_player_files;
+use crate::instance::ModSyncSummary;
+use crate::services::bom::BomService;
+use crate::services::mods::ModManagementService;
+use crate::services::packs::PackManagementService;
+use crate::tickets::TICKET_TTL_SECONDS;
+use crate::web::app::{ApiError, AppState, RealIp};
+use crate::web::config_routes::resolve_wake_target;
+use crate::web::views;
+
+/// GET /api/instances
+pub async fn list_instances(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let instances: Vec<serde_json::Value> = state
+        .instances
+        .list_instances()
+        .iter()
+        .map(|cfg| live_instance_map(&state, cfg))
+        .collect();
+    Json(serde_json::json!({ "instances": instances }))
+}
+
+/// POST /api/instances — body: {name, mcVersion, loaderType, loaderVersion}
+pub async fn create_instance(
+    State(state): State<AppState>,
+    Json(body): Json<CreateRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let name = body.name.ok_or_else(|| {
+        ApiError::BadRequest("name, mcVersion and loaderType are required".to_string())
+    })?;
+    let mc_version = body.mc_version.ok_or_else(|| {
+        ApiError::BadRequest("name, mcVersion and loaderType are required".to_string())
+    })?;
+    let raw_loader = body.loader_type.ok_or_else(|| {
+        ApiError::BadRequest("name, mcVersion and loaderType are required".to_string())
+    })?;
+    let approved_loader = ModLoaderType::from_id(raw_loader.trim()).ok_or_else(|| {
+        ApiError::BadRequest(format!( /* z0 */
+            "Invalid loaderType '{}'. Allowed loaders: {}", // z0
+            raw_loader.trim(),
+            ModLoaderType::ALLOWED_IDS.join(", ") /* z0 */
+        )) /* z0 */
+    })?; // z0
+    let loader_version = body.loader_version.unwrap_or_default();
+    let created = state.instances.create_instance(
+        name.trim(),
+        mc_version.trim(),
+        approved_loader.id(),
+        loader_version.trim(),
+    )?;
+    if let Some(auto) = body.auto_start.or(body.auto_start_server) {
+        state.instances.update_auto_start(&created.id, auto)?;
+    }
+    if let Some(args) = body
+        .java_args
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        state
+            .instances
+            .update_instance_config(&created.id, None, Some(args))?;
+    }
+    let fresh = state.instances.get_instance(&created.id).unwrap_or(created);
+    Ok((
+        StatusCode::CREATED,
+        Json(live_instance_map(&state, &fresh)),
+    ))
+}
+
+/// GET /api/instances/{id}
+pub async fn get_instance(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let config = state.instances.get_instance(&id)?;
+    Ok(Json(live_instance_map(&state, &config)))
+}
+
+/// PATCH /api/instances/{id}
+pub async fn update_instance(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<UpdateRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    // Manual player-facing port override — rebinds the multiplexer listener.
+    if body.external_port > 0 {
+        if let Err(e) = state
+            .instances
+            .update_external_port(&id, body.external_port)
+        {
+            return Err(e.into());
+        }
+    }
+    // Auto-start on wrapper boot.
+    if let Some(auto) = body.auto_start.or(body.auto_start_server) {
+        state.instances.update_auto_start(&id, auto)?;
+    }
+    // Backup retention (0 = keep everything).
+    if let Some(retention) = body.backup_retention {
+        state.instances.update_backup_retention(&id, retention)?;
+    }
+    // Backup schedule changes are independent of version re-sync.
+    if body.backup_frequency.is_some() || body.backup_time.is_some() {
+        if !valid_schedule(
+            body.backup_frequency.as_deref(),
+            body.backup_time.as_deref(),
+        ) {
+            return Err(ApiError::BadRequest(
+                "backupFrequency must be one of off, daily, weekly, monthly and backupTime must be in HH:MM 24-hour format"
+                    .to_string(),
+            ));
+        }
+        state.instances.update_backup_schedule(
+            &id,
+            body.backup_frequency.as_deref(),
+            body.backup_time.as_deref(),
+        )?;
+    }
+    // Idle shutdown settings (sleep when nobody is playing).
+    if body.idle_shutdown_enabled.is_some() || body.idle_shutdown_minutes.is_some() {
+        state.instances.update_idle_shutdown_settings(
+            &id,
+            body.idle_shutdown_enabled,
+            body.idle_shutdown_minutes,
+        )?;
+    }
+    // Partial server.properties update (e.g. MOTD / max-players from the
+    // settings screen) saved alongside the other fields.
+    if let Some(props) = &body.server_properties {
+        if !props.is_empty() {
+            let server_dir = state.instances.get_instance_dir(&id).join("server");
+            std::fs::create_dir_all(&server_dir)?;
+            let props_file = server_dir.join("server.properties");
+            let mut current = if props_file.is_file() {
+                crate::config::ServerProperties::load(&props_file)?
+            } else {
+                crate::config::ServerProperties::default()
+            };
+            for (key, value) in props {
+                current.set(key, value);
+            }
+            current.save(&props_file)?;
+        }
+    }
+
+    let current = state.instances.get_instance(&id)?;
+    let mc_changed = body
+        .mc_version
+        .as_deref()
+        .map(|v| !v.trim().is_empty() && v != current.minecraft_version)
+        .unwrap_or(false);
+    let loader_changed = body
+        .loader_version
+        .as_deref()
+        .map(|v| !v.trim().is_empty() && v != current.loader_version())
+        .unwrap_or(false);
+    let version_change = mc_changed || loader_changed;
+
+    if version_change {
+        // Keep javaArgs changes from getting lost in the version-sync path.
+        if let Some(java_args) = &body.java_args {
+            state
+                .instances
+                .update_instance_config(&id, None, Some(java_args))?;
+        }
+        let sync_result = state
+            .instances
+            .update_instance_versions(
+                &id,
+                body.mc_version.as_deref(),
+                body.loader_version.as_deref(),
+                body.name.as_deref(),
+            )
+            .await?;
+        let updated = state.instances.get_instance(&id)?;
+        let mut response = serde_json::json!(sync_result_to_value(&sync_result));
+        response["instance"] = live_instance_map(&state, &updated);
+        Ok(Json(response))
+    } else {
+        state.instances.update_instance_config(
+            &id,
+            body.name.as_deref(),
+            body.java_args.as_deref(),
+        )?;
+        let updated = state.instances.get_instance(&id)?;
+        Ok(Json(live_instance_map(&state, &updated)))
+    }
+}
+
+/// DELETE /api/instances/{id}
+pub async fn delete_instance(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let deleted = state.instances.delete_instance(&id).await?;
+    if !deleted {
+        return Err(ApiError::NotFound("Instance not found".to_string()));
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/instances/{id}/start
+pub async fn start_instance(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.start_instance(&id).await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// POST /api/instances/{id}/stop
+pub async fn stop_instance(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Json<serde_json::Value> {
+    state
+        .instances
+        .stop_instance_with_reason(&id, Some(zircon_core::model::SHUTDOWN_REASON_MANUAL))
+        .await;
+    Json(serde_json::json!({ "ok": true }))
+}
+
+/// POST /api/instances/{id}/restart — stops the instance, then starts it again shortly after.
+pub async fn restart_instance(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.get_instance(&id)?; // 404 for unknown ids
+    let instances = state.instances.clone();
+    state.instances.stop_instance(&id).await;
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(1500)).await; // allow OS process cleanup
+        if let Err(e) = instances.start_instance(&id).await {
+            tracing::error!("Failed to restart instance {id}: {e}");
+        }
+    });
+    Ok(Json(
+        serde_json::json!({ "ok": true, "message": "Server is restarting..." }),
+    ))
+}
+
+/// GET /api/instances/{id}/eula — EULA acceptance status.
+pub async fn get_eula(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.get_instance(&id)?; // 404 for unknown ids
+    Ok(Json(serde_json::json!({
+        "accepted": state.instances.is_eula_accepted(&id),
+        "eulaUrl": "https://aka.ms/MinecraftEULA"
+    })))
+}
+
+/// POST /api/instances/{id}/eula — body: {"accepted":true} records EULA consent.
+pub async fn accept_eula(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<EulaRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if !body.accepted {
+        return Err(ApiError::BadRequest(
+            r#"{"accepted":true} is required to accept the EULA"#.to_string(),
+        ));
+    }
+    state.instances.accept_eula(&id)?;
+    Ok(Json(serde_json::json!({ "accepted": true })))
+}
+
+/// GET /api/instances/{id}/server-properties — the instance's server.properties as a map.
+pub async fn get_server_properties(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.get_instance(&id)?; // 404 for unknown ids
+    let props_file = state
+        .instances
+        .get_instance_dir(&id)
+        .join("server")
+        .join("server.properties");
+    let props = if props_file.is_file() {
+        crate::config::ServerProperties::load(&props_file)?
+    } else {
+        crate::config::ServerProperties::default()
+    };
+    Ok(Json(serde_json::json!({ "properties": props.as_map() })))
+}
+
+/// POST /api/instances/{id}/server-properties — partial update preserving comments.
+pub async fn save_server_properties(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<ServerPropertiesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(properties) = body.properties else {
+        return Err(ApiError::BadRequest(
+            "properties map is required".to_string(),
+        ));
+    };
+    if properties.is_empty() {
+        return Err(ApiError::BadRequest(
+            "properties map is required".to_string(),
+        ));
+    }
+    state.instances.get_instance(&id)?; // 404 for unknown ids
+    let server_dir = state.instances.get_instance_dir(&id).join("server");
+    std::fs::create_dir_all(&server_dir)?;
+    let props_file = server_dir.join("server.properties");
+    let mut props = if props_file.is_file() {
+        crate::config::ServerProperties::load(&props_file)?
+    } else {
+        crate::config::ServerProperties::default()
+    };
+    for (key, value) in properties {
+        props.set(&key, &value);
+    }
+    props.save(&props_file)?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+// --------------------------------------------------------------------------
+// Per-instance player management
+// --------------------------------------------------------------------------
+
+/// GET /api/instances/{id}/players/online
+pub async fn online_players(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.get_instance(&id)?;
+    let players = state.instances.get_online_players(&id);
+    Ok(Json(serde_json::json!({ "players": players })))
+}
+
+/// GET /api/instances/{id}/players/history — every player that has ever joined.
+pub async fn player_history(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.get_instance(&id)?;
+    let history_file = state.instances.get_instance_dir(&id).join("players.json");
+    let players: Vec<serde_json::Value> =
+        crate::process::player_tracker::PlayerTracker::load_history(&history_file)
+            .iter()
+            .map(views::player_history_to_map)
+            .collect();
+    Ok(Json(serde_json::json!({ "players": players })))
+}
+
+/// GET /api/instances/{id}/players/whitelist
+pub async fn get_whitelist(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.get_instance(&id)?;
+    Ok(Json(
+        serde_json::json!({ "players": read_player_json(&server_dir(&state, &id), "whitelist.json") }),
+    ))
+}
+
+/// POST /api/instances/{id}/players/whitelist
+pub async fn add_whitelist(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<PlayerActionRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let raw_name = body
+        .name
+        .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let name = validate_minecraft_username(&raw_name)?;
+    state.instances.get_instance(&id)?;
+    Ok(send_instance_command(&state, &id, &format!("whitelist add {name}")).await)
+}
+
+/// DELETE /api/instances/{id}/players/whitelist/{name}
+pub async fn remove_whitelist(
+    State(state): State<AppState>,
+    Path((id, name)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
+    state.instances.get_instance(&id)?;
+    Ok(send_instance_command(&state, &id, &format!("whitelist remove {name}")).await)
+}
+
+/// GET /api/instances/{id}/players/ops
+pub async fn get_ops(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.get_instance(&id)?;
+    Ok(Json(
+        serde_json::json!({ "players": read_player_json(&server_dir(&state, &id), "ops.json") }),
+    ))
+}
+
+/// POST /api/instances/{id}/players/ops
+pub async fn add_op(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<PlayerActionRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let raw_name = body
+        .name
+        .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let name = validate_minecraft_username(&raw_name)?;
+    state.instances.get_instance(&id)?;
+    Ok(send_instance_command(&state, &id, &format!("op {name}")).await)
+}
+
+/// DELETE /api/instances/{id}/players/ops/{name}
+pub async fn remove_op(
+    State(state): State<AppState>,
+    Path((id, name)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
+    state.instances.get_instance(&id)?;
+    Ok(send_instance_command(&state, &id, &format!("deop {name}")).await)
+}
+
+/// GET /api/instances/{id}/players/bans
+pub async fn get_bans(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.instances.get_instance(&id)?;
+    Ok(Json(
+        serde_json::json!({ "players": read_player_json(&server_dir(&state, &id), "banned-players.json") }),
+    ))
+}
+
+/// POST /api/instances/{id}/players/bans — online or offline ban.
+pub async fn add_ban(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<PlayerActionRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let raw_name = body
+        .name
+        .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let name = validate_minecraft_username(&raw_name)?;
+    let reason_clean = sanitize_command_param(body.reason.as_deref());
+
+    state.instances.get_instance(&id)?;
+    if state.instances.is_running(&id) {
+        let reason_arg = if reason_clean.is_empty() {
+            String::new()
+        } else {
+            format!(" {reason_clean}")
+        };
+        Ok(send_instance_command(&state, &id, &format!("ban {name}{reason_arg}")).await)
+    } else {
+        add_ban_offline(
+            &state,
+            &id,
+            &name,
+            if reason_clean.is_empty() {
+                None
+            } else {
+                Some(&reason_clean)
+            },
+        )?;
+        Ok(Json(serde_json::json!({ "ok": true, "offline": true })))
+    }
+}
+
+/// DELETE /api/instances/{id}/players/bans/{name} — pardon, online or offline.
+pub async fn remove_ban(
+    State(state): State<AppState>,
+    Path((id, name)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let name = validate_minecraft_username(&name)?;
+    state.instances.get_instance(&id)?;
+    if state.instances.is_running(&id) {
+        Ok(send_instance_command(&state, &id, &format!("pardon {name}")).await)
+    } else {
+        let file = server_dir(&state, &id).join("banned-players.json");
+        let removed = vanilla_player_files::pardon(&file, &name)?;
+        Ok(Json(
+            serde_json::json!({ "ok": true, "offline": true, "removed": removed }),
+        ))
+    }
+}
+
+/// GET /api/instances/{id}/bom — the instance's mod list.
+pub async fn get_instance_bom(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let mods = mods_for(&state, &id)?.list_mods_enriched().await;
+    let mapped: Vec<serde_json::Value> = mods.iter().map(views::mod_entry_to_map).collect();
+    Ok(Json(serde_json::Value::Array(mapped)))
+}
+
+/// POST /api/join-intent and /api/instances/{id}/join-intent — registers a
+/// short-lived join ticket for the launcher's session so the player's
+/// connection passes the Zircon join gate, and holds the target instance's
+/// idle shutdown off while the player is on their way. Intentionally
+/// unauthenticated, but rate-limited per real client IP so a single attacker
+/// cannot fill the ticket store and block legitimate joins.
+pub async fn register_join_intent(
+    State(state): State<AppState>,
+    ip: RealIp,
+    Json(body): Json<JoinIntentRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if let Err(retry_after) = state.join_intent_limiter.check(&ip.0.to_string()) {
+        return Err(ApiError::TooManyRequests(format!(
+            "Too many join-intent registrations from this address. Retry in {retry_after}s."
+        )));
+    }
+    if body.username.is_none() && body.uuid.is_none() {
+        return Err(ApiError::BadRequest(
+            "username or uuid is required".to_string(),
+        ));
+    }
+    if let Some(username) = &body.username {
+        state.tickets.register_ticket(username);
+    }
+    if let Some(uuid) = &body.uuid {
+        state.tickets.register_ticket(uuid);
+    }
+
+    // A player is on their way: resolve the instance the same way the
+    // multiplexer routes connections and hold off its idle shutdown until the
+    // player connects (or the intent expires). When the instance is asleep,
+    // start it as a safety net — the launcher's wakeup may have raced an idle
+    // shutdown or a status ping.
+    let public_port = state.config.get_config().public_port;
+    if let Some(cfg) = resolve_wake_target(
+        &state.instances,
+        public_port,
+        body.hostname.as_deref(),
+        body.port,
+    ) {
+        if state.instances.is_running(&cfg.id) {
+            state.instances.register_join_intent(&cfg.id);
+        } else if state.instances.wakeable(&cfg.id) {
+            state.instances.register_join_intent(&cfg.id);
+            let instances = state.instances.clone();
+            let id = cfg.id.clone();
+            let log_id = id.clone();
+            tokio::spawn(async move {
+                if let Err(e) = instances.start_instance(&id).await {
+                    tracing::error!("Join-intent wake failed for instance {id}: {e}");
+                }
+            });
+            tracing::info!(
+                "Join intent for sleeping instance '{}' ({log_id}) — waking it",
+                cfg.name
+            );
+        } else {
+            // Stopped manually (maintenance): the player cannot join. Refuse so
+            // the launcher aborts before booting Minecraft into a dead server.
+            return Err(ApiError::Conflict(format!(
+                "Server '{}' is stopped and not in idle/sleep mode — start it from the admin panel.",
+                cfg.name
+            )));
+        }
+    }
+
+    Ok(Json(
+        serde_json::json!({ "ok": true, "expiresInSeconds": TICKET_TTL_SECONDS }),
+    ))
+}
+
+// --------------------------------------------------------------------------
+// Per-instance mods
+// --------------------------------------------------------------------------
+
+/// GET /api/instances/{id}/mods
+pub async fn list_mods(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let mods = mods_for(&state, &id)?.list_mods_enriched().await;
+    let mapped: Vec<serde_json::Value> = mods.iter().map(views::mod_entry_to_map).collect();
+    Ok(Json(serde_json::json!({ "mods": mapped })))
+}
+
+/// POST /api/instances/{id}/mods/upload (multipart, field "file")
+pub async fn upload_mod(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(params): Query<super::mod_controller::OriginParam>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let Some((filename, bytes)) = super::mod_controller::take_upload(&mut multipart).await? else {
+        return Err(ApiError::BadRequest(
+            "No file uploaded (form field 'file')".to_string(),
+        ));
+    };
+    let mods = mods_for(&state, &id)?;
+    if params.server_only == Some(true)
+        || params.origin.as_deref() == Some(crate::services::mods::ORIGIN_SERVER_CUSTOM)
+    {
+        let entry = mods.add_server_mod(std::io::Cursor::new(bytes), &filename).await?;
+        return Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))));
+    }
+    let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
+    let entry = mods
+        .add_mod_with_metadata(
+            std::io::Cursor::new(bytes),
+            &filename,
+            params.origin.as_deref(),
+            params.icon_url.as_deref(),
+            params.title.as_deref(),
+            expected_mod_id,
+            params.expected_file_id.as_deref(),
+            params.project_url.as_deref(),
+        )
+        .await?;
+    Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
+}
+
+/// POST /api/instances/{id}/mods/upload-server (multipart, field "file") — add a custom server-side JAR strictly excluded from BOM.
+pub async fn upload_server_mod(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let Some((filename, bytes)) = super::mod_controller::take_upload(&mut multipart).await? else {
+        return Err(ApiError::BadRequest(
+            "No file uploaded (form field 'file')".to_string(),
+        ));
+    };
+    let entry = mods_for(&state, &id)?
+        .add_server_mod(std::io::Cursor::new(bytes), &filename)
+        .await?;
+    Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
+}
+
+/// DELETE /api/instances/{id}/mods/{filename}
+pub async fn remove_mod(
+    State(state): State<AppState>,
+    Path((id, filename)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    let removed = mods_for(&state, &id)?.remove_mod(&filename)?;
+    if !removed {
+        return Err(ApiError::NotFound("Mod not found".to_string()));
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Bulk delete endpoint removing mods from disk and BOM.
+pub async fn bulk_delete_mods(
+    State(app_state): State<AppState>,
+    Path(instance_id): Path<String>,
+    Json(payload): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let purged = mods_for(&app_state, &instance_id)?.remove_mods(&payload.filenames)?;
+    Ok(Json(serde_json::json!({ "deleted": purged })))
+}
+
+/// Bulk enable endpoint activating mods and renaming from .disabled.
+pub async fn enable_mods(
+    State(app_state): State<AppState>,
+    Path(instance_id): Path<String>,
+    Json(payload): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let updated = mods_for(&app_state, &instance_id)?.set_mods_enabled(&payload.filenames, true)?;
+    Ok(Json(serde_json::json!({ "changed": updated })))
+}
+
+/// Bulk disable endpoint deactivating mods and renaming to .disabled.
+pub async fn disable_mods(
+    State(app_state): State<AppState>,
+    Path(instance_id): Path<String>,
+    Json(payload): Json<ModFilenamesRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let updated = mods_for(&app_state, &instance_id)?.set_mods_enabled(&payload.filenames, false)?;
+    Ok(Json(serde_json::json!({ "changed": updated })))
+}
+
+/// PATCH /api/instances/{id}/mods/{filename}/side — update the runtime side of a mod in an instance.
+pub async fn set_mod_side(
+    State(state): State<AppState>,
+    Path((id, filename)): Path<(String, String)>,
+    Json(body): Json<super::mod_controller::SetSideBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    let updated = mods_for(&state, &id)?
+        .set_mod_side(&filename, body.side)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    Ok((StatusCode::OK, Json(views::mod_entry_to_map(&updated))))
+}
+
+/// GET /api/instances/{id}/mods/search
+pub async fn search_mods(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(params): Query<super::mod_controller::SearchParams>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let mods = mods_for(&state, &id)?;
+    let query = params.query.unwrap_or_default();
+    let origin = params.origin.as_deref().unwrap_or("modrinth");
+    let mut result = serde_json::Map::new();
+    if origin.eq_ignore_ascii_case("curseforge") {
+        if !mods.has_curse_forge_key() {
+            result.insert(
+                "origin".to_string(),
+                serde_json::Value::String("curseforge".to_string()),
+            );
+            result.insert("hits".to_string(), serde_json::Value::Array(vec![]));
+            result.insert(
+                "notice".to_string(),
+                serde_json::Value::String(
+                    "CurseForge API key not configured on the server.".to_string(),
+                ),
+            );
+            return Ok(Json(serde_json::Value::Object(result)));
+        }
+        let hits = mods
+            .curse_forge()
+            .search_mods_with_type(
+                &query,
+                params.mc_version.as_deref(),
+                params.loader.as_deref(),
+                params.project_type.as_deref(),
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!("CurseForge search failed for query '{query}': {e}");
+                ApiError::BadGateway(format!("CurseForge search failed: {e}"))
+            })?;
+        tracing::info!(
+            "CurseForge search query='{}', mc_version={:?}, loader={:?}, type={:?} -> returned {} hit(s)",
+            query,
+            params.mc_version,
+            params.loader,
+            params.project_type,
+            hits.len()
+        );
+        result.insert(
+            "origin".to_string(),
+            serde_json::Value::String("curseforge".to_string()),
+        );
+        result.insert(
+            "hits".to_string(),
+            serde_json::Value::Array(hits.iter().map(views::curseforge_mod_to_map).collect()),
+        );
+    } else {
+        let hits = mods
+            .modrinth()
+            .search_mods_with_type(
+                &query,
+                params.mc_version.as_deref(),
+                params.loader.as_deref(),
+                params.project_type.as_deref(),
+            )
+            .await
+            .map_err(|e| ApiError::BadGateway(e.to_string()))?;
+        result.insert(
+            "origin".to_string(),
+            serde_json::Value::String("modrinth".to_string()),
+        );
+        result.insert(
+            "hits".to_string(),
+            serde_json::Value::Array(hits.iter().map(views::modrinth_hit_to_map).collect()),
+        );
+    }
+    Ok(Json(serde_json::Value::Object(result)))
+}
+
+/// GET /api/instances/{id}/mods/modrinth/versions
+pub async fn modrinth_versions(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(params): Query<super::mod_controller::VersionParams>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(project_id) = params.project_id else {
+        return Err(ApiError::BadRequest("projectId is required".to_string()));
+    };
+    let mods = mods_for(&state, &id)?;
+    let versions = mods
+        .modrinth()
+        .list_project_versions(
+            &project_id,
+            params.mc_version.as_deref(),
+            params.loader.as_deref(),
+        )
+        .await
+        .map_err(|e| ApiError::BadGateway(e.to_string()))?;
+    let mapped: Vec<serde_json::Value> = versions
+        .iter()
+        .map(views::modrinth_version_to_map)
+        .collect();
+    Ok(Json(serde_json::json!({ "versions": mapped })))
+}
+
+/// GET /api/instances/{id}/mods/curseforge/files?modId=
+pub async fn curseforge_files(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(params): Query<super::mod_controller::CurseForgeParams>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let mod_id = params
+        .mod_id
+        .ok_or_else(|| ApiError::BadRequest("modId is required".to_string()))?;
+    let mod_id: i64 = mod_id
+        .parse()
+        .map_err(|_| ApiError::BadRequest("modId must be a number".to_string()))?;
+    let mods = mods_for(&state, &id)?;
+    if !mods.has_curse_forge_key() {
+        return Err(ApiError::BadRequest(
+            "CurseForge API key not configured on the server".to_string(),
+        ));
+    }
+    let files = mods
+        .curse_forge()
+        .list_mod_files(mod_id)
+        .await
+        .map_err(|e| ApiError::BadGateway(e.to_string()))?;
+    let mapped: Vec<serde_json::Value> = files.iter().map(views::curseforge_file_to_map).collect();
+    Ok(Json(serde_json::json!({ "files": mapped })))
+}
+
+/// POST /api/instances/{id}/mods/install
+pub async fn install_mod(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<InstallRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let Some(origin) = &body.origin else {
+        return Err(ApiError::BadRequest("origin is required".to_string()));
+    };
+    let mods = mods_for(&state, &id)?;
+    let entry = match origin.to_lowercase().as_str() {
+        "modrinth" => {
+            let (Some(project_id), Some(version_id)) = (&body.project_id, &body.version_id) else {
+                return Err(ApiError::BadRequest(
+                    "projectId and versionId are required for modrinth".to_string(),
+                ));
+            };
+            mods.install_modrinth_version(project_id, Some(version_id), None, None)
+                .await?
+        }
+        "curseforge" => {
+            if let (Some(mod_id_str), Some(file_id_str)) = (&body.project_id, &body.version_id) {
+                if let (Ok(mod_id), Ok(file_id)) =
+                    (mod_id_str.parse::<i64>(), file_id_str.parse::<i64>())
+                {
+                    mods.install_curseforge_file(mod_id, file_id).await?
+                } else {
+                    return Err(ApiError::BadRequest(
+                        "modId and fileId must be numeric".into(),
+                    ));
+                }
+            } else if let (Some(download_url), Some(filename)) =
+                (&body.download_url, &body.filename)
+            {
+                let mut entry = mods
+                    .install_from_url(download_url, filename, "curseforge")
+                    .await?;
+                if let Some(file_id) = &body.file_id {
+                    entry.id = Some(file_id.to_string());
+                }
+                entry
+            } else {
+                return Err(ApiError::BadRequest(
+                    "CurseForge install requires (projectId, versionId) or (downloadUrl, filename)"
+                        .into(),
+                ));
+            }
+        }
+        _ => {
+            return Err(ApiError::BadRequest(
+                "origin must be 'modrinth' or 'curseforge'".to_string(),
+            ))
+        }
+    };
+    Ok((StatusCode::CREATED, Json(views::mod_entry_to_map(&entry))))
+}
+
+/// POST /api/instances/{id}/modpacks/install
+pub async fn install_modpack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<InstallRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let Some(project_id) = &body.project_id else {
+        return Err(ApiError::BadRequest("projectId is required".to_string()));
+    };
+    let mods = mods_for(&state, &id)?;
+    let result = mods
+        .install_modrinth_modpack(project_id, body.version_id.as_deref())
+        .await?;
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::json!({
+            "installedCount": result.installed_count,
+            "failedMods": result.failed_mods,
+            "message": result.message,
+        })),
+    ))
+}
+
+// --------------------------------------------------------------------------
+// Per-instance shaders & texture packs
+// --------------------------------------------------------------------------
+
+/// GET /api/instances/{id}/shaderpacks
+pub async fn list_shaderpacks(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let packs = packs_for(&state, &id)?;
+    let mapped: Vec<serde_json::Value> = packs
+        .list_shaderpacks()
+        .iter()
+        .map(|p| views::pack_entry_to_map(p, true))
+        .collect();
+    Ok(Json(serde_json::json!({ "shaderpacks": mapped })))
+}
+
+/// POST /api/instances/{id}/shaderpacks/upload
+pub async fn upload_shaderpack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(params): Query<super::mod_controller::OriginParam>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    upload_pack(&state, &id, &params, multipart, true).await
+}
+
+/// POST /api/instances/{id}/shaderpacks/install
+pub async fn install_shaderpack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<InstallRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    install_pack(&state, &id, body, true).await
+}
+
+/// DELETE /api/instances/{id}/shaderpacks/{filename}
+pub async fn remove_shaderpack(
+    State(state): State<AppState>,
+    Path((id, filename)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    remove_pack(&state, &id, &filename, true).await
+}
+
+/// GET /api/instances/{id}/resourcepacks
+pub async fn list_resourcepacks(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let packs = packs_for(&state, &id)?;
+    let mapped: Vec<serde_json::Value> = packs
+        .list_resourcepacks()
+        .iter()
+        .map(|p| views::pack_entry_to_map(p, false))
+        .collect();
+    Ok(Json(serde_json::json!({ "resourcepacks": mapped })))
+}
+
+/// POST /api/instances/{id}/resourcepacks/upload
+pub async fn upload_resourcepack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(params): Query<super::mod_controller::OriginParam>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    upload_pack(&state, &id, &params, multipart, false).await
+}
+
+/// POST /api/instances/{id}/resourcepacks/install
+pub async fn install_resourcepack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<InstallRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    install_pack(&state, &id, body, false).await
+}
+
+/// DELETE /api/instances/{id}/resourcepacks/{filename}
+pub async fn remove_resourcepack(
+    State(state): State<AppState>,
+    Path((id, filename)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    remove_pack(&state, &id, &filename, false).await
+}
+
+/// GET /api/instances/{id}/resourcepacks/server-pack
+pub async fn get_server_resourcepack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let packs = packs_for(&state, &id)?;
+    let active = packs.get_server_resourcepack();
+    let mapped = active.as_ref().map(|p| views::pack_entry_to_map(p, false));
+    Ok(Json(serde_json::json!({
+        "serverResourcePack": mapped,
+    })))
+}
+
+/// POST /api/instances/{id}/resourcepacks/server-pack
+pub async fn set_server_resourcepack(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<SetServerPackRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let packs = packs_for(&state, &id)?;
+    packs.set_server_resourcepack(body.filename.as_deref())
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    let active = packs.get_server_resourcepack();
+    let mapped = active.as_ref().map(|p| views::pack_entry_to_map(p, false));
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "serverResourcePack": mapped,
+    })))
+}
+
+/// GET /api/instances/{id}/crash-analysis — analyzes crash dumps and logs for the instance.
+pub async fn get_crash_analysis(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<crate::services::crash_analyzer::CrashAnalysis>, ApiError> {
+    let cfg = state.instances.get_instance(&id)?;
+
+    // If the instance is currently running, it has not crashed.
+    if state.instances.is_running(&id) {
+        return Ok(Json(crate::services::crash_analyzer::CrashAnalysis::healthy(
+            "Server is currently running.",
+        )));
+    }
+
+    let last_session = state.instances.get_last_session(&id);
+    let session_start = last_session.as_ref().map(|s| s.start_time);
+
+    let instance_dir = state.instances.get_instance_dir(&id);
+    let mods = mods_for(&state, &id).ok();
+    let loader_str = cfg.mod_loader.as_ref().map(|l| l.r#type.as_str()).unwrap_or("vanilla");
+    let analysis = crate::services::crash_analyzer::CrashAnalyzerService::analyze_instance(
+        &instance_dir,
+        &cfg.minecraft_version,
+        loader_str,
+        mods.as_ref(),
+        session_start,
+    )
+    .await;
+
+    // If the server was stopped cleanly by the operator with code 0 and no specific fatal
+    // crash report was generated, ensure healthy status is reported.
+    if let Some(session) = &last_session {
+        if session.stop_requested && session.exit_code == 0 && analysis.category == crate::services::crash_analyzer::CrashCategory::Unknown {
+            return Ok(Json(crate::services::crash_analyzer::CrashAnalysis::healthy(
+                "Server stopped cleanly.",
+            )));
+        }
+    }
+
+    Ok(Json(analysis))
+}
+
+/// POST /api/instances/{id}/crash-fix — executes a 1-click remediation action on the instance.
+pub async fn apply_crash_fix(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<CrashFixRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let _cfg = state.instances.get_instance(&id)?;
+    let instance_dir = state.instances.get_instance_dir(&id);
+    let mods = mods_for(&state, &id)?;
+    let bom = bom_for(&state, &id)?;
+
+    let message = crate::services::crash_analyzer::CrashAnalyzerService::execute_remediation(
+        &instance_dir,
+        &body.action,
+        &mods,
+        &bom,
+    )
+    .await
+    .map_err(ApiError::BadRequest)?;
+
+    // If the action was AcceptEula, synchronize instance EULA state
+    if let crate::services::crash_analyzer::CrashRemediationAction::AcceptEula = body.action {
+        let _ = state.instances.accept_eula(&id);
+    }
+
+    // If the action adjusted memory, persist the java_args update
+    if let crate::services::crash_analyzer::CrashRemediationAction::AdjustMemory { recommended_gb, .. } = body.action {
+        let new_args = format!("-Xms{recommended_gb}G -Xmx{recommended_gb}G");
+        let _ = state.instances.update_instance_config(&id, None, Some(&new_args));
+    }
+
+    // Auto-restart if requested
+    if body.auto_restart {
+        let instances = state.instances.clone();
+        let target_id = id.clone();
+        state.instances.stop_instance(&id).await;
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+            if let Err(e) = instances.start_instance(&target_id).await {
+                tracing::error!("Failed to restart instance {target_id} after crash fix: {e}");
+            }
+        });
+    }
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": message,
+        "restarted": body.auto_restart,
+    })))
+}
+
+// --------------------------------------------------------------------------
+// helpers
+// --------------------------------------------------------------------------
+
+fn server_dir(state: &AppState, id: &str) -> std::path::PathBuf {
+    state.instances.get_instance_dir(id).join("server")
+}
+
+/// Freshly built per-instance mod service (disk is always the source of truth).
+fn mods_for(state: &AppState, id: &str) -> Result<ModManagementService, ApiError> {
+    let cfg = state.instances.get_instance(id)?;
+    let instance_dir = state.instances.get_instance_dir(id);
+    let bom = Arc::new(
+        BomService::new(
+            instance_dir.join("bom.json"),
+            Some(BillOfMaterials::new(
+                cfg.minecraft_version.clone(),
+                cfg.mod_loader.clone(),
+                Some(cfg.name.clone()),
+            )),
+        )
+        .with_signing_key(state.signing_key.clone()),
+    );
+    let curseforge_key = state.config.effective_curseforge_key();
+    Ok(ModManagementService::new(
+        bom,
+        instance_dir.join("mods"),
+        &curseforge_key,
+    ))
+}
+
+/// Freshly built per-instance pack service.
+fn packs_for(state: &AppState, id: &str) -> Result<PackManagementService, ApiError> {
+    let cfg = state.instances.get_instance(id)?;
+    let instance_dir = state.instances.get_instance_dir(id);
+    let bom = Arc::new(
+        BomService::new(
+            instance_dir.join("bom.json"),
+            Some(BillOfMaterials::new(
+                cfg.minecraft_version.clone(),
+                cfg.mod_loader.clone(),
+                Some(cfg.name.clone()),
+            )),
+        )
+        .with_signing_key(state.signing_key.clone()),
+    );
+    let curseforge_key = state.config.effective_curseforge_key();
+    Ok(PackManagementService::new(
+        bom,
+        instance_dir.join("shaderpacks"),
+        instance_dir.join("resourcepacks"),
+    )
+    .with_curseforge_key(&curseforge_key))
+}
+
+/// Sends a command to the instance's own server process (no-op when offline).
+async fn send_instance_command(
+    state: &AppState,
+    instance_id: &str,
+    command: &str,
+) -> Json<serde_json::Value> {
+    let pm = state.instances.get_process_manager(instance_id);
+    match pm {
+        Some(pm) if pm.is_running() => match pm.send_command(command).await {
+            Ok(()) => command_result(command, true, None),
+            Err(e) => command_result(command, false, Some(e.to_string())),
+        },
+        _ => command_result(
+            command,
+            false,
+            Some("Server is not running — start it before managing players".to_string()),
+        ),
+    }
+}
+
+fn add_ban_offline(
+    state: &AppState,
+    instance_id: &str,
+    name: &str,
+    reason: Option<&str>,
+) -> Result<(), ApiError> {
+    let file = server_dir(state, instance_id).join("banned-players.json");
+    let user_cache = server_dir(state, instance_id).join("usercache.json");
+    let uuid = vanilla_player_files::resolve_uuid(&user_cache, name);
+    vanilla_player_files::ban(&file, name, reason, &uuid)?;
+    tracing::info!("Banned {name} (offline, instance {instance_id})");
+    Ok(())
+}
+
+pub(crate) fn live_instance_map(state: &AppState, config: &InstanceConfig) -> serde_json::Value {
+    let running = state.instances.is_running(&config.id);
+    let ready = state.instances.is_server_ready(&config.id);
+    let stopping_reason = state.instances.stopping_reason(&config.id);
+    let stopping = stopping_reason.is_some();
+    views::instance_to_map(
+        config,
+        running,
+        ready,
+        state.instances.get_online_player_count(&config.id),
+        state.instances.get_online_players(&config.id),
+        state.instances.get_idle_remaining_seconds(&config.id),
+        stopping,
+        stopping_reason,
+    )
+}
+
+fn sync_result_to_value(summary: &ModSyncSummary) -> serde_json::Value {
+    serde_json::json!({
+        "updatedCount": summary.updated_count,
+        "incompatibleCount": summary.incompatible_count,
+        "updatedMods": summary.updated_mods,
+        "incompatibleMods": summary.incompatible_mods,
+    })
+}
+
+fn valid_schedule(frequency: Option<&str>, time: Option<&str>) -> bool {
+    if let Some(f) = frequency {
+        let f = f.trim();
+        if !f.is_empty() && !zircon_core::model::instance::is_valid_backup_frequency(f) {
+            return false;
+        }
+    }
+    if let Some(t) = time {
+        let t = t.trim();
+        // Accept "HH:MM" and "H:MM" (and empty = no time change).
+        if !t.is_empty()
+            && chrono::NaiveTime::parse_from_str(t, "%H:%M").is_err()
+            && chrono::NaiveTime::parse_from_str(t, "%k:%M").is_err()
+        {
+            return false;
+        }
+    }
+    true
+}
+
+async fn upload_pack(
+    state: &AppState,
+    id: &str,
+    params: &super::mod_controller::OriginParam,
+    mut multipart: Multipart,
+    shader: bool,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let Some((filename, bytes)) = super::mod_controller::take_upload(&mut multipart).await? else {
+        return Err(ApiError::BadRequest(
+            "No file uploaded (form field 'file')".to_string(),
+        ));
+    };
+    let packs = packs_for(state, id)?;
+    let expected_mod_id = params.expected_mod_id.as_deref().or(params.mod_id.as_deref());
+    let entry = if shader {
+        packs
+            .add_shaderpack_with_metadata(
+                std::io::Cursor::new(bytes),
+                &filename,
+                params.origin.as_deref(),
+                params.icon_url.as_deref(),
+                params.title.as_deref(),
+                expected_mod_id,
+                params.expected_file_id.as_deref(),
+                params.project_url.as_deref(),
+            )
+            .await?
+    } else {
+        packs
+            .add_resourcepack_with_metadata(
+                std::io::Cursor::new(bytes),
+                &filename,
+                params.origin.as_deref(),
+                params.icon_url.as_deref(),
+                params.title.as_deref(),
+                expected_mod_id,
+                params.expected_file_id.as_deref(),
+                params.project_url.as_deref(),
+            )
+            .await?
+    };
+    Ok((
+        StatusCode::CREATED,
+        Json(views::pack_entry_to_map(&entry, shader)),
+    ))
+}
+
+async fn install_pack(
+    state: &AppState,
+    id: &str,
+    body: InstallRequest,
+    shader: bool,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let packs = packs_for(state, id)?;
+    let entry = if let Some(project_id) = &body.project_id {
+        packs
+            .install_modrinth_pack(project_id, body.version_id.as_deref(), shader)
+            .await?
+    } else if let (Some(download_url), Some(filename)) = (&body.download_url, &body.filename) {
+        if shader {
+            packs
+                .install_shaderpack_from_url(
+                    download_url,
+                    filename,
+                    body.origin.as_deref().or(Some("modrinth")),
+                )
+                .await?
+        } else {
+            packs
+                .install_resourcepack_from_url(
+                    download_url,
+                    filename,
+                    body.origin.as_deref().or(Some("modrinth")),
+                )
+                .await?
+        }
+    } else {
+        return Err(ApiError::BadRequest(
+            "projectId or (downloadUrl and filename) is required".to_string(),
+        ));
+    };
+    Ok((
+        StatusCode::CREATED,
+        Json(views::pack_entry_to_map(&entry, shader)),
+    ))
+}
+
+async fn remove_pack(
+    state: &AppState,
+    id: &str,
+    filename: &str,
+    shader: bool,
+) -> Result<StatusCode, ApiError> {
+    let packs = packs_for(state, id)?;
+    let removed = if shader {
+        packs.remove_shaderpack(filename)?
+    } else {
+        packs.remove_resourcepack(filename)?
+    };
+    if !removed {
+        return Err(ApiError::NotFound("Pack not found".to_string()));
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// --------------------------------------------------------------------------
+// Request DTOs
+// --------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRequest {
+    pub name: Option<String>,
+    pub mc_version: Option<String>,
+    pub loader_type: Option<String>,
+    pub loader_version: Option<String>,
+    pub auto_start: Option<bool>,
+    #[serde(alias = "autoStartServer")]
+    pub auto_start_server: Option<bool>,
+    /// Optional initial JVM args (e.g. the RAM slider's heap flags). When
+    /// absent/blank the instance keeps the wrapper default (-Xms2G -Xmx4G).
+    pub java_args: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateRequest {
+    /// Frontend sends `serverTitle` on the settings screen; the instance API
+    /// historically used `name`. Both bind here.
+    #[serde(alias = "serverTitle")]
+    pub name: Option<String>,
+    #[serde(alias = "minecraftVersion")]
+    pub mc_version: Option<String>,
+    #[serde(alias = "modLoaderVersion")]
+    pub loader_version: Option<String>,
+    pub java_args: Option<String>,
+    pub auto_start: Option<bool>,
+    #[serde(alias = "autoStartServer")]
+    pub auto_start_server: Option<bool>,
+    pub backup_frequency: Option<String>,
+    pub backup_time: Option<String>,
+    /// How many backups to keep (0 = unlimited).
+    pub backup_retention: Option<i32>,
+    /// Player-facing port; 0 / absent leaves it unchanged.
+    #[serde(default)]
+    pub external_port: i32,
+    /// Idle shutdown: put the server to sleep when nobody is playing, and let
+    /// the launcher wake it on the next join.
+    pub idle_shutdown_enabled: Option<bool>,
+    /// Idle window in minutes (clamped to 1–60 server-side).
+    pub idle_shutdown_minutes: Option<u32>,
+    /// Partial `server.properties` update applied alongside the other fields.
+    pub server_properties: Option<std::collections::BTreeMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallRequest {
+    pub origin: Option<String>,
+    pub project_id: Option<String>,
+    pub version_id: Option<String>,
+    pub download_url: Option<String>,
+    pub filename: Option<String>,
+    pub file_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModFilenamesRequest {
+    #[serde(default)]
+    pub filenames: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JoinIntentRequest {
+    pub username: Option<String>,
+    pub uuid: Option<String>,
+    /// The host the client will connect to; matched against instance id/name
+    /// like the multiplexer's hostname routing, so the hold can be applied to
+    /// the right instance. Optional — resolution falls back to the port, the
+    /// public port, then the active instance.
+    pub hostname: Option<String>,
+    /// The player-facing port the client will connect to.
+    pub port: Option<u16>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EulaRequest {
+    pub accepted: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerPropertiesRequest {
+    pub properties: Option<std::collections::BTreeMap<String, String>>,
+}
+
+fn bom_for(state: &AppState, id: &str) -> Result<Arc<BomService>, ApiError> {
+    let cfg = state.instances.get_instance(id)?;
+    let instance_dir = state.instances.get_instance_dir(id);
+    Ok(Arc::new(
+        BomService::new(
+            instance_dir.join("bom.json"),
+            Some(BillOfMaterials::new(
+                cfg.minecraft_version.clone(),
+                cfg.mod_loader.clone(),
+                Some(cfg.name.clone()),
+            )),
+        )
+        .with_signing_key(state.signing_key.clone()),
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashFixRequest {
+    pub action: crate::services::crash_analyzer::CrashRemediationAction,
+    #[serde(default)]
+    pub auto_restart: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetServerPackRequest {
+    pub filename: Option<String>,
+}

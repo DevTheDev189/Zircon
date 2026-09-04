@@ -1,0 +1,9 @@
+name = "zircon-coop"
+main = "coop-rendezvous.js"
+compatibility_date = "2024-09-01"
+
+# Free tier Workers KV namespace binding
+[[kv_namespaces]]
+binding = "COOP_SESSIONS"
+id = "placeholder_coop_sessions_kv_id"
+preview_id = "placeholder_preview_kv_id"

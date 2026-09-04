@@ -1,0 +1,26 @@
+[Unit]
+Description=Zircon Minecraft Server Manager Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=zircon
+Group=zircon
+WorkingDirectory=/opt/zircon-server
+ExecStart=/opt/zircon-server/zircon-server
+Restart=always
+RestartSec=5
+
+# OOM Hardening: protect the daemon itself from the kernel OOM killer so a
+# player-induced heap spike on a Minecraft JVM can never take down the
+# wrapper that supervises and restarts it.
+OOMScoreAdjust=-1000
+
+# Process sandboxing
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

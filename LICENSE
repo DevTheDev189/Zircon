@@ -1,0 +1,63 @@
+Business Source License 1.1
+
+Parameters:
+
+Licensor:
+    Deven Winslow
+
+Software:
+    Zircon Server Manager, Companion Launcher, and related tools and libraries.
+
+Change Date:
+    2030-01-01
+
+Change License:
+    Apache License, Version 2.0
+
+Additional Use Grant:
+    1. Internal, Non-Commercial, and Community Use:
+       You may use, copy, modify, distribute, and run the Software for self-hosted,
+       personal, community, educational, and internal operational purposes free of charge.
+
+    2. Game Server & Network Operations:
+       Gaming servers, Minecraft networks, server administrators, and gaming
+       communities (including commercial networks that generate revenue via donations,
+       ranks, or cosmetic purchases) are explicitly permitted to use the Software
+       internally to operate, manage, configure, monitor, and maintain their servers.
+
+    3. Managed Hosting & Commercial Cloud Restriction (Prohibited Use):
+       You may not make the functionality of the Software available to third parties
+       as a commercial, multi-tenant managed hosting service, server hosting platform,
+       or cloud game hosting product (e.g., offering a paid server panel or managed
+       infrastructure competing directly with official Zircon managed services).
+
+--------------------------------------------------------------------------------
+
+Notice:
+
+The Business Source License 1.1 (the "License") details:
+
+1. Grant of License. Licensor hereby grants you the right to copy, modify, create
+derivative works, redistribute, and make non-production use of the Software. You
+may make Production use of the Software only in accordance with the Additional Use
+Grant above.
+
+2. Change License. Effective on the Change Date, or the fourth anniversary of the
+first public release of a version of the Software under this License (whichever is
+earlier), Licensor hereby grants you rights under the Change License.
+
+3. Trademark & Brand Protection Policy.
+The names "Zircon", "Zircon Server Manager", "Zircon Launcher", "Zircon Cloud",
+the Zircon logos, icons, badges, and visual identity are trademarks and exclusive
+intellectual property of Deven Winslow (All Rights Reserved). This License does
+not grant any rights to use these trademarks in connection with forks, modified
+versions, or third-party redistributions. Any redistribution of modified versions
+must remove all official Zircon logos, icons, and brand marks.
+
+4. Disclaimer.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE LICENSOR OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

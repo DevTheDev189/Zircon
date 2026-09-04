@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+   xmlns="http://www.w3.org/2000/svg"
+   viewBox="0 0 64 64"
+   width="64"
+   height="64">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+      <feFlood flood-color="#0fbfbf" flood-opacity="0.45" result="flood" />
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.0" result="blur" />
+      <feComposite in="flood" in2="blur" operator="in" result="glow" />
+      <feMerge>
+        <feMergeNode in="glow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <path
+       d="M 10.73489,12.12731 v 11.06289 h 4.615739 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 11.62513 h 42.511617 v -12.93668 h -4.618839 l -3.52485,4.47053 H 27.401056 v -3.15898 l 25.864054,-16.18351 v -11.93674 H 13.462372 Z"
+       fill="#47d2c9"
+       stroke="#47d2c9"
+       stroke-width="0.5"
+       stroke-linejoin="round" />
+  </g>
+</svg>

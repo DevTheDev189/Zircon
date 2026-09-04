@@ -1,0 +1,64 @@
+[package]
+name = "zircon-server"
+version = "0.4.4"
+edition = "2021"
+description = "Zircon server manager daemon: process supervisor, TCP multiplexer, backup engine, Axum admin API"
+license = "BSL-1.1"
+
+[dependencies]
+zircon-core = { path = "../zircon-core" }
+
+tokio = { workspace = true, features = ["full"] }
+axum = { workspace = true }
+axum-extra = { version = "0.9", features = ["cookie"] }
+tower-http = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+reqwest = { workspace = true }
+dotenvy.workspace = true
+bcrypt.workspace = true
+jsonwebtoken.workspace = true
+totp-rs = { version = "5.5", features = ["gen_secret", "otpauth"] }
+self-replace = "1.5"
+semver = "1.0"
+sysinfo.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+dashmap.workspace = true
+bytes.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+url.workspace = true
+zip.workspace = true
+getrandom = "0.3"
+tokio-util = { workspace = true, features = ["io"] }
+futures-util = "0.3"
+sha1.workspace = true
+sha2.workspace = true
+flate2.workspace = true
+hex.workspace = true
+image.workspace = true
+# Ed25519 for BOM attestation (same version/features as zircon-core).
+ed25519-dalek = { version = "2.1", default-features = false, features = ["std", "rand_core"] }
+regex.workspace = true
+# CSPRNG for generating the persistent BOM signing key (ed25519-dalek's
+# `rand_core` feature only needs a `CryptoRngCore` implementation).
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Restricted-DACL hardening of secret files (users.json, jwt-secret.key,
+# audit.log): non-admins must not read or tamper with them.
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+serde_urlencoded = "0.7"
+tempfile = "3"
+totp-rs = { version = "5.5", features = ["gen_secret", "otpauth"] }

@@ -1,0 +1,68 @@
+# ---------- Gradle ----------
+.gradle/
+build/
+**/build/
+
+# ---------- IDE / editor ----------
+.idea/
+*.iml
+.vscode/
+*.classpath
+*.project
+.settings/
+*.swp
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+
+# ---------- Runtime data (never commit wrapper state) ----------
+# server-data/ contains config.json (may hold a CurseForge API key),
+# server.properties, worlds, logs, and the server JAR.
+server-data/
+*.log
+
+# ---------- Local secrets / credentials ----------
+client_id.txt
+.env
+*.key
+*.pem
+
+# ---------- Local dev-only build scripts (never commit) ----------
+/deven-build.bat
+
+# ---------- Website (managed outside the repo, staged to cloudflare-upload) ----------
+/website/
+/cloudflare-upload/
+
+# ---------- Rust ----------
+target/
+**/target/
+
+# ---------- Launcher frontend ----------
+crates/zircon-launcher/ui/node_modules/
+crates/zircon-launcher/ui/dist/
+
+# ---------- Launcher runtime state (never commit) ----------
+~/.mcmanager/
+~/.tauri/
+/dist-run/
+
+# ---------- Internal docs, scripts, tests, and builds ----------
+/scripts/
+/dist-run/
+/AGENT_PLAN.md
+/Changes.md
+/LAUNCHER_FEATURE_PARITY_ROADMAP.md
+/SKIN_STUDIO_AND_AI_GENERATOR_PLAN.md
+/UPDATES.md
+/UPnP-Co-Op-Update.md
+/ZIRCON_CLOUD_ARCHITECTURE.md
+/CLOUDFLARE_P2P_SETUP_GUIDE.html
+/pack.mcmeta
+/build.bat
+/build-launcher-mac.sh
+/generate_icons.py
+crates/*/tests/
+tests/
+

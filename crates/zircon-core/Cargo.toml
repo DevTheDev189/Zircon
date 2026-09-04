@@ -1,0 +1,33 @@
+[package]
+name = "zircon-core"
+version = "0.4.4"
+edition = "2021"
+description = "Shared domain for Zircon: models, hashes, archives, mod metadata, provider API clients"
+license = "BSL-1.1"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha1.workspace = true
+sha2.workspace = true
+hex.workspace = true
+zip.workspace = true
+toml.workspace = true
+tar.workspace = true
+lz4_flex.workspace = true
+flate2.workspace = true
+reqwest.workspace = true
+url.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+base64.workspace = true
+tokio = { workspace = true, features = ["fs", "io-util", "sync"] }
+# Ed25519 for BOM attestation: the server signs the canonical BOM digest on
+# every save; the launcher pins the server public key (TOFU) and verifies.
+ed25519-dalek = { version = "2.1", default-features = false, features = ["std", "rand_core"] }
+# RFC 8785 (JCS) canonical JSON for deterministic, cross-platform BOM digests.
+serde_jcs = "0.1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "fs", "io-util"] }
+tempfile = "3"
