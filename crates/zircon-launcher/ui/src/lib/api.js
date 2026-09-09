@@ -243,6 +243,13 @@ export const api = {
   renameSkin: (filename, newName) => invoke('rename_skin', { filename, newName }),
   uploadSkinToMojang: (variant = 'classic') => invoke('upload_skin_to_mojang', { variant }),
 
+  // AI Skin Concept & Draft Studio (100% Local, Private & Secure)
+  getSkinAiStatus: () => invoke('get_skin_ai_status'),
+  startSkinAiDownload: () => invoke('start_skin_ai_download'),
+  cancelSkinAiDownload: () => invoke('cancel_skin_ai_download'),
+  deleteSkinAiModel: () => invoke('delete_skin_ai_model'),
+  generateSkinBatch: (request) => invoke('generate_skin_batch', { request }),
+
   // Packs
   listInstancePacks: (gameDir) => invoke('list_instance_packs', { gameDir }),
   listInstancePacksDetailed: (gameDir) => invoke('list_instance_packs_detailed', { gameDir }), // fetch pack metadata
@@ -658,4 +665,16 @@ export async function renderSkinIsometric3D(skinDataUrl, variant = 'classic') {
     img.onerror = () => resolve(null);
     img.src = skinDataUrl;
   });
+}
+
+export function onSkinAiDownloadProgress(cb) {
+  return listen('skin-ai-download-progress', (e) => cb(e.payload));
+}
+
+export function onSkinAiDownloadComplete(cb) {
+  return listen('skin-ai-download-complete', (e) => cb(e.payload));
+}
+
+export function onSkinAiDownloadError(cb) {
+  return listen('skin-ai-download-error', (e) => cb(e.payload));
 }

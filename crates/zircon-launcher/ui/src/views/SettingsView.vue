@@ -655,7 +655,7 @@
               <button class="z-btn-ghost text-[10px] px-2 py-0.5 rounded hover:text-red-400" @click="clearLogs">Clear</button>
             </div>
           </div>
-          <pre class="bg-[#070b10] border border-slate-800/90 rounded-xl p-3 text-[10px] font-mono leading-relaxed text-slate-400 h-40 overflow-y-auto whitespace-pre-wrap select-text shadow-inner">{{ logText || 'No log lines captured yet.' }}</pre>
+          <pre class="bg-black/40 backdrop-blur-md border border-slate-800/80 rounded-xl p-3 text-[10px] font-mono leading-relaxed text-slate-300 h-40 overflow-y-auto whitespace-pre-wrap select-text shadow-inner">{{ logText || 'No log lines captured yet.' }}</pre>
           <p v-if="copiedAt" class="z-label text-cyan-300 font-medium text-xs">{{ copiedAt }}</p>
         </div>
       </div>
@@ -757,7 +757,7 @@
       <!-- Log Terminal Box -->
       <div
         ref="mcLogBox"
-        class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 text-[11px] font-mono leading-relaxed min-h-[300px] max-h-[440px] overflow-y-auto whitespace-pre-wrap space-y-1 mt-3.5 select-text shadow-inner"
+        class="bg-black/40 backdrop-blur-md border border-slate-800/80 rounded-xl p-4 text-[11px] font-mono leading-relaxed min-h-[300px] max-h-[440px] overflow-y-auto whitespace-pre-wrap space-y-1 mt-3.5 select-text shadow-inner"
       >
         <template v-if="filteredMcLogLines.length > 0">
           <div

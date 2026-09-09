@@ -1820,7 +1820,12 @@ async function loadPacks() {
 async function playOffline() {
   if (!selected.value) return;
   launching.value = true;
-  emit('launching');
+  emit('launching', selected.value ? {
+    name: selected.value.name,
+    address: `${selected.value.loaderType ? selected.value.loaderType.toUpperCase() : 'FABRIC'} ${selected.value.mcVersion || ''}`.trim(),
+    iconUrl: selected.value.icon || null,
+    bannerUrl: selected.value.banner || selected.value.bannerUrl || null,
+  } : null);
   try {
     await api.launchOfflineInstance(selected.value.id);
   } catch (e) {

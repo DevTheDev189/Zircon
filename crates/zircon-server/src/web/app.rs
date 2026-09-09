@@ -738,6 +738,10 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
             "text/css; charset=utf-8",
             include_str!("../../assets/web/styles.css"),
         ),
+        "/custom.css" => (
+            "text/css; charset=utf-8",
+            include_str!("../../assets/web/custom.css"),
+        ),
         "/zircon-icon.svg" => (
             "image/svg+xml",
             include_str!("../../assets/web/zircon-icon.svg"),

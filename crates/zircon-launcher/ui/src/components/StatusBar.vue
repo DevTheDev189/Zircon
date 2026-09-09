@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center gap-3 px-4 py-2 border-t border-edge bg-sidebar">
+  <div class="flex items-center gap-3 px-4 py-2 border-t border-edge bg-sidebar select-none">
     <span
       class="w-2 h-2 rounded-full shrink-0 shadow-sm"
       :class="dotClass"

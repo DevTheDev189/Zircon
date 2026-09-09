@@ -86,6 +86,16 @@ pub fn skin_presets_dir() -> PathBuf {
     skins_dir().join("presets")
 }
 
+/// `~/.mcmanager/models` — local AI models directory.
+pub fn models_dir() -> PathBuf {
+    mcmanager_dir().join("models")
+}
+
+/// `~/.mcmanager/models/skin_dit_v1` — directory for the optional on-demand Skin Pixel-DiT model.
+pub fn skin_ai_model_dir() -> PathBuf {
+    models_dir().join("skin_dit_v1")
+}
+
 /// `~/.zircon/instances` — per-server game directories keyed by host_port
 /// (mirrors the Java launcher's `INSTANCES_ROOT`).
 pub fn instances_dir() -> PathBuf {

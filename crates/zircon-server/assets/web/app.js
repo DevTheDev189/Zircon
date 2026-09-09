@@ -106,6 +106,10 @@ createApp({
             isLoadingMods: false,
             // { [filename]: true } for mods checked in the bulk-action toolbar.
             selectedMods: {},
+            // { [filename]: true } for shaderpacks checked in the bulk-action toolbar.
+            selectedShaders: {},
+            // { [filename]: true } for resourcepacks checked in the bulk-action toolbar.
+            selectedResourcePacks: {},
             // True after an enable/disable change until the admin restarts the
             // server (mod loaders only rescan mods at JVM boot).
             modsRestartNeeded: false,
@@ -263,6 +267,24 @@ createApp({
             const list = this.installedMods;
             if (!Array.isArray(list) || list.length === 0) return false;
             return list.every(item => Boolean(this.selectedMods?.[item.filename]));
+        },
+        selectedShaderCount() {
+            if (!this.selectedShaders) return 0;
+            return Object.values(this.selectedShaders).filter(Boolean).length;
+        },
+        allShadersSelected() {
+            const list = this.shaderpacks;
+            if (!Array.isArray(list) || list.length === 0) return false;
+            return list.every(item => Boolean(this.selectedShaders?.[item.filename]));
+        },
+        selectedResourcePackCount() {
+            if (!this.selectedResourcePacks) return 0;
+            return Object.values(this.selectedResourcePacks).filter(Boolean).length;
+        },
+        allResourcePacksSelected() {
+            const list = this.resourcepacks;
+            if (!Array.isArray(list) || list.length === 0) return false;
+            return list.every(item => Boolean(this.selectedResourcePacks?.[item.filename]));
         },
         isStatsInstanceRunning() {
             const inst = this.statsSelectedInstance;

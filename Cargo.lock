@@ -7028,7 +7028,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-core"
-version = "0.4.4"
+version = "0.4.6"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -7053,7 +7053,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-launcher"
-version = "0.4.4"
+version = "0.4.6"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -7092,7 +7092,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-server"
-version = "0.4.4"
+version = "0.4.6"
 dependencies = [
  "axum",
  "axum-extra",

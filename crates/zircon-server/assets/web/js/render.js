@@ -340,7 +340,7 @@ const _hoisted_185 = {
 const _hoisted_186 = ["checked", "onChange"]
 const _hoisted_187 = {
   key: 1,
-  class: "mods-bulk-toolbar"
+  class: "mods-bulk-toolbar z-bulk-toolbar"
 }
 const _hoisted_188 = { class: "text-xs text-slate-400 font-medium" }
 const _hoisted_189 = ["onClick"]
@@ -675,7 +675,7 @@ const _hoisted_369 = ["onUpdate:modelValue"]
 const _hoisted_370 = ["onClick"]
 const _hoisted_371 = {
   ref: "consoleBox",
-  class: "flex-1 overflow-y-auto bg-[#1e293b] border border-slate-800/90 rounded-xl p-4 font-mono text-xs space-y-1 min-h-0 select-text"
+  class: "flex-1 overflow-y-auto bg-black/40 backdrop-blur-md border border-slate-700/60 rounded-xl p-4 font-mono text-xs space-y-1 min-h-0 select-text shadow-inner"
 }
 const _hoisted_372 = {
   key: 0,
@@ -1121,15 +1121,15 @@ const _hoisted_638 = {
   key: 0,
   class: "animate-spin text-sm"
 }
-const _hoisted_639 = { class: "mt-1 border-t border-slate-800/80 pt-3" }
-const _hoisted_640 = { class: "flex items-center justify-between mb-1.5" }
+const _hoisted_639 = { class: "zircon-instance-docked-log flex flex-col gap-2" }
+const _hoisted_640 = { class: "flex items-center justify-between mb-0.5" }
 const _hoisted_641 = {
   key: 0,
   class: "text-[10px] font-mono text-cyan-400 animate-pulse"
 }
 const _hoisted_642 = {
   id: "import-log-container",
-  class: "bg-[#1e293b] border border-slate-800 rounded-xl p-3 font-mono text-[11px] text-slate-300 max-h-28 overflow-y-auto space-y-1 select-text"
+  class: "rounded-xl p-3 font-mono text-[11px] text-slate-300 max-h-32 overflow-y-auto space-y-1 select-text shadow-inner"
 }
 const _hoisted_643 = {
   key: 0,
@@ -2478,39 +2478,40 @@ return function render(_ctx, _cache) {
                                 : _createCommentVNode("v-if", true),
                               _createElementVNode("div", _hoisted_183, [
                                 _createElementVNode("h3", _hoisted_184, `Installed Mods (${installedMods.length})`, 1 /* TEXT */),
-                                (installedMods.length > 0)
-                                  ? (_openBlock(), _createElementBlock("label", _hoisted_185, [
-                                      _createElementVNode("input", {
-                                        type: "checkbox",
-                                        class: "zircon-check select-all-mods-check",
-                                        checked: Boolean(allModsSelected),
-                                        onChange: () => toggleSelectAllMods()
-                                      }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_186),
-                                      _cache[64] || (_cache[64] = _createTextVNode(" Select All ", -1 /* CACHED */))
-                                    ]))
-                                  : _createCommentVNode("v-if", true)
+                                _createElementVNode("div", { class: "flex items-center gap-2.5 ml-auto" }, [
+                                  (installedMods.length > 0)
+                                    ? (_openBlock(), _createElementBlock("label", _hoisted_185, [
+                                        _createElementVNode("input", {
+                                          type: "checkbox",
+                                          class: "zircon-check select-all-mods-check",
+                                          checked: Boolean(allModsSelected),
+                                          onChange: () => toggleSelectAllMods()
+                                        }, null, 40 /* PROPS, NEED_HYDRATION */, _hoisted_186),
+                                        _cache[64] || (_cache[64] = _createTextVNode(" Select All ", -1 /* CACHED */))
+                                      ]))
+                                    : _createCommentVNode("v-if", true),
+                                  (selectedModCount > 0)
+                                    ? (_openBlock(), _createElementBlock("div", { class: "flex items-center gap-1.5 pl-2 border-l border-slate-800" }, [
+                                        _createElementVNode("span", { class: "z-bulk-counter-compact" }, `${selectedModCount} selected`),
+                                        _createElementVNode("button", {
+                                          type: "button",
+                                          class: "mods-bulk-enable z-bulk-btn z-bulk-btn-sm",
+                                          onClick: () => bulkEnableMods()
+                                        }, "Enable", 8 /* PROPS */, _hoisted_189),
+                                        _createElementVNode("button", {
+                                          type: "button",
+                                          class: "mods-bulk-disable z-bulk-btn z-bulk-btn-sm",
+                                          onClick: () => bulkDisableMods()
+                                        }, "Disable", 8 /* PROPS */, _hoisted_190),
+                                        _createElementVNode("button", {
+                                          type: "button",
+                                          class: "mods-bulk-delete z-bulk-btn z-bulk-btn-sm",
+                                          onClick: () => bulkDeleteMods()
+                                        }, "Delete", 8 /* PROPS */, _hoisted_191)
+                                      ]))
+                                    : _createCommentVNode("v-if", true)
+                                ])
                               ]),
-                              (selectedModCount > 0)
-                                ? (_openBlock(), _createElementBlock("div", _hoisted_187, [
-                                    _createElementVNode("span", _hoisted_188, `${selectedModCount} selected`, 1 /* TEXT */),
-                                    _cache[65] || (_cache[65] = _createElementVNode("div", { class: "flex-1" }, null, -1 /* CACHED */)),
-                                    _createElementVNode("button", {
-                                      type: "button",
-                                      class: "mods-bulk-enable z-bulk-btn",
-                                      onClick: () => bulkEnableMods()
-                                    }, "Enable", 8 /* PROPS */, _hoisted_189),
-                                    _createElementVNode("button", {
-                                      type: "button",
-                                      class: "mods-bulk-disable z-bulk-btn",
-                                      onClick: () => bulkDisableMods()
-                                    }, "Disable", 8 /* PROPS */, _hoisted_190),
-                                    _createElementVNode("button", {
-                                      type: "button",
-                                      class: "mods-bulk-delete z-bulk-btn",
-                                      onClick: () => bulkDeleteMods()
-                                    }, "Delete", 8 /* PROPS */, _hoisted_191)
-                                  ]))
-                                : _createCommentVNode("v-if", true),
                               _createElementVNode("div", _hoisted_192, [
                                 (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(installedMods, (m) => {
                                   return (_openBlock(), _createElementBlock("div", {
@@ -2867,12 +2868,44 @@ return function render(_ctx, _cache) {
                                     }), 128 /* KEYED_FRAGMENT */))
                                   ]))
                                 : _createCommentVNode("v-if", true),
+                              _createElementVNode("div", { class: "flex items-center justify-between mt-2 mb-1.5 min-h-[30px] gap-2 flex-wrap" }, [
+                                _createElementVNode("h4", { class: "font-bold text-xs text-slate-300 uppercase tracking-wider" }, `Installed Shaders (${shaderpacks.length})`),
+                                _createElementVNode("div", { class: "flex items-center gap-2.5 ml-auto" }, [
+                                  (shaderpacks.length > 0)
+                                    ? (_openBlock(), _createElementBlock("label", { class: "flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none" }, [
+                                        _createElementVNode("input", {
+                                          type: "checkbox",
+                                          class: "zircon-check select-all-mods-check",
+                                          checked: Boolean(allShadersSelected),
+                                          onChange: () => toggleSelectAllShaders()
+                                        }, null, 40 /* PROPS, NEED_HYDRATION */, ["checked", "onChange"]),
+                                        _createTextVNode(" Select All ")
+                                      ]))
+                                    : _createCommentVNode("v-if", true),
+                                  (selectedShaderCount > 0)
+                                    ? (_openBlock(), _createElementBlock("div", { class: "flex items-center gap-1.5 pl-2 border-l border-slate-800" }, [
+                                        _createElementVNode("span", { class: "z-bulk-counter-compact" }, `${selectedShaderCount} selected`),
+                                        _createElementVNode("button", {
+                                          type: "button",
+                                          class: "mods-bulk-delete z-bulk-btn z-bulk-btn-sm",
+                                          onClick: () => bulkDeleteShaders()
+                                        }, "Delete")
+                                      ]))
+                                    : _createCommentVNode("v-if", true)
+                                ])
+                              ]),
                               _createElementVNode("div", _hoisted_269, [
                                 (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(shaderpacks, (p) => {
                                   return (_openBlock(), _createElementBlock("div", {
                                     key: p.filename,
                                     class: "bg-slate-900/60 border border-slate-800 p-3 rounded-xl flex gap-3 items-center"
                                   }, [
+                                    _createElementVNode("input", {
+                                      type: "checkbox",
+                                      class: "zircon-check shrink-0 mod-item-check",
+                                      checked: Boolean(selectedShaders[p.filename]),
+                                      onChange: () => toggleShaderSelected(p.filename)
+                                    }, null, 40 /* PROPS, NEED_HYDRATION */, ["checked", "onChange"]),
                                     _createElementVNode("img", {
                                       src: p.iconUrl || (p.origin === 'curseforge' ? 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%23F16436\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>' : 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2346d66d\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>'),
                                       class: "w-10 h-10 rounded-lg object-cover shrink-0"
@@ -3063,12 +3096,44 @@ return function render(_ctx, _cache) {
                                     }), 128 /* KEYED_FRAGMENT */))
                                   ]))
                                 : _createCommentVNode("v-if", true),
+                              _createElementVNode("div", { class: "flex items-center justify-between mt-2 mb-1.5 min-h-[30px] gap-2 flex-wrap" }, [
+                                _createElementVNode("h4", { class: "font-bold text-xs text-slate-300 uppercase tracking-wider" }, `Installed Textures (${resourcepacks.length})`),
+                                _createElementVNode("div", { class: "flex items-center gap-2.5 ml-auto" }, [
+                                  (resourcepacks.length > 0)
+                                    ? (_openBlock(), _createElementBlock("label", { class: "flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none" }, [
+                                        _createElementVNode("input", {
+                                          type: "checkbox",
+                                          class: "zircon-check select-all-mods-check",
+                                          checked: Boolean(allResourcePacksSelected),
+                                          onChange: () => toggleSelectAllResourcePacks()
+                                        }, null, 40 /* PROPS, NEED_HYDRATION */, ["checked", "onChange"]),
+                                        _createTextVNode(" Select All ")
+                                      ]))
+                                    : _createCommentVNode("v-if", true),
+                                  (selectedResourcePackCount > 0)
+                                    ? (_openBlock(), _createElementBlock("div", { class: "flex items-center gap-1.5 pl-2 border-l border-slate-800" }, [
+                                        _createElementVNode("span", { class: "z-bulk-counter-compact" }, `${selectedResourcePackCount} selected`),
+                                        _createElementVNode("button", {
+                                          type: "button",
+                                          class: "mods-bulk-delete z-bulk-btn z-bulk-btn-sm",
+                                          onClick: () => bulkDeleteResourcePacks()
+                                        }, "Delete")
+                                      ]))
+                                    : _createCommentVNode("v-if", true)
+                                ])
+                              ]),
                               _createElementVNode("div", _hoisted_311, [
                                 (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(resourcepacks, (p) => {
                                   return (_openBlock(), _createElementBlock("div", {
                                     key: p.filename,
                                     class: _normalizeClass(["bg-slate-900/60 border border-slate-800 p-3 rounded-xl flex gap-3 items-center", p.serverEnforced ? 'border-cyan-500/40 bg-cyan-950/10 shadow-[0_0_12px_rgba(71,210,201,0.06)]' : ''])
                                   }, [
+                                    _createElementVNode("input", {
+                                      type: "checkbox",
+                                      class: "zircon-check shrink-0 mod-item-check",
+                                      checked: Boolean(selectedResourcePacks[p.filename]),
+                                      onChange: () => toggleResourcePackSelected(p.filename)
+                                    }, null, 40 /* PROPS, NEED_HYDRATION */, ["checked", "onChange"]),
                                     _createElementVNode("img", {
                                       src: p.iconUrl || (p.origin === 'curseforge' ? 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%23F16436\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>' : 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2346d66d\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>'),
                                       class: "w-10 h-10 rounded-lg object-cover shrink-0"

@@ -1,12 +1,13 @@
 <template>
-  <div
-    v-if="open"
-    class="fixed inset-0 z-50 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4 select-none"
-    @click.self="close"
-  >
+  <Teleport to="body">
     <div
-      class="z-card w-full max-w-4xl max-h-[90vh] flex flex-col p-6 bg-[#0e1622] border border-slate-700/60 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+      v-if="open"
+      class="fixed inset-0 z-50 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4 select-none"
+      @click.self="close"
     >
+      <div
+        class="z-card w-full max-w-4xl max-h-[90vh] flex flex-col p-6 bg-[#0e1622] border border-slate-700/60 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+      >
       <!-- Modal Header -->
       <div class="flex items-center justify-between pb-4 border-b border-slate-800/80 mb-4 shrink-0">
         <div class="min-w-0">
@@ -631,6 +632,7 @@
       @close="onCloseDependencies"
     />
   </div>
+</Teleport>
 </template>
 
 <script setup>

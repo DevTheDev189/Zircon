@@ -1,6 +1,6 @@
 [package]
 name = "zircon-launcher"
-version = "0.4.4"
+version = "0.4.6"
 edition = "2021"
 description = "Zircon companion launcher: Tauri v2 shell + Vue 3 frontend over the Phase 4 launch engine (Microsoft auth, classpath resolver, sync engines, offline instances)"
 license = "BSL-1.1"

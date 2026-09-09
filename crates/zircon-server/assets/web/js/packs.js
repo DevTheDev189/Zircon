@@ -38,6 +38,8 @@ window.Zircon.packs = {
         } catch (e) {
             this.serverResourcePack = null;
         }
+        this.selectedShaders = {};
+        this.selectedResourcePacks = {};
     },
     async searchPacks(type) {
         const isShader = type === 'shaderpack';
@@ -201,6 +203,92 @@ window.Zircon.packs = {
     async deletePack(filename, type) {
         await this.api(`/api/instances/${this.selectedInstance.id}/${this.packEndpoint(type)}/${encodeURIComponent(filename)}`, { method: 'DELETE' });
         this.loadShaders();
+    },
+    // --- Shaderpack Bulk Operations ---
+    toggleShaderSelected(filename) {
+        if (!filename) return;
+        const current = { ...this.selectedShaders };
+        if (current[filename]) {
+            delete current[filename];
+        } else {
+            current[filename] = true;
+        }
+        this.selectedShaders = current;
+    },
+    toggleSelectAllShaders() {
+        if (this.allShadersSelected) {
+            this.selectedShaders = {};
+            return;
+        }
+        const selections = {};
+        for (const p of (this.shaderpacks || [])) {
+            if (p && p.filename) {
+                selections[p.filename] = true;
+            }
+        }
+        this.selectedShaders = selections;
+    },
+    async bulkDeleteShaders() {
+        if (!this.selectedInstance) return;
+        const filenames = Object.keys(this.selectedShaders || {}).filter(k => this.selectedShaders[k]);
+        if (filenames.length === 0) return;
+        const count = filenames.length;
+        const noun = count === 1 ? 'shaderpack' : 'shaderpacks';
+        if (!window.confirm(`Permanently remove ${count} ${noun}? This action cannot be reverted.`)) {
+            return;
+        }
+        for (const filename of filenames) {
+            try {
+                await this.api(`/api/instances/${this.selectedInstance.id}/shaderpacks/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+            } catch (err) {
+                console.error(`Failed to delete shader ${filename}:`, err);
+            }
+        }
+        this.selectedShaders = {};
+        await this.loadShaders();
+    },
+    // --- Resourcepack / Texture Bulk Operations ---
+    toggleResourcePackSelected(filename) {
+        if (!filename) return;
+        const current = { ...this.selectedResourcePacks };
+        if (current[filename]) {
+            delete current[filename];
+        } else {
+            current[filename] = true;
+        }
+        this.selectedResourcePacks = current;
+    },
+    toggleSelectAllResourcePacks() {
+        if (this.allResourcePacksSelected) {
+            this.selectedResourcePacks = {};
+            return;
+        }
+        const selections = {};
+        for (const p of (this.resourcepacks || [])) {
+            if (p && p.filename) {
+                selections[p.filename] = true;
+            }
+        }
+        this.selectedResourcePacks = selections;
+    },
+    async bulkDeleteResourcePacks() {
+        if (!this.selectedInstance) return;
+        const filenames = Object.keys(this.selectedResourcePacks || {}).filter(k => this.selectedResourcePacks[k]);
+        if (filenames.length === 0) return;
+        const count = filenames.length;
+        const noun = count === 1 ? 'texture pack' : 'texture packs';
+        if (!window.confirm(`Permanently remove ${count} ${noun}? This action cannot be reverted.`)) {
+            return;
+        }
+        for (const filename of filenames) {
+            try {
+                await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+            } catch (err) {
+                console.error(`Failed to delete resourcepack ${filename}:`, err);
+            }
+        }
+        this.selectedResourcePacks = {};
+        await this.loadShaders();
     },
     async handlePackDrop(event, type) {
         const files = Array.from(event.dataTransfer.files || []).filter(f => f.name.toLowerCase().endsWith('.zip'));

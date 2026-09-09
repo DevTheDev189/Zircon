@@ -27,6 +27,7 @@ pub mod sync;
 pub mod worlds;
 pub mod export;
 pub mod coop;
+pub mod skin_ai;
 
 
 /// Boots the Tauri application: registers the plugins, manages the shared
@@ -119,6 +120,11 @@ pub fn run() {
             commands::delete_history_skin,
             commands::rename_skin,
             commands::upload_skin_to_mojang,
+            commands::get_skin_ai_status,
+            commands::start_skin_ai_download,
+            commands::cancel_skin_ai_download,
+            commands::delete_skin_ai_model,
+            commands::generate_skin_batch,
             commands::list_instance_packs,
             commands::list_instance_packs_detailed,
             commands::open_external_url,

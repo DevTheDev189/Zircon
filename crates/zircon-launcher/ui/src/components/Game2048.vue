@@ -1,32 +1,51 @@
 <template>
-  <div class="game-2048-container flex flex-col h-full select-none bg-[#09111c]/90 rounded-2xl border border-cyan-500/25 p-4 shadow-xl shadow-black/50 backdrop-blur-md">
+  <div
+    class="game-2048-container flex flex-col h-full select-none rounded-2xl p-4 transition-all duration-300"
+    :class="[
+      embedded
+        ? 'bg-[#080e17]/80 border border-teal-500/25 shadow-xl shadow-black/40 backdrop-blur-md'
+        : 'bg-[#09111c]/95 border border-cyan-500/30 shadow-2xl shadow-black/60 backdrop-blur-lg'
+    ]"
+  >
     <!-- Header: Title, Scores, Actions -->
     <div class="flex items-center justify-between gap-2 mb-3">
-      <div>
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-black tracking-wider text-accent uppercase font-mono">2048</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold tracking-tight">Mini</span>
+      <div class="flex items-center gap-2">
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-500/15 border border-teal-400/30 text-teal-300">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" stroke-width="2" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" stroke-width="2" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" stroke-width="2" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" stroke-width="2" />
+          </svg>
         </div>
-        <p class="text-[10px] text-slate-400 font-medium">Join tiles to reach 2048!</p>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-black tracking-wider text-teal-300 uppercase font-mono">2048</span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-200 font-bold tracking-tight border border-teal-500/30">
+              MINIGAME
+            </span>
+          </div>
+          <p class="text-[10px] text-slate-400 font-medium leading-none mt-0.5">Join tiles to reach 2048!</p>
+        </div>
       </div>
 
       <div class="flex items-center gap-2">
         <!-- Score & Best Boxes -->
         <div class="flex gap-1.5">
-          <div class="px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-center min-w-[50px]">
-            <span class="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Score</span>
-            <span class="block text-xs font-extrabold text-cyan-200 font-mono leading-none mt-0.5">{{ score }}</span>
+          <div class="px-2.5 py-1 rounded-xl bg-[#0b1420] border border-teal-500/20 text-center min-w-[52px] shadow-sm">
+            <span class="block text-[8px] uppercase tracking-wider text-slate-400 font-bold">Score</span>
+            <span class="block text-xs font-black text-teal-200 font-mono leading-none mt-0.5">{{ score }}</span>
           </div>
-          <div class="px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-center min-w-[50px]">
-            <span class="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Best</span>
-            <span class="block text-xs font-extrabold text-accent font-mono leading-none mt-0.5">{{ bestScore }}</span>
+          <div class="px-2.5 py-1 rounded-xl bg-[#0b1420] border border-emerald-500/20 text-center min-w-[52px] shadow-sm">
+            <span class="block text-[8px] uppercase tracking-wider text-emerald-400/80 font-bold">Best</span>
+            <span class="block text-xs font-black text-emerald-300 font-mono leading-none mt-0.5">{{ bestScore }}</span>
           </div>
         </div>
 
         <!-- Reset Button -->
         <button
           type="button"
-          class="p-1.5 rounded-xl border border-slate-700/80 bg-slate-800/80 hover:bg-cyan-500/20 hover:border-cyan-400 text-slate-300 hover:text-cyan-200 transition-all text-xs"
+          class="p-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-teal-500/20 hover:border-teal-400/50 text-slate-300 hover:text-teal-200 transition-all text-xs"
           title="Restart Game"
           @click="resetGame"
         >
@@ -38,8 +57,8 @@
         <!-- Hide/Close Button -->
         <button
           type="button"
-          class="p-1.5 rounded-xl border border-slate-700/80 bg-slate-800/80 hover:bg-rose-500/20 hover:border-rose-400/60 text-slate-300 hover:text-rose-300 transition-all text-xs"
-          title="Hide 2048 Minigame"
+          class="p-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-rose-500/20 hover:border-rose-400/60 text-slate-400 hover:text-rose-300 transition-all text-xs"
+          title="Minimize Minigame"
           @click="$emit('close')"
         >
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -52,7 +71,7 @@
     <!-- 4x4 Square Game Board -->
     <div
       ref="boardRef"
-      class="relative w-full aspect-square max-w-[280px] mx-auto bg-[#050a10] rounded-xl p-2 border border-slate-800/90 shadow-inner touch-none overflow-hidden select-none"
+      class="relative w-full aspect-square max-w-[270px] mx-auto bg-[#04080e] rounded-xl p-2 border border-teal-500/20 shadow-inner touch-none overflow-hidden select-none"
       tabindex="0"
       @keydown="handleKeyDown"
       @touchstart="handleTouchStart"
@@ -63,7 +82,7 @@
         <div
           v-for="i in 16"
           :key="i"
-          class="rounded-lg bg-[#0d1826]/70 border border-slate-800/60 w-full h-full min-h-0 min-w-0"
+          class="rounded-lg bg-[#0c1522]/80 border border-slate-800/80 w-full h-full min-h-0 min-w-0"
         />
       </div>
 
@@ -76,7 +95,7 @@
           :style="getTilePositionStyle(tile.row, tile.col)"
         >
           <div
-            class="tile-inner w-full h-full flex items-center justify-center rounded-lg font-bold text-center select-none shadow-md"
+            class="tile-inner w-full h-full flex items-center justify-center rounded-lg font-bold text-center select-none shadow-md backdrop-blur-xs transition-colors"
             :class="[getTileClass(tile.value), tile.isNew ? 'tile-appear' : '', tile.isMerged ? 'tile-pop' : '']"
           >
             <span
@@ -92,13 +111,13 @@
       <!-- Game Over Overlay -->
       <div
         v-if="gameOver"
-        class="absolute inset-0 z-20 bg-slate-950/85 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-4 text-center animate-fade-in"
+        class="absolute inset-0 z-20 bg-[#05090f]/90 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-4 text-center animate-fade-in border border-rose-500/30"
       >
-        <span class="text-xs font-bold uppercase tracking-widest text-rose-400 mb-1">Game Over</span>
+        <span class="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-1">Game Over</span>
         <p class="text-sm font-extrabold text-white mb-3">No more moves!</p>
         <button
           type="button"
-          class="z-btn-accent text-xs font-bold px-4 py-1.5 rounded-xl shadow-lg hover:shadow-accent/30 transition-all"
+          class="z-btn-accent text-xs font-bold px-4 py-1.5 rounded-xl shadow-lg hover:shadow-teal-400/30 transition-all active:scale-95"
           @click="resetGame"
         >
           Try Again
@@ -108,9 +127,9 @@
       <!-- Win Overlay (2048 reached) -->
       <div
         v-else-if="gameWon && !dismissedWin"
-        class="absolute inset-0 z-20 bg-cyan-950/90 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-4 text-center animate-fade-in border border-accent/40 shadow-[0_0_20px_rgba(71,210,201,0.3)]"
+        class="absolute inset-0 z-20 bg-[#06151f]/92 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-4 text-center animate-fade-in border border-teal-400/40 shadow-[0_0_25px_rgba(71,210,201,0.35)]"
       >
-        <span class="text-xs font-black uppercase tracking-widest text-accent mb-1 drop-shadow-[0_0_8px_#47d2c9]">Victory!</span>
+        <span class="text-[10px] font-black uppercase tracking-widest text-teal-300 mb-1 drop-shadow-[0_0_8px_#47d2c9]">Victory!</span>
         <p class="text-sm font-extrabold text-white mb-3">You reached 2048!</p>
         <div class="flex gap-2">
           <button
@@ -134,39 +153,35 @@
     <!-- Footer Controls Hint -->
     <div class="mt-2.5 flex items-center justify-between text-[10px] text-slate-400 font-mono px-1">
       <span class="flex items-center gap-1">
-        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-cyan-300 font-sans font-bold">↑</kbd>
-        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-cyan-300 font-sans font-bold">↓</kbd>
-        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-cyan-300 font-sans font-bold">←</kbd>
-        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-cyan-300 font-sans font-bold">→</kbd>
-        <span class="ml-1 text-slate-400">or WASD</span>
+        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">↑</kbd>
+        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">↓</kbd>
+        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">←</kbd>
+        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">→</kbd>
+        <span class="ml-1 text-slate-500">or WASD</span>
       </span>
-      <span class="text-slate-500 hover:text-slate-400 cursor-pointer" @click="$emit('close')">
+      <span class="text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" @click="$emit('close')">
         ✕ Hide
       </span>
     </div>
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 
-const emit = defineEmits<{
-  (e: 'close'): void;
-}>();
+const props = defineProps({
+  embedded: {
+    type: Boolean,
+    default: false,
+  },
+});
 
-interface Tile {
-  id: number;
-  value: number;
-  row: number;
-  col: number;
-  isNew?: boolean;
-  isMerged?: boolean;
-}
+const emit = defineEmits(['close']);
 
-const boardRef = ref<HTMLElement | null>(null);
+const boardRef = ref(null);
 
 let nextTileId = 1;
-const activeTiles = ref<Tile[]>([]);
+const activeTiles = ref([]);
 
 const score = ref(0);
 const bestScore = ref(0);
@@ -178,7 +193,7 @@ const STORAGE_STATE_KEY = 'zircon_2048_state';
 const STORAGE_BEST_KEY = 'zircon_2048_best';
 
 // --- Responsive Tile Position Style ---
-function getTilePositionStyle(row: number, col: number) {
+function getTilePositionStyle(row, col) {
   return {
     width: 'calc((100% - 24px) / 4)',
     height: 'calc((100% - 24px) / 4)',
@@ -198,7 +213,7 @@ function loadSavedGame() {
     if (savedState) {
       const parsed = JSON.parse(savedState);
       if (Array.isArray(parsed.tiles) && parsed.tiles.length > 0) {
-        activeTiles.value = parsed.tiles.map((t: any) => ({
+        activeTiles.value = parsed.tiles.map((t) => ({
           id: nextTileId++,
           value: t.value,
           row: t.row,
@@ -267,7 +282,7 @@ function focusBoard() {
 // --- Spawning Tiles ---
 function spawnTile() {
   const occupied = new Set(activeTiles.value.map((t) => `${t.row}-${t.col}`));
-  const emptyCells: { row: number; col: number }[] = [];
+  const emptyCells = [];
 
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
@@ -279,7 +294,7 @@ function spawnTile() {
 
   if (emptyCells.length === 0) return;
   const rand = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-  const newTile: Tile = {
+  const newTile = {
     id: nextTileId++,
     value: Math.random() < 0.9 ? 2 : 4,
     row: rand.row,
@@ -290,7 +305,7 @@ function spawnTile() {
 }
 
 // --- Sliding Movement with CSS Transition ---
-function move(direction: 'left' | 'right' | 'up' | 'down') {
+function move(direction) {
   if (gameOver.value) return;
 
   // Clear previous transient animation flags
@@ -300,53 +315,55 @@ function move(direction: 'left' | 'right' | 'up' | 'down') {
   }
 
   // Build current 4x4 matrix of tile references
-  const grid: (Tile | null)[][] = Array.from({ length: 4 }, () => [null, null, null, null]);
+  const grid = Array.from({ length: 4 }, () => [null, null, null, null]);
   for (const tile of activeTiles.value) {
     grid[tile.row][tile.col] = tile;
   }
 
   let anyMoved = false;
   let scoreGained = 0;
-  const tilesToRemove = new Set<number>();
-  const tilesToAdd: Tile[] = [];
+  const tilesToRemove = new Set();
+  const tilesToAdd = [];
 
   const isHorizontal = direction === 'left' || direction === 'right';
   const isForward = direction === 'right' || direction === 'down';
 
   for (let line = 0; line < 4; line++) {
     // Collect non-empty tiles along line in directional order
-    const lineTiles: Tile[] = [];
+    const lineTiles = [];
     for (let i = 0; i < 4; i++) {
       const pos = isForward ? 3 - i : i;
-      const r = isHorizontal ? line : pos;
-      const c = isHorizontal ? pos : line;
-      const t = grid[r][c];
-      if (t) lineTiles.push(t);
+      const tile = isHorizontal ? grid[line][pos] : grid[pos][line];
+      if (tile) lineTiles.push(tile);
     }
 
     let targetIdx = 0;
-    for (let i = 0; i < lineTiles.length; i++) {
+    let i = 0;
+    while (i < lineTiles.length) {
       const current = lineTiles[i];
-      const next = i + 1 < lineTiles.length ? lineTiles[i + 1] : null;
-
       const targetPos = isForward ? 3 - targetIdx : targetIdx;
-      const targetRow = isHorizontal ? line : targetPos;
-      const targetCol = isHorizontal ? targetPos : line;
 
-      if (next && next.value === current.value) {
-        // Merge current and next!
-        anyMoved = true;
+      if (i + 1 < lineTiles.length && lineTiles[i].value === lineTiles[i + 1].value) {
+        const nextTile = lineTiles[i + 1];
         const mergedValue = current.value * 2;
         scoreGained += mergedValue;
-        if (mergedValue === 2048) gameWon.value = true;
 
-        current.row = targetRow;
-        current.col = targetCol;
-        next.row = targetRow;
-        next.col = targetCol;
+        const targetRow = isHorizontal ? line : targetPos;
+        const targetCol = isHorizontal ? targetPos : line;
+
+        if (current.row !== targetRow || current.col !== targetCol) {
+          current.row = targetRow;
+          current.col = targetCol;
+          anyMoved = true;
+        }
+        if (nextTile.row !== targetRow || nextTile.col !== targetCol) {
+          nextTile.row = targetRow;
+          nextTile.col = targetCol;
+          anyMoved = true;
+        }
 
         tilesToRemove.add(current.id);
-        tilesToRemove.add(next.id);
+        tilesToRemove.add(nextTile.id);
 
         tilesToAdd.push({
           id: nextTileId++,
@@ -356,36 +373,43 @@ function move(direction: 'left' | 'right' | 'up' | 'down') {
           isMerged: true,
         });
 
-        i++; // Skip next tile since it merged
-        targetIdx++;
+        if (mergedValue === 2048) gameWon.value = true;
+        i += 2;
       } else {
-        // Slide current to target position
+        const targetRow = isHorizontal ? line : targetPos;
+        const targetCol = isHorizontal ? targetPos : line;
+
         if (current.row !== targetRow || current.col !== targetCol) {
-          anyMoved = true;
           current.row = targetRow;
           current.col = targetCol;
+          anyMoved = true;
         }
-        targetIdx++;
+        i += 1;
       }
+      targetIdx++;
     }
   }
 
   if (anyMoved) {
-    score.value += scoreGained;
-    activeTiles.value = activeTiles.value.filter((t) => !tilesToRemove.has(t.id)).concat(tilesToAdd);
+    activeTiles.value = activeTiles.value.filter((t) => !tilesToRemove.has(t.id));
+    activeTiles.value.push(...tilesToAdd);
 
-    setTimeout(() => {
-      spawnTile();
-      checkGameOver();
-      saveGameState();
-    }, 130);
+    score.value += scoreGained;
+    if (score.value > bestScore.value) {
+      bestScore.value = score.value;
+    }
+
+    spawnTile();
+    saveGameState();
+
+    checkGameOver();
   }
 }
 
 function checkGameOver() {
   if (activeTiles.value.length < 16) return;
 
-  const grid: number[][] = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
+  const grid = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
   for (const t of activeTiles.value) {
     grid[t.row][t.col] = t.value;
   }
@@ -393,8 +417,9 @@ function checkGameOver() {
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
       const val = grid[r][c];
-      if (r + 1 < 4 && grid[r + 1][c] === val) return;
-      if (c + 1 < 4 && grid[r][c + 1] === val) return;
+      if (val === 0) return;
+      if (r < 3 && grid[r + 1][c] === val) return;
+      if (c < 3 && grid[r][c + 1] === val) return;
     }
   }
 
@@ -402,7 +427,12 @@ function checkGameOver() {
 }
 
 // --- Key & Touch Handlers ---
-function handleKeyDown(e: KeyboardEvent) {
+function handleKeyDown(e) {
+  const tag = e.target?.tagName?.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) {
+    return;
+  }
+
   const key = e.key.toLowerCase();
   if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'a', 'd', 'w', 's'].includes(key)) {
     e.preventDefault();
@@ -422,14 +452,14 @@ function handleKeyDown(e: KeyboardEvent) {
 let touchStartX = 0;
 let touchStartY = 0;
 
-function handleTouchStart(e: TouchEvent) {
+function handleTouchStart(e) {
   if (e.touches.length === 1) {
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
   }
 }
 
-function handleTouchEnd(e: TouchEvent) {
+function handleTouchEnd(e) {
   if (e.changedTouches.length === 1) {
     const deltaX = e.changedTouches[0].clientX - touchStartX;
     const deltaY = e.changedTouches[0].clientY - touchStartY;
@@ -447,37 +477,37 @@ function handleTouchEnd(e: TouchEvent) {
   }
 }
 
-// --- Tile Styling (Cyan & Blue Brand Palette) ---
-function getTileClass(val: number): string {
+// --- Tile Styling (Vibrant Cyberpunk Minecraft Gem Palette) ---
+function getTileClass(val) {
   switch (val) {
     case 2:
-      return 'bg-[#102235] text-cyan-200 border border-cyan-900/60 shadow-sm';
+      return 'bg-[#0e1f2d] text-teal-200 border border-teal-500/30 shadow-sm';
     case 4:
-      return 'bg-[#132c48] text-cyan-100 border border-cyan-800/70 shadow-sm';
+      return 'bg-[#102a3f] text-teal-100 border border-teal-500/45 shadow-sm';
     case 8:
-      return 'bg-[#163a62] text-cyan-50 border border-cyan-700/80 shadow-md shadow-cyan-950/40';
+      return 'bg-[#123854] text-cyan-50 border border-cyan-400/50 shadow-md shadow-cyan-950/50';
     case 16:
-      return 'bg-[#174d82] text-white border border-cyan-600/80 shadow-md shadow-cyan-900/50';
+      return 'bg-[#14476a] text-white border border-cyan-400/70 shadow-md shadow-cyan-900/50';
     case 32:
-      return 'bg-[#0e618e] text-white border border-cyan-500/80 shadow-lg shadow-cyan-900/50';
+      return 'bg-[#0f5c80] text-white border border-teal-400/80 shadow-lg shadow-teal-900/50';
     case 64:
-      return 'bg-[#0a7a9e] text-white border border-cyan-400/90 shadow-lg shadow-cyan-800/60 font-extrabold';
+      return 'bg-[#0d738f] text-white border border-emerald-400/80 shadow-lg shadow-emerald-900/60 font-extrabold';
     case 128:
-      return 'bg-[#0895b6] text-white border border-cyan-300 shadow-xl shadow-cyan-700/60 font-extrabold';
+      return 'bg-[#0a8c9e] text-white border border-emerald-300 shadow-xl shadow-emerald-700/60 font-extrabold';
     case 256:
-      return 'bg-[#07b3d3] text-slate-950 border border-cyan-200 shadow-xl shadow-cyan-600/70 font-black';
+      return 'bg-gradient-to-br from-[#0ab4aa] to-[#06847d] text-slate-950 border border-teal-200 shadow-xl shadow-teal-500/50 font-black';
     case 512:
-      return 'bg-[#10cbe6] text-slate-950 border border-white shadow-2xl shadow-cyan-500/80 font-black';
+      return 'bg-gradient-to-br from-[#20d7be] to-[#0bb19d] text-slate-950 border border-white shadow-2xl shadow-teal-400/70 font-black';
     case 1024:
-      return 'bg-[#2be2f5] text-slate-950 border border-white shadow-2xl shadow-cyan-400/90 font-black';
+      return 'bg-gradient-to-br from-[#38ebd5] to-[#12c4b0] text-slate-950 border border-white shadow-2xl shadow-cyan-400/80 font-black';
     case 2048:
-      return 'bg-gradient-to-br from-[#5adfd5] via-[#47d2c9] to-[#20b2aa] text-slate-950 border-2 border-white shadow-[0_0_25px_rgba(71,210,201,0.9)] animate-pulse font-black';
+      return 'bg-gradient-to-br from-[#68fff0] via-[#47d2c9] to-[#14b8a6] text-slate-950 border-2 border-white shadow-[0_0_25px_rgba(71,210,201,0.95)] animate-pulse font-black';
     default:
-      return 'bg-gradient-to-br from-white via-cyan-200 to-cyan-400 text-slate-950 border-2 border-cyan-100 shadow-[0_0_30px_rgba(255,255,255,0.9)] font-black';
+      return 'bg-gradient-to-br from-white via-teal-200 to-emerald-400 text-slate-950 border-2 border-white shadow-[0_0_30px_rgba(255,255,255,0.9)] font-black';
   }
 }
 
-function getTileTextSize(val: number): string {
+function getTileTextSize(val) {
   if (val < 100) return 'text-base sm:text-lg';
   if (val < 1000) return 'text-sm sm:text-base';
   if (val < 10000) return 'text-xs';
@@ -491,6 +521,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown);
+});
+
+defineExpose({
+  resetGame,
+  focusBoard,
 });
 </script>
 

@@ -129,6 +129,7 @@ pub struct LauncherState {
     pub accounts: crate::auth::accounts::AccountManager,
     pub coop_session: AsyncMutex<Option<crate::coop::CoopSessionInfo>>,
     pub coop_p2p_shutdown: AsyncMutex<Option<tokio::sync::oneshot::Sender<()>>>,
+    pub skin_ai_download: Arc<crate::skin_ai::ModelDownloadManager>,
 }
 
 impl Default for LauncherState {
@@ -180,6 +181,7 @@ impl LauncherState {
             discord_client: Arc::new(AsyncMutex::new(None)),
             coop_session: AsyncMutex::new(None),
             coop_p2p_shutdown: AsyncMutex::new(None),
+            skin_ai_download: Arc::new(crate::skin_ai::ModelDownloadManager::new()),
         }
     }
 }
@@ -3102,6 +3104,36 @@ pub async fn upload_skin_to_mojang(
         )
         .await
         .map_err(err_string)
+}
+
+// ---------------------------------------------------------------------------
+// AI Skin Studio commands (Local, Private, Concept-to-Editor)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn get_skin_ai_status(state: State<'_, LauncherState>) -> crate::skin_ai::SkinAiStatus {
+    state.skin_ai_download.get_status()
+}
+
+#[tauri::command]
+pub async fn start_skin_ai_download(app: AppHandle, state: State<'_, LauncherState>) -> Result<(), String> {
+    state.skin_ai_download.start_download(app).await
+}
+
+#[tauri::command]
+pub fn cancel_skin_ai_download(state: State<'_, LauncherState>) -> Result<(), String> {
+    state.skin_ai_download.cancel_download();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_skin_ai_model(state: State<'_, LauncherState>) -> Result<(), String> {
+    state.skin_ai_download.delete_model()
+}
+
+#[tauri::command]
+pub fn generate_skin_batch(request: crate::skin_ai::GenerationRequest) -> Result<crate::skin_ai::GenerationResponse, String> {
+    crate::skin_ai::SkinAiEngine::generate_batch(request)
 }
 
 // ---------------------------------------------------------------------------

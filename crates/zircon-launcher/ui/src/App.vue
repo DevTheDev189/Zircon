@@ -188,7 +188,6 @@
           :status="statusText"
           :progress="progress"
           :busy="busy"
-          class="relative z-10"
         />
       </main>
     </div>
@@ -594,14 +593,16 @@ async function onLogout() {
 }
 
 
-async function onShaderChoice({ enabled, remember }) {
+async function onShaderChoice(payload) {
   const prompt = shaderPrompt.value;
   if (!prompt) return;
   shaderPrompt.value = null;
+  const enabled = typeof payload === 'boolean' ? payload : Boolean(payload?.enabled);
+  const remember = typeof payload === 'object' && payload !== null ? Boolean(payload?.remember) : false;
   try {
-    await api.respondShaderChoice(prompt.requestId, enabled, !!remember);
-  } catch {
-    // The launch flow falls back to "no shaders" if it never hears back.
+    await api.respondShaderChoice(prompt.requestId, enabled, remember);
+  } catch (err) {
+    console.error('Failed to respond to shader choice:', err);
   }
 }
 
