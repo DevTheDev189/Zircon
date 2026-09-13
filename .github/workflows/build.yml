@@ -171,7 +171,8 @@ jobs:
             librsvg2-dev \
             libdbus-1-dev \
             libfuse2 \
-            rpm
+            rpm \
+            zip
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
@@ -196,7 +197,9 @@ jobs:
           echo "placeholder" > dist-run/zircon-server/server-data/.keep/readme.txt
           tar -czvf dist-run/zircon-server-linux-x86_64.tar.gz -C dist-run/zircon-server .
           sha256sum dist-run/zircon-server-linux-x86_64.tar.gz > dist-run/zircon-server-linux-x86_64.tar.gz.sha256
-          echo "Linux Server packaged: dist-run/zircon-server-linux-x86_64.tar.gz"
+          (cd dist-run/zircon-server && zip -r ../zircon-server-linux-x86_64.zip .)
+          sha256sum dist-run/zircon-server-linux-x86_64.zip > dist-run/zircon-server-linux-x86_64.zip.sha256
+          echo "Linux Server packaged: tar.gz and zip"
 
       - name: Build Zircon Launcher (.deb, .AppImage, .rpm)
         working-directory: crates/zircon-launcher
@@ -215,7 +218,7 @@ jobs:
       - name: Stage Linux Artifacts
         run: |
           mkdir -p artifacts-linux
-          cp dist-run/zircon-server-linux-x86_64.tar.gz* artifacts-linux/
+          cp dist-run/zircon-server-linux-x86_64.* artifacts-linux/
           find target/release/bundle/deb/ -type f -name "*.deb" -exec cp {} artifacts-linux/ \; 2>/dev/null || true
           find target/release/bundle/appimage/ -type f -name "*.AppImage" -exec cp {} artifacts-linux/ \; 2>/dev/null || true
           find target/release/bundle/rpm/ -type f -name "*.rpm" -exec cp {} artifacts-linux/ \; 2>/dev/null || true
