@@ -5,9 +5,7 @@
   "identifier": "com.zircon.launcher",
   "build": {
     "frontendDist": "ui/dist",
-    "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "cd ui && npm run dev",
-    "beforeBuildCommand": "cd ui && npm run build"
+    "devUrl": "http://localhost:1420"
   },
   "app": {
     "windows": [
