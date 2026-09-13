@@ -3132,8 +3132,8 @@ pub fn delete_skin_ai_model(state: State<'_, LauncherState>) -> Result<(), Strin
 }
 
 #[tauri::command]
-pub fn generate_skin_batch(request: crate::skin_ai::GenerationRequest) -> Result<crate::skin_ai::GenerationResponse, String> {
-    crate::skin_ai::SkinAiEngine::generate_batch(request)
+pub fn generate_skin_batch(app: tauri::AppHandle, request: crate::skin_ai::GenerationRequest) -> Result<crate::skin_ai::GenerationResponse, String> {
+    crate::skin_ai::SkinAiEngine::generate_batch(Some(&app), request)
 }
 
 // ---------------------------------------------------------------------------

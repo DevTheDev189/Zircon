@@ -44,6 +44,8 @@ zeroize = { version = "1.8", features = ["derive"] }
 getrandom = "0.3"
 futures-util = "0.3"
 igd-next = "0.14"
+ort = { version = "2.0.0-rc.13", features = ["download-binaries", "copy-dylibs"] }
+ndarray = "0.16"
 
 # OS keychain backends for the persisted Microsoft session (see
 # `auth::msa::MicrosoftAuthService`). Each platform uses its native store;
@@ -51,12 +53,15 @@ igd-next = "0.14"
 # unavailable (headless CI, locked keychain, ...).
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["windows-native"] }
+ort = { version = "2.0.0-rc.13", features = ["directml"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["apple-native"] }
+ort = { version = "2.0.0-rc.13", features = ["coreml"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["linux-native"] }
+ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

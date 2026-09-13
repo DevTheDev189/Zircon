@@ -10,5 +10,5 @@ pub mod engine;
 pub mod postprocess;
 
 pub use download::{DownloadProgressPayload, ModelDownloadManager, SkinAiStatus};
-pub use engine::{GeneratedVariant, GenerationRequest, GenerationResponse, SkinAiEngine};
+pub use engine::{GeneratedVariant, GenerationProgressPayload, GenerationRequest, GenerationResponse, SkinAiEngine};
 pub use postprocess::{encode_to_png_data_url, postprocess_skin_buffer};

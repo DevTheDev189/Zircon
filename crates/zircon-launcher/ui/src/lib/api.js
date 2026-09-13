@@ -249,6 +249,7 @@ export const api = {
   cancelSkinAiDownload: () => invoke('cancel_skin_ai_download'),
   deleteSkinAiModel: () => invoke('delete_skin_ai_model'),
   generateSkinBatch: (request) => invoke('generate_skin_batch', { request }),
+  onSkinAiProgress: (callback) => listen('skin-ai-progress', (event) => callback(event.payload)),
 
   // Packs
   listInstancePacks: (gameDir) => invoke('list_instance_packs', { gameDir }),
@@ -677,4 +678,8 @@ export function onSkinAiDownloadComplete(cb) {
 
 export function onSkinAiDownloadError(cb) {
   return listen('skin-ai-download-error', (e) => cb(e.payload));
+}
+
+export function onSkinAiProgress(cb) {
+  return listen('skin-ai-progress', (e) => cb(e.payload));
 }

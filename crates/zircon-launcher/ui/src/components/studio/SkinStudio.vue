@@ -35,6 +35,20 @@
 
       <!-- Right: Main Document Actions (New, Import, Export, Save, Apply) -->
       <div class="flex items-center gap-1.5 shrink-0">
+        <!-- AI Concept Studio Button (Disabled for this release) -->
+        <button
+          v-if="ENABLE_AI_STUDIO"
+          type="button"
+          class="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-gradient-to-r from-cyan-500/15 to-blue-500/15 hover:from-cyan-500/25 hover:to-blue-500/25 border border-cyan-500/40 text-cyan-300 shadow-sm transition-all"
+          title="Open AI Concept Studio (100% Local ONNX)"
+          @click="emit('openAiModal')"
+        >
+          <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+          </svg>
+          <span>AI Concept</span>
+        </button>
+
         <!-- New Skin Menu Button -->
         <div class="relative">
           <button
@@ -421,7 +435,10 @@ const props = defineProps({
   session: { type: Object, default: null },
 });
 
-const emit = defineEmits(['skinSaved', 'skinApplied']);
+const emit = defineEmits(['skinSaved', 'skinApplied', 'openAiModal']);
+
+// Feature flag: set to true when AI studio is ready for production
+const ENABLE_AI_STUDIO = false;
 
 const showNewModal = ref(false);
 const isSaving = ref(false);

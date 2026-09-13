@@ -28,22 +28,18 @@
         >
           Paint Studio
         </button>
+        <button
+          v-if="ENABLE_AI_STUDIO"
+          type="button"
+          class="z-segmented-pill"
+          :class="{ 'active': activeTab === 'ai' }"
+          @click="activeTab = 'ai'"
+        >
+          AI Skin Studio
+        </button>
       </div>
 
       <div class="flex items-center gap-2">
-        <!-- AI Concept Studio Button -->
-        <button
-          type="button"
-          class="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 bg-gradient-to-r from-cyan-500/15 to-blue-500/15 hover:from-cyan-500/25 hover:to-blue-500/25 border border-cyan-500/40 text-cyan-300 shadow-sm transition-all"
-          title="Open AI Concept & Draft Studio (100% Local & Private)"
-          @click="showAiStudioModal = true"
-        >
-          <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
-          </svg>
-          <span>AI Concept Studio</span>
-        </button>
-
         <button
           v-if="activeTab === 'saved'"
           class="z-btn-ghost text-xs px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 border border-slate-700 hover:border-cyan-400 hover:text-cyan-300"
@@ -68,7 +64,7 @@
         </button>
 
         <button
-          v-if="activeTab !== 'studio'"
+          v-if="activeTab === 'saved' || activeTab === 'library'"
           class="z-btn-ghost text-xs px-2.5 py-1.5 rounded-xl font-semibold"
           :title="activeTab === 'saved' ? 'Refresh saved skins' : 'Refresh library'"
           @click="activeTab === 'saved' ? refreshGallery() : reloadCurrentCommunityPage()"
@@ -80,11 +76,20 @@
       </div>
     </div>
 
+    <!-- TAB 4: AI SKIN STUDIO (Dedicated First-Class Tab) -->
+    <div v-if="ENABLE_AI_STUDIO && activeTab === 'ai'" class="flex-1 min-h-0">
+      <SkinAiStudio
+        @edit-in-studio="onAiConceptSelected"
+        @skin-saved="refreshGallery"
+      />
+    </div>
+
     <!-- TAB 3: PAINT STUDIO (Full Width & Height Workspace) -->
-    <div v-if="activeTab === 'studio'" class="flex-1 min-h-0">
+    <div v-else-if="activeTab === 'studio'" class="flex-1 min-h-0">
       <SkinStudio
         :studio="studioInstance"
         :session="session"
+        @open-ai-modal="activeTab = 'ai'"
         @skin-saved="onStudioSkinSaved"
         @skin-applied="onStudioSkinApplied"
       />
@@ -459,13 +464,6 @@
     </div>
   </div>
 
-  <!-- AI CONCEPT & DRAFT STUDIO MODAL -->
-  <SkinAiModal
-    v-if="showAiStudioModal"
-    @close="showAiStudioModal = false"
-    @edit-in-studio="onAiConceptSelected"
-    @skin-saved="refreshGallery"
-  />
 </div>
 </template>
 
@@ -473,7 +471,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import Player3DPreview from '../components/Player3DPreview.vue';
 import SkinStudio from '../components/studio/SkinStudio.vue';
-import SkinAiModal from '../components/studio/SkinAiModal.vue';
+import SkinAiStudio from '../components/studio/SkinAiStudio.vue';
 import { createStudioState } from '../components/studio/skinStudioState';
 import {
   api,
@@ -500,6 +498,9 @@ const selectedSkin = ref(null);
 const saving = ref(false);
 const activeTab = ref('saved'); // 'saved' | 'library' | 'studio'
 const showAiStudioModal = ref(false);
+
+// Feature flag: set to true when AI studio is ready for production
+const ENABLE_AI_STUDIO = false;
 
 // Paint Studio instance
 const studioInstance = createStudioState();

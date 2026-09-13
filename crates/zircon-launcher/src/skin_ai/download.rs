@@ -16,6 +16,7 @@ use tracing::{error, info};
 use crate::paths::skin_ai_model_dir;
 
 pub const MODEL_ONNX_FILENAME: &str = "skin_dit_b4_v1.onnx";
+pub const MODEL_ONNX_FP16_FILENAME: &str = "skin_dit_b4_v1_fp16.onnx";
 pub const VOCAB_JSON_FILENAME: &str = "tags_vocab.json";
 pub const MANIFEST_JSON_FILENAME: &str = "manifest.json";
 
@@ -63,7 +64,12 @@ impl ModelDownloadManager {
     /// Checks if the local AI model files exist and are ready for inference.
     pub fn get_status(&self) -> SkinAiStatus {
         let dir = skin_ai_model_dir();
-        let onnx = dir.join(MODEL_ONNX_FILENAME);
+        let fp16_onnx = dir.join(MODEL_ONNX_FP16_FILENAME);
+        let onnx = if fp16_onnx.exists() {
+            fp16_onnx
+        } else {
+            dir.join(MODEL_ONNX_FILENAME)
+        };
         let vocab = dir.join(VOCAB_JSON_FILENAME);
 
         let exists = onnx.exists() && vocab.exists();
