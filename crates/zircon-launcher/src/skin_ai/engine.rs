@@ -408,7 +408,7 @@ impl SkinAiEngine {
 
             #[cfg(target_os = "macos")]
             let mut builder = {
-                let coreml = ort::ep::CoreML::default().with_ane_only(false).build();
+                let coreml = ort::ep::CoreML::default().build();
                 match builder.with_execution_providers([coreml]) {
                     Ok(b) => {
                         info!("SkinAiEngine: [GPU Decision] Native CoreML (Apple Neural Engine + Metal) attached successfully");

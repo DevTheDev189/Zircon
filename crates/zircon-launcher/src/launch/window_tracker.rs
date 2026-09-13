@@ -15,12 +15,13 @@ use tauri::{AppHandle, Emitter, Manager};
 pub fn spawn_window_tracker(
     app: AppHandle,
     game_id: u64,
-    pid: u32,
+    #[allow(unused_variables)] pid: u32,
 ) {
     tauri::async_runtime::spawn(async move {
         let start_time = Instant::now();
         // Maximum time to wait for window initialization before falling back (75 seconds).
         let max_wait = Duration::from_secs(75);
+        #[allow(unused_variables, unused_mut)]
         let mut visible_streak = 0u32;
 
         loop {
