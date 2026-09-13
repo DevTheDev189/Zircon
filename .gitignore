@@ -52,7 +52,7 @@ crates/zircon-launcher/ui/dist/
 /dist-run/
 
 # ---------- Internal docs, scripts, tests, and builds ----------
-/scripts/
+/scripts/*
 !/scripts/ci_deploy_cloudflare.py
 !/scripts/sync-version.ps1
 !/scripts/stage-cloudflare.ps1
