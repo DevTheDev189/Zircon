@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frequently Asked Questions — Zircon Minecraft</title>
+  <meta name="description" content="Frequently asked questions about Zircon Launcher and Server Manager. Learn about automatic mod sync, Modrinth and CurseForge integration, Microsoft authentication security, port multiplexing, and troubleshooting.">
+  <meta name="keywords" content="zircon faq, modded minecraft questions, zircon launcher help, minecraft mod sync help, curseforge modrinth verification">
+  <meta name="author" content="Zircon Contributors">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0d1117">
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://zirconmc.net/faq.html">
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:site_name" content="Zircon">
+  <meta property="og:url" content="https://zirconmc.net/faq.html">
+  <meta property="og:title" content="Frequently Asked Questions — Zircon">
+  <meta property="og:description" content="Answers to common questions about Zircon Launcher, Server Manager, Modrinth &amp; CurseForge integration, security, and troubleshooting.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://zirconmc.net/assets/img/main_launcher.png">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Favicons & Manifest -->
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+  <link rel="apple-touch-icon" href="assets/img/favicon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="assets/css/styles.css">
+
+  <!-- Structured Data / JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How does Zircon automatically sync Minecraft mods?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "When you hit PLAY, Zircon connects to your server, fetches its published Bill of Materials (BOM), verifies all mod hashes against Modrinth and CurseForge, and automatically downloads missing mods straight to your isolated instance folder."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I use Modrinth and CurseForge to find and download mods?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes! Zircon natively supports both Modrinth and CurseForge with zero API key configuration required. Server owners can browse, search, and install mods from both repositories directly in the web dashboard, and the launcher automatically verifies downloads against both platforms."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is my Microsoft Minecraft account safe with Zircon?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Zircon uses standard Microsoft OAuth 2.0 PKCE authentication in your default browser. Your password and credentials are submitted directly to Microsoft and never touch or get stored by Zircon."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which mod loaders does Zircon support?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Zircon supports Fabric, Quilt, Forge, and NeoForge mod loaders across modern Minecraft versions."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does single-port multiplexing work for server hosts?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Zircon Server Manager multiplexes both standard Minecraft game traffic (port 25565) and HTTP REST mod manifest traffic on the same single port. Server owners only need to forward one port on their router."
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ================= NAV ================= -->
+  <header class="site-nav">
+    <div class="container">
+      <a class="brand" href="/" aria-label="Zircon home">
+        <img src="assets/img/zircon-title.svg" alt="Zircon" width="150" height="44">
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="launcher.html">Launcher</a></li>
+        <li><a href="server.html">Server Manager</a></li>
+        <li><a href="docs.html">Guides</a></li>
+        <li><a href="faq.html" class="active">FAQ</a></li>
+        <li><a href="downloads.html">Downloads</a></li>
+        <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a class="nav-cta" href="downloads.html#players">Get Launcher</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ================= PAGE HERO ================= -->
+  <section class="page-hero">
+    <div class="container">
+      <span class="eyebrow">Help &amp; Knowledge Base</span>
+      <h1>Frequently Asked Questions</h1>
+      <p>Everything you need to know about Zircon Launcher, Server Manager, mod sync, and security.</p>
+    </div>
+  </section>
+
+  <!-- ================= FAQ SECTION ================= -->
+  <section class="section" style="padding-top: 0;">
+    <div class="container">
+
+      <!-- Category Filter Pills -->
+      <div class="filter-pills" role="tablist">
+        <button class="filter-pill active" data-category="all">All Questions</button>
+        <button class="filter-pill" data-category="players">For Players</button>
+        <button class="filter-pill" data-category="servers">For Server Hosts</button>
+        <button class="filter-pill" data-category="security">Security &amp; Accounts</button>
+        <button class="filter-pill" data-category="troubleshoot">Troubleshooting</button>
+      </div>
+
+      <!-- FAQ Accordion List -->
+      <div class="faq-list">
+
+        <!-- Players -->
+        <details class="faq-item" data-category="players" open>
+          <summary class="faq-question">How does Zircon automatically sync Minecraft mods?</summary>
+          <div class="faq-answer">
+            <p>When you pick a server and hit <strong>PLAY</strong>, the Zircon Launcher connects to the server and retrieves its cryptographic mod manifest (BOM). It compares this against your local instance folder, verifies SHA-512 hashes and CurseForge fingerprints against official repositories, and downloads any missing or updated mods automatically.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="players">
+          <summary class="faq-question">Can I use CurseForge or Modrinth to find and download mods?</summary>
+          <div class="faq-answer">
+            <p>Yes! Zircon natively supports both <strong>Modrinth</strong> and <strong>CurseForge</strong> with zero API keys required. Whether configuring an instance in the Server Manager or playing on a server, mods from both repositories are handled seamlessly with automatic hash verification.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="players">
+          <summary class="faq-question">Can I create single-player offline instances?</summary>
+          <div class="faq-answer">
+            <p>Yes. The launcher includes a full offline instance manager. You can create local single-player instances with choice of Minecraft version (1.16 through latest), mod loader (Fabric, Quilt, Forge, NeoForge), custom RAM allocation, and local mods.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="players">
+          <summary class="faq-question">How do the Skin Customizer and Community Skin Library work?</summary>
+          <div class="faq-answer">
+            <p>The skin selector lets you pick from saved skins or upload a custom PNG, preview your character in live rotating 3D (with Steve and Alex geometry options), and sync directly to Mojang. In addition, the Community Skin Library lets you browse thousands of trending community skins fetched live via API and apply them with one click.</p>
+          </div>
+        </details>
+
+        <!-- Server Hosts -->
+        <details class="faq-item" data-category="servers">
+          <summary class="faq-question">How does single-port multiplexing work?</summary>
+          <div class="faq-answer">
+            <p>Zircon Server Manager multiplexes both standard Minecraft game traffic (port 25565) and HTTP REST mod manifest traffic on the same single port. Players simply enter your server address once (e.g. <code>play.example.com</code>) and the launcher fetches the mod manifest and connects the game over port 25565 without requiring secondary ports.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="servers">
+          <summary class="faq-question">How do I access the Admin Web Dashboard?</summary>
+          <div class="faq-answer">
+            <p>When you start the server manager, an admin password is generated and printed to your console. Open your browser and navigate to <strong>http://localhost:25564</strong> (or your private IP) to log in. For security, keep port 25564 local or behind a VPN/reverse proxy.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="servers">
+          <summary class="faq-question">How does the server sleep/wake mode work?</summary>
+          <div class="faq-answer">
+            <p>When all players leave the server, Zircon gracefully pauses the Minecraft server process to conserve CPU and RAM. When any player clicks PLAY in their launcher, a pre-join intent wakes the server up before the player enters the game.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="servers">
+          <summary class="faq-question">Do I need an API key for Modrinth or CurseForge?</summary>
+          <div class="faq-answer">
+            <p>No. Both Modrinth and CurseForge support are pre-configured and bundled directly into Zircon. Server owners and players can search, download, and sync mods from both platforms immediately with zero API keys or manual setup required.</p>
+          </div>
+        </details>
+
+        <!-- Security -->
+        <details class="faq-item" data-category="security">
+          <summary class="faq-question">Is my Microsoft Minecraft account safe?</summary>
+          <div class="faq-answer">
+            <p>Yes. Authentication is performed via standard Microsoft OAuth 2.0 PKCE in your system web browser. Your credentials are submitted directly to Microsoft login servers. Zircon never sees, handles, or stores your Microsoft password.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="security">
+          <summary class="faq-question">Is Zircon free and open source?</summary>
+          <div class="faq-answer">
+            <p>Yes, Zircon is free and source-available under the Business Source License 1.1 (BSL 1.1). The entire codebase (companion launcher and self-hosted server manager) is available for public inspection, auditing, and personal/community deployment on GitHub.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="security">
+          <summary class="faq-question">Are downloaded mods verified for safety?</summary>
+          <div class="faq-answer">
+            <p>Yes. Mod files are verified using SHA-512 cryptographic hashes and CurseForge murmur2 fingerprints against official Modrinth and CurseForge APIs before they are ever placed in your active instance folder.</p>
+          </div>
+        </details>
+
+        <!-- Troubleshooting -->
+        <details class="faq-item" data-category="troubleshoot">
+          <summary class="faq-question">Windows SmartScreen says "Windows protected your PC" — what should I do?</summary>
+          <div class="faq-answer">
+            <p>This is standard for new open-source software that has not yet built up Microsoft SmartScreen certificate reputation. Click <strong>More info</strong> and then click <strong>Run anyway</strong>. You can also inspect the full source code on GitHub for transparency.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="troubleshoot">
+          <summary class="faq-question">Do I need to install Java manually?</summary>
+          <div class="faq-answer">
+            <p>No. Zircon automatically detects your system Java, and if a required version (e.g. Java 17 or Java 21) is missing, it downloads and caches the verified Eclipse Temurin JDK from Adoptium automatically.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="troubleshoot">
+          <summary class="faq-question">How do I allocate more RAM to modded Minecraft?</summary>
+          <div class="faq-answer">
+            <p>In the Zircon Launcher, click the <strong>Settings</strong> icon in the sidebar. Use the memory allocation slider to adjust allocated RAM (4 GB to 8 GB is recommended for medium-to-large modpacks).</p>
+          </div>
+        </details>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CTA ================= -->
+  <section class="section" style="padding-top: 0;">
+    <div class="container">
+      <div class="cta-band">
+        <h2>Still have questions?</h2>
+        <p>Check out our step-by-step documentation guides or join the open-source community on GitHub.</p>
+        <a class="btn btn-white btn-lg" href="docs.html">Read Setup Guides</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub Discussions &amp; Issues</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="assets/img/zircon-title.svg" alt="Zircon">
+          <p>A free, open-source launcher and server manager for modded Minecraft. Exact mod sync verified on every launch against Modrinth &amp; CurseForge.</p>
+          <a class="pill pill-accent" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">Source-Available (BSL 1.1)</a>
+        </div>
+        <div class="footer-col">
+          <h4>Pages</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="launcher.html">Launcher</a></li>
+            <li><a href="server.html">Server Manager</a></li>
+            <li><a href="docs.html">Guides &amp; Docs</a></li>
+            <li><a href="faq.html">FAQ</a></li>
+            <li><a href="downloads.html">Downloads</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" target="_blank" rel="noopener">Business Source License 1.1</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <span>© Zircon contributors · v0.4.8</span>
+        <span>Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

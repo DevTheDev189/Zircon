@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation &amp; Setup Guides — Zircon Minecraft</title>
+  <meta name="description" content="Step-by-step guides for Zircon players and server owners. Learn how to install the launcher, connect to modded servers, host a server, and search mods from Modrinth and CurseForge.">
+  <meta name="keywords" content="zircon guides, zircon setup guide, minecraft modded server setup, zircon launcher tutorial, minecraft mod sync tutorial">
+  <meta name="author" content="Zircon Contributors">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0d1117">
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://zirconmc.net/docs.html">
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:site_name" content="Zircon">
+  <meta property="og:url" content="https://zirconmc.net/docs.html">
+  <meta property="og:title" content="Documentation &amp; Setup Guides — Zircon">
+  <meta property="og:description" content="Quickstart tutorials and hosting guides for Zircon Launcher and Server Manager.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://zirconmc.net/assets/img/main_launcher.png">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Favicons & Manifest -->
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+  <link rel="apple-touch-icon" href="assets/img/favicon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+  <!-- ================= NAV ================= -->
+  <header class="site-nav">
+    <div class="container">
+      <a class="brand" href="/" aria-label="Zircon home">
+        <img src="assets/img/zircon-title.svg" alt="Zircon" width="150" height="44">
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="launcher.html">Launcher</a></li>
+        <li><a href="server.html">Server Manager</a></li>
+        <li><a href="docs.html" class="active">Guides</a></li>
+        <li><a href="faq.html">FAQ</a></li>
+        <li><a href="downloads.html">Downloads</a></li>
+        <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a class="nav-cta" href="downloads.html#players">Get Launcher</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ================= COMPACT PAGE HERO ================= -->
+  <section class="page-hero" style="padding: 36px 0 20px;">
+    <div class="container">
+      <span class="eyebrow">Documentation &amp; Tutorials</span>
+      <h1 style="font-size: clamp(26px, 4vw, 36px); margin-bottom: 8px;">Quickstart Setup Guides</h1>
+      <p style="margin: 0 auto; max-width: 620px;">Select your guide below for step-by-step instructions.</p>
+
+      <!-- Quick Switcher Tabs directly in hero for instant above-the-fold access -->
+      <div class="filter-pills" style="margin-top: 18px; margin-bottom: 0;">
+        <button class="docs-pill filter-pill active" data-guide="all">All Guides</button>
+        <button class="docs-pill filter-pill" data-guide="players">Player Quickstart</button>
+        <button class="docs-pill filter-pill" data-guide="servers">Server Host Setup</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DOCS CONTENT ================= -->
+  <section class="section" style="padding-top: 16px;">
+    <div class="container">
+      <div class="docs-layout">
+
+        <!-- Sidebar Navigation -->
+        <nav class="docs-nav" aria-label="Documentation sections">
+          <h4>Player Quickstart</h4>
+          <ul>
+            <li><a href="#player-install">1. Install Launcher</a></li>
+            <li><a href="#player-signin">2. Sign In with Microsoft</a></li>
+            <li><a href="#player-join">3. Join a Server</a></li>
+            <li><a href="#player-offline">4. Single-Player Worlds</a></li>
+            <li><a href="#player-skins">5. 3D Skins &amp; Library</a></li>
+          </ul>
+
+          <h4 style="margin-top: 20px;">Server Host Setup</h4>
+          <ul>
+            <li><a href="#server-install">1. Install Server Manager</a></li>
+            <li><a href="#server-dashboard">2. Admin Dashboard</a></li>
+            <li><a href="#server-instance">3. Create Instance</a></li>
+            <li><a href="#server-mods">4. Add Mods (Modrinth/CF)</a></li>
+            <li><a href="#server-ports">5. Port Forwarding (25565)</a></li>
+          </ul>
+        </nav>
+
+        <!-- Main Guide Content -->
+        <div class="docs-content">
+
+          <!-- ================= PLAYER SECTION ================= -->
+          <section id="player-guide" class="docs-guide-section" data-guide="players">
+            <h2 style="margin-top: 0; color: var(--accent);">Player Quickstart Guide</h2>
+
+            <div id="player-install" class="docs-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h4>Download &amp; Install the Launcher</h4>
+                <p>Download the Windows setup from the <a href="downloads.html#players">Downloads page</a>. Run the installer to place Zircon in your programs folder.</p>
+                <div class="callout" style="margin-top: 12px;">
+                  <strong>Note:</strong> If Windows Defender SmartScreen appears, click <em>"More info"</em> and then <em>"Run anyway"</em>.
+                </div>
+              </div>
+            </div>
+
+            <div id="player-signin" class="docs-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h4>Sign in with Microsoft</h4>
+                <p>Launch Zircon and click <strong>Sign in with Microsoft</strong>. Your default browser will open to Microsoft's official login page. Sign in with the account that owns Minecraft Java Edition.</p>
+              </div>
+            </div>
+
+            <div id="player-join" class="docs-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h4>Add Your Server &amp; Hit PLAY</h4>
+                <p>Click <strong>Add Server</strong> in the top bar and enter the server's domain or IP address (e.g., <code>play.example.com</code>). Select the server and click <strong>PLAY</strong>.</p>
+                <p style="margin: 8px 0 16px;">Zircon will automatically download the correct Minecraft version, mod loader (Fabric/Forge/NeoForge), and sync all server mods verified against Modrinth &amp; CurseForge before launching into the game.</p>
+                <div class="app-frame" style="margin-top: 14px;">
+                  <div class="frame-bar" aria-hidden="true">
+                    <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                    <div class="frame-title"><span>Zircon Launcher Home</span></div>
+                    <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+                  </div>
+                  <img src="assets/img/main_launcher.png" alt="Zircon Launcher Main Screen" width="800" height="500" loading="lazy">
+                </div>
+              </div>
+            </div>
+
+            <div id="player-offline" class="docs-step">
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <h4>Create Offline Single-Player Instances</h4>
+                <p>Click the <strong>Offline Instances</strong> tab in the sidebar. Click <strong>+ Create Instance</strong>, pick your Minecraft version, choose a mod loader, and launch directly without connecting to a remote server.</p>
+                <div class="app-frame" style="margin-top: 14px;">
+                  <div class="frame-bar" aria-hidden="true">
+                    <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                    <div class="frame-title"><span>Offline Instances Manager</span></div>
+                    <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+                  </div>
+                  <img src="assets/img/offline_worlds_launcher.png" alt="Offline Worlds Manager" width="800" height="500" loading="lazy">
+                </div>
+              </div>
+            </div>
+
+            <div id="player-skins" class="docs-step">
+              <div class="step-num">5</div>
+              <div class="step-body">
+                <h4>Saved Skins &amp; Community Skin Library</h4>
+                <p>Click your avatar in the sidebar to open the 3D Skin customizer. Preview your saved skins in 3D, upload custom PNGs, or search thousands of trending community skins fetched directly via API.</p>
+                <div class="app-frame" style="margin-top: 14px;">
+                  <div class="frame-bar" aria-hidden="true">
+                    <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                    <div class="frame-title"><span>3D Skin Customizer</span></div>
+                    <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+                  </div>
+                  <img src="assets/img/skin_selector_launcher.png" alt="Zircon 3D Skin Studio" width="800" height="500" loading="lazy">
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================= SERVER HOST SECTION ================= -->
+          <section id="server-guide" class="docs-guide-section" data-guide="servers" style="padding-top: 24px;">
+            <h2 style="color: var(--accent);">Server Owner &amp; Host Guide</h2>
+
+            <div id="server-install" class="docs-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h4>Download &amp; Extract the Server Manager</h4>
+                <p>Grab the <code>zircon-server</code> zip package from <a href="downloads.html#server-owners">Downloads</a>. Extract the contents to a folder where you want your Minecraft instances and server files saved.</p>
+                <div class="codeblock">
+<span class="c"># Run Zircon Server Manager</span>
+./zircon-server.exe
+                </div>
+              </div>
+            </div>
+
+            <div id="server-dashboard" class="docs-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h4>Open the Web Admin Panel</h4>
+                <p>On first start, a secure random admin password is generated and printed in the terminal console. Open your web browser and visit:</p>
+                <div class="codeblock">http://localhost:25564</div>
+                <p>Enter your generated admin password to access the web dashboard.</p>
+                <div class="app-frame" style="margin-top: 14px;">
+                  <div class="frame-bar" aria-hidden="true">
+                    <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                    <div class="frame-title"><span>Server Dashboard (localhost:25564)</span></div>
+                    <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+                  </div>
+                  <img src="assets/img/performance_server.png" alt="Zircon Server Manager Web Dashboard" width="800" height="500" loading="lazy">
+                </div>
+              </div>
+            </div>
+
+            <div id="server-instance" class="docs-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h4>Create Your First Server Instance</h4>
+                <p>In the dashboard, click <strong>Create Instance</strong>. Choose your Minecraft version (e.g. <code>1.20.1</code>), select your mod loader (Fabric, NeoForge, Forge, or Quilt), accept the Mojang EULA, and set allocated memory.</p>
+              </div>
+            </div>
+
+            <div id="server-mods" class="docs-step">
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <h4>Search &amp; Install Mods (Modrinth &amp; CurseForge Built-In)</h4>
+                <p>Open the <strong>Mods</strong> tab within your instance. Use the built-in search bar to browse millions of mods from <strong>Modrinth</strong> or <strong>CurseForge</strong>. Both repositories work out of the box with zero API key configuration. Click <em>Install</em> on any mod — Zircon handles dependency resolution automatically.</p>
+                <div class="app-frame" style="margin-top: 14px;">
+                  <div class="frame-bar" aria-hidden="true">
+                    <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                    <div class="frame-title"><span>Search &amp; Install Mods</span></div>
+                    <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+                  </div>
+                  <img src="assets/img/mod_browser_server.png" alt="Zircon Mod Browser" width="800" height="500" loading="lazy">
+                </div>
+              </div>
+            </div>
+
+            <div id="server-ports" class="docs-step">
+              <div class="step-num">5</div>
+              <div class="step-body">
+                <h4>Port Forwarding (Only Port 25565 Needed)</h4>
+                <p>Because Zircon uses single-port multiplexing, you only need to forward <strong>port 25565 (TCP)</strong> on your home router. Share your public IP or DDNS domain (e.g. <code>play.yourdomain.com</code>) with your players. They type it in the Zircon Launcher and join right away.</p>
+              </div>
+            </div>
+
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CTA ================= -->
+  <section class="section" style="padding-top: 0;">
+    <div class="container">
+      <div class="cta-band">
+        <h2>Ready to get started?</h2>
+        <p>Download the launcher for your computer or set up your own server manager in minutes.</p>
+        <a class="btn btn-white btn-lg" href="downloads.html">Go to Downloads</a>
+        <a class="btn btn-ghost btn-lg" href="faq.html">View Frequently Asked Questions</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="assets/img/zircon-title.svg" alt="Zircon">
+          <p>A free, open-source launcher and server manager for modded Minecraft. Exact mod sync verified on every launch against Modrinth &amp; CurseForge.</p>
+          <a class="pill pill-accent" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">Source-Available (BSL 1.1)</a>
+        </div>
+        <div class="footer-col">
+          <h4>Pages</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="launcher.html">Launcher</a></li>
+            <li><a href="server.html">Server Manager</a></li>
+            <li><a href="docs.html" class="active">Guides &amp; Docs</a></li>
+            <li><a href="faq.html">FAQ</a></li>
+            <li><a href="downloads.html">Downloads</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" target="_blank" rel="noopener">Business Source License 1.1</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <span>© Zircon contributors · v0.4.8</span>
+        <span>Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

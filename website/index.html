@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zircon — Modded Minecraft with friends, without the headache</title>
+  <meta name="description" content="Zircon is a free, open-source launcher for modded Minecraft. Pick a server, hit PLAY, and the exact mods that server runs install themselves — verified against Modrinth &amp; CurseForge on every launch. Windows 10/11 now; macOS &amp; Linux planned.">
+  <meta name="keywords" content="modded minecraft launcher, minecraft mod sync, modrinth launcher, curseforge launcher, minecraft server manager, fabric launcher, forge launcher, neoforge, automatic mod installer">
+  <meta name="author" content="Zircon Contributors">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0d1117">
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://zirconmc.net/">
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:site_name" content="Zircon">
+  <meta property="og:url" content="https://zirconmc.net/">
+  <meta property="og:title" content="Zircon — Modded Minecraft with friends, without the headache">
+  <meta property="og:description" content="Free open-source launcher &amp; server manager for modded Minecraft. Pick a server, hit PLAY, and mods sync automatically with Modrinth &amp; CurseForge verification.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://zirconmc.net/assets/img/main_launcher.png">
+  <meta property="og:image:alt" content="Zircon Modded Minecraft Launcher Interface">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Zircon — Modded Minecraft with friends, without the headache">
+  <meta name="twitter:description" content="Free open-source launcher &amp; server manager for modded Minecraft. Exact mod sync verified on every launch via Modrinth &amp; CurseForge.">
+  <meta name="twitter:image" content="https://zirconmc.net/assets/img/main_launcher.png">
+  <meta name="twitter:image:alt" content="Zircon Launcher Preview">
+
+  <!-- Favicons & Manifest -->
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+  <link rel="apple-touch-icon" href="assets/img/favicon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="assets/css/styles.css">
+
+  <!-- Structured Data / JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://zirconmc.net/#website",
+        "url": "https://zirconmc.net/",
+        "name": "Zircon",
+        "description": "Free and open-source launcher & server manager for modded Minecraft.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Zircon",
+          "url": "https://github.com/DevTheDev189/Zircon"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://zirconmc.net/#launcher",
+        "name": "Zircon Launcher",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Windows 10, Windows 11",
+        "description": "A free, open-source companion launcher for modded Minecraft servers with automatic Modrinth & CurseForge verification.",
+        "url": "https://zirconmc.net/",
+        "downloadUrl": "https://zirconmc.net/downloads.html#players",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://zirconmc.net/#server-manager",
+        "name": "Zircon Server Manager",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "description": "Self-hosted Minecraft server manager featuring automatic player mod syncing, Modrinth & CurseForge integration, web dashboard, and single-port multiplexing.",
+        "url": "https://zirconmc.net/downloads.html#server-owners",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://zirconmc.net/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How does Zircon automatically sync Minecraft mods?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "When you hit PLAY, the Zircon Launcher connects to the server, fetches its exact mod manifest, verifies each mod hash against Modrinth and CurseForge, and automatically downloads any missing mods directly to your isolated instance folder."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use Modrinth and CurseForge to find and download mods?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes! Zircon natively integrates with both Modrinth and CurseForge with zero API key configuration needed. Server owners and players can search, browse, and download mods directly from both platforms."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Zircon free and open source?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, Zircon is free and source-available under the Business Source License 1.1 (BSL 1.1). It is 100% free for players, homelabbers, and gaming communities, while commercial managed cloud hosting is reserved."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is my Microsoft Minecraft account safe with Zircon?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Zircon uses Microsoft OAuth 2.0 authentication in your browser. Your password and credentials are submitted directly to Microsoft and never touch or get stored by Zircon."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which mod loaders does Zircon support?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Zircon supports Fabric, Quilt, Forge, and NeoForge mod loaders across supported Minecraft versions."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ================= NAV ================= -->
+  <header class="site-nav">
+    <div class="container">
+      <a class="brand" href="/" aria-label="Zircon home">
+        <img src="assets/img/zircon-title.svg" alt="Zircon" width="150" height="44">
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+      <ul class="nav-links">
+        <li><a href="/" class="active">Home</a></li>
+        <li><a href="launcher.html">Launcher</a></li>
+        <li><a href="server.html">Server Manager</a></li>
+        <li><a href="docs.html">Guides</a></li>
+        <li><a href="faq.html">FAQ</a></li>
+        <li><a href="downloads.html">Downloads</a></li>
+        <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a class="nav-cta" href="downloads.html#players">Get Launcher</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ================= HERO ================= -->
+  <section class="hero">
+    <div class="container">
+      <span class="eyebrow">Free &amp; open-source launcher &amp; server manager for modded Minecraft</span>
+      <img class="hero-title" src="assets/img/zircon-title.svg" alt="Zircon">
+      <h1>Modded Minecraft with friends,<br><span class="hl">without the headache.</span></h1>
+      <p class="lede">
+        Zircon connects players and servers seamlessly. Pick a server,
+        hit <strong>PLAY</strong>, and the exact mods that server runs install
+        themselves — verified against Modrinth &amp; CurseForge on every launch.
+        No modpack hunting. No version guessing.
+      </p>
+      <div class="hero-actions-stacked">
+        <a class="btn btn-primary btn-xl" href="downloads.html#players">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          Download Zircon Launcher
+        </a>
+        <a class="hero-sublink" href="server.html">
+          <span>Running a dedicated server? Explore Server Manager &rarr;</span>
+        </a>
+      </div>
+      <div class="hero-foot">
+        <span><i class="dot"></i> Windows, macOS &amp; Linux</span>
+        <span><i class="dot"></i> Source-Available (BSL 1.1) · Free for Players &amp; Communities</span>
+        <span><i class="dot"></i> Modrinth &amp; CurseForge integrated</span>
+      </div>
+
+      <!-- ================= INTERACTIVE SHOWCASE FRAME ================= -->
+      <div class="hero-shot showcase-container">
+        <div class="showcase-tabs" role="tablist">
+          <button class="showcase-tab active" data-view="launcher" data-title="Zircon Launcher — One-Click Join &amp; Mod Sync">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Launcher
+          </button>
+          <button class="showcase-tab" data-view="mods" data-title="Zircon Mod Browser — Modrinth &amp; CurseForge Search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            Mod Browser
+          </button>
+          <button class="showcase-tab" data-view="stats" data-title="Zircon Server Manager — Live Performance &amp; Stats">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            Server Dashboard
+          </button>
+          <button class="showcase-tab" data-view="skin" data-title="Zircon 3D Skin Studio &amp; Mojang Sync">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            3D Skin Studio
+          </button>
+          <button class="showcase-tab" data-view="console" data-title="Zircon Server Manager — Live Terminal Console">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            Live Console
+          </button>
+        </div>
+
+        <div class="app-frame">
+          <div class="frame-bar" aria-hidden="true">
+            <div class="frame-dots">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <div class="frame-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span id="frameTitleText">Zircon Launcher — One-Click Join &amp; Mod Sync</span>
+            </div>
+            <div class="frame-controls">
+              <button class="frame-zoom-btn" title="Click to view full screen" aria-label="Zoom image">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- View 1: Launcher -->
+          <div class="showcase-view active" data-view="launcher">
+            <img src="assets/img/main_launcher.png" alt="Zircon Launcher Main Screen" width="1000" height="600" loading="eager" fetchpriority="high">
+          </div>
+
+          <!-- View 2: Mod Browser -->
+          <div class="showcase-view" data-view="mods">
+            <img src="assets/img/mod_browser_server.png" alt="CurseForge and Modrinth Mod Browser" width="1000" height="600" loading="lazy">
+          </div>
+
+          <!-- View 3: Server Stats -->
+          <div class="showcase-view" data-view="stats">
+            <img src="assets/img/performance_server.png" alt="Zircon Server Performance Stats" width="1000" height="600" loading="lazy">
+          </div>
+
+          <!-- View 4: Skin Editor -->
+          <div class="showcase-view" data-view="skin">
+            <img src="assets/img/skin_selector_launcher.png" alt="Zircon 3D Skin Studio with Live Preview" width="1000" height="600" loading="lazy">
+          </div>
+
+          <!-- View 5: Live Console -->
+          <div class="showcase-view" data-view="console">
+            <img src="assets/img/console_log_server.png" alt="Zircon Live Server Terminal Console" width="1000" height="600" loading="lazy">
+          </div>
+        </div>
+        <p class="shot-caption">Click any tab above or click the image to inspect full-screen details.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SPLIT FEATURE: PLAYERS ================= -->
+  <section class="section">
+    <div class="container">
+      <div class="feature-split">
+        <div class="feature-split-text">
+          <span class="eyebrow">For Minecraft Players</span>
+          <h2>Zero setup. Hit PLAY and you're in the world.</h2>
+          <p>
+            No more manually downloading ZIP files, matching Forge versions, or debugging missing library crashes. Zircon detects your server's modpack, pulls verified files from Modrinth &amp; CurseForge, and connects you seamlessly.
+          </p>
+          <ul class="spec-list">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Official Microsoft Sign-In:</b> Safe OAuth 2.0 PKCE browser authentication.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Instant Asset Fast-Path:</b> Sub-millisecond launch verification after first scan.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Isolated Server Sandboxes:</b> Each server maintains its own clean mods folder.</span>
+            </li>
+          </ul>
+          <div style="margin-top: 26px;">
+            <a class="btn btn-primary" href="launcher.html">Explore Launcher Features →</a>
+          </div>
+        </div>
+        <div class="app-frame">
+          <div class="frame-bar" aria-hidden="true">
+            <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+            <div class="frame-title"><span>Zircon Launcher Home</span></div>
+            <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+          </div>
+          <img src="assets/img/main_launcher.png" alt="Zircon Launcher Interface" width="800" height="500" loading="lazy">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SPLIT FEATURE: SERVER HOSTS ================= -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="feature-split reverse">
+        <div class="feature-split-text">
+          <span class="eyebrow">For Server Hosts</span>
+          <h2>A self-hosted management engine built for modpacks.</h2>
+          <p>
+            Manage instances, install CurseForge &amp; Modrinth mods, monitor live CPU/RAM charts, and configure sleep/wake modes without writing shell scripts or configuring multi-port firewalls.
+          </p>
+          <ul class="spec-list">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Single-Port Multiplexing:</b> Game and REST manifests both run on port 25565.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Automatic Sleep &amp; Wake:</b> Pauses JVM when empty; wakes on player intent.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Integrated Web Dashboard:</b> Access live stats and console at <code>localhost:25564</code>.</span>
+            </li>
+          </ul>
+          <div style="margin-top: 26px;">
+            <a class="btn btn-primary" href="server.html">Explore Server Manager →</a>
+          </div>
+        </div>
+        <div class="app-frame">
+          <div class="frame-bar" aria-hidden="true">
+            <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+            <div class="frame-title"><span>Live Performance Dashboard</span></div>
+            <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+          </div>
+          <img src="assets/img/performance_server.png" alt="Zircon Server Manager Dashboard" width="800" height="500" loading="lazy">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= INTERACTIVE FEATURE TOUR DECK ================= -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Interactive Showcase</div>
+        <h2>Take a deep look inside Zircon</h2>
+        <p>A unified suite for modded Minecraft — click any feature below to inspect the interface and tools.</p>
+      </div>
+
+      <!-- Feature Deck Navigator -->
+      <div class="feature-deck">
+        <div class="feature-deck-nav" role="tablist">
+          <button class="deck-tab active" data-deck="mods" role="tab">
+            <div class="deck-tab-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </div>
+            <div>
+              <span class="deck-tab-title">Mod Ecosystem</span>
+              <span class="deck-tab-sub">CurseForge &amp; Modrinth</span>
+            </div>
+          </button>
+
+          <button class="deck-tab" data-deck="console" role="tab">
+            <div class="deck-tab-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            </div>
+            <div>
+              <span class="deck-tab-title">Live Terminal</span>
+              <span class="deck-tab-sub">Colorized Server Logs</span>
+            </div>
+          </button>
+
+          <button class="deck-tab" data-deck="skin" role="tab">
+            <div class="deck-tab-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div>
+              <span class="deck-tab-title">3D Skin Studio</span>
+              <span class="deck-tab-sub">Skins &amp; Community API</span>
+            </div>
+          </button>
+
+          <button class="deck-tab" data-deck="config" role="tab">
+            <div class="deck-tab-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div>
+              <span class="deck-tab-title">Config Editor</span>
+              <span class="deck-tab-sub">In-Browser File Studio</span>
+            </div>
+          </button>
+
+          <button class="deck-tab" data-deck="backups" role="tab">
+            <div class="deck-tab-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            </div>
+            <div>
+              <span class="deck-tab-title">Backups</span>
+              <span class="deck-tab-sub">LZ4 Snapshots &amp; Restore</span>
+            </div>
+          </button>
+
+          <button class="deck-tab" data-deck="offline" role="tab">
+            <div class="deck-tab-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </div>
+            <div>
+              <span class="deck-tab-title">Offline Play</span>
+              <span class="deck-tab-sub">Custom Local Worlds</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="deck-body">
+          <!-- Panel 1: Mod Ecosystem -->
+          <div class="deck-panel active" data-deck="mods">
+            <div class="deck-text">
+              <span class="gallery-badge">Mod Management</span>
+              <h3>CurseForge &amp; Modrinth Built-In</h3>
+              <p>Search, filter, and install hundreds of thousands of mods from both leading Minecraft repositories directly inside your interface with zero API key configuration needed. Automatic dependency resolution and SHA-512 cryptographic verification ensure rock-solid stability.</p>
+              <ul class="spec-list">
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Dual-repository search in a unified browser</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Automated dependency matching for Forge, NeoForge &amp; Fabric</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>1-Click client synchronization for seamless party play</span></li>
+              </ul>
+            </div>
+            <div class="app-frame">
+              <div class="frame-bar"><div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div><div class="frame-title"><span>Mod Browser</span></div><div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div></div>
+              <img src="assets/img/mod_browser_server.png" alt="CurseForge and Modrinth Mod Browser" width="800" height="500" loading="lazy">
+            </div>
+          </div>
+
+          <!-- Panel 2: Live Console -->
+          <div class="deck-panel" data-deck="console">
+            <div class="deck-text">
+              <span class="gallery-badge">Server Control</span>
+              <h3>Real-Time Terminal &amp; Colorized Logs</h3>
+              <p>Monitor your server live with sub-millisecond WebSocket output. Send commands, inspect formatted Minecraft logs with color-coded info, warnings, and error stacks, and filter logs with one click.</p>
+              <ul class="spec-list">
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Instant command dispatch directly from your browser</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Interactive log level filtering (Info, Warn, Error)</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Auto-scrolling with pause on scrollback</span></li>
+              </ul>
+            </div>
+            <div class="app-frame">
+              <div class="frame-bar"><div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div><div class="frame-title"><span>Live Console</span></div><div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div></div>
+              <img src="assets/img/console_log_server.png" alt="Server Terminal Console" width="800" height="500" loading="lazy">
+            </div>
+          </div>
+
+          <!-- Panel 3: 3D Skin Studio -->
+          <div class="deck-panel" data-deck="skin">
+            <div class="deck-text">
+              <span class="gallery-badge">Customization</span>
+              <h3>3D Skin Studio &amp; Community Library</h3>
+              <p>Pick from your saved skins or upload a custom PNG, preview your character in full rotating 3D, and sync directly to Mojang. Plus, browse thousands of trending skins fetched live from the community API.</p>
+              <ul class="spec-list">
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Saved skin selector with live rotating 3D viewport</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Community skin library pulling trending skins live via API</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Direct 1-click synchronization to official Mojang accounts</span></li>
+              </ul>
+            </div>
+            <div class="app-frame">
+              <div class="frame-bar"><div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div><div class="frame-title"><span>3D Skin Studio</span></div><div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div></div>
+              <img src="assets/img/skin_selector_launcher.png" alt="3D Skin Studio" width="800" height="500" loading="lazy">
+            </div>
+          </div>
+
+          <!-- Panel 4: In-Browser Config Editor -->
+          <div class="deck-panel" data-deck="config">
+            <div class="deck-text">
+              <span class="gallery-badge">Developer &amp; Host Tools</span>
+              <h3>In-Browser Code &amp; Config Studio</h3>
+              <p>Edit server.properties, JSON configs, and game files with full syntax highlighting directly in the web browser. Push config changes to all connected client launchers in seconds with "Sync to Clients".</p>
+              <ul class="spec-list">
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Full code editor with keyboard shortcuts</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Instant Bill of Materials (BOM) synchronization</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Built-in directory explorer and file uploader</span></li>
+              </ul>
+            </div>
+            <div class="app-frame">
+              <div class="frame-bar"><div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div><div class="frame-title"><span>Config Editor</span></div><div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div></div>
+              <img src="assets/img/files_text_editor.png" alt="In-Browser Config Editor" width="800" height="500" loading="lazy">
+            </div>
+          </div>
+
+          <!-- Panel 5: Automated Backups -->
+          <div class="deck-panel" data-deck="backups">
+            <div class="deck-text">
+              <span class="gallery-badge">Reliability</span>
+              <h3>Automated Backups &amp; Snapshots</h3>
+              <p>Protect your world with scheduled high-speed LZ4 compressed backups. Set custom retention policies, create manual restore points before major mod additions, and revert with a single click.</p>
+              <ul class="spec-list">
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Ultra-fast LZ4 compression with zero game stutter</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Configurable retention policies (keep last N backups)</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>1-Click snapshot restore for full peace of mind</span></li>
+              </ul>
+            </div>
+            <div class="app-frame">
+              <div class="frame-bar"><div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div><div class="frame-title"><span>Server Backups</span></div><div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div></div>
+              <img src="assets/img/backups_server.png" alt="Automated Backups" width="800" height="500" loading="lazy">
+            </div>
+          </div>
+
+          <!-- Panel 6: Offline Worlds -->
+          <div class="deck-panel" data-deck="offline">
+            <div class="deck-text">
+              <span class="gallery-badge">Singleplayer</span>
+              <h3>Singleplayer Modded Worlds</h3>
+              <p>Launch isolated offline instances with your choice of Minecraft version, loader (Fabric/Quilt/Forge/NeoForge), custom RAM allocation, and local modpacks without needing an active internet connection.</p>
+              <ul class="spec-list">
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Isolated singleplayer directories per instance</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Dedicated shader &amp; texture pack manager</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span>Custom Java runtime and memory allocation</span></li>
+              </ul>
+            </div>
+            <div class="app-frame">
+              <div class="frame-bar"><div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div><div class="frame-title"><span>Offline Instances</span></div><div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div></div>
+              <img src="assets/img/offline_worlds_launcher.png" alt="Offline Worlds Manager" width="800" height="500" loading="lazy">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PAIN POINTS ================= -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Sound familiar?</div>
+        <h2>If you've done any of these, Zircon is for you</h2>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+          <h3>Hunting mod versions</h3>
+          <p>Scrolling mod sites for "the right build" and hoping it matches what your friends are running.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+          <h3>Dragging JARs into folders</h3>
+          <p>Manually dropping mod files into <code>mods/</code> and deleting the ones that crash on launch.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+          <h3>"It works on my machine"</h3>
+          <p>Comparing configs with your friend at 1am, one mismatch at a time, while the server sits empty.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= WHY PLAYERS LOVE IT ================= -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Why players love Zircon</div>
+        <h2>Everything between you and playing just… works</h2>
+        <p>Built for people who want to <em>play modded Minecraft</em> with friends — not
+        spend their evening reconciling mod versions and crash logs.</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+          <h3>One click. You're in.</h3>
+          <p>Hit PLAY and Zircon downloads the right Minecraft version and mod loader —
+          Fabric, Quilt, Forge, or NeoForge — installs the mods, and drops you
+          straight into the game.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg></span>
+          <h3>CurseForge &amp; Modrinth sync</h3>
+          <p>Search &amp; download mods from Modrinth and CurseForge with verified SHA-512 and fingerprint checks on every launch. Nothing missing, nothing stale.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+          <h3>Sign in with your real account</h3>
+          <p>Official Microsoft sign-in — your password goes to Microsoft, never to
+          Zircon. No shared logins, no cracked launchers, no offline workarounds.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <h3>3D Skins &amp; Community Library</h3>
+          <p>Saved skin selector with live 3D preview, official Mojang cloud sync, and an in-app community skin explorer pulling trending skins via API.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg></span>
+          <h3>Shaders &amp; packs, auto-applied</h3>
+          <p>Servers can offer their own shaders and resource packs. Zircon applies
+          them when you join — you just say yes once, and it's done.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg></span>
+          <h3>Solo adventures, too</h3>
+          <p>Create offline single-player instances with their own mods, shaders, and
+          texture packs. No server required — just build in peace.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= HOW IT WORKS ================= -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">How it works</div>
+        <h2>Three steps. Then you're in.</h2>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <h3>Sign in with Microsoft</h3>
+          <p>One click, in your browser. Zircon uses the official Microsoft flow —
+          your password never touches the app.</p>
+        </div>
+        <div class="step">
+          <h3>Pick a server</h3>
+          <p>Your saved servers, most recently played first — plus recommendations.
+          Each server brings its own mod list along.</p>
+        </div>
+        <div class="step">
+          <h3>Hit PLAY</h3>
+          <p>Zircon syncs and verifies the mods from Modrinth &amp; CurseForge, wakes the server if it's asleep,
+          and connects you. You spawn in — fully modded, ready to go.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SERVER OWNERS (Restyled with Sleek Cards) ================= -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">For server owners</div>
+        <h2>Run a modded server your friends can actually join</h2>
+        <p>Zircon's server manager pairs with the launcher, so your players install exactly what you run. No setup guides. No support tickets.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>
+          </span>
+          <h3>Exact mod sync for players</h3>
+          <p>Your server publishes its cryptographic mod manifest; every player's launcher installs precisely what you run with zero version mismatch.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
+          </span>
+          <h3>Modrinth &amp; CurseForge built-in</h3>
+          <p>Search and install mods directly from Modrinth and CurseForge in your dashboard with zero API key configuration needed, or drop in custom JARs.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v4H4z"/><path d="M4 10h16v4H4z"/><path d="M4 16h16v4H4z"/><path d="M7 6h.01M7 12h.01M7 18h.01"/></svg>
+          </span>
+          <h3>Single-Port Multiplexing</h3>
+          <p>Minecraft gameplay (25565) and HTTP REST manifests run on the exact same port — no firewall gymnastics or port juggling required.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
+          </span>
+          <h3>Live Web Console &amp; Logs</h3>
+          <p>Execute commands, review color-coded server logs in real time, and monitor CPU and memory usage from any web browser.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+          </span>
+          <h3>Sleeps idle, wakes on demand</h3>
+          <p>Servers pause gracefully when empty to conserve host resources and wake automatically the moment a player clicks PLAY.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          </span>
+          <h3>Automated Backups &amp; Restore</h3>
+          <p>Schedule high-speed LZ4 backups with custom retention policies and revert to any world snapshot with a single click.</p>
+        </div>
+      </div>
+
+      <div style="text-align:center; margin-top: 36px;">
+        <a class="btn btn-primary" href="downloads.html#server-owners">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          Download the Server Manager
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FREQUENTLY ASKED QUESTIONS ================= -->
+  <section class="section section-alt" id="faq">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Questions &amp; Answers</div>
+        <h2>Frequently Asked Questions</h2>
+        <p>Everything you need to know about getting started with Zircon.</p>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item" open>
+          <summary class="faq-question">How does Zircon automatically sync Minecraft mods?</summary>
+          <div class="faq-answer">
+            <p>When you join a server and hit <strong>PLAY</strong>, Zircon compares the server's published mod list against your local client folder. Any missing or updated mods are verified via Modrinth &amp; CurseForge SHA-512 hashes and fingerprints, then downloaded instantly without manual file dragging.</p>
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-question">Can I use CurseForge or Modrinth to find and download mods?</summary>
+          <div class="faq-answer">
+            <p>Yes! Zircon natively supports searching, installing, and synchronizing mods directly from both <strong>Modrinth</strong> and <strong>CurseForge</strong> with zero API key configuration needed. Both repositories are fully integrated out of the box.</p>
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-question">Is Zircon free and open source?</summary>
+          <div class="faq-answer">
+            <p>Yes, Zircon is source-available under the Business Source License 1.1 (BSL 1.1). Both the client launcher and the self-hosted server manager are completely free for players, homelabbers, and gaming networks. The entire codebase is open for public inspection, self-hosting, and community contribution on GitHub.</p>
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-question">Is my Microsoft / Minecraft account safe?</summary>
+          <div class="faq-answer">
+            <p>Yes. Authentication is performed via standard Microsoft OAuth in your default browser. Your login credentials go directly to Microsoft's login servers and are never accessed, handled, or stored by Zircon.</p>
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-question">Which mod loaders and Minecraft versions are supported?</summary>
+          <div class="faq-answer">
+            <p>Zircon natively supports <strong>Fabric, Quilt, Forge, and NeoForge</strong>. The launcher automatically installs the required mod loader version when you launch an instance or join a server.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CTA ================= -->
+  <section class="section" style="padding-top: 32px;">
+    <div class="container">
+      <div class="cta-band">
+        <h2>Ready to actually play?</h2>
+        <p>Download Zircon, sign in with your Microsoft account, and join a server.
+        The mods will be waiting for you — verified, synced, ready.</p>
+        <a class="btn btn-white btn-lg" href="downloads.html#players">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          Download Zircon Launcher
+        </a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">View Source on GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="assets/img/zircon-title.svg" alt="Zircon">
+          <p>A free, open-source launcher and server manager for modded Minecraft.
+          Players hit PLAY and get the exact mods a server runs — verified against
+          Modrinth &amp; CurseForge on every launch.</p>
+          <a class="pill pill-accent" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.14c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+            Open Source
+          </a>
+        </div>
+        <div class="footer-col">
+          <h4>Pages</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="launcher.html">Launcher</a></li>
+            <li><a href="server.html">Server Manager</a></li>
+            <li><a href="docs.html">Guides &amp; Docs</a></li>
+            <li><a href="faq.html">FAQ</a></li>
+            <li><a href="downloads.html">Downloads</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" target="_blank" rel="noopener">Business Source License 1.1</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <span>© Zircon contributors · v0.4.8 (active development)</span>
+        <span>Not an official Minecraft product. Not approved by or associated with Mojang
+        Studios or Microsoft. "Minecraft" is a trademark of Mojang Synergies AB.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

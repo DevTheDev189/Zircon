@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zircon Server Manager — Self-Hosted Modded Minecraft Management</title>
+  <meta name="description" content="Download Zircon Server Manager. Self-hosted Minecraft server management with single-port multiplexing, integrated Modrinth &amp; CurseForge mod browsing, live web console, and player mod syncing.">
+  <meta name="keywords" content="zircon server manager, minecraft server manager, self-hosted minecraft server, single port minecraft multiplexer, auto mod sync server">
+  <meta name="author" content="Zircon Contributors">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0d1117">
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://zirconmc.net/server.html">
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:site_name" content="Zircon">
+  <meta property="og:url" content="https://zirconmc.net/server.html">
+  <meta property="og:title" content="Zircon Server Manager — Modded Minecraft for Server Hosts">
+  <meta property="og:description" content="Host modded Minecraft servers with zero player headaches. Single-port multiplexing, web admin panel, and automatic Modrinth &amp; CurseForge sync.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://zirconmc.net/assets/img/performance_server.png">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Favicons & Manifest -->
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+  <link rel="apple-touch-icon" href="assets/img/favicon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+  <!-- ================= NAV ================= -->
+  <header class="site-nav">
+    <div class="container">
+      <a class="brand" href="/" aria-label="Zircon home">
+        <img src="assets/img/zircon-title.svg" alt="Zircon" width="150" height="44">
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="launcher.html">Launcher</a></li>
+        <li><a href="server.html" class="active">Server Manager</a></li>
+        <li><a href="docs.html">Guides</a></li>
+        <li><a href="faq.html">FAQ</a></li>
+        <li><a href="downloads.html">Downloads</a></li>
+        <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a class="nav-cta" href="downloads.html#server-owners">Download</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ================= HERO ================= -->
+  <section class="page-hero">
+    <div class="container">
+      <span class="eyebrow">For Server Owners &amp; Hosts</span>
+      <h1>Host modded servers<br><span class="hl">your friends can actually join.</span></h1>
+      <p>The self-hosted engine behind Zircon: publishes exact mod manifests to your players, multiplexes game &amp; web traffic over a single port, and includes a full browser dashboard.</p>
+      <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 26px;">
+        <a class="btn btn-primary btn-lg" href="https://zirconmc.net/updates/server/v0.4.8/zircon-server-windows-x86_64.zip" data-download="serverZip" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          Download Server Manager (.zip)
+        </a>
+        <a class="btn btn-ghost btn-lg" href="docs.html#server-guide">Read Hosting Guide</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= INTERACTIVE SERVER MANAGER CAROUSEL ================= -->
+  <section class="section" style="padding-top: 0;">
+    <div class="container">
+      <div class="carousel">
+        <div class="carousel-track">
+
+          <!-- Slide 1: Performance & Stats -->
+          <div class="carousel-slide active">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>System Stats &amp; Multi-Instance</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/performance_server.png" alt="Server Performance Stats" width="1000" height="600" loading="eager">
+            </div>
+            <div class="carousel-caption"><b>Dashboard &amp; Stats:</b> Real-time CPU, RAM, and tick-rate monitoring across all your server instances.</div>
+          </div>
+
+          <!-- Slide 2: Mod Browser -->
+          <div class="carousel-slide">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>CurseForge &amp; Modrinth Search</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/mod_browser_server.png" alt="Server Mod Browser" width="1000" height="600" loading="lazy">
+            </div>
+            <div class="carousel-caption"><b>Integrated Mod Browser:</b> Search and 1-click install mods from Modrinth &amp; CurseForge with dependency resolution and zero API keys needed.</div>
+          </div>
+
+          <!-- Slide 3: Live Console -->
+          <div class="carousel-slide">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>Live Interactive Terminal</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/console_log_server.png" alt="Live Console" width="1000" height="600" loading="lazy">
+            </div>
+            <div class="carousel-caption"><b>Live Console:</b> Send commands, review color-coded logs, and filter warnings or error stacks.</div>
+          </div>
+
+          <!-- Slide 4: Shaders & Resource Packs -->
+          <div class="carousel-slide">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>Shaders &amp; Resource Packs</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/shaders_server.png" alt="Shaders and Texture Packs" width="1000" height="600" loading="lazy">
+            </div>
+            <div class="carousel-caption"><b>Visual Packs:</b> Manage recommended shaders and texture packs that automatically sync to joining players.</div>
+          </div>
+
+          <!-- Slide 5: File Manager -->
+          <div class="carousel-slide">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>Web File Manager &amp; BOM Sync</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/files_server.png" alt="Server File Manager" width="1000" height="600" loading="lazy">
+            </div>
+            <div class="carousel-caption"><b>File Manager:</b> Browse server directory, upload files, and mark items for client synchronization with "Sync to BOM".</div>
+          </div>
+
+          <!-- Slide 6: In-Browser Config Editor -->
+          <div class="carousel-slide">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>In-Browser Config Editor</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/files_text_editor.png" alt="In-Browser File Editor" width="1000" height="600" loading="lazy">
+            </div>
+            <div class="carousel-caption"><b>Web Code Editor:</b> Edit server.properties, JSON configs, and game files with keyboard shortcuts and instant client sync.</div>
+          </div>
+
+          <!-- Slide 7: Player Management -->
+          <div class="carousel-slide">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>Players, Operators &amp; Whitelist</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/players_server.png" alt="Player Management" width="1000" height="600" loading="lazy">
+            </div>
+            <div class="carousel-caption"><b>Player Control:</b> Manage whitelisted users, operator permission levels, and ban lists visually.</div>
+          </div>
+
+          <!-- Slide 8: Automated Backups -->
+          <div class="carousel-slide">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>Automated Backups &amp; Restore</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/backups_server.png" alt="Server Backups" width="1000" height="600" loading="lazy">
+            </div>
+            <div class="carousel-caption"><b>Automated Snapshots:</b> Scheduled LZ4 backups with configurable retention and 1-click restore.</div>
+          </div>
+
+          <!-- Slide 9: Server Settings -->
+          <div class="carousel-slide">
+            <div class="app-frame">
+              <div class="frame-bar" aria-hidden="true">
+                <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+                <div class="frame-title"><span>Server Settings &amp; Sleep Trigger</span></div>
+                <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+              </div>
+              <img src="assets/img/settings_server.png" alt="Server Settings" width="1000" height="600" loading="lazy">
+            </div>
+            <div class="carousel-caption"><b>Server Settings:</b> Port multiplexing configuration, built-in Modrinth &amp; CurseForge integrations, and idle sleep timeout rules.</div>
+          </div>
+
+        </div>
+
+        <!-- Carousel Navigation Controls -->
+        <div class="carousel-nav">
+          <button class="carousel-btn carousel-prev" aria-label="Previous screenshot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="carousel-dots">
+            <button class="carousel-dot active" aria-label="Slide 1"></button>
+            <button class="carousel-dot" aria-label="Slide 2"></button>
+            <button class="carousel-dot" aria-label="Slide 3"></button>
+            <button class="carousel-dot" aria-label="Slide 4"></button>
+            <button class="carousel-dot" aria-label="Slide 5"></button>
+            <button class="carousel-dot" aria-label="Slide 6"></button>
+            <button class="carousel-dot" aria-label="Slide 7"></button>
+            <button class="carousel-dot" aria-label="Slide 8"></button>
+            <button class="carousel-dot" aria-label="Slide 9"></button>
+          </div>
+          <button class="carousel-btn carousel-next" aria-label="Next screenshot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- Carousel Thumbnails -->
+        <div class="carousel-thumbs">
+          <button class="carousel-thumb active" aria-label="View Stats"><img src="assets/img/performance_server.png" alt="Stats"></button>
+          <button class="carousel-thumb" aria-label="View Mod Browser"><img src="assets/img/mod_browser_server.png" alt="Mod Browser"></button>
+          <button class="carousel-thumb" aria-label="View Live Console"><img src="assets/img/console_log_server.png" alt="Console"></button>
+          <button class="carousel-thumb" aria-label="View Shaders"><img src="assets/img/shaders_server.png" alt="Shaders"></button>
+          <button class="carousel-thumb" aria-label="View Files"><img src="assets/img/files_server.png" alt="Files"></button>
+          <button class="carousel-thumb" aria-label="View Config Editor"><img src="assets/img/files_text_editor.png" alt="Editor"></button>
+          <button class="carousel-thumb" aria-label="View Players"><img src="assets/img/players_server.png" alt="Players"></button>
+          <button class="carousel-thumb" aria-label="View Backups"><img src="assets/img/backups_server.png" alt="Backups"></button>
+          <button class="carousel-thumb" aria-label="View Settings"><img src="assets/img/settings_server.png" alt="Settings"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCREENSHOT SPOTLIGHT: LIVE CONSOLE ================= -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="feature-split">
+        <div class="feature-split-text">
+          <span class="eyebrow">Real-Time Control</span>
+          <h2>Live Terminal &amp; Colorized Logs</h2>
+          <p>
+            Execute server commands directly from your browser with instant stdout/stderr streaming. Filter logs by Info, Warn, or Error to quickly isolate mod exceptions and track game events.
+          </p>
+          <ul class="spec-list">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Live WebSocket Stream:</b> Color-coded logs updated with zero refresh lag.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Command Dispatch:</b> Send op commands, give items, and manage time.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Log Level Filters:</b> Instantly toggle Info, Warning, or Error streams.</span>
+            </li>
+          </ul>
+        </div>
+        <div class="app-frame">
+          <div class="frame-bar" aria-hidden="true">
+            <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+            <div class="frame-title"><span>Live Terminal Console</span></div>
+            <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+          </div>
+          <img src="assets/img/console_log_server.png" alt="Live Console" width="800" height="500" loading="lazy">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCREENSHOT SPOTLIGHT: FILE MANAGER & EDITOR ================= -->
+  <section class="section">
+    <div class="container">
+      <div class="feature-split reverse">
+        <div class="feature-split-text">
+          <span class="eyebrow">Built-In Web Tools</span>
+          <h2>Web File Manager &amp; Config Editor</h2>
+          <p>
+            No need for external FTP clients or SSH sessions. Explore your instance files, edit <code>server.properties</code> and JSON configs with the built-in syntax-highlighted editor, and use "Sync to Clients" to propagate configs directly to player launchers.
+          </p>
+          <ul class="spec-list">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>In-Browser Editor:</b> Syntax highlighting and keyboard shortcuts (Ctrl+S).</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>One-Click Client Sync:</b> Distribute modified configs straight to players.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              <span><b>Upload &amp; Extract:</b> Upload ZIP packs and custom mod JARs easily.</span>
+            </li>
+          </ul>
+        </div>
+        <div class="app-frame">
+          <div class="frame-bar" aria-hidden="true">
+            <div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+            <div class="frame-title"><span>server.properties Editor</span></div>
+            <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/></svg></button></div>
+          </div>
+          <img src="assets/img/files_text_editor.png" alt="Config Editor" width="800" height="500" loading="lazy">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FEATURE HIGHLIGHTS ================= -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Why Server Owners Choose Zircon</div>
+        <h2>No support tickets. No version conflicts.</h2>
+        <p>Your server dictates the mods, shaders, and configs. Players click PLAY and spawn in synced.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v4H4z"/><path d="M4 10h16v4H4z"/><path d="M4 16h16v4H4z"/><path d="M7 6h.01M7 12h.01M7 18h.01"/></svg></span>
+          <h3>Single-Port Multiplexing</h3>
+          <p>Minecraft protocol (25565) and HTTP/REST manifest delivery run on the <strong>same single port</strong>. No configuring multiple ports, reverse proxies, or complex firewalls.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg></span>
+          <h3>CurseForge &amp; Modrinth In Dashboard</h3>
+          <p>Search millions of mods directly from both Modrinth and CurseForge inside the web panel with zero API keys required. Click once to install dependencies automatically.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+          <h3>Idle Sleep &amp; Auto-Wake</h3>
+          <p>When everyone logs off, the server pauses JVM execution to save CPU and RAM. When a player hits PLAY in the launcher, Zircon wakes the server automatically before connect.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg></span>
+          <h3>Live Web Console &amp; Stats</h3>
+          <p>Execute commands, review colorized Minecraft server logs in real time, and monitor server CPU, memory, and tick rates from any web browser.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></span>
+          <h3>Automated Backups</h3>
+          <p>Schedule zip backups of worlds and configurations. Restore full snapshots with a single click if something breaks.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></span>
+          <h3>Multi-Instance Management</h3>
+          <p>Host multiple Minecraft servers on different ports or switch active modpacks effortlessly from one centralized web dashboard.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= HOW IT OPERATES ================= -->
+  <section class="section">
+    <div class="container" style="max-width: 900px;">
+      <div class="section-head">
+        <div class="section-kicker">Architecture</div>
+        <h2>How Port Multiplexing Works</h2>
+        <p>Traditional servers require separate ports for the game, web manifests, and admin consoles. Zircon does it on port 25565.</p>
+      </div>
+
+      <div class="codeblock">
+<span class="c"># 1. Start Zircon Server Manager</span>
+./zircon-server --port 25565 --admin-port 25564
+
+<span class="c"># Public Address: 25565 (serves Minecraft protocol + REST mod manifests)</span>
+<span class="c"># Local Admin Panel: http://localhost:25564 (secure dashboard with generated password)</span>
+      </div>
+
+      <div class="callout" style="margin-top: 24px;">
+        <strong>Security by design:</strong> The admin dashboard (25564) stays local or behind your VPN/reverse proxy. Only the multiplexed Minecraft port (25565) needs to be forwarded to your players.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CTA ================= -->
+  <section class="section" style="padding-top: 0;">
+    <div class="container">
+      <div class="cta-band">
+        <h2>Ready to run your server?</h2>
+        <p>Download the standalone binary or build from source in seconds.</p>
+        <a class="btn btn-white btn-lg" href="https://zirconmc.net/updates/server/v0.4.8/zircon-server-windows-x86_64.zip" data-download="serverZip" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          Download Server Manager (.zip)
+        </a>
+        <a class="btn btn-ghost btn-lg" href="docs.html#server-guide">View Step-by-Step Setup Guide</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="assets/img/zircon-title.svg" alt="Zircon">
+          <p>A free, open-source launcher and server manager for modded Minecraft. Exact mod sync verified on every launch against Modrinth &amp; CurseForge.</p>
+          <a class="pill pill-accent" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">Source-Available (BSL 1.1)</a>
+        </div>
+        <div class="footer-col">
+          <h4>Pages</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="launcher.html">Launcher</a></li>
+            <li><a href="server.html">Server Manager</a></li>
+            <li><a href="docs.html">Guides &amp; Docs</a></li>
+            <li><a href="faq.html">FAQ</a></li>
+            <li><a href="downloads.html">Downloads</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" target="_blank" rel="noopener">Business Source License 1.1</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <span>© Zircon contributors · v0.4.8</span>
+        <span>Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
