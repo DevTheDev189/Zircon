@@ -24,8 +24,8 @@ use zircon_core::security::ssrf;
 
 /// Version of the currently running server binary.
 pub const CURRENT_SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
-/// Update manifest endpoint (served from the Cloudflare R2 bucket).
-pub const SERVER_UPDATE_URL: &str = "https://zirconmc.net/updates/server/latest.json";
+/// Update manifest endpoint (served from the Cloudflare R2 bucket via downloads.zirconmc.net).
+pub const SERVER_UPDATE_URL: &str = "https://downloads.zirconmc.net/updates/server/latest.json";
 
 /// Published update manifest: newest version + per-platform artifacts.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -216,12 +216,12 @@ mod tests {
             "notes": "Security fix",
             "platforms": {
                 "windows-x86_64": {
-                    "url": "https://zirconmc.net/updates/server/windows-x86_64.zip",
+                    "url": "https://downloads.zirconmc.net/updates/server/windows-x86_64.zip",
                     "sha256": "abc123",
                     "binName": "zircon-server.exe"
                 },
                 "linux-x86_64": {
-                    "url": "https://zirconmc.net/updates/server/linux-x86_64.zip",
+                    "url": "https://downloads.zirconmc.net/updates/server/linux-x86_64.zip",
                     "sha256": "def456",
                     "binName": "zircon-server"
                 }
@@ -234,7 +234,7 @@ mod tests {
         assert_eq!("zircon-server.exe", win.bin_name);
         assert_eq!("abc123", win.sha256);
         assert_eq!(
-            "https://zirconmc.net/updates/server/windows-x86_64.zip",
+            "https://downloads.zirconmc.net/updates/server/windows-x86_64.zip",
             win.url
         );
     }
@@ -247,10 +247,10 @@ mod tests {
     #[test]
     fn update_endpoints_pass_the_ssrf_whitelist() {
         // Both the manifest and artifact hosts must be CDN-allowlisted
-        // (zirconmc.net was added in the Phase 1 SSRF hardening).
+        // (downloads.zirconmc.net is covered by *.zirconmc.net).
         assert!(ssrf::is_safe_cdn_url(SERVER_UPDATE_URL));
         assert!(ssrf::is_safe_cdn_url(
-            "https://zirconmc.net/updates/server/windows-x86_64.zip"
+            "https://downloads.zirconmc.net/updates/server/windows-x86_64.zip"
         ));
     }
 }

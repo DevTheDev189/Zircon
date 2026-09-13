@@ -34,6 +34,9 @@ client_id.txt
 # ---------- Website (managed outside the repo, staged to cloudflare-upload) ----------
 /website/
 /cloudflare-upload/
+/cloudflare-pages/
+/cloudflare-r2/
+/download-artifacts/
 
 # ---------- Rust ----------
 target/
