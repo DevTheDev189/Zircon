@@ -138,6 +138,12 @@ $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 foreach ($file in $launcherFiles) {
     if ($file.Name -like "*server*") { continue }
+    if ($file.Name -like "*control.tar.gz*" -or $file.Name -like "*data.tar.gz*") { continue }
+    # Only stage artifacts matching the target version or unversioned bundles
+    if ($file.Name -match '\d+\.\d+\.\d+' -and $file.Name -notlike "*$Version*") {
+        Write-Host "  Skipping older version artifact: $($file.Name)" -ForegroundColor DarkGray
+        continue
+    }
     Copy-Item $file.FullName -Destination $launcherStageDir -Force
     Write-Host "  Staged: $($file.Name)" -ForegroundColor Gray
 }

@@ -40,6 +40,30 @@ def upload_to_r2(account_id: str, bucket: str, token: str, key: str, filepath: P
         if resp.status not in (200, 201):
             raise RuntimeError(f"R2 upload failed for {key}: HTTP {resp.status}")
 
+def cleanup_old_r2_objects(account_id: str, bucket: str, token: str, current_version: str):
+    list_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket}/objects"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        req = urllib.request.Request(list_url, headers=headers, method="GET")
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            objects = data.get("result", [])
+            for obj in objects:
+                key = obj.get("key", "")
+                # Purge older launcher binaries (keep latest.json and current version)
+                if key.startswith("updates/launcher/") and "latest.json" not in key:
+                    if any(c.isdigit() for c in key) and current_version not in key and "zircon-macos-app" not in key.lower():
+                        print(f"  -> Purging obsolete launcher release from R2: {key}")
+                        del_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket}/objects/{key}"
+                        urllib.request.urlopen(urllib.request.Request(del_url, headers=headers, method="DELETE"))
+                # Purge older server release directories (keep latest.json and current version)
+                elif key.startswith("updates/server/") and not key.startswith(f"updates/server/v{current_version}/") and "latest.json" not in key:
+                    print(f"  -> Purging obsolete server release from R2: {key}")
+                    del_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket}/objects/{key}"
+                    urllib.request.urlopen(urllib.request.Request(del_url, headers=headers, method="DELETE"))
+    except Exception as e:
+        print(f"  Notice: R2 cleanup skipped or completed: {e}")
+
 def main():
     token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
     account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
@@ -108,6 +132,12 @@ def main():
     for f in assets_dir.iterdir():
         if "server" in f.name.lower():
             continue
+        if "control.tar.gz" in f.name.lower() or "data.tar.gz" in f.name.lower():
+            continue
+        # Skip older version artifacts
+        if any(c.isdigit() for c in f.name) and version not in f.name and "zircon-macos-app" not in f.name.lower():
+            print(f"  Skipping older version artifact: {f.name}")
+            continue
         if f.suffix in (".exe", ".msi", ".dmg", ".AppImage", ".deb", ".rpm", ".tar.gz", ".sig", ".zip"):
             dest = launcher_stage / f.name
             dest.write_bytes(f.read_bytes())
@@ -163,6 +193,10 @@ def main():
                 key = path.relative_to(r2_stage).as_posix()
                 upload_to_r2(account_id, bucket, token, key, path)
         print("  -> All binary artifacts and manifests successfully synced to R2!")
+        
+        # Purge older versions so only the latest release is kept
+        print("\n  Cleaning up older version artifacts from R2...")
+        cleanup_old_r2_objects(account_id, bucket, token, version)
     else:
         print("\n[3/4] SKIPPED R2 Upload: CLOUDFLARE_API_TOKEN, ACCOUNT_ID, or R2_BUCKET secret missing.")
 
