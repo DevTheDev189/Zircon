@@ -53,6 +53,9 @@ crates/zircon-launcher/ui/dist/
 
 # ---------- Internal docs, scripts, tests, and builds ----------
 /scripts/
+!/scripts/ci_deploy_cloudflare.py
+!/scripts/sync-version.ps1
+!/scripts/stage-cloudflare.ps1
 /dist-run/
 /AGENT_PLAN.md
 /Changes.md
