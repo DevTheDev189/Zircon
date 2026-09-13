@@ -267,12 +267,13 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
-          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ]; then
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
             echo "Apple Developer certificate detected — preparing signing keychain."
             echo "has_apple_key=true" >> $GITHUB_OUTPUT
           else
-            echo "No Apple Developer certificate detected. Skipping macOS code signing and notarization."
+            echo "No Apple Developer certificate detected. Skipping macOS code signing and notarization (ad-hoc signing will be used)."
             echo "has_apple_key=false" >> $GITHUB_OUTPUT
           fi
 
@@ -281,6 +282,10 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
@@ -295,15 +300,16 @@ jobs:
 
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
 
+          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> $GITHUB_ENV
+          if [ -n "$APPLE_ID" ]; then echo "APPLE_ID=$APPLE_ID" >> $GITHUB_ENV; fi
+          if [ -n "$APPLE_PASSWORD" ]; then echo "APPLE_PASSWORD=$APPLE_PASSWORD" >> $GITHUB_ENV; fi
+          if [ -n "$APPLE_TEAM_ID" ]; then echo "APPLE_TEAM_ID=$APPLE_TEAM_ID" >> $GITHUB_ENV; fi
+
       - name: Build Zircon Launcher (.dmg & .app)
         working-directory: crates/zircon-launcher
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             echo "Tauri updater signing key detected — generating signed updater artifacts."
