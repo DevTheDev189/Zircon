@@ -92,7 +92,8 @@ impl JavaRuntimeSelector {
     }
 }
 
-/// Resolves `<javaHome>/bin/java(.exe)` or `<javaHome>/java(.exe)` for the current platform.
+/// Resolves `<javaHome>/bin/java(.exe)`, `<javaHome>/Contents/Home/bin/java(.exe)` (macOS),
+/// or `<javaHome>/java(.exe)` for the current platform.
 pub fn java_executable(java_home: &Path) -> PathBuf {
     if java_home.is_file() {
         return java_home.to_path_buf();
@@ -104,35 +105,112 @@ pub fn java_executable(java_home: &Path) -> PathBuf {
     };
     let with_bin = java_home.join("bin").join(exe);
     if with_bin.is_file() {
+        ensure_executable(&with_bin);
         return with_bin;
+    }
+    // macOS bundle structure: <java_home>/Contents/Home/bin/java
+    let macos_home = java_home.join("Contents").join("Home").join("bin").join(exe);
+    if macos_home.is_file() {
+        ensure_executable(&macos_home);
+        return macos_home;
     }
     let direct = java_home.join(exe);
     if direct.is_file() {
+        ensure_executable(&direct);
         return direct;
     }
     with_bin
 }
 
-/// Finds the Java home directory within `jdk_dir`, supporting both direct installations
-/// (`<jdk_dir>/bin/java`) and archives extracted with an enclosing folder
-/// (`<jdk_dir>/<release_name>/bin/java`).
+#[inline]
+fn ensure_executable(_path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(_path) {
+            let mode = meta.permissions().mode();
+            if mode & 0o111 == 0 {
+                let mut perms = meta.permissions();
+                perms.set_mode(mode | 0o755);
+                let _ = std::fs::set_permissions(_path, perms);
+            }
+        }
+    }
+}
+
+/// Finds the Java home directory within `jdk_dir`, supporting direct installations
+/// (`<jdk_dir>/bin/java`), macOS bundles (`<jdk_dir>/Contents/Home/bin/java`),
+/// archives extracted with an enclosing folder (`<jdk_dir>/<release_name>/bin/java`),
+/// macOS archives with bundle enclosing folder (`<jdk_dir>/<release_name>/Contents/Home/bin/java`),
+/// or any nested hierarchy up to 4 directory levels deep.
 pub fn find_java_home_in(jdk_dir: &Path) -> Option<PathBuf> {
     if !jdk_dir.is_dir() {
         return None;
     }
+
+    // 1. Direct check on jdk_dir itself
+    if jdk_dir.join("Contents").join("Home").join("bin").is_dir()
+        && java_executable(&jdk_dir.join("Contents").join("Home")).is_file()
+    {
+        return Some(jdk_dir.join("Contents").join("Home"));
+    }
     if java_executable(jdk_dir).is_file() {
         return Some(jdk_dir.to_path_buf());
     }
+
+    // 2. Direct child folders (typical unpack destination)
     if let Ok(entries) = std::fs::read_dir(jdk_dir) {
-        let mut candidates: Vec<PathBuf> = entries
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.is_dir() && java_executable(p).is_file())
-            .collect();
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if !p.is_dir() {
+                continue;
+            }
+            if p.join("Contents").join("Home").join("bin").is_dir()
+                && java_executable(&p.join("Contents").join("Home")).is_file()
+            {
+                candidates.push(p.join("Contents").join("Home"));
+            } else if java_executable(&p).is_file() {
+                candidates.push(p);
+            }
+        }
         // Sort descending so newer versions/names are preferred if multiple exist
         candidates.sort_by(|a, b| b.cmp(a));
         if let Some(candidate) = candidates.into_iter().next() {
             return Some(candidate);
+        }
+    }
+
+    // 3. Recursive fallback up to 4 directory levels deep (for heavily nested archives or .jdk bundles)
+    find_java_home_recursive(jdk_dir, 0, 4)
+}
+
+fn find_java_home_recursive(dir: &Path, current_depth: usize, max_depth: usize) -> Option<PathBuf> {
+    if current_depth > max_depth {
+        return None;
+    }
+    let exe = if cfg!(target_os = "windows") {
+        "java.exe"
+    } else {
+        "java"
+    };
+
+    if dir.join("bin").join(exe).is_file() {
+        ensure_executable(&dir.join("bin").join(exe));
+        return Some(dir.to_path_buf());
+    }
+
+    let entries = std::fs::read_dir(dir).ok()?;
+    let mut dirs: Vec<PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    dirs.sort_by(|a, b| b.cmp(a));
+
+    for sub_dir in dirs {
+        if let Some(found) = find_java_home_recursive(&sub_dir, current_depth + 1, max_depth) {
+            return Some(found);
         }
     }
     None
@@ -605,6 +683,17 @@ mod tests {
         std::fs::create_dir_all(&inner_bin).unwrap();
         std::fs::write(inner_bin.join(exe_name), b"mock").unwrap();
         assert_eq!(find_java_home_in(&nested_dir), Some(inner_dir));
+
+        // macOS bundle layout (Adoptium macOS archives): <jdk_dir>/jdk-25.0.1+8/Contents/Home/bin/java(.exe)
+        let macos_dir = temp.join("jdk-macos");
+        let macos_inner = macos_dir.join("jdk-25.0.1+8");
+        let macos_home = macos_inner.join("Contents").join("Home");
+        let macos_bin = macos_home.join("bin");
+        std::fs::create_dir_all(&macos_bin).unwrap();
+        std::fs::write(macos_bin.join(exe_name), b"mock").unwrap();
+        assert_eq!(find_java_home_in(&macos_dir), Some(macos_home.clone()));
+        assert_eq!(java_executable(&macos_inner), macos_bin.join(exe_name));
+        assert_eq!(java_executable(&macos_home), macos_bin.join(exe_name));
 
         let _ = std::fs::remove_dir_all(&temp);
     }

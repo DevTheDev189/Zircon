@@ -438,7 +438,7 @@ const props = defineProps({
 const emit = defineEmits(['skinSaved', 'skinApplied', 'openAiModal']);
 
 // Feature flag: set to true when AI studio is ready for production
-const ENABLE_AI_STUDIO = true;
+const ENABLE_AI_STUDIO = false;
 
 const showNewModal = ref(false);
 const isSaving = ref(false);

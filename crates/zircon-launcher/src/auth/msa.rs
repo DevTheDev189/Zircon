@@ -44,6 +44,8 @@ const XSTS_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 const MC_LOGIN_URL: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
 const MC_ENTITLEMENTS_URL: &str = "https://api.minecraftservices.com/entitlements/mcstore";
 const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
+pub const MINECRAFT_BUY_URL: &str =
+    "https://www.minecraft.net/store/minecraft-java-bedrock-edition-pc";
 
 /// Endpoints whose responses carry bearer tokens. Their bodies are never
 /// logged or embedded in error messages, so tokens cannot leak into logs or
@@ -622,6 +624,11 @@ impl MicrosoftAuthService {
         let status = response.status().as_u16();
         let text = response.text().await?;
         tracing::debug!("GET {MC_PROFILE_URL} -> HTTP {status}: {}", truncate(&text));
+        if status == 404 {
+            return Err(LauncherError::Auth(format!(
+                "This Microsoft account does not own Minecraft Java Edition. Please purchase Minecraft Java Edition to play: {MINECRAFT_BUY_URL}"
+            )));
+        }
         if status != 200 {
             return Err(LauncherError::Http {
                 status,

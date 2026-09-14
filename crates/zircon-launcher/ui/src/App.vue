@@ -534,6 +534,13 @@ async function addAccount() {
     statusText.value = `Added ${newSession.username}.`;
   } catch (err) {
     console.error('Login error:', err);
+    const msg = String(err).toLowerCase();
+    if (msg.includes('does not own minecraft') || (msg.includes('404') && (msg.includes('profile') || msg.includes('minecraft')))) {
+      statusText.value = 'Account does not own Minecraft Java Edition. Purchase required.';
+      api.openBrowserUrl('https://www.minecraft.net/store/minecraft-java-bedrock-edition-pc').catch(() => {});
+    } else {
+      statusText.value = `Login failed: ${err}`;
+    }
   }
 }
 

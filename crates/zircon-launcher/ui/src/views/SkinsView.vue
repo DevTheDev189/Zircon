@@ -500,7 +500,7 @@ const activeTab = ref('saved'); // 'saved' | 'library' | 'studio'
 const showAiStudioModal = ref(false);
 
 // Feature flag: set to true when AI studio is ready for production
-const ENABLE_AI_STUDIO = true;
+const ENABLE_AI_STUDIO = false;
 
 // Paint Studio instance
 const studioInstance = createStudioState();
