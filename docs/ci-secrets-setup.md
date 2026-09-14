@@ -2,6 +2,8 @@
 
 This document explains the repository secrets and environment variables utilized by the multi-platform GitHub Actions build workflow (`.github/workflows/build.yml`).
 
+For full details on the automated pipeline architecture, build matrices, Cloudflare R2/Pages deployments, and release commands, see the **[CI Pipeline Guide](ci-pipeline-guide.md)**.
+
 ---
 
 ## 1. Building Key (CurseForge API)

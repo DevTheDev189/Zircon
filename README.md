@@ -238,6 +238,15 @@ The project is designed to respect the [Minecraft EULA](https://aka.ms/Minecraft
 
 ---
 
+## 🚀 CI/CD & Automated Releases
+
+The multi-platform build, packaging, and deployment pipeline is fully automated via GitHub Actions:
+- **[CI Pipeline Guide](docs/ci-pipeline-guide.md)** — Architecture, matrix builders (Windows, Linux, macOS), Cloudflare R2/Pages automation, boundaries, and trigger commands.
+- **[CI Secrets Setup](docs/ci-secrets-setup.md)** — Repository secrets reference (Cloudflare, Azure, Apple Developer, CurseForge).
+- **One-Click Release**: Run `release.bat <version>` from the workspace root to sync versions, tag, and dispatch the release pipeline.
+
+---
+
 ## © License
 
 The code in this repository is licensed under the [Business Source License 1.1 (BSL 1.1)](LICENSE).
