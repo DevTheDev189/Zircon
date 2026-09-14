@@ -219,6 +219,10 @@ impl MinecraftClasspathBuilder {
             .to_string();
         let loader_type = loader.r#type.to_lowercase();
         let mut jvm_args: Vec<String> = Vec::new();
+        #[cfg(target_os = "macos")]
+        if !jvm_args.iter().any(|arg| arg == "-XstartOnFirstThread") {
+            jvm_args.push("-XstartOnFirstThread".to_string());
+        }
         let mut game_args: Vec<String> = Vec::new();
         match loader_type.as_str() {
             "fabric" | "quilt" => {

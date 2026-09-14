@@ -309,6 +309,13 @@ fn build_online_command(
 
     let java = java_executable(&data.java_home);
     let mut command = vec![java.display().to_string()];
+    // On macOS, GLFW/Cocoa requires running on the first thread of the process.
+    #[cfg(target_os = "macos")]
+    if !data.jvm_args.iter().any(|arg| arg == "-XstartOnFirstThread")
+        && !java_args.is_some_and(|args| args.contains("-XstartOnFirstThread"))
+    {
+        command.push("-XstartOnFirstThread".to_string());
+    }
     // Forge/NeoForge contribute JVM args from the version profile chain:
     // -p module path, --add-modules/--add-opens/--add-exports, -D system
     // properties such as -DlibraryDirectory and -DignoreList.
@@ -397,6 +404,13 @@ fn build_offline_command(
 
     let java = java_executable(&data.java_home);
     let mut command = vec![java.display().to_string()];
+    // On macOS, GLFW/Cocoa requires running on the first thread of the process.
+    #[cfg(target_os = "macos")]
+    if !data.jvm_args.iter().any(|arg| arg == "-XstartOnFirstThread")
+        && !java_args.is_some_and(|args| args.contains("-XstartOnFirstThread"))
+    {
+        command.push("-XstartOnFirstThread".to_string());
+    }
     command.extend(data.jvm_args.iter().cloned());
     append_jvm_memory_args(&mut command, java_args);
     command.push(format!(
