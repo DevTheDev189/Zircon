@@ -200,17 +200,22 @@ def main():
     else:
         print("\n[3/4] SKIPPED R2 Upload: CLOUDFLARE_API_TOKEN, ACCOUNT_ID, or R2_BUCKET secret missing.")
 
-    # 4. Deploy Website to Cloudflare Pages
+    # 4. Deploy Website to Cloudflare Pages (Production branch 'main')
     if token and account_id:
-        print("\n[4/4] Deploying website to Cloudflare Pages (project 'zircon')...")
+        print("\n[4/4] Deploying website to Cloudflare Pages (project 'zircon', branch 'main' -> Production)...")
         env = os.environ.copy()
         env["CLOUDFLARE_API_TOKEN"] = token
         env["CLOUDFLARE_ACCOUNT_ID"] = account_id
-        res = subprocess.run(["npx", "--yes", "wrangler", "pages", "deploy", "website", "--project-name", "zircon"], env=env)
+        res = subprocess.run([
+            "npx", "--yes", "wrangler", "pages", "deploy", "website",
+            "--project-name", "zircon",
+            "--branch", "main",
+            "--commit-dirty=true"
+        ], env=env)
         if res.returncode != 0:
             print("WARNING: Wrangler Pages deployment failed with non-zero exit code.", file=sys.stderr)
         else:
-            print("  -> Website successfully deployed to Cloudflare Pages!")
+            print("  -> Website successfully deployed to Cloudflare Pages (Production)!")
     else:
         print("\n[4/4] SKIPPED Pages Deploy: CLOUDFLARE_API_TOKEN or ACCOUNT_ID missing.")
 
