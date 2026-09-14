@@ -65,8 +65,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path "dist-run/zircon-server"
           Copy-Item "target/release/zircon-server.exe" -Destination "dist-run/zircon-server/"
-          New-Item -ItemType Directory -Force -Path "dist-run/zircon-server/server-data/.keep"
-          "placeholder" | Out-File -FilePath "dist-run/zircon-server/server-data/.keep/readme.txt" -Encoding utf8
+          Copy-Item "crates/zircon-server/deploy/start-server.bat" -Destination "dist-run/zircon-server/"
+          Copy-Item "crates/zircon-server/deploy/README.txt" -Destination "dist-run/zircon-server/"
+          Copy-Item "LICENSE" -Destination "dist-run/zircon-server/"
           Compress-Archive -Path "dist-run/zircon-server/*" -DestinationPath "dist-run/zircon-server-windows-x86_64.zip" -Force
           $hash = (Get-FileHash -Path "dist-run/zircon-server-windows-x86_64.zip" -Algorithm SHA256).Hash
           "$hash  zircon-server-windows-x86_64.zip" | Out-File -FilePath "dist-run/zircon-server-windows-x86_64.zip.sha256" -Encoding ascii
@@ -193,8 +194,12 @@ jobs:
         run: |
           mkdir -p dist-run/zircon-server
           cp target/release/zircon-server dist-run/zircon-server/
-          mkdir -p dist-run/zircon-server/server-data/.keep
-          echo "placeholder" > dist-run/zircon-server/server-data/.keep/readme.txt
+          chmod +x dist-run/zircon-server/zircon-server
+          cp crates/zircon-server/deploy/start-server.sh dist-run/zircon-server/
+          chmod +x dist-run/zircon-server/start-server.sh
+          cp crates/zircon-server/deploy/zircon-server.service dist-run/zircon-server/
+          cp crates/zircon-server/deploy/README.txt dist-run/zircon-server/
+          cp LICENSE dist-run/zircon-server/
           tar -czvf dist-run/zircon-server-linux-x86_64.tar.gz -C dist-run/zircon-server .
           sha256sum dist-run/zircon-server-linux-x86_64.tar.gz > dist-run/zircon-server-linux-x86_64.tar.gz.sha256
           (cd dist-run/zircon-server && zip -r ../zircon-server-linux-x86_64.zip .)
