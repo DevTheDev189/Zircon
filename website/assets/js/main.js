@@ -3,33 +3,7 @@
    Interactive showcases, carousels, lightbox modal, and motion.
    ============================================================ */
 
-const RELEASE_URLS = {
-  // Windows Launcher
-  launcherExe: 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.8_x64-setup.exe',
-  launcherMsi: 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.8_x64_en-US.msi',
-
-  // macOS Launcher
-  launcherDmg: 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.8_aarch64.dmg',
-  launcherApp: 'https://downloads.zirconmc.net/updates/launcher/Zircon-macOS-app.tar.gz',
-
-  // Linux Launcher
-  launcherAppImage: 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.8_amd64.AppImage',
-  launcherDeb: 'https://downloads.zirconmc.net/updates/launcher/zircon_0.4.8_amd64.deb',
-  launcherRpm: 'https://downloads.zirconmc.net/updates/launcher/zircon-0.4.8-1.x86_64.rpm',
-
-  // Server packages
-  serverZip: 'https://downloads.zirconmc.net/updates/server/v0.4.8/zircon-server-windows-x86_64.zip',
-  serverTar: 'https://downloads.zirconmc.net/updates/server/v0.4.8/zircon-server-linux-x86_64.tar.gz',
-};
-
 document.addEventListener('DOMContentLoaded', () => {
-  // ---------------------------------------------------------------------------
-  // 1. Wire every [data-download] button to the release URLs
-  // ---------------------------------------------------------------------------
-  document.querySelectorAll('[data-download]').forEach((a) => {
-    const url = RELEASE_URLS[a.dataset.download];
-    if (url) a.setAttribute('href', url);
-  });
 
   // ---------------------------------------------------------------------------
   // 1b. Multi-Platform OS Auto-Detection & Selector

@@ -10,6 +10,7 @@ Automated Cloudflare deployment for GitHub Actions:
 
 import os
 import sys
+import re
 import glob
 import json
 import hashlib
@@ -63,6 +64,27 @@ def cleanup_old_r2_objects(account_id: str, bucket: str, token: str, current_ver
                     urllib.request.urlopen(urllib.request.Request(del_url, headers=headers, method="DELETE"))
     except Exception as e:
         print(f"  Notice: R2 cleanup skipped or completed: {e}")
+
+def stamp_website_files(website_dir: Path, version: str):
+    print(f"\n  Stamping release version v{version} into website files...")
+    patterns = [
+        (re.compile(r'v\d+\.\d+\.\d+'), f'v{version}'),
+        (re.compile(r'Zircon_\d+\.\d+\.\d+_'), f'Zircon_{version}_'),
+        (re.compile(r'zircon_\d+\.\d+\.\d+_'), f'zircon_{version}_'),
+        (re.compile(r'zircon-\d+\.\d+\.\d+-'), f'zircon-{version}-'),
+    ]
+    for ext in ("*.html", "*.js"):
+        for f in website_dir.rglob(ext):
+            try:
+                content = f.read_text(encoding="utf-8")
+                new_content = content
+                for pat, repl in patterns:
+                    new_content = pat.sub(repl, new_content)
+                if new_content != content:
+                    f.write_text(new_content, encoding="utf-8")
+                    print(f"    -> Updated version in {f.name}")
+            except Exception as e:
+                print(f"    Notice: could not stamp {f.name}: {e}")
 
 def main():
     token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
@@ -203,6 +225,9 @@ def main():
     # 4. Deploy Website to Cloudflare Pages (Production branch 'main')
     if token and account_id:
         print("\n[4/4] Deploying website to Cloudflare Pages (project 'zircon', branch 'main' -> Production)...")
+        website_dir = Path("website")
+        if website_dir.exists():
+            stamp_website_files(website_dir, version)
         env = os.environ.copy()
         env["CLOUDFLARE_API_TOKEN"] = token
         env["CLOUDFLARE_ACCOUNT_ID"] = account_id

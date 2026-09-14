@@ -371,9 +371,11 @@ img {
 }
 
 .hero-actions-stacked {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100%;
   gap: 12px;
   margin: 28px 0 24px;
 }

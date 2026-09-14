@@ -4,6 +4,7 @@
   "version": "0.4.8",
   "identifier": "com.zircon.launcher",
   "build": {
+    "beforeDevCommand": "npm run dev",
     "frontendDist": "ui/dist",
     "devUrl": "http://localhost:1420"
   },
