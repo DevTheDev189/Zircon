@@ -151,6 +151,7 @@ def main():
     launcher_platforms = {}
     pub_date = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    valid_launcher_extensions = (".exe", ".msi", ".dmg", ".AppImage", ".deb", ".rpm", ".tar.gz", ".sig", ".zip")
     for f in assets_dir.iterdir():
         if "server" in f.name.lower():
             continue
@@ -160,7 +161,7 @@ def main():
         if any(c.isdigit() for c in f.name) and version not in f.name and "zircon-macos-app" not in f.name.lower():
             print(f"  Skipping older version artifact: {f.name}")
             continue
-        if f.suffix in (".exe", ".msi", ".dmg", ".AppImage", ".deb", ".rpm", ".tar.gz", ".sig", ".zip"):
+        if any(f.name.endswith(ext) for ext in valid_launcher_extensions):
             dest = launcher_stage / f.name
             dest.write_bytes(f.read_bytes())
             print(f"  Launcher artifact staged: {f.name}")
@@ -184,18 +185,42 @@ def main():
             "url": f"{domain}/updates/launcher/{linux_appimages[0].name}"
         }
 
-    mac_dmgs = list(launcher_stage.glob("*.dmg"))
-    if mac_dmgs:
-        sig_file = launcher_stage / f"{mac_dmgs[0].name}.sig"
-        sig_content = sig_file.read_text(encoding="utf-8").strip() if sig_file.exists() else ""
-        launcher_platforms["darwin-aarch64"] = {
-            "signature": sig_content,
-            "url": f"{domain}/updates/launcher/{mac_dmgs[0].name}"
-        }
-        launcher_platforms["darwin-x86_64"] = {
-            "signature": sig_content,
-            "url": f"{domain}/updates/launcher/{mac_dmgs[0].name}"
-        }
+    # macOS Tauri updater strictly requires a .app.tar.gz archive with its accompanying minisign .sig file
+    mac_updaters = [
+        f for f in launcher_stage.glob("*.tar.gz")
+        if (launcher_stage / f"{f.name}.sig").exists() and not f.name.lower().startswith("zircon-macos-app")
+    ]
+    if mac_updaters:
+        for mac_pkg in mac_updaters:
+            sig_file = launcher_stage / f"{mac_pkg.name}.sig"
+            sig_content = sig_file.read_text(encoding="utf-8").strip()
+            url = f"{domain}/updates/launcher/{mac_pkg.name}"
+            name_lower = mac_pkg.name.lower()
+            if "x86_64" in name_lower or "x64" in name_lower:
+                launcher_platforms["darwin-x86_64"] = {
+                    "signature": sig_content,
+                    "url": url
+                }
+            elif "aarch64" in name_lower or "arm64" in name_lower:
+                launcher_platforms["darwin-aarch64"] = {
+                    "signature": sig_content,
+                    "url": url
+                }
+            else:
+                # Universal or default macOS bundle (e.g. Zircon.app.tar.gz)
+                if "darwin-aarch64" not in launcher_platforms:
+                    launcher_platforms["darwin-aarch64"] = {
+                        "signature": sig_content,
+                        "url": url
+                    }
+                if "darwin-x86_64" not in launcher_platforms:
+                    launcher_platforms["darwin-x86_64"] = {
+                        "signature": sig_content,
+                        "url": url
+                    }
+        print(f"  macOS updater configured with: {[f.name for f in mac_updaters]}")
+    else:
+        print("  WARNING: No signed macOS updater bundle (*.tar.gz with *.sig) found!")
 
     launcher_manifest = {
         "version": version,
