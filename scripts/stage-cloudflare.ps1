@@ -148,9 +148,17 @@ foreach ($file in $launcherFiles) {
     Write-Host "  Staged: $($file.Name)" -ForegroundColor Gray
 }
 
+$winZip = Get-ChildItem -Path $launcherStageDir -Filter "*setup.nsis.zip" | Select-Object -First 1
 $winSetup = Get-ChildItem -Path $launcherStageDir -Filter "*setup.exe" | Select-Object -First 1
-$winSig = Get-ChildItem -Path $launcherStageDir -Filter "*setup.exe.sig" | Select-Object -First 1
-if ($winSetup) {
+if ($winZip) {
+    $winSig = Get-ChildItem -Path $launcherStageDir -Filter "$($winZip.Name).sig" | Select-Object -First 1
+    $sigContent = if ($winSig) { [System.IO.File]::ReadAllText($winSig.FullName).Trim() } else { "" }
+    $launcherPlatforms["windows-x86_64"] = @{
+        signature = $sigContent
+        url = "$Domain/updates/launcher/$($winZip.Name)"
+    }
+} elseif ($winSetup) {
+    $winSig = Get-ChildItem -Path $launcherStageDir -Filter "*setup.exe.sig" | Select-Object -First 1
     $sigContent = if ($winSig) { [System.IO.File]::ReadAllText($winSig.FullName).Trim() } else { "" }
     $launcherPlatforms["windows-x86_64"] = @{
         signature = $sigContent
@@ -168,18 +176,25 @@ if ($linuxAppImage) {
     }
 }
 
+$macTar = Get-ChildItem -Path $launcherStageDir -Filter "*.tar.gz" | Where-Object { $_.Name -notlike "*server*" } | Select-Object -First 1
 $macDmg = Get-ChildItem -Path $launcherStageDir -Filter "*.dmg" | Select-Object -First 1
-$macSig = Get-ChildItem -Path $launcherStageDir -Filter "*.dmg.sig" | Select-Object -First 1
-if ($macDmg) {
+
+if ($macTar) {
+    $macSig = Get-ChildItem -Path $launcherStageDir -Filter "$($macTar.Name).sig" | Select-Object -First 1
     $sigContent = if ($macSig) { [System.IO.File]::ReadAllText($macSig.FullName).Trim() } else { "" }
-    $launcherPlatforms["darwin-aarch64"] = @{
-        signature = $sigContent
-        url = "$Domain/updates/launcher/$($macDmg.Name)"
-    }
-    $launcherPlatforms["darwin-x86_64"] = @{
-        signature = $sigContent
-        url = "$Domain/updates/launcher/$($macDmg.Name)"
-    }
+    $macUrl = "$Domain/updates/launcher/$($macTar.Name)"
+    $launcherPlatforms["darwin-aarch64"] = @{ signature = $sigContent; url = $macUrl }
+    $launcherPlatforms["darwin-aarch64-app"] = @{ signature = $sigContent; url = $macUrl }
+    $launcherPlatforms["darwin-x86_64"] = @{ signature = $sigContent; url = $macUrl }
+    $launcherPlatforms["darwin-x86_64-app"] = @{ signature = $sigContent; url = $macUrl }
+} elseif ($macDmg) {
+    $macSig = Get-ChildItem -Path $launcherStageDir -Filter "*.dmg.sig" | Select-Object -First 1
+    $sigContent = if ($macSig) { [System.IO.File]::ReadAllText($macSig.FullName).Trim() } else { "" }
+    $macUrl = "$Domain/updates/launcher/$($macDmg.Name)"
+    $launcherPlatforms["darwin-aarch64"] = @{ signature = $sigContent; url = $macUrl }
+    $launcherPlatforms["darwin-aarch64-app"] = @{ signature = $sigContent; url = $macUrl }
+    $launcherPlatforms["darwin-x86_64"] = @{ signature = $sigContent; url = $macUrl }
+    $launcherPlatforms["darwin-x86_64-app"] = @{ signature = $sigContent; url = $macUrl }
 }
 
 $launcherManifest = @{

@@ -2,6 +2,10 @@
 ; Executed during setup and uninstallation phases.
 
 !macro NSIS_HOOK_PREINSTALL
+  ; Terminate any running Zircon launcher instances so files can be cleanly overwritten during auto-update
+  nsExec::Exec 'taskkill /F /IM Zircon.exe /T'
+  nsExec::Exec 'taskkill /F /IM zircon-launcher.exe /T'
+  Sleep 500
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL
