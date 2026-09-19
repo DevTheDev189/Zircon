@@ -175,6 +175,36 @@ impl BillOfMaterials {
     pub fn get_resourcepack_by_filename(&self, filename: &str) -> Option<&PackEntry> {
         self.resourcepacks.iter().find(|p| p.filename == filename)
     }
+
+    /// Converts this BOM into a spec-compliant Modrinth modpack index manifest.
+    pub fn to_modrinth_index(&self, pack_name: Option<&str>) -> crate::export::ModrinthIndex {
+        crate::export::bom_to_modrinth_index(self, pack_name)
+    }
+
+    /// Encodes this BOM into a URL-safe Base64 Deflate Share Code (`zircon://setup/...`).
+    pub fn to_share_code(&self) -> Result<String, crate::export::ExportError> {
+        crate::export::bom_to_share_code(self)
+    }
+
+    /// Decodes a Zircon Share Code string into a `BillOfMaterials`.
+    pub fn from_share_code(code: &str) -> Result<Self, crate::export::ExportError> {
+        crate::export::bom_from_share_code(code)
+    }
+
+    /// Renders a formatted Discord/GitHub Markdown table of the mods in this BOM.
+    pub fn to_markdown_table(&self) -> String {
+        crate::export::bom_to_markdown_table(self)
+    }
+
+    /// Compares this BOM with an incoming BOM, producing a categorized diff.
+    pub fn diff(&self, incoming: &Self) -> crate::export::ModDiffReport {
+        crate::export::diff_boms(self, incoming)
+    }
+
+    /// Produces a copy of this BOM sanitized for external distribution.
+    pub fn sanitize_for_export(&self, custom_title: Option<String>) -> Self {
+        crate::export::sanitize_for_export(self, custom_title)
+    }
 }
 
 /// Describes the mod loader (Fabric, NeoForge, Forge, Quilt) used by the
@@ -243,6 +273,9 @@ pub struct ModEntry {
     /// Lower-case hex SHA-1 of the file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha1: Option<String>,
+    /// Lower-case hex SHA-256 of the file (used for Cloudflare R2 Content-Addressed Storage).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
     /// CurseForge MurmurHash3 fingerprint (only meaningful for CurseForge origin mods).
     #[serde(default)]
     pub murmur3: u64,
@@ -310,6 +343,7 @@ impl ModEntry {
             project_url: None,
             filename: filename.into(),
             sha1,
+            sha256: None,
             murmur3,
             origin,
             download_url,
@@ -329,6 +363,12 @@ impl ModEntry {
     /// Builder helper to set the mod side.
     pub fn with_side(mut self, side: ModSide) -> Self {
         self.side = side;
+        self
+    }
+
+    /// Builder helper to set the SHA-256 hash.
+    pub fn with_sha256(mut self, sha256: impl Into<String>) -> Self {
+        self.sha256 = Some(sha256.into());
         self
     }
 

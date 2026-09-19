@@ -52,6 +52,9 @@ pub struct OfflineInstance {
     /// Unix epoch milliseconds of the last launch (Java `System.currentTimeMillis()`).
     #[serde(default = "default_last_played")]
     pub last_played: i64,
+    /// Optional path to a custom Minecraft game/client JAR override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_client_jar: Option<String>,
 }
 
 fn default_minecraft_version() -> String {
@@ -79,6 +82,7 @@ impl Default for OfflineInstance {
             mod_loader: default_mod_loader(),
             java_args: default_java_args(),
             last_played: default_last_played(),
+            custom_client_jar: None,
         }
     }
 }
@@ -117,6 +121,33 @@ impl OfflineInstanceManager {
     /// The instance's `mods/` directory (does not create it).
     pub fn mods_dir(&self, instance: &OfflineInstance) -> PathBuf {
         self.instance_dir(&instance.id).join("mods")
+    }
+
+    /// Resolves the effective client JAR override for an offline instance, if any:
+    /// 1. An explicit `custom_client_jar` path specified on the instance.
+    /// 2. `<instance_dir>/custom.jar` if present on disk.
+    /// 3. `<instance_dir>/minecraft.jar` if present on disk.
+    pub fn resolve_custom_client_jar(&self, instance: &OfflineInstance) -> Option<PathBuf> {
+        let dir = self.instance_dir(&instance.id);
+        if let Some(custom) = &instance.custom_client_jar {
+            let p = PathBuf::from(custom);
+            if p.is_absolute() && p.is_file() {
+                return Some(p);
+            }
+            let rel = dir.join(custom);
+            if rel.is_file() {
+                return Some(rel);
+            }
+        }
+        let custom_jar = dir.join("custom.jar");
+        if custom_jar.is_file() {
+            return Some(custom_jar);
+        }
+        let mc_jar = dir.join("minecraft.jar");
+        if mc_jar.is_file() {
+            return Some(mc_jar);
+        }
+        None
     }
 
     /// Creates and persists a new offline instance with a fresh UUID and the
@@ -162,6 +193,7 @@ impl OfflineInstanceManager {
             ),
             java_args: default_java_args(),
             last_played: chrono::Utc::now().timestamp_millis(),
+            custom_client_jar: None,
         };
         self.save(&instance)?;
         Ok(instance)
@@ -246,42 +278,92 @@ impl OfflineInstanceManager {
         source_id: &str,
         new_name: &str,
     ) -> Result<OfflineInstance, LauncherError> {
+        self.clone_instance_extended(source_id, new_name, None, None, true, true)
+    }
+
+    /// Clones an existing instance with options to selectively copy worlds/mods and override loader settings.
+    pub fn clone_instance_extended(
+        &self,
+        source_id: &str,
+        new_name: &str,
+        new_loader_type: Option<&str>,
+        new_loader_version: Option<&str>,
+        copy_world: bool,
+        copy_mods: bool,
+    ) -> Result<OfflineInstance, LauncherError> {
         let source_instance = self.load(source_id).ok_or_else(|| {
             LauncherError::InvalidInput(format!("Source instance not found: {source_id}"))
         })?;
 
         let source_dir = self.instance_dir(&source_instance.id);
-        if !source_dir.is_dir() { return Err(LauncherError::InvalidInput(format!("Instance directory does not exist: {}", source_dir.display()))); }
+        if !source_dir.is_dir() {
+            return Err(LauncherError::InvalidInput(format!(
+                "Instance directory does not exist: {}",
+                source_dir.display()
+            )));
+        }
 
         let new_id = uuid::Uuid::new_v4().to_string();
         let target_dir = self.instance_dir(&new_id);
         std::fs::create_dir_all(&target_dir)?;
 
-        fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+        fn copy_dir_filtered(
+            src: &Path,
+            dst: &Path,
+            copy_world: bool,
+            copy_mods: bool,
+            is_root: bool,
+        ) -> std::io::Result<()> {
             std::fs::create_dir_all(dst)?;
             for entry in std::fs::read_dir(src)? {
                 let entry = entry?;
+                let file_name = entry.file_name();
+                let name_str = file_name.to_string_lossy();
+
+                if is_root {
+                    if !copy_world && name_str == "saves" {
+                        continue;
+                    }
+                    if !copy_mods && name_str == "mods" {
+                        continue;
+                    }
+                }
+
                 let ty = entry.file_type()?;
-                let dest_child = dst.join(entry.file_name());
+                let dest_child = dst.join(&file_name);
                 if ty.is_dir() {
-                    copy_dir_all(&entry.path(), &dest_child)?;
+                    copy_dir_filtered(&entry.path(), &dest_child, copy_world, copy_mods, false)?;
                 } else {
                     std::fs::copy(entry.path(), dest_child)?;
                 }
-            } // end loop over entries
+            }
             Ok(())
-        } // end copy_dir_all
+        }
 
-        copy_dir_all(&source_dir, &target_dir)?;
+        copy_dir_filtered(&source_dir, &target_dir, copy_world, copy_mods, true)?;
 
         let mut cloned = source_instance;
         cloned.id = new_id;
-        cloned.name = if new_name.trim().is_empty() { format!("{} (Copy)", cloned.name) } else { new_name.trim().to_string() };
+        cloned.name = if new_name.trim().is_empty() {
+            format!("{} (Copy)", cloned.name)
+        } else {
+            new_name.trim().to_string()
+        };
         cloned.last_played = chrono::Utc::now().timestamp_millis();
 
-        self.save(&cloned)?;
-        Ok(cloned)
-    } // end clone_instance
+        if let Some(lt) = new_loader_type {
+            if let Some(loader_enum) = ModLoaderType::from_id(lt.trim()) {
+                cloned.mod_loader.r#type = loader_enum.id().to_string();
+            }
+        }
+        if let Some(lv) = new_loader_version {
+            cloned.mod_loader.version = lv.trim().to_string();
+        }
+
+        let sanitized = sanitize_instance_loader(cloned);
+        self.save(&sanitized)?;
+        Ok(sanitized)
+    }
     // --- Mod management methods ---
     pub fn delete_mod(&self, instance: &OfflineInstance, filename: &str) -> Result<(), LauncherError> {
         if instance.id.trim().is_empty() || filename.trim().is_empty() { return Ok(()); }
@@ -703,5 +785,76 @@ mod tests {
         let list = manager.list(); // z1
         assert_eq!(2, list.len());
     } // end-block 1
+
+    #[test]
+    fn clone_instance_extended_with_custom_loader_and_selective_copy() {
+        let root = TempDir::new("offline-clone-extended-test");
+        let manager = OfflineInstanceManager::new(root.path().join("offline_instances"));
+
+        let created = manager
+            .create("Source Instance", "1.20.1", "fabric", "0.15.11")
+            .unwrap();
+
+        let inst_dir = manager.instance_dir(&created.id);
+        std::fs::create_dir_all(inst_dir.join("saves/world1")).unwrap();
+        std::fs::write(inst_dir.join("saves/world1/level.dat"), b"world-data").unwrap();
+        std::fs::create_dir_all(inst_dir.join("mods")).unwrap();
+        std::fs::write(inst_dir.join("mods/test-mod.jar"), b"mod-jar-data").unwrap();
+        std::fs::write(inst_dir.join("options.txt"), "fov:90").unwrap();
+
+        // Clone with NeoForge loader override and without world copy
+        let cloned = manager
+            .clone_instance_extended(
+                &created.id,
+                "NeoForge Clone",
+                Some("neoforge"),
+                Some("20.1.100"),
+                false, // copy_world = false
+                true,  // copy_mods = true
+            )
+            .unwrap();
+
+        assert_eq!(cloned.name, "NeoForge Clone");
+        assert_eq!(cloned.mod_loader.r#type, "neoforge");
+        assert_eq!(cloned.mod_loader.version, "20.1.100");
+
+        let cloned_dir = manager.instance_dir(&cloned.id);
+        // options.txt should be copied
+        assert!(cloned_dir.join("options.txt").is_file());
+        // mods should be copied
+        assert!(cloned_dir.join("mods/test-mod.jar").is_file());
+        // saves should NOT be copied
+        assert!(!cloned_dir.join("saves/world1").exists());
+    }
+
+    #[test]
+    fn resolve_custom_client_jar_from_config_or_disk() {
+        let root = TempDir::new("offline-custom-jar-test");
+        let manager = OfflineInstanceManager::new(root.path().join("offline_instances"));
+
+        let mut instance = manager
+            .create("Custom Jar Instance", "1.12.2", "forge", "14.23.5.2859")
+            .unwrap();
+
+        // 1. None by default
+        assert_eq!(manager.resolve_custom_client_jar(&instance), None);
+
+        // 2. Detects minecraft.jar on disk
+        let inst_dir = manager.instance_dir(&instance.id);
+        let mc_jar = inst_dir.join("minecraft.jar");
+        std::fs::write(&mc_jar, b"fake client jar").unwrap();
+        assert_eq!(manager.resolve_custom_client_jar(&instance), Some(mc_jar.clone()));
+
+        // 3. custom.jar takes precedence over minecraft.jar
+        let custom_jar = inst_dir.join("custom.jar");
+        std::fs::write(&custom_jar, b"fake custom jar").unwrap();
+        assert_eq!(manager.resolve_custom_client_jar(&instance), Some(custom_jar.clone()));
+
+        // 4. Explicit configuration takes precedence
+        let special_jar = inst_dir.join("special.jar");
+        std::fs::write(&special_jar, b"fake special jar").unwrap();
+        instance.custom_client_jar = Some("special.jar".to_string());
+        assert_eq!(manager.resolve_custom_client_jar(&instance), Some(special_jar));
+    }
 }
 

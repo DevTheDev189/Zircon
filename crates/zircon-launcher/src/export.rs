@@ -4,47 +4,15 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-
-use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
+use zircon_core::export::ModrinthIndex;
 use zircon_core::model::{BillOfMaterials, ModEntry, ModSide};
 
 use crate::error::LauncherError;
 use crate::offline::OfflineInstance;
-
-/// Standard Modrinth modpack index structure.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModrinthIndex {
-    pub format_version: u32,
-    pub game: String,
-    pub version_id: String,
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub summary: Option<String>,
-    pub dependencies: std::collections::HashMap<String, String>,
-    pub files: Vec<ModrinthIndexFile>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModrinthIndexFile {
-    pub path: String,
-    pub hashes: std::collections::HashMap<String, String>,
-    pub env: ModrinthIndexEnv,
-    pub downloads: Vec<String>,
-    pub file_size: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModrinthIndexEnv {
-    pub client: String,
-    pub server: String,
-}
 
 /// Known client-only mods that should not be bundled into dedicated server packages.
 const CLIENT_ONLY_MODS: &[&str] = &[
@@ -100,21 +68,7 @@ fn add_dir_to_zip(
     Ok(())
 }
 
-/// Exports an offline instance as a `.mrpack` archive.
-pub fn export_instance_mrpack(
-    game_dir: &Path,
-    instance: &OfflineInstance,
-    out_path: &Path,
-) -> Result<(), LauncherError> {
-    if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    let file = File::create(out_path)?;
-    let mut zip = ZipWriter::new(file);
-    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-
-    // Build modrinth.index.json
+fn build_fallback_index(instance: &OfflineInstance) -> (ModrinthIndex, std::collections::HashSet<String>) {
     let mut dependencies = std::collections::HashMap::new();
     dependencies.insert("minecraft".to_string(), instance.minecraft_version.clone());
     if !instance.mod_loader.r#type.is_empty() && instance.mod_loader.r#type != "vanilla" {
@@ -129,9 +83,50 @@ pub fn export_instance_mrpack(
         game: "minecraft".to_string(),
         version_id: instance.id.clone(),
         name: instance.name.clone(),
-        summary: Some(format!("Exported from Zircon Launcher for MC {}", instance.minecraft_version)),
+        summary: Some(format!(
+            "Exported from Zircon Launcher for MC {}",
+            instance.minecraft_version
+        )),
         dependencies,
         files: Vec::new(),
+    };
+    (index, std::collections::HashSet::new())
+}
+
+/// Exports an offline instance as a `.mrpack` archive.
+pub fn export_instance_mrpack(
+    game_dir: &Path,
+    instance: &OfflineInstance,
+    out_path: &Path,
+) -> Result<(), LauncherError> {
+    if let Some(parent) = out_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let file = File::create(out_path)?;
+    let mut zip = ZipWriter::new(file);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    // 1. Build modrinth.index.json using active BOM if present
+    let bom_file = game_dir.join("bom.json");
+    let (index, remote_files) = if bom_file.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&bom_file) {
+            if let Ok(bom) = serde_json::from_str::<BillOfMaterials>(&content) {
+                let idx = bom.to_modrinth_index(Some(&instance.name));
+                let remotes: std::collections::HashSet<String> = idx
+                    .files
+                    .iter()
+                    .map(|f| f.path.trim_start_matches("mods/").to_ascii_lowercase())
+                    .collect();
+                (idx, remotes)
+            } else {
+                build_fallback_index(instance)
+            }
+        } else {
+            build_fallback_index(instance)
+        }
+    } else {
+        build_fallback_index(instance)
     };
 
     let index_json = serde_json::to_string_pretty(&index)?;
@@ -139,12 +134,28 @@ pub fn export_instance_mrpack(
         .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
     zip.write_all(index_json.as_bytes())?;
 
-    // Add overrides/mods/
+    // 2. Add overrides/mods/ ONLY for files without remote downloads (e.g. custom local mods)
     let mods_dir = game_dir.join("mods");
     if mods_dir.is_dir() {
-        zip.add_directory("overrides/mods", options)
-            .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-        add_dir_to_zip(&mods_dir, "overrides/mods", &mut zip, options)?;
+        if let Ok(entries) = std::fs::read_dir(&mods_dir) {
+            let mut created_dir = false;
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+                if path.is_file() && !remote_files.contains(&name.to_ascii_lowercase()) {
+                    if !created_dir {
+                        zip.add_directory("overrides/mods", options)
+                            .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+                        created_dir = true;
+                    }
+                    let entry_rel = format!("overrides/mods/{name}");
+                    zip.start_file(&entry_rel, options)
+                        .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+                    let mut f = File::open(&path)?;
+                    std::io::copy(&mut f, &mut zip)?;
+                }
+            }
+        }
     }
 
     // Add overrides/config/
@@ -303,6 +314,75 @@ pub fn export_to_zircon_server(
     Ok(())
 }
 
+/// Packages a connected server instance (from <gameDir>) into a complete Zircon Server ZIP archive.
+pub fn export_server_instance_to_zip(
+    game_dir: &Path,
+    server_name: Option<&str>,
+    out_path: &Path,
+) -> Result<(), LauncherError> {
+    if let Some(parent) = out_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let file = File::create(out_path)?;
+    let mut zip = ZipWriter::new(file);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    // 1. Pack mods/
+    let mods_dir = game_dir.join("mods");
+    if mods_dir.is_dir() {
+        zip.add_directory("mods", options)
+            .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        add_dir_to_zip(&mods_dir, "mods", &mut zip, options)?;
+    }
+
+    // 2. Pack config/
+    let config_dir = game_dir.join("config");
+    if config_dir.is_dir() {
+        zip.add_directory("config", options)
+            .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        add_dir_to_zip(&config_dir, "config", &mut zip, options)?;
+    }
+
+    // 3. Add bom.json if present
+    let bom_file = game_dir.join("bom.json");
+    if bom_file.is_file() {
+        zip.start_file("bom.json", options)
+            .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let mut f = File::open(&bom_file)?;
+        std::io::copy(&mut f, &mut zip)?;
+    }
+
+    // 4. Add server.properties
+    let props_file = game_dir.join("server.properties");
+    if props_file.is_file() {
+        zip.start_file("server.properties", options)
+            .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let mut f = File::open(&props_file)?;
+        std::io::copy(&mut f, &mut zip)?;
+    } else {
+        let name = server_name.unwrap_or("Zircon Server");
+        let props = format!(
+            "motd=Zircon Server - {}\nserver-port=25565\ndifficulty=easy\ngamemode=survival\nmax-players=20\nview-distance=10\nenable-command-block=true\nonline-mode=true\n",
+            name
+        );
+        zip.start_file("server.properties", options)
+            .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        zip.write_all(props.as_bytes())?;
+    }
+
+    // 5. Add eula.txt
+    let eula = "eula=true\n";
+    zip.start_file("eula.txt", options)
+        .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+    zip.write_all(eula.as_bytes())?;
+
+    zip.finish()
+        .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,6 +404,7 @@ mod tests {
             mod_loader: ModLoaderInfo::new("fabric", "0.15.11", None),
             java_args: "-Xmx4G".to_string(),
             last_played: 1000,
+            custom_client_jar: None,
         };
 
         let out_zip = temp_dir.join("test_pack.mrpack");

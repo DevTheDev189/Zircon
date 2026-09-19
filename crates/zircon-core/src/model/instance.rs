@@ -102,6 +102,9 @@ pub struct InstanceConfig {
     /// across wrapper restarts.
     #[serde(default)]
     pub last_shutdown_reason: Option<String>,
+    /// Customer subdomain (e.g. "emerald" for "emerald.zirconmc.net") when provisioned in Zircon Cloud.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subdomain: Option<String>,
 }
 
 fn random_instance_id() -> String {
@@ -177,6 +180,7 @@ impl InstanceConfig {
             idle_shutdown_enabled: false,
             idle_shutdown_minutes: default_idle_shutdown_minutes(),
             last_shutdown_reason: None,
+            subdomain: None,
         };
         // "vanilla" installs carry no mod loader metadata.
         if config.mod_loader.as_ref().map(|l| l.r#type.as_str()) == Some("vanilla") {
@@ -186,12 +190,26 @@ impl InstanceConfig {
     }
 
     /// Updates the mod loader *version* string (e.g. Fabric `0.15.11`).
-    /// The loader *type* stays locked — this only ever touches the version.
     pub fn set_loader_version(&mut self, loader_version: impl Into<String>) {
         match self.mod_loader.as_mut() {
             Some(loader) => loader.version = loader_version.into(),
             None => {
                 self.mod_loader = Some(ModLoaderInfo::new("vanilla", loader_version, None));
+            }
+        }
+    }
+
+    /// Updates the mod loader type (e.g. "fabric", "neoforge", "forge", "quilt", "vanilla").
+    pub fn set_loader_type(&mut self, loader_type: impl Into<String>) {
+        let t: String = loader_type.into();
+        if t.eq_ignore_ascii_case("vanilla") {
+            self.mod_loader = None;
+        } else {
+            match self.mod_loader.as_mut() {
+                Some(loader) => loader.r#type = t,
+                None => {
+                    self.mod_loader = Some(ModLoaderInfo::new(t, "", None));
+                }
             }
         }
     }

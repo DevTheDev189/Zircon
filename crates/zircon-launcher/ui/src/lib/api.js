@@ -119,7 +119,8 @@ export const api = {
     });
   },
   deleteOfflineInstance: (id) => invoke('delete_offline_instance', { id }),
-  cloneOfflineInstance: (id, newName) => invoke('clone_offline_instance', { id, newName }),
+  cloneOfflineInstance: (id, newName, loaderType = null, loaderVersion = null, copyWorld = true, copyMods = true) =>
+    invoke('clone_offline_instance', { id, newName, loaderType, loaderVersion, copyWorld, copyMods }),
   getOfflineInstanceDir: (id) => invoke('get_offline_instance_dir', { id }),
   openInstanceFolder: (instanceId, subfolder = null) =>
     invoke('open_instance_folder', { instanceId, subfolder }),
@@ -131,6 +132,28 @@ export const api = {
     invoke('export_offline_instance_mrpack', { instanceId, exportPath }),
   exportToZirconServer: (instanceId, worldFolder, exportPath) =>
     invoke('export_to_zircon_server', { instanceId, worldFolder, exportPath }),
+  exportServerInstanceToZip: (address, exportPath) =>
+    invoke('export_server_instance_to_zip', { address, exportPath }),
+
+  // Mod Metadata Export, Social Sharing, Snapshots & Repair
+  exportInstanceSetup: (instanceId, format = 'share_code', customTitle = null) =>
+    invoke('export_instance_setup', { instanceId, format, customTitle }),
+  previewImportSetup: (rawPayload, targetInstanceId = null) =>
+    invoke('preview_import_setup', { rawPayload, targetInstanceId }),
+  applyImportSetup: (incomingBom, strategy = 'new_instance', targetInstanceId = null, newInstanceName = null) =>
+    invoke('apply_import_setup', { incomingBom, strategy, targetInstanceId, newInstanceName }),
+  createInstanceModSnapshot: (instanceId, label) =>
+    invoke('create_instance_mod_snapshot', { instanceId, label }),
+  listInstanceModSnapshots: (instanceId) =>
+    invoke('list_instance_mod_snapshots', { instanceId }),
+  restoreInstanceModSnapshot: (instanceId, filename) =>
+    invoke('restore_instance_mod_snapshot', { instanceId, filename }),
+  deleteInstanceModSnapshot: (instanceId, filename) =>
+    invoke('delete_instance_mod_snapshot', { instanceId, filename }),
+  auditInstanceMods: (instanceId) =>
+    invoke('audit_instance_mods', { instanceId }),
+  repairInstanceMods: (instanceId) =>
+    invoke('repair_instance_mods', { instanceId }),
 
   // Worlds, Backups & Screenshots
   listInstanceWorlds: (instanceId) => invoke('list_instance_worlds', { instanceId }),
@@ -372,6 +395,8 @@ export const ZIP_FILTER = [{ name: 'ZIP Archives', extensions: ['zip'] }];
 export const MRPACK_FILTER = [{ name: 'Modrinth Modpack', extensions: ['mrpack'] }];
 export const MODPACK_FILTER = [{ name: 'Modpack Archives (.mrpack, .zip)', extensions: ['mrpack', 'zip'] }];
 export const EXE_FILTER = [{ name: 'Executables', extensions: ['exe', 'bat', 'cmd', '*'] }];
+export const JSON_FILTER = [{ name: 'JSON Files', extensions: ['json'] }];
+export const MD_FILTER = [{ name: 'Markdown Files', extensions: ['md', 'markdown'] }];
 
 
 
@@ -682,4 +707,8 @@ export function onSkinAiDownloadError(cb) {
 
 export function onSkinAiProgress(cb) {
   return listen('skin-ai-progress', (e) => cb(e.payload));
+}
+
+export function onDeepLinkJoin(cb) {
+  return listen('deep-link-join', (e) => cb(e.payload));
 }

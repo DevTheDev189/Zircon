@@ -89,9 +89,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // run, cached in memory); launchers pin the matching public key via TOFU.
     let signing_key = config.load_or_create_signing_key()?;
 
+    let execution_driver: Option<Arc<dyn zircon_server::process::ProcessDriver>> =
+        match config.get_config().effective_execution_driver() {
+            zircon_server::config::ExecutionDriverType::Docker => {
+                match zircon_server::process::DockerDriver::new() {
+                    Ok(driver) => {
+                        tracing::info!("Docker execution driver initialized for container orchestration");
+                        Some(Arc::new(driver))
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to initialize Docker driver ({e}); falling back to native execution");
+                        None
+                    }
+                }
+            }
+            zircon_server::config::ExecutionDriverType::Native => None,
+        };
+
     // Multi-instance engine (isolated <data>/instances/<id>/ dirs).
     let instances = Arc::new(
         ServerInstanceManager::new(&config.data_dir, console.clone())?
+            .with_driver(execution_driver)
             .with_signing_key(Some(signing_key.clone())),
     );
 

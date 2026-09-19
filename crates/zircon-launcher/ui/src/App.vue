@@ -14,6 +14,7 @@
       :shader-prompt="shaderPrompt"
       @shader-choice="onShaderChoice"
       @close="onLaunchOverlayClose"
+      @open-skins="onOpenSkinsFromLaunch"
     ></LaunchOverlay>
 
     <div class="flex flex-1 min-h-0">
@@ -160,8 +161,8 @@
       <main
         class="relative flex-1 min-w-0 flex flex-col bg-gradient-to-br from-card/85 via-bg to-well overflow-hidden"
       >
-        <!-- Dynamic ambient corner flare matching active theme accent -->
-        <div class="absolute -top-36 -left-36 w-96 h-96 rounded-full pointer-events-none blur-3xl opacity-10 bg-accent z-0"></div>
+        <!-- Dynamic ambient corner flare matching active theme accent (2x enlarged) -->
+        <div class="absolute -top-72 -left-72 w-[48rem] h-[48rem] rounded-full pointer-events-none blur-3xl opacity-15 bg-accent z-0"></div>
 
         <div class="relative z-10 flex-1 min-h-0 overflow-hidden">
           <KeepAlive>
@@ -169,6 +170,7 @@
               v-if="view === 'servers'"
               :session="session"
               :game-status="gameStatus"
+              :deep-link-address="deepLinkAddress"
               @launching="onLaunching"
               @stopped="onStopped"
               @error="onLaunchError"
@@ -236,7 +238,7 @@ import ServersView from './views/ServersView.vue';
 import OfflineView from './views/OfflineView.vue';
 import SkinsView from './views/SkinsView.vue';
 import SettingsView from './views/SettingsView.vue';
-import { api, createDefaultSteveDataUrl, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
+import { api, createDefaultSteveDataUrl, onDeepLinkJoin, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { applyTheme } from './lib/theme';
@@ -305,6 +307,7 @@ const shaderPrompt = ref(null);
 const shaderRemember = ref(false);
 const keyPrompt = ref(null);
 const launchingServer = ref(null);
+const deepLinkAddress = ref('');
 
 let unlisten = [];
 
@@ -385,6 +388,10 @@ onMounted(async () => {
     }),
     onServerKeyMismatch((payload) => {
       keyPrompt.value = payload;
+    }),
+    onDeepLinkJoin((addr) => {
+      view.value = 'servers';
+      deepLinkAddress.value = addr;
     })
   );
 
@@ -630,6 +637,11 @@ function onLaunchOverlayClose() {
   launchError.value = '';
   progress.value = null;
   launchingServer.value = null;
+}
+
+function onOpenSkinsFromLaunch() {
+  launchModalActive.value = false;
+  view.value = 'skins';
 }
 
 function onLaunching(server = null) {

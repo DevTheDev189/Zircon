@@ -26,6 +26,19 @@ pub const DEFAULT_PUBLIC_PORT: i32 = 25565;
 pub const DEFAULT_WEB_PORT: i32 = 25564;
 pub const DEFAULT_MC_PORT: i32 = 25566;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecutionDriverType {
+    Native,
+    Docker,
+}
+
+impl Default for ExecutionDriverType {
+    fn default() -> Self {
+        Self::Native
+    }
+}
+
 /// Serializable wrapper settings (`config.json`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,6 +58,74 @@ pub struct ServerConfig {
     /// reachable in plaintext on the Minecraft ports.
     #[serde(default = "default_http_proxy")]
     pub http_proxy: bool,
+    /// Execution driver used to spawn Minecraft server instances (Native process or Docker container).
+    #[serde(default)]
+    pub execution_driver: ExecutionDriverType,
+    /// Zircon Cloud coordination and telemetry configuration.
+    #[serde(default)]
+    pub cloud: CloudConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_node_id")]
+    pub node_id: String,
+    #[serde(default = "default_central_api_url")]
+    pub central_api_url: String,
+    #[serde(default)]
+    pub internal_api_secret: String,
+    #[serde(default = "default_heartbeat_interval_secs")]
+    pub heartbeat_interval_secs: u64,
+}
+
+fn default_node_id() -> String {
+    "node1".to_string()
+}
+
+fn default_central_api_url() -> String {
+    "http://127.0.0.1:3000".to_string()
+}
+
+fn default_heartbeat_interval_secs() -> u64 {
+    10
+}
+
+impl Default for CloudConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            node_id: default_node_id(),
+            central_api_url: default_central_api_url(),
+            internal_api_secret: String::new(),
+            heartbeat_interval_secs: default_heartbeat_interval_secs(),
+        }
+    }
+}
+
+impl CloudConfig {
+    pub fn is_enabled(&self) -> bool {
+        if let Ok(val) = std::env::var("ZIRCON_CLOUD_ENABLED") {
+            return val == "1" || val.eq_ignore_ascii_case("true");
+        }
+        self.enabled
+    }
+
+    pub fn effective_node_id(&self) -> String {
+        std::env::var("ZIRCON_NODE_ID").unwrap_or_else(|_| self.node_id.clone())
+    }
+
+    pub fn effective_central_api_url(&self) -> String {
+        std::env::var("ZIRCON_CENTRAL_API_URL").unwrap_or_else(|_| self.central_api_url.clone())
+    }
+
+    pub fn effective_internal_secret(&self) -> String {
+        std::env::var("INTERNAL_API_SECRET")
+            .or_else(|_| std::env::var("ZIRCON_INTERNAL_API_SECRET"))
+            .unwrap_or_else(|_| self.internal_api_secret.clone())
+    }
 }
 
 fn default_http_proxy() -> bool {
@@ -64,6 +145,8 @@ impl Default for ServerConfig {
             auto_start_server: false,
             curseforge_api_key: String::new(),
             http_proxy: true,
+            execution_driver: ExecutionDriverType::Native,
+            cloud: CloudConfig::default(),
         }
     }
 }
@@ -87,6 +170,19 @@ impl ServerConfig {
             }
         }
         crate::security::obfuscation::embedded_curseforge_key()
+    }
+
+    /// Returns the effective execution driver, checking the `ZIRCON_EXECUTION_DRIVER`
+    /// environment variable ("docker" or "native") before falling back to config.
+    pub fn effective_execution_driver(&self) -> ExecutionDriverType {
+        if let Ok(driver) = std::env::var("ZIRCON_EXECUTION_DRIVER") {
+            match driver.trim().to_ascii_lowercase().as_str() {
+                "docker" => return ExecutionDriverType::Docker,
+                "native" => return ExecutionDriverType::Native,
+                _ => {}
+            }
+        }
+        self.execution_driver
     }
 
     fn apply_defaults(&mut self) {

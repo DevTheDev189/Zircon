@@ -10,7 +10,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, warn};
 
 /// Default Discord application client ID for Zircon Launcher.
-pub const ZIRCON_DISCORD_CLIENT_ID: &str = "1345900000000000000";
+pub const ZIRCON_DISCORD_CLIENT_ID: &str = "1550711464069832714";
 
 /// Opcodes in Discord IPC protocol.
 const OP_HANDSHAKE: u32 = 0;
@@ -24,6 +24,22 @@ pub struct ActivityTimestamps {
     pub start: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end: Option<i64>,
+}
+
+/// Party information for multiplayer presence.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct ActivityParty {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<[u32; 2]>,
+}
+
+/// Interactive button on Discord presence.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct ActivityButton {
+    pub label: String,
+    pub url: String,
 }
 
 /// Asset images and tooltips for Discord presence.
@@ -50,6 +66,10 @@ pub struct Activity {
     pub timestamps: Option<ActivityTimestamps>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assets: Option<ActivityAssets>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub party: Option<ActivityParty>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buttons: Option<Vec<ActivityButton>>,
 }
 
 impl Activity {
@@ -88,7 +108,58 @@ impl Activity {
                 small_image,
                 small_text,
             }),
+            party: None,
+            buttons: None,
         }
+    }
+
+    /// Attaches interactive action buttons (max 2 per Discord spec).
+    pub fn with_buttons(mut self, buttons: Vec<ActivityButton>) -> Self {
+        self.buttons = Some(buttons);
+        self
+    }
+
+    /// Attaches a multiplayer party / player count.
+    pub fn with_party(mut self, party_id: impl Into<String>, current: u32, max: u32) -> Self {
+        self.party = Some(ActivityParty {
+            id: Some(party_id.into()),
+            size: Some([current, max]),
+        });
+        self
+    }
+
+    /// Overrides the large asset image key or URL and tooltip.
+    pub fn with_large_image(mut self, image_key: impl Into<String>, text: Option<String>) -> Self {
+        if let Some(assets) = self.assets.as_mut() {
+            assets.large_image = Some(image_key.into());
+            if let Some(t) = text {
+                assets.large_text = Some(t);
+            }
+        } else {
+            self.assets = Some(ActivityAssets {
+                large_image: Some(image_key.into()),
+                large_text: text,
+                ..Default::default()
+            });
+        }
+        self
+    }
+
+    /// Overrides the small asset image key or URL and tooltip.
+    pub fn with_small_image(mut self, image_key: impl Into<String>, text: Option<String>) -> Self {
+        if let Some(assets) = self.assets.as_mut() {
+            assets.small_image = Some(image_key.into());
+            if let Some(t) = text {
+                assets.small_text = Some(t);
+            }
+        } else {
+            self.assets = Some(ActivityAssets {
+                small_image: Some(image_key.into()),
+                small_text: text,
+                ..Default::default()
+            });
+        }
+        self
     }
 }
 
@@ -306,6 +377,29 @@ pub async fn clear_discord_presence(client_slot: &tokio::sync::Mutex<Option<Disc
     }
 }
 
+/// Spawns a background task that rotates through an activity slideshow every 25 seconds
+/// (conforming to Discord's >=15s rate limit), alternating between gameplay details,
+/// player counts, and Zircon community messaging.
+pub fn spawn_presence_rotator(
+    client_slot: std::sync::Arc<tokio::sync::Mutex<Option<DiscordRpcClient>>>,
+    activities: Vec<Activity>,
+    interval_secs: u64,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        if activities.is_empty() {
+            return;
+        }
+        let safe_interval = interval_secs.max(20); // enforce >=20s Discord rate limit
+        let mut idx = 0;
+        loop {
+            let act = activities[idx % activities.len()].clone();
+            update_discord_presence(&client_slot, act).await;
+            idx += 1;
+            tokio::time::sleep(tokio::time::Duration::from_secs(safe_interval)).await;
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,5 +460,44 @@ mod tests {
         assert!(json.contains("Playing on test.server.net"));
         assert!(json.contains("zircon_logo"));
         assert!(json.contains("vanilla"));
+    }
+
+    #[test]
+    fn activity_with_party_and_buttons() {
+        let act = Activity::new(
+            "Playing on emerald.zirconmc.net",
+            "Create Modded",
+            Some(1700000000),
+            Some("fabric"),
+        )
+        .with_party("emerald-party", 3, 10)
+        .with_buttons(vec![
+            ActivityButton {
+                label: "Play on this Server".to_string(),
+                url: "https://zirconmc.net/s/emerald".to_string(),
+            },
+            ActivityButton {
+                label: "Get Zircon Launcher".to_string(),
+                url: "https://zirconmc.net".to_string(),
+            },
+        ])
+        .with_large_image("custom_cover_1", Some("Zircon Cloud Server".to_string()));
+
+        let json = serde_json::to_string(&act).unwrap();
+        assert!(json.contains("\"party\":{\"id\":\"emerald-party\",\"size\":[3,10]}"));
+        assert!(json.contains("\"buttons\":[{\"label\":\"Play on this Server\""));
+        assert!(json.contains("custom_cover_1"));
+    }
+
+    #[tokio::test]
+    async fn rotator_spawn_aborts_cleanly() {
+        let slot = std::sync::Arc::new(tokio::sync::Mutex::new(None));
+        let activities = vec![
+            Activity::new("Status 1", "Sub 1", None, None),
+            Activity::new("Status 2", "Sub 2", None, None),
+        ];
+        let handle = spawn_presence_rotator(slot, activities, 20);
+        assert!(!handle.is_finished());
+        handle.abort();
     }
 }

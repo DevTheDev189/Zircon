@@ -20,6 +20,7 @@ use std::path::Path;
 
 use futures_util::StreamExt;
 use sha1::{Digest, Sha1};
+use sha2::Sha256;
 use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
 
@@ -77,16 +78,46 @@ impl HashVerifier {
         Ok(hex::encode(hasher.finalize()))
     }
 
+    /// Lower-case hex SHA-256 of a file, streamed through an 8 KiB buffer.
+    /// Used for Cloudflare R2 Content-Addressed Storage verification.
+    pub fn sha256_file(path: &Path) -> std::io::Result<String> {
+        let mut file = std::fs::File::open(path)?;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 8192];
+        loop {
+            let read = file.read(&mut buffer)?;
+            if read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..read]);
+        }
+        Ok(hex::encode(hasher.finalize()))
+    }
+
     /// Checks that `file` matches the hashes of `entry`.
     ///
-    /// Port of the Java `HashVerifier.matches` — hardened: the pinned SHA-1 is
-    /// mandatory. A missing file never matches; an entry without a pinned
-    /// (non-blank) SHA-1 never matches, because the 32-bit MurmurHash3
-    /// fingerprint alone is not collision-resistant enough to verify a file;
-    /// a pinned SHA-1 is compared case-insensitively. I/O errors while hashing
-    /// are treated as a mismatch.
+    /// Verifies either `sha256` (when present, e.g. R2 CAS) or `sha1` (Modrinth / CurseForge).
+    /// A missing file never matches; an entry without a cryptographic digest never matches.
     pub fn matches(file: &Path, entry: &ModEntry) -> bool {
-        matches_inner(file, entry.sha1.as_deref())
+        if !file.is_file() {
+            return false;
+        }
+        // Verify SHA-256 first if pinned in BOM
+        if let Some(sha256) = entry.sha256.as_deref().filter(|s| !s.trim().is_empty()) {
+            if let Ok(actual) = Self::sha256_file(file) {
+                if !sha256.eq_ignore_ascii_case(&actual) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        // Verify SHA-1 if pinned in BOM
+        if let Some(sha1) = entry.sha1.as_deref().filter(|s| !s.trim().is_empty()) {
+            return matches_inner(file, Some(sha1));
+        }
+        // At least one hash must have been present and verified
+        entry.sha256.is_some()
     }
 
     /// Same check as [`matches`](Self::matches), for a [`PackEntry`].
@@ -241,7 +272,7 @@ impl ModSyncEngine {
         emit_status(listener, &format!("Fetching mod list from {base}..."));
         let bom_json = self.get(&format!("{base}/bom")).await?;
         let bom: BillOfMaterials = serde_json::from_str(&bom_json)?;
-        self.sync_with_bom(&bom, &base, game_dir, &[], listener).await
+        self.sync_with_bom(&bom, &base, game_dir, &[], &[], listener).await
     }
 
     /// Like [`sync`](Self::sync), but synchronizes against a caller-supplied
@@ -258,6 +289,7 @@ impl ModSyncEngine {
         server_base_url: &str,
         game_dir: &Path,
         keep_mods: &[String],
+        disabled_mods: &[String],
         listener: Option<&dyn ProgressListener>,
     ) -> Result<SyncResult, LauncherError> {
         let base = server_base_url
@@ -299,7 +331,15 @@ impl ModSyncEngine {
                 continue;
             }
 
-            let url = format!("{base}/files/mods/{}", url_encode(&mod_entry.filename));
+            let url = if let Some(direct_url) = &mod_entry.download_url {
+                if direct_url.starts_with("http://") || direct_url.starts_with("https://") {
+                    direct_url.clone()
+                } else {
+                    format!("{base}/files/mods/{}", url_encode(&mod_entry.filename))
+                }
+            } else {
+                format!("{base}/files/mods/{}", url_encode(&mod_entry.filename))
+            };
             emit_status(
                 listener,
                 &format!(
@@ -379,7 +419,7 @@ impl ModSyncEngine {
         // Staged mods are copied into mods/ via a hidden temp file, re-hashed on
         // the destination block, and atomically renamed into place (TOCTOU-free).
         emit_status(listener, "Synchronizing active instance mods folder...");
-        let (removed, kept) = reconcile_atomic(&mods_dir, &staging_dir, &mods, keep_mods)?;
+        let (removed, kept) = reconcile_atomic(&mods_dir, &staging_dir, &mods, keep_mods, disabled_mods)?;
         result.removed = removed;
         result.kept = kept;
 
@@ -523,6 +563,7 @@ pub(crate) fn reconcile_atomic(
     staging_dir: &Path,
     bom_mods: &[ModEntry],
     keep_mods: &[String],
+    disabled_mods: &[String],
 ) -> Result<(Vec<String>, Vec<String>), LauncherError> {
     let wanted_set: HashSet<&str> = bom_mods.iter().map(|m| m.filename.as_str()).collect();
     let keep_set: HashSet<&str> = keep_mods.iter().map(|m| m.as_str()).collect();
@@ -555,14 +596,20 @@ pub(crate) fn reconcile_atomic(
     }
 
     // Transfer wanted mods from staging into mods/ directory:
-    // Respects mod_entry.enabled: disabled mods are placed as `<filename>.disabled`.
+    // Respects mod_entry.enabled and disabled_mods: disabled mods are placed as `<filename>.disabled`.
     for mod_entry in bom_mods {
         let filename = &mod_entry.filename;
         let staged_file = staging_dir.join(filename);
         let active_dest = mods_dir.join(filename);
         let disabled_dest = mods_dir.join(format!("{filename}.disabled"));
 
-        let (target_dest, opposite_dest) = if mod_entry.enabled { (&active_dest, &disabled_dest) } else { (&disabled_dest, &active_dest) };
+        let is_user_disabled = disabled_mods.iter().any(|d| {
+            let clean_d = d.strip_suffix(".disabled").unwrap_or(d);
+            let clean_f = filename.strip_suffix(".disabled").unwrap_or(filename);
+            clean_d.eq_ignore_ascii_case(clean_f)
+        });
+        let effective_enabled = mod_entry.enabled && !is_user_disabled;
+        let (target_dest, opposite_dest) = if effective_enabled { (&active_dest, &disabled_dest) } else { (&disabled_dest, &active_dest) };
         let temp_write_path = mods_dir.join(format!(".{filename}.tmp"));
 
         if !staged_file.is_file() {
@@ -1062,7 +1109,7 @@ mod tests {
             ),
         ];
 
-        let (removed, kept) = reconcile_atomic(&mods_dir, &staging_dir, &bom_mods, &[]).unwrap();
+        let (removed, kept) = reconcile_atomic(&mods_dir, &staging_dir, &bom_mods, &[], &[]).unwrap();
 
         assert_eq!(vec!["c.jar".to_string()], removed);
         // The staged a.jar was transferred into mods/ with its content, via an
@@ -1102,7 +1149,7 @@ mod tests {
             0,
         )];
 
-        let err = reconcile_atomic(&mods_dir, &staging_dir, &bom_mods, &[]).unwrap_err();
+        let err = reconcile_atomic(&mods_dir, &staging_dir, &bom_mods, &[], &[]).unwrap_err();
         assert!(matches!(err, LauncherError::InvalidInput(_)), "{err:?}");
         assert!(err.to_string().contains("TOCTOU"), "unhelpful error: {err}");
 
@@ -1125,7 +1172,7 @@ mod tests {
         let mut mod_item = ModEntry::new(None, "inactive.jar", Some(digest), 0, Some("direct".to_string()), None, 0);
         mod_item.enabled = false;
 
-        let (_purged, preserved) = reconcile_atomic(&mods_path, &staging_path, &[mod_item], &[]).expect("reconcile");
+        let (_purged, preserved) = reconcile_atomic(&mods_path, &staging_path, &[mod_item], &[], &[]).expect("reconcile");
         assert_eq!(vec!["inactive.jar".to_string()], preserved);
         assert!(!mods_path.join("inactive.jar").exists(), "active jar should not exist");
         assert!(mods_path.join("inactive.jar.disabled").is_file(), "disabled jar should exist");
@@ -1146,7 +1193,7 @@ mod tests {
         mod_item.enabled = false;
 
         // Transition from enabled -> disabled without staging file
-        let (_p, preserved) = reconcile_atomic(&mods_path, &staging_path, &[mod_item.clone()], &[]).unwrap();
+        let (_p, preserved) = reconcile_atomic(&mods_path, &staging_path, &[mod_item.clone()], &[], &[]).unwrap();
         assert_eq!(vec!["toggle.jar".to_string()], preserved);
         assert!(!mods_path.join("toggle.jar").exists());
         assert!(mods_path.join("toggle.jar.disabled").is_file());
@@ -1154,7 +1201,7 @@ mod tests {
 
         // Transition back from disabled -> enabled without staging file
         mod_item.enabled = true;
-        let (_p2, preserved2) = reconcile_atomic(&mods_path, &staging_path, &[mod_item], &[]).unwrap();
+        let (_p2, preserved2) = reconcile_atomic(&mods_path, &staging_path, &[mod_item], &[], &[]).unwrap();
         assert_eq!(vec!["toggle.jar".to_string()], preserved2);
         assert!(mods_path.join("toggle.jar").is_file());
         assert!(!mods_path.join("toggle.jar.disabled").exists());
@@ -1169,7 +1216,7 @@ mod tests {
 
         std::fs::write(mods_path.join("orphan.jar.disabled"), b"orphan-content").unwrap();
 
-        let (purged, preserved) = reconcile_atomic(&mods_path, &staging_path, &[], &[]).unwrap();
+        let (purged, preserved) = reconcile_atomic(&mods_path, &staging_path, &[], &[], &[]).unwrap();
         assert_eq!(vec!["orphan.jar".to_string()], purged);
         assert!(preserved.is_empty());
         assert!(!mods_path.join("orphan.jar.disabled").exists());
@@ -1187,11 +1234,68 @@ mod tests {
         std::fs::write(mods_path.join("unwanted.jar"), b"unwanted payload").unwrap();
 
         let keep = vec!["client-tool.jar".to_string(), "optout-mod.jar".to_string()];
-        let (purged, _retained) = reconcile_atomic(&mods_path, &staging_path, &[], &keep).expect("reconcile with keep mods");
+        let (purged, _retained) = reconcile_atomic(&mods_path, &staging_path, &[], &keep, &[]).expect("reconcile with keep mods");
 
         assert_eq!(vec!["unwanted.jar".to_string()], purged);
         assert!(mods_path.join("client-tool.jar").is_file());
         assert!(mods_path.join("optout-mod.jar.disabled").is_file());
         assert!(!mods_path.join("unwanted.jar").exists());
     } // end reconcile_atomic_preserves_custom_keep_mods
+
+    #[test]
+    fn reconcile_atomic_respects_user_disabled_mods() {
+        let env = TempDir::new("reconcile-test-user-disabled");
+        let mods_path = env.path().join("mods");
+        let staging_path = env.path().join(".mod_staging");
+        std::fs::create_dir_all(&mods_path).unwrap();
+        std::fs::create_dir_all(&staging_path).unwrap();
+
+        let raw_bytes = b"active-server-mod-data";
+        std::fs::write(staging_path.join("server-sync.jar"), raw_bytes).unwrap();
+        let digest = HashVerifier::sha1_file(&staging_path.join("server-sync.jar")).unwrap();
+
+        // Server BOM has this mod enabled = true
+        let mut mod_item = ModEntry::new(None, "server-sync.jar", Some(digest), 0, Some("direct".to_string()), None, 0);
+        mod_item.enabled = true;
+
+        // Player explicitly disabled it
+        let disabled = vec!["server-sync.jar".to_string()];
+        let (_purged, preserved) = reconcile_atomic(&mods_path, &staging_path, &[mod_item], &[], &disabled).expect("reconcile");
+        assert_eq!(vec!["server-sync.jar".to_string()], preserved);
+        assert!(!mods_path.join("server-sync.jar").exists(), "active jar should not exist because user disabled it");
+        assert!(mods_path.join("server-sync.jar.disabled").is_file(), "disabled jar should exist");
+        assert_eq!(raw_bytes.to_vec(), std::fs::read(mods_path.join("server-sync.jar.disabled")).unwrap());
+    }
+
+    #[test]
+    fn hash_verifier_sha256_matches_and_detects_mismatch() {
+        let env = TempDir::new("hash-verifier-sha256");
+        let jar_path = env.path().join("test-mod.jar");
+        let payload = b"Hello Cloudflare R2 Content Addressed Storage";
+        std::fs::write(&jar_path, payload).unwrap();
+
+        let sha256_actual = HashVerifier::sha256_file(&jar_path).unwrap();
+        assert_eq!(
+            sha256_actual,
+            "e48b13b03d0403b0a2879196eb9f9a8c2b622aa6eb163bf76363461af7fe42f7"
+        );
+
+        let mut entry = ModEntry::new(
+            Some("test-mod".to_string()),
+            "test-mod.jar",
+            None,
+            0,
+            Some("direct".to_string()),
+            Some("https://cdn.zirconmc.net/objects/e48b13b03d0403b0a2879196eb9f9a8c2b622aa6eb163bf76363461af7fe42f7.jar".to_string()),
+            payload.len() as u64,
+        );
+        entry.sha256 = Some(sha256_actual.clone());
+
+        assert!(HashVerifier::matches(&jar_path, &entry));
+
+        // Tampered hash should fail verification
+        entry.sha256 = Some("0000000000000000000000000000000000000000000000000000000000000000".to_string());
+        assert!(!HashVerifier::matches(&jar_path, &entry));
+    }
 }
+

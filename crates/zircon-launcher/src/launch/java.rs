@@ -27,26 +27,52 @@ use crate::sync::mod_sync::ProgressListener;
 /// * `1.20.5+` — Java 21
 ///
 /// Unparseable versions default to 17.
+/// Structured Java version requirement with optional upper bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JavaRequirement {
+    pub preferred_major: i32,
+    pub min_major: i32,
+    pub max_major: Option<i32>,
+}
+
+impl JavaRequirement {
+    pub fn exact(major: i32) -> Self {
+        Self {
+            preferred_major: major,
+            min_major: major,
+            max_major: Some(major),
+        }
+    }
+
+    pub fn at_least(major: i32) -> Self {
+        Self {
+            preferred_major: major,
+            min_major: major,
+            max_major: None,
+        }
+    }
+
+    pub fn matches(&self, major: i32) -> bool {
+        major >= self.min_major && self.max_major.map_or(true, |max| major <= max)
+    }
+}
+
 pub struct JavaRuntimeSelector;
 
 impl JavaRuntimeSelector {
-    /// Required Java major version per Minecraft version.
-    pub fn get_required_java_major_version(minecraft_version: &str) -> i32 {
+    /// Evaluates the Java version requirement for a given Minecraft version and optional mod loader.
+    pub fn get_java_requirement(minecraft_version: &str, loader: Option<&str>) -> JavaRequirement {
         let parts: Vec<&str> = minecraft_version.split('.').collect();
         if parts.is_empty() || parts[0].is_empty() {
-            return 17;
+            return JavaRequirement::at_least(17);
         }
-        // Non-"1.x" version schemes (e.g. "26.2") are modern by construction;
-        // the 1.x-era mappings below would otherwise read them as ancient
-        // ("26.2" would parse minor=2 -> Java 8). Snapshot ids like "25w06a"
-        // don't parse as a number and fall through to the old logic.
         if let Ok(major) = parts[0].parse::<i32>() {
             if major != 1 {
-                return 21;
+                return JavaRequirement::at_least(21);
             }
         }
         if parts.len() < 2 {
-            return 17;
+            return JavaRequirement::at_least(17);
         }
         let minor = safe_parse(parts[1]);
         let patch = if parts.len() > 2 {
@@ -55,15 +81,31 @@ impl JavaRuntimeSelector {
             0
         };
 
+        let is_forge = loader.is_some_and(|l| l.eq_ignore_ascii_case("forge"));
+
         if minor < 17 {
-            8 // MC < 1.17
+            // MC < 1.17: Java 8 is required. Forge 1.16 and older MUST run on Java 8 due to LaunchWrapper / ModLauncher restrictions.
+            if is_forge || minor <= 16 {
+                JavaRequirement::exact(8)
+            } else {
+                JavaRequirement::at_least(8)
+            }
         } else if minor == 17 {
-            16 // MC 1.17
+            JavaRequirement {
+                preferred_major: 16,
+                min_major: 16,
+                max_major: Some(17),
+            }
         } else if minor < 20 || (minor == 20 && patch < 5) {
-            17 // MC 1.18 - 1.20.4
+            JavaRequirement::at_least(17)
         } else {
-            21 // MC 1.20.5+
+            JavaRequirement::at_least(21)
         }
+    }
+
+    /// Required Java major version per Minecraft version.
+    pub fn get_required_java_major_version(minecraft_version: &str) -> i32 {
+        Self::get_java_requirement(minecraft_version, None).preferred_major
     }
 
     /// A `java` executable for the given major version.
@@ -302,6 +344,21 @@ impl JavaRuntimeResolver {
         override_path: Option<&Path>,
         listener: Option<&dyn ProgressListener>,
     ) -> Result<PathBuf, LauncherError> {
+        let req = if required_major <= 8 {
+            JavaRequirement::exact(8)
+        } else {
+            JavaRequirement::at_least(required_major)
+        };
+        self.resolve_with_requirement_and_override(&req, override_path, listener).await
+    }
+
+    /// Resolves a compatible Java runtime for the given requirement with optional override and progress.
+    pub async fn resolve_with_requirement_and_override(
+        &self,
+        requirement: &JavaRequirement,
+        override_path: Option<&Path>,
+        listener: Option<&dyn ProgressListener>,
+    ) -> Result<PathBuf, LauncherError> {
         if let Some(p) = override_path {
             if p.exists() {
                 tracing::info!("Using custom Java runtime override at {}", p.display());
@@ -313,7 +370,7 @@ impl JavaRuntimeResolver {
                 );
             }
         }
-        self.resolve_with_progress(required_major, listener).await
+        self.resolve_with_requirement_progress(requirement, listener).await
     }
 
     /// Returns a Java home whose major version is `>= required_major`, emitting
@@ -323,30 +380,45 @@ impl JavaRuntimeResolver {
         required_major: i32,
         listener: Option<&dyn ProgressListener>,
     ) -> Result<PathBuf, LauncherError> {
+        let req = if required_major <= 8 {
+            JavaRequirement::exact(8)
+        } else {
+            JavaRequirement::at_least(required_major)
+        };
+        self.resolve_with_requirement_progress(&req, listener).await
+    }
 
+    /// Returns a Java home matching `requirement`, downloading from Adoptium if necessary.
+    pub async fn resolve_with_requirement_progress(
+        &self,
+        requirement: &JavaRequirement,
+        listener: Option<&dyn ProgressListener>,
+    ) -> Result<PathBuf, LauncherError> {
+        let pref = requirement.preferred_major;
         if let Some(l) = listener {
-            l.on_status(&format!("Checking Java {required_major} runtime..."));
+            l.on_status(&format!("Checking Java {pref} runtime..."));
         }
-        if let Some(home) = sufficient_system_java(required_major).await {
+        if let Some(home) = sufficient_system_java_req(requirement).await {
             tracing::info!(
-                "Using system Java (major >= {required_major}) at {}",
+                "Using compatible system Java for requirement ({:?}) at {}",
+                requirement,
                 home.display()
             );
             return Ok(home);
         }
 
-        let jdk_dir = self.cache_dir.join(format!("jdk-{required_major}"));
+        let jdk_dir = self.cache_dir.join(format!("jdk-{pref}"));
         if let Some(home) = find_java_home_in(&jdk_dir) {
             tracing::info!("Using cached Java runtime at {}", home.display());
             return Ok(home);
         }
 
         if let Some(l) = listener {
-            l.on_status(&format!("Fetching Java {required_major} release from Adoptium..."));
+            l.on_status(&format!("Fetching Java {pref} release from Adoptium..."));
         }
         tracing::info!(
             "Downloading Java {} runtime from Adoptium (this can take a few minutes)...",
-            required_major
+            pref
         );
         // Adoptium serves .zip on Windows and .tar.gz on Linux/macOS.
         let archive_ext = if cfg!(target_os = "windows") {
@@ -356,20 +428,20 @@ impl JavaRuntimeResolver {
         };
         let archive = self
             .cache_dir
-            .join(format!("jdk-{required_major}.{archive_ext}"));
+            .join(format!("jdk-{pref}.{archive_ext}"));
 
         // Resolve the canonical download URL and its SHA-256 from Adoptium's
         // metadata API *before* fetching anything.
-        let (download_url, expected_sha256) = self.fetch_adoptium_release(required_major).await?;
+        let (download_url, expected_sha256) = self.fetch_adoptium_release(pref).await?;
 
         if let Some(l) = listener {
-            l.on_status(&format!("Downloading Java {required_major} from Adoptium..."));
+            l.on_status(&format!("Downloading Java {pref} from Adoptium..."));
         }
-        tracing::info!("Downloading Java {required_major} from {download_url}...");
+        tracing::info!("Downloading Java {pref} from {download_url}...");
         self.download(&download_url, &archive).await?;
 
         if let Some(l) = listener {
-            l.on_status(&format!("Verifying Java {required_major} archive checksum..."));
+            l.on_status(&format!("Verifying Java {pref} archive checksum..."));
         }
         // Cryptographic integrity check: the archive must match the SHA-256
         // published by Adoptium's metadata API. A poisoned or corrupted
@@ -379,10 +451,10 @@ impl JavaRuntimeResolver {
             let _ = tokio::fs::remove_file(&archive).await;
             return Err(e);
         }
-        tracing::info!("Java {required_major} archive SHA-256 verified successfully.");
+        tracing::info!("Java {pref} archive SHA-256 verified successfully.");
 
         if let Some(l) = listener {
-            l.on_status(&format!("Extracting Java {required_major} runtime..."));
+            l.on_status(&format!("Extracting Java {pref} runtime..."));
         }
         self.extract(&archive, &jdk_dir)?;
 
@@ -512,17 +584,17 @@ pub(crate) fn parse_java_version_output(output: &str) -> Option<i32> {
     }
 }
 
-/// A system Java satisfying `required_major`, if any: `$JAVA_HOME` when set,
+/// A system Java satisfying `req`, if any: `$JAVA_HOME` when set,
 /// else `java` on PATH. When PATH is used, the returned home is verified to
 /// produce a valid executable before being returned.
-async fn sufficient_system_java(required_major: i32) -> Option<PathBuf> {
+async fn sufficient_system_java_req(req: &JavaRequirement) -> Option<PathBuf> {
     if let Some(java_home) = std::env::var_os("JAVA_HOME") {
         let home = PathBuf::from(java_home);
         let exe = java_executable(&home);
         if exe.is_file()
             && probe_java_major(&exe)
                 .await
-                .is_some_and(|m| m >= required_major)
+                .is_some_and(|m| req.matches(m))
         {
             return Some(home);
         }
@@ -536,7 +608,7 @@ async fn sufficient_system_java(required_major: i32) -> Option<PathBuf> {
     if let Some(exe) = find_on_path(name) {
         if probe_java_major(&exe)
             .await
-            .is_some_and(|m| m >= required_major)
+            .is_some_and(|m| req.matches(m))
         {
             let candidate_home = if exe
                 .parent()
@@ -635,6 +707,23 @@ mod tests {
                 "minecraft version {minecraft}"
             );
         }
+    }
+
+    #[test]
+    fn java_requirement_bounds_mapping() {
+        let forge_1_12 = JavaRuntimeSelector::get_java_requirement("1.12.2", Some("forge"));
+        assert_eq!(forge_1_12.preferred_major, 8);
+        assert_eq!(forge_1_12.max_major, Some(8));
+        assert!(forge_1_12.matches(8));
+        assert!(!forge_1_12.matches(17));
+        assert!(!forge_1_12.matches(21));
+
+        let modern = JavaRuntimeSelector::get_java_requirement("1.20.4", Some("fabric"));
+        assert_eq!(modern.preferred_major, 17);
+        assert_eq!(modern.max_major, None);
+        assert!(!modern.matches(8));
+        assert!(modern.matches(17));
+        assert!(modern.matches(21));
     }
 
     #[test]

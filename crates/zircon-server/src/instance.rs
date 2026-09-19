@@ -17,13 +17,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use ed25519_dalek::SigningKey;
 use sysinfo::System;
 use zircon_core::model::{clamp_idle_shutdown_minutes, BillOfMaterials, InstanceConfig, ModLoaderType}; // z0
 
 use crate::process::console::ConsoleStreamHandler;
+use crate::process::driver::ProcessDriver;
 use crate::process::manager::MinecraftProcessManager;
 use crate::process::player_tracker::PlayerTracker;
 use crate::services::bom::BomService;
@@ -130,6 +131,8 @@ pub struct ServerInstanceManager {
     signing_key: Option<Arc<SigningKey>>,
     inner: Mutex<Inner>,
     port_binding_listener: Mutex<Option<Arc<dyn PortBindingListener>>>,
+    /// Execution driver used to spawn instances (Native or Docker).
+    execution_driver: Option<Arc<dyn ProcessDriver>>,
     /// instance_id → a wake/start attempt is in flight. Guards the public
     /// wakeup path from spawning duplicate start tasks for the same instance;
     /// the entry is removed when the start attempt completes (success or
@@ -160,10 +163,22 @@ impl ServerInstanceManager {
                 pending_join_intents: HashMap::new(),
             }),
             port_binding_listener: Mutex::new(None),
+            execution_driver: None,
             in_progress_wakes: dashmap::DashSet::new(),
         };
         manager.load_from_disk()?;
         Ok(manager)
+    }
+
+    /// Attaches an execution driver (e.g. DockerDriver or NativeDriver).
+    pub fn with_driver(mut self, driver: Option<Arc<dyn ProcessDriver>>) -> Self {
+        self.execution_driver = driver;
+        self
+    }
+
+    /// Returns the attached execution driver, if any.
+    pub fn driver(&self) -> Option<Arc<dyn ProcessDriver>> {
+        self.execution_driver.clone()
     }
 
     /// Attaches the server's BOM signing key so instance BOMs are attested on
@@ -239,6 +254,239 @@ impl ServerInstanceManager {
         Ok(config)
     }
 
+    /// Creates or registers an instance provisioned by the Zircon Cloud control plane.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_cloud_instance(
+        &self,
+        id: &str,
+        name: &str,
+        subdomain: &str,
+        mc_version: &str,
+        loader_type: &str,
+        loader_version: &str,
+        internal_port: i32,
+        external_port: i32,
+        java_args: &str,
+    ) -> Result<InstanceConfig, InstanceError> {
+        let loader_enum = ModLoaderType::from_id(loader_type).ok_or_else(|| {
+            InstanceError::Invalid(format!(
+                "Invalid mod loader '{loader_type}'. Allowed loaders: {}",
+                ModLoaderType::ALLOWED_IDS.join(", ")
+            ))
+        })?;
+
+        let mut config = InstanceConfig::with_external_port(
+            name,
+            mc_version,
+            loader_enum.id(),
+            loader_version,
+            internal_port,
+            external_port,
+        );
+        config.id = id.to_string();
+        config.java_args = java_args.to_string();
+        config.subdomain = Some(subdomain.trim().to_lowercase());
+
+        let instance_dir = self.instance_dir(&config.id);
+        fs::create_dir_all(instance_dir.join("mods"))?;
+        fs::create_dir_all(instance_dir.join("server"))?;
+        self.save_instance_to_disk(&config)?;
+
+        let mut inner = self.inner.lock().unwrap();
+        inner
+            .instance_configs
+            .insert(config.id.clone(), config.clone());
+        if inner.active_instance_id.is_none() {
+            inner.active_instance_id = Some(config.id.clone());
+        }
+        drop(inner);
+
+        self.notify_added(&config);
+        tracing::info!(
+            "Provisioned cloud instance '{name}' (id: {}, MC {}, loader {}, internal port {}, external port {})",
+            id,
+            mc_version,
+            loader_type,
+            internal_port,
+            external_port
+        );
+        Ok(config)
+    }
+
+    /// Clones an existing instance with options to selectively copy worlds/mods and override loader settings.
+    pub fn clone_instance(
+        &self,
+        source_id: &str,
+        new_name: &str,
+        new_loader_type: Option<&str>,
+        new_loader_version: Option<&str>,
+        copy_world: bool,
+        copy_mods: bool,
+    ) -> Result<InstanceConfig, InstanceError> {
+        let source_config = self.get_instance(source_id)?;
+        if self.is_running(source_id) {
+            return Err(InstanceError::Conflict(format!(
+                "Cannot clone instance '{}' while it is currently running. Please stop it first.",
+                source_config.name
+            )));
+        }
+
+        let source_dir = self.instance_dir(source_id);
+        if !source_dir.is_dir() {
+            return Err(InstanceError::NotFound(format!(
+                "Source instance directory not found: {}",
+                source_dir.display()
+            )));
+        }
+
+        let new_id = uuid::Uuid::new_v4().to_string();
+        let target_dir = self.instance_dir(&new_id);
+
+        let internal_port = self.allocate_next_port()?;
+        let external_port = self.allocate_next_external_port()?;
+
+        let mut cloned_config = source_config.clone();
+        cloned_config.id = new_id.clone();
+        cloned_config.name = if new_name.trim().is_empty() {
+            format!("{} (Copy)", source_config.name)
+        } else {
+            new_name.trim().to_string()
+        };
+        cloned_config.internal_mc_port = internal_port;
+        cloned_config.external_mc_port = external_port;
+        cloned_config.auto_start = false;
+
+        if let Some(t) = new_loader_type {
+            if !t.trim().is_empty() {
+                let approved = ModLoaderType::from_id(t.trim()).ok_or_else(|| {
+                    InstanceError::Invalid(format!(
+                        "Invalid mod loader '{t}'. Allowed loaders: {}",
+                        ModLoaderType::ALLOWED_IDS.join(", ")
+                    ))
+                })?;
+                cloned_config.set_loader_type(approved.id());
+            }
+        }
+        if let Some(v) = new_loader_version {
+            if !v.trim().is_empty() {
+                cloned_config.set_loader_version(v.trim());
+            }
+        }
+
+        // Validate memory headroom
+        let instances: Vec<InstanceConfig> = self
+            .inner
+            .lock()
+            .unwrap()
+            .instance_configs
+            .values()
+            .cloned()
+            .collect();
+        validate_instance_memory_headroom(&instances, None, &cloned_config.java_args)?;
+
+        fs::create_dir_all(&target_dir)?;
+
+        // Recursive directory copy with selective world/mods filtering
+        fn copy_dir_filtered(
+            src: &Path,
+            dst: &Path,
+            copy_world: bool,
+            copy_mods: bool,
+            is_root: bool,
+        ) -> std::io::Result<()> {
+            fs::create_dir_all(dst)?;
+            for entry in fs::read_dir(src)? {
+                let entry = entry?;
+                let file_name = entry.file_name();
+                let name_str = file_name.to_string_lossy();
+
+                if is_root {
+                    if !copy_mods && name_str == "mods" {
+                        continue;
+                    }
+                    if name_str == "instance.json" {
+                        continue;
+                    }
+                }
+
+                // If !copy_world, skip standard world directories inside server/ or root
+                if !copy_world {
+                    let lower = name_str.to_ascii_lowercase();
+                    if lower == "world"
+                        || lower == "world_nether"
+                        || lower == "world_the_end"
+                        || lower == "saves"
+                        || lower.starts_with("world_")
+                    {
+                        continue;
+                    }
+                }
+
+                let ty = entry.file_type()?;
+                let dest_child = dst.join(&file_name);
+                if ty.is_dir() {
+                    copy_dir_filtered(&entry.path(), &dest_child, copy_world, copy_mods, false)?;
+                } else {
+                    fs::copy(entry.path(), dest_child)?;
+                }
+            }
+            Ok(())
+        }
+
+        copy_dir_filtered(&source_dir, &target_dir, copy_world, copy_mods, true)?;
+
+        // Ensure mods and server subdirectories exist
+        fs::create_dir_all(target_dir.join("mods"))?;
+        let target_server_dir = target_dir.join("server");
+        fs::create_dir_all(&target_server_dir)?;
+
+        // Update server.properties ports if present
+        let props_path = target_server_dir.join("server.properties");
+        if props_path.is_file() {
+            if let Ok(content) = fs::read_to_string(&props_path) {
+                let mut updated_lines = Vec::new();
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("server-port=") {
+                        updated_lines.push(format!("server-port={internal_port}"));
+                    } else if trimmed.starts_with("query.port=") {
+                        updated_lines.push(format!("query.port={internal_port}"));
+                    } else {
+                        updated_lines.push(line.to_string());
+                    }
+                }
+                let _ = fs::write(&props_path, updated_lines.join("\n"));
+            }
+        }
+
+        // Save fresh instance.json
+        self.save_instance_to_disk(&cloned_config)?;
+
+        // Re-sign BOM if exists
+        let bom_path = target_dir.join("bom.json");
+        if bom_path.is_file() {
+            let bom_svc = BomService::new(bom_path, None);
+            let _ = bom_svc.with_signing_key(self.signing_key.clone());
+        }
+
+        let mut inner = self.inner.lock().unwrap();
+        inner
+            .instance_configs
+            .insert(cloned_config.id.clone(), cloned_config.clone());
+        drop(inner);
+
+        self.notify_added(&cloned_config);
+        tracing::info!(
+            "Cloned instance '{}' from '{}' (id: {}, internal port {}, external port {})",
+            cloned_config.name,
+            source_config.name,
+            cloned_config.id,
+            internal_port,
+            external_port
+        );
+        Ok(cloned_config)
+    }
+
     pub async fn start_instance(&self, instance_id: &str) -> Result<(), InstanceError> {
         let config = self.get_instance(instance_id)?;
         if !self.is_eula_accepted(instance_id) {
@@ -271,11 +519,12 @@ impl ServerInstanceManager {
                 })
                 .clone();
 
-            let pm = Arc::new(MinecraftProcessManager::for_instance(
+            let pm = Arc::new(MinecraftProcessManager::for_instance_with_driver(
                 Arc::new(config.clone()),
                 self.instance_dir(instance_id).join("server"),
                 self.installer_cache_dir.clone(),
                 inst_console.clone(),
+                self.execution_driver.clone(),
             ));
             inner
                 .player_trackers
@@ -537,13 +786,13 @@ impl ServerInstanceManager {
         Ok(())
     }
 
-    /// Applies a Minecraft / loader version change (and optionally a rename) to
+    /// Applies a Minecraft / loader version / loader type change (and optionally a rename) to
     /// an instance, then re-syncs every installed mod against the new versions.
-    /// The mod loader *type* stays locked — only its version string may change.
     pub async fn update_instance_versions(
         &self,
         instance_id: &str,
         new_mc_version: Option<&str>,
+        new_loader_type: Option<&str>,
         new_loader_version: Option<&str>,
         new_name: Option<&str>,
     ) -> Result<ModSyncSummary, InstanceError> {
@@ -556,6 +805,11 @@ impl ServerInstanceManager {
         if let Some(mc) = new_mc_version {
             if !mc.trim().is_empty() {
                 config.minecraft_version = mc.trim().to_string();
+            }
+        }
+        if let Some(t) = new_loader_type {
+            if let Some(approved) = ModLoaderType::from_id(t.trim()) {
+                config.set_loader_type(approved.id());
             }
         }
         if let Some(v) = new_loader_version {
@@ -707,6 +961,25 @@ impl ServerInstanceManager {
             .get(instance_id)
             .map(|pm| pm.is_running())
             .unwrap_or(false)
+    }
+
+    /// Polls an internal port on loopback until it accepts connections or `timeout` expires.
+    pub async fn poll_port_ready(&self, port: u16, timeout: Duration) -> bool {
+        let start = Instant::now();
+        let poll_interval = Duration::from_millis(250);
+        while start.elapsed() < timeout {
+            if let Ok(Ok(stream)) = tokio::time::timeout(
+                Duration::from_millis(500),
+                tokio::net::TcpStream::connect(("127.0.0.1", port)),
+            )
+            .await
+            {
+                drop(stream);
+                return true;
+            }
+            tokio::time::sleep(poll_interval).await;
+        }
+        false
     }
 
     /// Returns session information for the last run of the instance.
@@ -1037,17 +1310,29 @@ impl ServerInstanceManager {
     }
 
     /// Resolves the instance whose id or (normalized) name matches a handshake
-    /// hostname.
+    /// hostname, including subdomain prefixes (e.g. "emerald" for "emerald.zirconmc.net").
     pub fn find_by_hostname(&self, hostname: &str) -> Option<InstanceConfig> {
-        let hostname = hostname.trim().to_lowercase();
-        if hostname.is_empty() {
+        let clean = hostname.split('\0').next().unwrap_or("").trim().to_lowercase();
+        if clean.is_empty() {
             return None;
         }
+        let subdomain = clean.split('.').next().unwrap_or(&clean);
+
         let inner = self.inner.lock().unwrap();
         inner
             .instance_configs
             .values()
-            .find(|cfg| cfg.id.to_lowercase() == hostname || normalize_name(&cfg.name) == hostname)
+            .find(|cfg| {
+                if let Some(sub) = &cfg.subdomain {
+                    let sub_lower = sub.to_lowercase();
+                    if sub_lower == clean || sub_lower == subdomain {
+                        return true;
+                    }
+                }
+                let id = cfg.id.to_lowercase();
+                let norm_name = normalize_name(&cfg.name);
+                id == clean || norm_name == clean || id == subdomain || norm_name == subdomain
+            })
             .cloned()
     }
 
@@ -1430,7 +1715,7 @@ pub fn validate_instance_memory_headroom(
 /// ignored (the JVM reads them as bytes, i.e. negligible). When no usable
 /// `-Xmx` is present the default 4 GB is assumed, matching the default
 /// `javaArgs`.
-fn parse_xmx_bytes(java_args: &str) -> u64 {
+pub fn parse_xmx_bytes(java_args: &str) -> u64 {
     for token in java_args.split_whitespace() {
         let lower = token.to_ascii_lowercase();
         if let Some(val) = lower.strip_prefix("-xmx") {
@@ -1815,4 +2100,217 @@ mod tests {
         )
         .is_ok());
     }
+
+    #[test]
+    fn find_by_hostname_matches_subdomains_and_ports() {
+        let dir = temp_dir();
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let manager = ServerInstanceManager::new(&dir, console).unwrap();
+
+        let inst = manager
+            .create_instance("Emerald SMP", "1.20.4", "fabric", "0.15.11")
+            .unwrap();
+
+        // Exact ID
+        assert_eq!(manager.find_by_hostname(&inst.id).unwrap().id, inst.id);
+        // Subdomain formatted hostname
+        assert_eq!(
+            manager
+                .find_by_hostname("emerald-smp.zirconmc.net")
+                .unwrap()
+                .id,
+            inst.id
+        );
+        // With trailing loader / forge tags
+        assert_eq!(
+            manager
+                .find_by_hostname("emerald-smp.zirconmc.net\0FML\0")
+                .unwrap()
+                .id,
+            inst.id
+        );
+        // Subdomain matching ID
+        assert_eq!(
+            manager
+                .find_by_hostname(&format!("{}.zirconmc.net", inst.id))
+                .unwrap()
+                .id,
+            inst.id
+        );
+
+        // Cloud provisioned instance with explicit subdomain
+        let cloud_inst = manager
+            .create_cloud_instance(
+                "inst-cloud-99",
+                "Custom Display Name",
+                "ruby",
+                "1.20.1",
+                "fabric",
+                "0.15.11",
+                25610,
+                25610,
+                "-Xmx6G",
+            )
+            .unwrap();
+        assert_eq!(cloud_inst.subdomain, Some("ruby".to_string()));
+        assert_eq!(
+            manager.find_by_hostname("ruby.zirconmc.net").unwrap().id,
+            "inst-cloud-99"
+        );
+        assert_eq!(
+            manager.find_by_hostname("ruby").unwrap().id,
+            "inst-cloud-99"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn poll_port_ready_returns_false_on_closed_port() {
+        let dir = temp_dir();
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let manager = ServerInstanceManager::new(&dir, console).unwrap();
+
+        // Unbound port should return false quickly
+        let ready = manager
+            .poll_port_ready(49151, Duration::from_millis(100))
+            .await;
+        assert!(!ready);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_update_instance_versions_changes_loader_type() {
+        let dir = temp_dir();
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let manager = ServerInstanceManager::new(&dir, console).unwrap();
+
+        let inst = manager
+            .create_instance("Test Loader Change", "1.20.1", "fabric", "0.15.11")
+            .unwrap();
+        assert_eq!(inst.loader_type(), "fabric");
+
+        // Update to NeoForge
+        let _ = manager
+            .update_instance_versions(
+                &inst.id,
+                Some("1.20.4"),
+                Some("neoforge"),
+                Some("20.4.164"),
+                None,
+            )
+            .await
+            .unwrap();
+
+        let updated = manager.get_instance(&inst.id).unwrap();
+        assert_eq!(updated.loader_type(), "neoforge");
+        assert_eq!(updated.minecraft_version, "1.20.4");
+        assert_eq!(updated.loader_version(), "20.4.164");
+
+        // Update to Vanilla
+        let _ = manager
+            .update_instance_versions(
+                &inst.id,
+                Some("1.21.4"),
+                Some("vanilla"),
+                Some(""),
+                None,
+            )
+            .await
+            .unwrap();
+
+        let vanilla_inst = manager.get_instance(&inst.id).unwrap();
+        assert_eq!(vanilla_inst.loader_type(), "vanilla");
+        assert_eq!(vanilla_inst.minecraft_version, "1.21.4");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_clone_instance_creates_isolated_duplicate() {
+        let dir = temp_dir();
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let manager = ServerInstanceManager::new(&dir, console).unwrap();
+
+        let source = manager
+            .create_instance("Source Server", "1.21.4", "fabric", "0.16.14")
+            .unwrap();
+
+        // Create dummy mod and world in source instance
+        let source_mods = manager.instance_dir(&source.id).join("mods");
+        let source_server = manager.instance_dir(&source.id).join("server");
+        let source_world = source_server.join("world");
+        fs::create_dir_all(&source_world).unwrap();
+        fs::write(source_mods.join("test_mod.jar"), b"dummy-mod-data").unwrap();
+        fs::write(source_world.join("level.dat"), b"dummy-world-data").unwrap();
+        fs::write(source_server.join("server.properties"), "server-port=25700\nquery.port=25700\n").unwrap();
+
+        // Clone with all defaults
+        let cloned = manager
+            .clone_instance(&source.id, "Cloned Server", None, None, true, true)
+            .unwrap();
+
+        assert_ne!(source.id, cloned.id);
+        assert_eq!(cloned.name, "Cloned Server");
+        assert_eq!(cloned.minecraft_version, "1.21.4");
+        assert_eq!(cloned.loader_type(), "fabric");
+        assert_ne!(source.internal_mc_port, cloned.internal_mc_port);
+        assert_ne!(source.external_mc_port, cloned.external_mc_port);
+
+        // Verify files copied
+        let cloned_dir = manager.instance_dir(&cloned.id);
+        assert!(cloned_dir.join("mods").join("test_mod.jar").is_file());
+        assert!(cloned_dir.join("server").join("world").join("level.dat").is_file());
+
+        // Verify server.properties was rewritten with cloned internal port
+        let cloned_props = fs::read_to_string(cloned_dir.join("server").join("server.properties")).unwrap();
+        assert!(cloned_props.contains(&format!("server-port={}", cloned.internal_mc_port)));
+        assert!(cloned_props.contains(&format!("query.port={}", cloned.internal_mc_port)));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_clone_instance_with_loader_override_and_selective_copy() {
+        let dir = temp_dir();
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let manager = ServerInstanceManager::new(&dir, console).unwrap();
+
+        let source = manager
+            .create_instance("Source 2", "1.21.1", "fabric", "0.16.9")
+            .unwrap();
+
+        let source_mods = manager.instance_dir(&source.id).join("mods");
+        let source_server = manager.instance_dir(&source.id).join("server");
+        let source_world = source_server.join("world");
+        fs::create_dir_all(&source_world).unwrap();
+        fs::write(source_mods.join("sample.jar"), b"mod-binary").unwrap();
+        fs::write(source_world.join("level.dat"), b"world-binary").unwrap();
+
+        // Clone with loader override (fabric -> neoforge), copy_world=false, copy_mods=true
+        let cloned = manager
+            .clone_instance(
+                &source.id,
+                "NeoForge Clone",
+                Some("neoforge"),
+                Some("21.1.80"),
+                false,
+                true,
+            )
+            .unwrap();
+
+        assert_eq!(cloned.name, "NeoForge Clone");
+        assert_eq!(cloned.loader_type(), "neoforge");
+        assert_eq!(cloned.loader_version(), "21.1.80");
+
+        let cloned_dir = manager.instance_dir(&cloned.id);
+        // Mods were copied
+        assert!(cloned_dir.join("mods").join("sample.jar").is_file());
+        // World was excluded
+        assert!(!cloned_dir.join("server").join("world").exists());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
+

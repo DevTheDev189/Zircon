@@ -1,6 +1,6 @@
 [package]
 name = "zircon-server"
-version = "0.4.10"
+version = "0.4.11"
 edition = "2021"
 description = "Zircon server manager daemon: process supervisor, TCP multiplexer, backup engine, Axum admin API"
 license = "BSL-1.1"
@@ -44,6 +44,9 @@ regex.workspace = true
 # CSPRNG for generating the persistent BOM signing key (ed25519-dalek's
 # `rand_core` feature only needs a `CryptoRngCore` implementation).
 rand_core = { version = "0.6", features = ["getrandom"] }
+async-trait = "0.1"
+bollard = { version = "0.17", features = ["chrono"] }
+tokio-stream = "0.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # Restricted-DACL hardening of secret files (users.json, jwt-secret.key,

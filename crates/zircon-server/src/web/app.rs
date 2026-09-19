@@ -33,8 +33,8 @@ use crate::tickets::JoinTicketManager;
 use super::auth::require_auth;
 use super::controllers::{
     auth_controller, backup_controller, bom_controller, branding_controller, console_controller,
-    file_controller, import_controller, instance_controller, mod_controller, pack_controller,
-    player_controller, stats_controller, system_controller, version_controller,
+    file_controller, import_controller, instance_controller, mod_controller,
+    pack_controller, player_controller, stats_controller, system_controller, version_controller,
 };
 use super::rate_limit::FixedWindowLimiter;
 
@@ -294,6 +294,12 @@ pub fn router(state: AppState) -> Router {
             get(mod_controller::curseforge_files),
         )
         .route("/api/mods/install", post(mod_controller::install_mod))
+        .route("/api/mods/export/share-code", get(mod_controller::export_share_code))
+        .route("/api/mods/export/markdown", get(mod_controller::export_markdown))
+        .route("/api/mods/import", post(mod_controller::import_setup))
+        .route("/api/mods/snapshots", get(mod_controller::list_snapshots).post(mod_controller::create_snapshot))
+        .route("/api/mods/snapshots/:filename", delete(mod_controller::delete_snapshot))
+        .route("/api/mods/snapshots/:filename/restore", post(mod_controller::restore_snapshot))
         .route("/api/players/online", get(player_controller::online))
         .route(
             "/api/players/whitelist",
@@ -366,6 +372,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/instances/:id/start",
             post(instance_controller::start_instance),
+        )
+        .route(
+            "/api/instances/:id/clone",
+            post(instance_controller::clone_instance),
         )
         .route(
             "/api/instances/:id/stop",
@@ -475,6 +485,12 @@ pub fn router(state: AppState) -> Router {
         .route("/api/instances/:id/mods/bulk-delete", post(instance_controller::bulk_delete_mods))
         .route("/api/instances/:id/mods/enable", post(instance_controller::enable_mods))
         .route("/api/instances/:id/mods/disable", post(instance_controller::disable_mods))
+        .route("/api/instances/:id/mods/export/share-code", get(instance_controller::export_instance_share_code))
+        .route("/api/instances/:id/mods/export/markdown", get(instance_controller::export_instance_markdown))
+        .route("/api/instances/:id/mods/import", post(instance_controller::import_instance_setup))
+        .route("/api/instances/:id/mods/snapshots", get(instance_controller::list_instance_snapshots).post(instance_controller::create_instance_snapshot))
+        .route("/api/instances/:id/mods/snapshots/:filename", delete(instance_controller::delete_instance_snapshot))
+        .route("/api/instances/:id/mods/snapshots/:filename/restore", post(instance_controller::restore_instance_snapshot))
         .route(
             "/api/instances/:id/modpacks/install",
             post(instance_controller::install_modpack),
@@ -532,6 +548,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/instances/:id/files",
             get(file_controller::list_files),
+        )
+        .route(
+            "/api/instances/:id/files/download",
+            get(file_controller::download_file),
         )
         .route(
             "/api/instances/:id/files/content",
@@ -757,6 +777,10 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
         "/curseforge.svg" => (
             "image/svg+xml",
             include_str!("../../assets/web/curseforge.svg"),
+        ),
+        "/js/alerts.js" => (
+            "application/javascript; charset=utf-8",
+            include_str!("../../assets/web/js/alerts.js"),
         ),
         "/js/auth.js" => (
             "application/javascript; charset=utf-8",

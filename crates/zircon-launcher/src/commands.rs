@@ -22,7 +22,7 @@ use tokio::sync::Mutex as AsyncMutex;
 use zircon_core::api::curseforge::CurseForgeApiClient;
 use zircon_core::api::modrinth::{ModrinthApiClient, ModrinthSearchHit};
 use zircon_core::crypto::signing;
-use zircon_core::model::{BillOfMaterials, ModLoaderInfo, ModLoaderType}; // z0
+use zircon_core::model::{BillOfMaterials, ModLoaderInfo, ModLoaderType, ModSide}; // z0
 
 use crate::auth::msa::MicrosoftAuthService;
 use crate::auth::session::SessionData;
@@ -1391,6 +1391,7 @@ async fn run_online_flow(
             &loader,
             required_java,
             java_override_path,
+            None,
             Some(&listener),
         )
         .await?;
@@ -1398,9 +1399,10 @@ async fn run_online_flow(
     // --- mod sync ---
     emit_status(app, "Checking mod hashes & synchronizing staging area...");
     let keep_mods: Vec<String> = selection.locally_added_mods.iter().cloned().collect();
+    let disabled_mods: Vec<String> = selection.disabled_mods.iter().cloned().collect();
     let sync_result = state
         .sync_engine
-        .sync_with_bom(&bom, &base_url, &game_dir, &keep_mods, Some(&listener))
+        .sync_with_bom(&bom, &base_url, &game_dir, &keep_mods, &disabled_mods, Some(&listener))
         .await?;
     state.launch_cancellation.guard_active()?;
     if sync_result.aborted {
@@ -1488,12 +1490,23 @@ async fn run_online_flow(
             .unwrap_or_default();
         let details = format!("Playing on {canonical_name}");
         let state_text = format!("Minecraft {}{}", bom.minecraft_version, loader_str);
+        let connect_url = format!("https://zirconmc.net/s/{url_host}");
         let activity = crate::discord_rpc::Activity::new(
             details,
             state_text,
             Some(chrono::Utc::now().timestamp()),
             loader_type,
-        );
+        )
+        .with_buttons(vec![
+            crate::discord_rpc::ActivityButton {
+                label: "Play on this Server".to_string(),
+                url: connect_url,
+            },
+            crate::discord_rpc::ActivityButton {
+                label: "Get Zircon Launcher".to_string(),
+                url: "https://zirconmc.net".to_string(),
+            },
+        ]);
         let discord_client = state.discord_client.clone();
         tauri::async_runtime::spawn(async move {
             crate::discord_rpc::update_discord_presence(&discord_client, activity).await;
@@ -1906,14 +1919,28 @@ pub fn delete_offline_instance(state: State<'_, LauncherState>, id: String) -> R
     Ok(())
 }
 
-/// Clones an offline instance with a new name and unique ID.
+/// Clones an offline instance with a new name, unique ID, and optional loader & folder filters.
 #[tauri::command]
 pub fn clone_offline_instance(
     state: State<'_, LauncherState>,
     id: String,
     new_name: String,
+    loader_type: Option<String>,
+    loader_version: Option<String>,
+    copy_world: Option<bool>,
+    copy_mods: Option<bool>,
 ) -> Result<OfflineInstance, String> {
-    state.offline.clone_instance(&id, &new_name).map_err(err_string)
+    state
+        .offline
+        .clone_instance_extended(
+            &id,
+            &new_name,
+            loader_type.as_deref(),
+            loader_version.as_deref(),
+            copy_world.unwrap_or(true),
+            copy_mods.unwrap_or(true),
+        )
+        .map_err(err_string)
 }
 
 
@@ -2094,6 +2121,21 @@ pub async fn export_to_zircon_server(
     let game_dir = state.offline.instance_dir(&inst.id);
     let out = Path::new(&export_path);
     crate::export::export_to_zircon_server(&game_dir, &inst, world_folder.as_deref(), out).map_err(err_string)
+}
+
+/// Exports a server instance's synced mods, configs, and BOM into a Zircon Server ZIP package.
+#[tauri::command]
+pub async fn export_server_instance_to_zip(
+    address: String,
+    export_path: String,
+) -> Result<(), String> {
+    let (host, port) = servers::parse_server_address(&address);
+    let game_dir = servers::instance_game_dir(&host, port);
+    if !game_dir.is_dir() {
+        return Err("Server instance game directory does not exist".to_string());
+    }
+    let out = Path::new(&export_path);
+    crate::export::export_server_instance_to_zip(&game_dir, Some(&address), out).map_err(err_string)
 }
 
 // ---------------------------------------------------------------------------
@@ -2436,6 +2478,9 @@ async fn run_offline_flow(
         java_override.as_deref().map(std::path::Path::new);
 
 
+    let client_jar_override = state.offline.resolve_custom_client_jar(instance);
+    let client_jar_path = client_jar_override.as_deref();
+
     let launch_data = state
         .classpath
         .resolve_with_progress_and_override(
@@ -2443,6 +2488,7 @@ async fn run_offline_flow(
             &instance.mod_loader,
             required_java,
             java_override_path,
+            client_jar_path,
             Some(&listener),
         )
         .await?;
@@ -2511,7 +2557,11 @@ async fn run_offline_flow(
             state_text,
             Some(chrono::Utc::now().timestamp()),
             loader_type,
-        );
+        )
+        .with_buttons(vec![crate::discord_rpc::ActivityButton {
+            label: "Get Zircon Launcher".to_string(),
+            url: "https://zirconmc.net".to_string(),
+        }]);
         let discord_client = state.discord_client.clone();
         tauri::async_runtime::spawn(async move {
             crate::discord_rpc::update_discord_presence(&discord_client, activity).await;
@@ -3736,9 +3786,10 @@ pub async fn get_server_instance_mods(
             let on_disk = on_disk_mods.get(base_name);
             let is_downloaded = on_disk.is_some() || staging_dir.join(base_name).is_file();
 
+            let is_user_disabled = selection.is_mod_disabled(base_name);
             let (enabled, size_bytes, author, version, name, icon_url, description) = if let Some(disk) = on_disk {
                 (
-                    disk.1,
+                    disk.1 && !is_user_disabled,
                     disk.2,
                     disk.3.clone().or_else(|| bom_mod.author.clone()),
                     disk.4.clone().or_else(|| bom_mod.version.clone()),
@@ -3748,7 +3799,7 @@ pub async fn get_server_instance_mods(
                 )
             } else {
                 (
-                    bom_mod.enabled,
+                    bom_mod.enabled && !is_user_disabled,
                     bom_mod.file_size,
                     bom_mod.author.clone(),
                     bom_mod.version.clone(),
@@ -3777,13 +3828,14 @@ pub async fn get_server_instance_mods(
     // 5. Add custom on-disk mods not on the BOM
     for (base_filename, disk) in on_disk_mods {
         if !processed_filenames.contains(&base_filename) {
+            let is_user_disabled = selection.is_mod_disabled(&base_filename);
             result_mods.push(ServerModInfo {
                 filename: base_filename,
                 name: disk.5,
                 version: disk.4,
                 author: disk.3,
                 size_bytes: disk.2,
-                enabled: disk.1,
+                enabled: disk.1 && !is_user_disabled,
                 icon_url: disk.6,
                 is_bom: false,
                 is_custom: true,
@@ -3877,6 +3929,10 @@ pub fn set_server_mod_enabled(
             std::fs::rename(&active_path, &disabled_path).map_err(|e| e.to_string())?;
         }
     }
+
+    let mut selection = PackSelection::load(&game_dir);
+    selection.set_mod_disabled(clean_base, !enabled);
+    selection.save(&game_dir);
 
     Ok(())
 }
@@ -5034,6 +5090,349 @@ pub fn check_game_crash(
             &game_dir,
         )),
     )
+}
+
+// =========================================================================
+// Mod Metadata Export, Social Sharing, Snapshots & Repair Commands
+// =========================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetupPreview {
+    pub incoming_bom: BillOfMaterials,
+    pub diff: Option<zircon_core::export::ModDiffReport>,
+}
+
+#[tauri::command]
+pub async fn create_instance_mod_snapshot(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    label: String,
+) -> Result<crate::snapshots::SnapshotInfo, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let instance_dir = state.offline.instance_dir(&instance.id);
+    let bom_file = instance_dir.join("bom.json");
+    let bom = if bom_file.is_file() {
+        let content = std::fs::read_to_string(&bom_file).map_err(|e| e.to_string())?;
+        serde_json::from_str::<BillOfMaterials>(&content).unwrap_or_else(|_| {
+            BillOfMaterials::new(&instance.minecraft_version, Some(instance.mod_loader.clone()), Some(instance.name.clone()))
+        })
+    } else {
+        BillOfMaterials::new(&instance.minecraft_version, Some(instance.mod_loader.clone()), Some(instance.name.clone()))
+    };
+
+    crate::snapshots::create_snapshot(&instance_dir, &label, &bom).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_instance_mod_snapshots(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+) -> Result<Vec<crate::snapshots::SnapshotInfo>, String> {
+    let instance_dir = state.offline.instance_dir(&instance_id);
+    crate::snapshots::list_snapshots(&instance_dir).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn restore_instance_mod_snapshot(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    filename: String,
+) -> Result<crate::snapshots::SnapshotRestoreResult, String> {
+    let instance_dir = state.offline.instance_dir(&instance_id);
+    crate::snapshots::restore_snapshot(&instance_dir, &filename).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_instance_mod_snapshot(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    filename: String,
+) -> Result<(), String> {
+    let instance_dir = state.offline.instance_dir(&instance_id);
+    crate::snapshots::delete_snapshot(&instance_dir, &filename).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn audit_instance_mods(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+) -> Result<crate::snapshots::ModAuditReport, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let instance_dir = state.offline.instance_dir(&instance.id);
+    let bom_file = instance_dir.join("bom.json");
+    let bom = if bom_file.is_file() {
+        let content = std::fs::read_to_string(&bom_file).map_err(|e| e.to_string())?;
+        serde_json::from_str::<BillOfMaterials>(&content).map_err(|e| e.to_string())?
+    } else {
+        BillOfMaterials::new(&instance.minecraft_version, Some(instance.mod_loader.clone()), Some(instance.name.clone()))
+    };
+
+    crate::snapshots::audit_instance_mods(&instance_dir, &bom).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn repair_instance_mods(
+    app: AppHandle,
+    state: State<'_, LauncherState>,
+    instance_id: String,
+) -> Result<usize, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let instance_dir = state.offline.instance_dir(&instance.id);
+    let bom_file = instance_dir.join("bom.json");
+    if !bom_file.is_file() {
+        return Err("No active BOM found to repair from".to_string());
+    }
+    let content = std::fs::read_to_string(&bom_file).map_err(|e| e.to_string())?;
+    let bom = serde_json::from_str::<BillOfMaterials>(&content).map_err(|e| e.to_string())?;
+
+    let audit = crate::snapshots::audit_instance_mods(&instance_dir, &bom).map_err(|e| e.to_string())?;
+    let mut to_download = audit.missing_mods;
+    to_download.extend(audit.corrupted_mods);
+
+    let mods_dir = state.offline.mods_dir(&instance);
+    let mut repaired = 0;
+    for m in to_download {
+        if let Some(url) = &m.download_url {
+            emit_status(&app, format!("Repairing mod: {}", m.filename));
+            let dest = mods_dir.join(&m.filename);
+            if download_file(&state.http, url, &dest, m.sha1.as_deref()).await.is_ok() {
+                repaired += 1;
+            }
+        }
+    }
+    emit_status(&app, format!("Repaired {repaired} mod(s) successfully"));
+    Ok(repaired)
+}
+
+#[tauri::command]
+pub async fn export_instance_setup(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    format: String,
+    custom_title: Option<String>,
+) -> Result<String, String> {
+    let Some(instance) = state.offline.load(&instance_id) else {
+        return Err("Instance not found".to_string());
+    };
+    let instance_dir = state.offline.instance_dir(&instance.id);
+    let bom_file = instance_dir.join("bom.json");
+    let bom = if bom_file.is_file() {
+        let content = std::fs::read_to_string(&bom_file).map_err(|e| e.to_string())?;
+        serde_json::from_str::<BillOfMaterials>(&content).unwrap_or_else(|_| {
+            BillOfMaterials::new(&instance.minecraft_version, Some(instance.mod_loader.clone()), Some(instance.name.clone()))
+        })
+    } else {
+        BillOfMaterials::new(&instance.minecraft_version, Some(instance.mod_loader.clone()), Some(instance.name.clone()))
+    };
+
+    let title = custom_title.or_else(|| Some(instance.name.clone()));
+    let sanitized = bom.sanitize_for_export(title);
+
+    match format.as_str() {
+        "share_code" | "code" => sanitized.to_share_code().map_err(|e| e.to_string()),
+        "markdown" | "md" => Ok(sanitized.to_markdown_table()),
+        "json" => serde_json::to_string_pretty(&sanitized).map_err(|e| e.to_string()),
+        _ => Err(format!("Unsupported format: {format}")),
+    }
+}
+
+#[tauri::command]
+pub async fn preview_import_setup(
+    state: State<'_, LauncherState>,
+    target_instance_id: Option<String>,
+    raw_payload: String,
+) -> Result<SetupPreview, String> {
+    let trimmed = raw_payload.trim();
+    let incoming_bom = if trimmed.starts_with('{') {
+        serde_json::from_str::<BillOfMaterials>(trimmed).map_err(|e| format!("Invalid JSON manifest: {e}"))?
+    } else {
+        BillOfMaterials::from_share_code(trimmed).map_err(|e| format!("Invalid share code: {e}"))?
+    };
+
+    let diff = if let Some(ref tid) = target_instance_id {
+        if let Some(target_instance) = state.offline.load(tid) {
+            let instance_dir = state.offline.instance_dir(&target_instance.id);
+            let bom_file = instance_dir.join("bom.json");
+            let current_bom = if bom_file.is_file() {
+                let content = std::fs::read_to_string(&bom_file).unwrap_or_default();
+                serde_json::from_str::<BillOfMaterials>(&content).unwrap_or_default()
+            } else {
+                BillOfMaterials::default()
+            };
+            Some(current_bom.diff(&incoming_bom))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    Ok(SetupPreview {
+        incoming_bom,
+        diff,
+    })
+}
+
+#[tauri::command]
+pub async fn apply_import_setup(
+    app: AppHandle,
+    state: State<'_, LauncherState>,
+    target_instance_id: Option<String>,
+    incoming_bom: BillOfMaterials,
+    strategy: String,
+    new_instance_name: Option<String>,
+) -> Result<OfflineInstance, String> {
+    match strategy.as_str() {
+        "new_instance" => {
+            let name = new_instance_name
+                .or_else(|| incoming_bom.server_title.clone())
+                .unwrap_or_else(|| format!("Imported {}", incoming_bom.minecraft_version));
+
+            let loader = incoming_bom.mod_loader.clone().unwrap_or_else(|| {
+                zircon_core::model::ModLoaderInfo::new("fabric", "0.15.11", None)
+            });
+
+            emit_status(&app, format!("Creating instance {name}..."));
+            let instance = state
+                .offline
+                .create(
+                    &name,
+                    &incoming_bom.minecraft_version,
+                    &loader.r#type,
+                    &loader.version,
+                )
+                .map_err(err_string)?;
+
+            let instance_dir = state.offline.instance_dir(&instance.id);
+            let mods_dir = state.offline.mods_dir(&instance);
+            tokio::fs::create_dir_all(&mods_dir)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            // Write bom.json
+            let bom_json = serde_json::to_string_pretty(&incoming_bom).map_err(|e| e.to_string())?;
+            tokio::fs::write(instance_dir.join("bom.json"), bom_json)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            // Concurrently download client-compatible mods
+            let to_download: Vec<_> = incoming_bom
+                .mods
+                .iter()
+                .filter(|m| m.side != ModSide::Server && m.download_url.is_some())
+                .cloned()
+                .collect();
+
+            let total = to_download.len();
+            for (idx, m) in to_download.into_iter().enumerate() {
+                if let Some(url) = &m.download_url {
+                    emit_status(
+                        &app,
+                        format!("Downloading mod [{}/{}]: {}", idx + 1, total, m.filename),
+                    );
+                    let dest = mods_dir.join(&m.filename);
+                    let _ = download_file(&state.http, url, &dest, m.sha1.as_deref()).await;
+                }
+            }
+
+            emit_status(&app, "Setup imported successfully!");
+            Ok(instance)
+        }
+        "merge" => {
+            let tid = target_instance_id.ok_or_else(|| "Target instance ID required for merge".to_string())?;
+            let instance = state.offline.load(&tid).ok_or_else(|| "Target instance not found".to_string())?;
+            let instance_dir = state.offline.instance_dir(&instance.id);
+            let bom_file = instance_dir.join("bom.json");
+
+            let mut current_bom = if bom_file.is_file() {
+                let content = std::fs::read_to_string(&bom_file).map_err(|e| e.to_string())?;
+                serde_json::from_str::<BillOfMaterials>(&content).unwrap_or_default()
+            } else {
+                BillOfMaterials::new(&instance.minecraft_version, Some(instance.mod_loader.clone()), Some(instance.name.clone()))
+            };
+
+            let diff = current_bom.diff(&incoming_bom);
+            let mods_dir = state.offline.mods_dir(&instance);
+
+            let mut to_download = diff.to_add;
+            for upd in diff.to_update {
+                to_download.push(upd.incoming);
+            }
+
+            for m in &to_download {
+                current_bom.add_mod(m.clone());
+            }
+
+            let bom_json = serde_json::to_string_pretty(&current_bom).map_err(|e| e.to_string())?;
+            tokio::fs::write(bom_file, bom_json).await.map_err(|e| e.to_string())?;
+
+            let total = to_download.len();
+            for (idx, m) in to_download.into_iter().enumerate() {
+                if m.side != ModSide::Server {
+                    if let Some(url) = &m.download_url {
+                        emit_status(
+                            &app,
+                            format!("Merging mod [{}/{}]: {}", idx + 1, total, m.filename),
+                        );
+                        let dest = mods_dir.join(&m.filename);
+                        let _ = download_file(&state.http, url, &dest, m.sha1.as_deref()).await;
+                    }
+                }
+            }
+
+            emit_status(&app, "Merged setup successfully!");
+            Ok(instance)
+        }
+        "replace" => {
+            let tid = target_instance_id.ok_or_else(|| "Target instance ID required for replace".to_string())?;
+            let instance = state.offline.load(&tid).ok_or_else(|| "Target instance not found".to_string())?;
+            let instance_dir = state.offline.instance_dir(&instance.id);
+            let bom_file = instance_dir.join("bom.json");
+
+            // Auto-snapshot current mods before replace
+            if bom_file.is_file() {
+                if let Ok(content) = std::fs::read_to_string(&bom_file) {
+                    if let Ok(curr) = serde_json::from_str::<BillOfMaterials>(&content) {
+                        let _ = crate::snapshots::create_snapshot(&instance_dir, "Auto-Backup Pre-Replace", &curr);
+                    }
+                }
+            }
+
+            let bom_json = serde_json::to_string_pretty(&incoming_bom).map_err(|e| e.to_string())?;
+            tokio::fs::write(bom_file, bom_json).await.map_err(|e| e.to_string())?;
+
+            let mods_dir = state.offline.mods_dir(&instance);
+            let to_download: Vec<_> = incoming_bom
+                .mods
+                .iter()
+                .filter(|m| m.side != ModSide::Server && m.download_url.is_some())
+                .cloned()
+                .collect();
+
+            let total = to_download.len();
+            for (idx, m) in to_download.into_iter().enumerate() {
+                if let Some(url) = &m.download_url {
+                    emit_status(
+                        &app,
+                        format!("Installing mod [{}/{}]: {}", idx + 1, total, m.filename),
+                    );
+                    let dest = mods_dir.join(&m.filename);
+                    let _ = download_file(&state.http, url, &dest, m.sha1.as_deref()).await;
+                }
+            }
+
+            emit_status(&app, "Replaced setup successfully!");
+            Ok(instance)
+        }
+        _ => Err(format!("Unknown strategy: {strategy}")),
+    }
 }
 
 

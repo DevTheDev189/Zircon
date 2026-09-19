@@ -457,6 +457,31 @@
           </button>
         </div>
 
+        <!-- Zircon Cloud Instant Server CTA Banner -->
+        <div class="mb-4 p-3 rounded-xl bg-gradient-to-r from-cyan-950/40 via-cyan-900/20 to-slate-900/60 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-md">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-300 shrink-0">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                <span>Deploy Private Cloud Server</span>
+                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">$5.99/mo</span>
+              </div>
+              <div class="text-[10px] text-slate-400 truncate">1-click provisioning, auto-sleep &amp; modpack sync</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="z-btn-accent text-[11px] font-black px-3 py-1.5 rounded-lg shrink-0 whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all"
+            @click="openDeployCloud"
+          >
+            Deploy
+          </button>
+        </div>
+
         <!-- Address Input -->
         <div class="mb-4">
           <label class="z-label flex items-center justify-between mb-1">
@@ -722,6 +747,7 @@ const emit = defineEmits(['launching', 'stopped', 'error']);
 const props = defineProps({
   session: { type: Object, default: null },
   gameStatus: { type: Object, default: null },
+  deepLinkAddress: { type: String, default: '' },
 });
 
 // Join via Code state
@@ -1041,8 +1067,12 @@ async function removeServer(server) {
 // Add Server Dialog logic
 // -------------------------------------------------------------
 
-function openAddDialog() {
-  newServerAddress.value = '';
+function openDeployCloud() {
+  api.openBrowserUrl('https://zirconmc.net/pricing').catch(() => {});
+}
+
+function openAddDialog(initialAddress = '') {
+  newServerAddress.value = typeof initialAddress === 'string' ? initialAddress : '';
   customServerName.value = '';
   isEditingName.value = false;
   probeResult.value = null;
@@ -1050,8 +1080,21 @@ function openAddDialog() {
   showAddDialog.value = true;
   nextTick(() => {
     addressInputRef.value?.focus();
+    if (newServerAddress.value) {
+      onAddressInput();
+    }
   });
 }
+
+watch(
+  () => props.deepLinkAddress,
+  (addr) => {
+    if (addr && addr.trim()) {
+      openAddDialog(addr.trim());
+    }
+  },
+  { immediate: true }
+);
 
 function closeAddDialog() {
   showAddDialog.value = false;

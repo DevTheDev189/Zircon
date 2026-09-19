@@ -87,6 +87,27 @@ pub async fn create_instance(
     ))
 }
 
+/// POST /api/instances/{id}/clone
+pub async fn clone_instance(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<CloneRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
+    let new_name = body.name.unwrap_or_default();
+    let cloned = state.instances.clone_instance(
+        &id,
+        &new_name,
+        body.loader_type.as_deref(),
+        body.loader_version.as_deref(),
+        body.copy_world,
+        body.copy_mods,
+    )?;
+    Ok((
+        StatusCode::CREATED,
+        Json(live_instance_map(&state, &cloned)),
+    ))
+}
+
 /// GET /api/instances/{id}
 pub async fn get_instance(
     State(state): State<AppState>,
@@ -164,6 +185,16 @@ pub async fn update_instance(
     }
 
     let current = state.instances.get_instance(&id)?;
+    if let Some(ref lt) = body.loader_type {
+        let trimmed = lt.trim();
+        if !trimmed.is_empty() && ModLoaderType::from_id(trimmed).is_none() {
+            return Err(ApiError::BadRequest(format!(
+                "Invalid loaderType '{}'. Allowed loaders: {}",
+                trimmed,
+                ModLoaderType::ALLOWED_IDS.join(", ")
+            )));
+        }
+    }
     let mc_changed = body
         .mc_version
         .as_deref()
@@ -174,7 +205,12 @@ pub async fn update_instance(
         .as_deref()
         .map(|v| !v.trim().is_empty() && v != current.loader_version())
         .unwrap_or(false);
-    let version_change = mc_changed || loader_changed;
+    let loader_type_changed = body
+        .loader_type
+        .as_deref()
+        .map(|v| !v.trim().is_empty() && v != current.loader_type())
+        .unwrap_or(false);
+    let version_change = mc_changed || loader_changed || loader_type_changed;
 
     if version_change {
         // Keep javaArgs changes from getting lost in the version-sync path.
@@ -188,6 +224,7 @@ pub async fn update_instance(
             .update_instance_versions(
                 &id,
                 body.mc_version.as_deref(),
+                body.loader_type.as_deref(),
                 body.loader_version.as_deref(),
                 body.name.as_deref(),
             )
@@ -1380,6 +1417,22 @@ pub struct CreateRequest {
     pub java_args: Option<String>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneRequest {
+    pub name: Option<String>,
+    pub loader_type: Option<String>,
+    pub loader_version: Option<String>,
+    #[serde(default = "default_true")]
+    pub copy_world: bool,
+    #[serde(default = "default_true")]
+    pub copy_mods: bool,
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateRequest {
@@ -1389,6 +1442,8 @@ pub struct UpdateRequest {
     pub name: Option<String>,
     #[serde(alias = "minecraftVersion")]
     pub mc_version: Option<String>,
+    #[serde(alias = "modLoaderType", alias = "loaderType")]
+    pub loader_type: Option<String>,
     #[serde(alias = "modLoaderVersion")]
     pub loader_version: Option<String>,
     pub java_args: Option<String>,
@@ -1483,4 +1538,153 @@ pub struct CrashFixRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SetServerPackRequest {
     pub filename: Option<String>,
+}
+
+/// GET /api/instances/{id}/mods/export/share-code
+pub async fn export_instance_share_code(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let bom = bom_for(&state, &id)?.get_bom();
+    let code = bom.to_share_code().map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::json!({
+        "code": code,
+        "modCount": bom.mods.len(),
+        "minecraftVersion": bom.minecraft_version,
+        "modLoader": bom.mod_loader,
+    })))
+}
+
+/// GET /api/instances/{id}/mods/export/markdown
+pub async fn export_instance_markdown(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let bom = bom_for(&state, &id)?.get_bom();
+    let markdown = bom.to_markdown_table();
+    Ok(Json(serde_json::json!({
+        "markdown": markdown,
+        "modCount": bom.mods.len(),
+    })))
+}
+
+/// POST /api/instances/{id}/mods/import
+pub async fn import_instance_setup(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<super::mod_controller::ImportSetupPayload>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let incoming = if let Some(code) = &payload.code {
+        zircon_core::model::BillOfMaterials::from_share_code(code)
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?
+    } else if let Some(bom) = payload.bom {
+        bom
+    } else {
+        return Err(ApiError::BadRequest("Either 'code' or 'bom' must be provided".to_string()));
+    };
+
+    let instance_dir = state.instances.get_instance_dir(&id);
+    let bom_service = bom_for(&state, &id)?;
+
+    let current = bom_service.get_bom();
+    if !current.mods.is_empty() {
+        let _ = zircon_core::export::snapshots::create_snapshot(&instance_dir, "Auto-Backup Pre-Import", &current);
+    }
+
+    if payload.strategy.eq_ignore_ascii_case("replace") {
+        bom_service.with_bom(|b| {
+            *b = incoming.clone();
+        });
+    } else {
+        bom_service.with_bom(|b| {
+            let mut existing_slugs: std::collections::HashSet<_> = b.mods.iter().map(|m| m.slug.clone()).collect();
+            let mut existing_files: std::collections::HashSet<_> = b.mods.iter().map(|m| m.filename.clone()).collect();
+            for m in incoming.mods {
+                if !existing_slugs.contains(&m.slug) && !existing_files.contains(&m.filename) {
+                    existing_slugs.insert(m.slug.clone());
+                    existing_files.insert(m.filename.clone());
+                    b.mods.push(m);
+                }
+            }
+            b.deduplicate_mods();
+        });
+    }
+    bom_service.save().map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let final_bom = bom_service.get_bom();
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "totalMods": final_bom.mods.len(),
+        "minecraftVersion": final_bom.minecraft_version,
+    })))
+}
+
+/// GET /api/instances/{id}/mods/snapshots
+pub async fn list_instance_snapshots(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let instance_dir = state.instances.get_instance_dir(&id);
+    let list = zircon_core::export::snapshots::list_snapshots(&instance_dir)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "snapshots": list })))
+}
+
+/// POST /api/instances/{id}/mods/snapshots
+pub async fn create_instance_snapshot(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<super::mod_controller::CreateSnapshotPayload>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let instance_dir = state.instances.get_instance_dir(&id);
+    let bom = bom_for(&state, &id)?.get_bom();
+    let label = payload.label.as_deref().unwrap_or("Manual Snapshot");
+    let info = zircon_core::export::snapshots::create_snapshot(&instance_dir, label, &bom)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::to_value(info).unwrap_or_default()))
+}
+
+/// POST /api/instances/{id}/mods/snapshots/{filename}/restore
+pub async fn restore_instance_snapshot(
+    State(state): State<AppState>,
+    Path((id, filename)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let instance_dir = state.instances.get_instance_dir(&id);
+    let bom_service = bom_for(&state, &id)?;
+    let current_bom = bom_service.get_bom();
+
+    if !current_bom.mods.is_empty() {
+        let _ = zircon_core::export::snapshots::create_snapshot(&instance_dir, "Auto-Backup Pre-Restore", &current_bom);
+    }
+
+    let target_bom = zircon_core::export::snapshots::load_snapshot(&instance_dir, &filename)
+        .map_err(|e| ApiError::NotFound(e.to_string()))?;
+
+    let diff = zircon_core::export::diff_boms(&current_bom, &target_bom);
+
+    bom_service.with_bom(|b| {
+        *b = target_bom.clone();
+    });
+    bom_service.save().map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "diff": diff,
+        "totalMods": target_bom.mods.len(),
+    })))
+}
+
+/// DELETE /api/instances/{id}/mods/snapshots/{filename}
+pub async fn delete_instance_snapshot(
+    State(state): State<AppState>,
+    Path((id, filename)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    let instance_dir = state.instances.get_instance_dir(&id);
+    let deleted = zircon_core::export::snapshots::delete_snapshot(&instance_dir, &filename)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    if deleted {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::NotFound("Snapshot not found".to_string()))
+    }
 }

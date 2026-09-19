@@ -22,6 +22,17 @@ createApp({
             selectedInstance: null,
             activeTab: 'mods',
             showAddServerModal: false,
+            addServerTab: 'scratch', // 'scratch' | 'import' | 'clone'
+            importMode: 'archive', // 'archive' | 'discovery'
+            cloneServerForm: { sourceInstanceId: '', name: '', loaderType: 'fabric', loaderVersion: '', copyWorld: true, copyMods: true },
+            cloneLoaderVersions: [],
+            cloneLoaderLoading: false,
+            cloningServer: false,
+            modpackSearchQuery: '',
+            modpackSearchResults: [],
+            modpackSearching: false,
+            modpackInstallingId: '',
+            selectedModpackVersions: {},
             newServerForm: { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4, autoStart: false },
             minecraftVersions: [],
             minecraftVersionsLoading: false,
@@ -29,6 +40,8 @@ createApp({
             newServerLoaderLoading: false,
             settingsLoaderVersions: [],
             settingsLoaderLoading: false,
+            showSettingsMcVersionDropdown: false,
+            showSettingsLoaderDropdown: false,
             windowsAutostartEnabled: false,
             windowsAutostartSupported: true,
             windowsAutostartLoading: false,
@@ -168,13 +181,24 @@ createApp({
                 breadcrumbs: [{ name: 'server', path: '' }],
                 loading: false,
                 error: '',
-                searchQuery: ''
+                searchQuery: '',
+                sortColumn: 'name',
+                sortDirection: 'asc',
+                isDragging: false,
+                pathCopied: false
             },
             fileClipboard: null,
             createFileModal: {
                 open: false,
                 isDir: false,
                 name: '',
+                error: '',
+                loading: false
+            },
+            renameModal: {
+                open: false,
+                file: null,
+                newName: '',
                 error: '',
                 loading: false
             },
@@ -188,7 +212,8 @@ createApp({
                 loading: false,
                 saving: false,
                 saveSuccess: false,
-                error: ''
+                error: '',
+                isMaximized: false
             },
             fileContextMenu: {
                 open: false,
@@ -203,7 +228,9 @@ createApp({
                 iconUrl: null,
                 bannerUrl: null,
                 loading: false
-            }
+            },
+            copiedIp: false,
+            userRole: 'Owner'
         };
     },
     methods: Object.assign({},

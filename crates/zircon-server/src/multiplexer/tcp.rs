@@ -367,6 +367,94 @@ impl TcpMultiplexer {
                         let target_port =
                             self.resolve_target_port(Some(&handshake), &fixed_instance);
 
+                        // Wake-from-sleep integration: detect sleeping instances and wake on demand
+                        if let Some(instances) = &self.instances {
+                            let matched_cfg = instances
+                                .find_by_hostname(&handshake.hostname)
+                                .or_else(|| fixed_instance.clone());
+
+                            if let Some(cfg) = matched_cfg {
+                                let is_sleeping = !instances.is_running(&cfg.id)
+                                    && (instances.wakeable(&cfg.id) || instances.driver().is_some());
+
+                                if is_sleeping {
+                                    tracing::info!(
+                                        "Instance '{}' is currently SLEEPING (state {}). Initiating wake flow...",
+                                        cfg.name,
+                                        handshake.next_state
+                                    );
+
+                                    // 1. Status Ping (next_state == 1)
+                                    if handshake.next_state == 1 {
+                                        let wake_status = serde_json::json!({
+                                            "version": {
+                                                "name": "Zircon Waking...",
+                                                "protocol": handshake.protocol_version
+                                            },
+                                            "players": {
+                                                "max": 20,
+                                                "online": 0,
+                                                "sample": []
+                                            },
+                                            "description": {
+                                                "text": "§e[Zircon Cloud] §fServer is waking up (15s)... Connect to start!"
+                                            }
+                                        });
+                                        let packet = disconnect::create_status_response_packet(&wake_status.to_string());
+                                        let _ = client.write_all(&packet).await;
+                                        let _ = client.shutdown().await;
+                                        return Ok(None);
+                                    }
+
+                                    // 2. Login (next_state == 2): validate ticket first so scanner bots don't wake containers
+                                    let server_url = handshake.hostname.split('\0').next().unwrap_or("").trim();
+                                    match detector::parse_login_start_username(&buf) {
+                                        ParseResult::Incomplete => continue,
+                                        ParseResult::NotMatch => {
+                                            tracing::warn!("Rejecting unparseable Login Start frame during wake");
+                                            let error_msg = disconnect::build_custom_error_message(server_url);
+                                            let packet = disconnect::create_disconnect_packet(&error_msg);
+                                            let _ = client.write_all(&packet).await;
+                                            let _ = client.shutdown().await;
+                                            return Ok(None);
+                                        }
+                                        ParseResult::Matched(username) => {
+                                            if !self.tickets.consume_ticket(&username) {
+                                                tracing::info!(
+                                                    "Rejected connection for '{username}' to sleeping server — no active Zircon join ticket"
+                                                );
+                                                let error_msg = disconnect::build_custom_error_message(server_url);
+                                                let packet = disconnect::create_disconnect_packet(&error_msg);
+                                                let _ = client.write_all(&packet).await;
+                                                let _ = client.shutdown().await;
+                                                return Ok(None);
+                                            }
+                                        }
+                                    }
+
+                                    // Trigger instance / container start
+                                    if let Err(e) = instances.start_instance(&cfg.id).await {
+                                        tracing::error!("Wakeup failed for instance '{}': {e}", cfg.id);
+                                    }
+
+                                    // Poll internal loopback port until accepted (up to 45s)
+                                    let ready = instances
+                                        .poll_port_ready(cfg.internal_mc_port as u16, Duration::from_secs(45))
+                                        .await;
+                                    if !ready {
+                                        let err_msg = "§c[Zircon Cloud] Server took too long to wake. Please try again.";
+                                        let packet = disconnect::create_disconnect_packet(err_msg);
+                                        let _ = client.write_all(&packet).await;
+                                        let _ = client.shutdown().await;
+                                        return Ok(None);
+                                    }
+
+                                    instances.clear_pending_join_intent(&cfg.id);
+                                    return Ok(Some((buf, cfg.internal_mc_port as u16)));
+                                }
+                            }
+                        }
+
                         // Zircon join gate: login connections MUST present a
                         // valid one-time join ticket registered by the launcher
                         // right before launch.
@@ -1142,6 +1230,46 @@ mod tests {
         assert_eq!(0, n, "expected EOF after detection timeout");
 
         assert!(mux_handle.await.unwrap().is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn sleeping_instance_ping_returns_waking_status() {
+        let _guard = MUX_TEST_LOCK.lock().await;
+        let dir = temp_dir();
+        let config = config_at(&dir);
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let instances = Arc::new(ServerInstanceManager::new(&dir, console).unwrap());
+        let instance = instances
+            .create_instance("Emerald", "1.20.4", "fabric", "")
+            .unwrap();
+
+        // Put instance to sleep with idle reason
+        instances
+            .stop_instance_with_reason(&instance.id, Some(zircon_core::model::SHUTDOWN_REASON_IDLE))
+            .await;
+
+        let external_port = free_port().await;
+        instances
+            .update_external_port(&instance.id, external_port as i32)
+            .unwrap();
+
+        let tickets = Arc::new(JoinTicketManager::new());
+        let multiplexer = TcpMultiplexer::new(config.clone(), Some(instances.clone()), tickets);
+        let handle = multiplexer.spawn_listener(external_port, None);
+
+        // Send status ping (next_state == 1) to "emerald.zirconmc.net"
+        let frame = handshake_frame("emerald.zirconmc.net", 1);
+        let mut client = TcpStream::connect(("127.0.0.1", external_port)).await.unwrap();
+        client.write_all(&frame).await.unwrap();
+        let mut response = Vec::new();
+        client.read_to_end(&mut response).await.unwrap();
+
+        let response_str = String::from_utf8_lossy(&response);
+        assert!(response_str.contains("Zircon Waking..."), "got: {response_str}");
+        assert!(response_str.contains("Server is waking up"), "got: {response_str}");
+
+        handle.abort();
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

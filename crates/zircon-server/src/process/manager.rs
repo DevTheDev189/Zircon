@@ -24,10 +24,36 @@ use zircon_core::model::{InstanceConfig, ModLoaderInfo, ModLoaderType};
 use crate::config::{ConfigService, ServerProperties};
 use crate::installer;
 use crate::process::console::ConsoleStreamHandler;
+use crate::process::driver::{ProcessDriver, ProcessLaunchOptions, ProcessLimits};
+
+/// Detects the expected Java runtime version based on Minecraft release number.
+pub fn detect_java_version(mc_version: &str) -> u8 {
+    let parts: Vec<&str> = mc_version.split('.').collect();
+    if parts.len() >= 2 {
+        if let Ok(minor) = parts[1].parse::<u32>() {
+            if minor <= 16 {
+                return 8;
+            } else if minor <= 20 {
+                if minor == 20 && parts.len() >= 3 {
+                    if let Ok(patch) = parts[2].parse::<u32>() {
+                        if patch >= 5 {
+                            return 21;
+                        }
+                    }
+                }
+                return 17;
+            } else {
+                return 21;
+            }
+        }
+    }
+    21
+}
 
 /// Immutable launch description captured at construction time.
 #[derive(Debug, Clone)]
 struct LaunchContext {
+    instance_id: String,
     server_dir: PathBuf,
     server_jar: PathBuf,
     mods_dir: PathBuf,
@@ -76,13 +102,14 @@ impl From<std::io::Error> for ProcessError {
     }
 }
 
-/// Launches and supervises one Minecraft server subprocess.
+/// Launches and supervises one Minecraft server subprocess or container.
 pub struct MinecraftProcessManager {
     context: LaunchContext,
     console: Arc<ConsoleStreamHandler>,
     inner: Arc<Mutex<ProcessInner>>,
     /// Set when the wrapper requests a force kill (graceful stop timed out).
     kill_tx: tokio::sync::watch::Sender<bool>,
+    driver: Option<Arc<dyn ProcessDriver>>,
 }
 
 impl MinecraftProcessManager {
@@ -91,6 +118,7 @@ impl MinecraftProcessManager {
         let cfg = config.get_config();
         Self::new_from_context(
             LaunchContext {
+                instance_id: "legacy".to_string(),
                 server_dir: config.server_dir.clone(),
                 server_jar: config.server_jar.clone(),
                 mods_dir: config.mods_dir.clone(),
@@ -102,6 +130,7 @@ impl MinecraftProcessManager {
                 public_port: cfg.public_port,
             },
             console,
+            None,
         )
     }
 
@@ -113,6 +142,17 @@ impl MinecraftProcessManager {
         installer_cache_dir: PathBuf,
         console: Arc<ConsoleStreamHandler>,
     ) -> Self {
+        Self::for_instance_with_driver(config, server_dir, installer_cache_dir, console, None)
+    }
+
+    /// Multi-instance wiring with an explicit process driver (e.g. DockerDriver).
+    pub fn for_instance_with_driver(
+        config: Arc<InstanceConfig>,
+        server_dir: PathBuf,
+        installer_cache_dir: PathBuf,
+        console: Arc<ConsoleStreamHandler>,
+        driver: Option<Arc<dyn ProcessDriver>>,
+    ) -> Self {
         let loader_info = config
             .mod_loader
             .clone()
@@ -123,6 +163,7 @@ impl MinecraftProcessManager {
             .unwrap_or_else(|| server_dir.join("mods"));
         Self::new_from_context(
             LaunchContext {
+                instance_id: config.id.clone(),
                 server_dir: server_dir.clone(),
                 server_jar: server_dir.join("server.jar"),
                 mods_dir,
@@ -134,10 +175,21 @@ impl MinecraftProcessManager {
                 public_port: config.external_mc_port,
             },
             console,
+            driver,
         )
     }
 
-    fn new_from_context(context: LaunchContext, console: Arc<ConsoleStreamHandler>) -> Self {
+    /// Attaches or updates the process driver on this manager.
+    pub fn with_driver(mut self, driver: Option<Arc<dyn ProcessDriver>>) -> Self {
+        self.driver = driver;
+        self
+    }
+
+    fn new_from_context(
+        context: LaunchContext,
+        console: Arc<ConsoleStreamHandler>,
+        driver: Option<Arc<dyn ProcessDriver>>,
+    ) -> Self {
         let (kill_tx, _) = tokio::sync::watch::channel(false);
         Self {
             context,
@@ -150,6 +202,7 @@ impl MinecraftProcessManager {
                 stdin: None,
             })),
             kill_tx,
+            driver,
         }
     }
 
@@ -225,6 +278,129 @@ impl MinecraftProcessManager {
         props.set("server-port", &self.context.mc_port.to_string());
         props.set("server-ip", "127.0.0.1");
         props.save(&props_file)?;
+
+        if let Some(driver) = &self.driver {
+            let java_version = detect_java_version(&self.context.minecraft_version);
+            let limits = ProcessLimits::from_java_args(&self.context.java_args);
+            let opts = ProcessLaunchOptions {
+                instance_id: self.context.instance_id.clone(),
+                server_dir: self.context.server_dir.clone(),
+                internal_port: self.context.mc_port as u16,
+                memory_args: self.context.java_args.clone(),
+                java_version,
+                limits,
+            };
+
+            driver.start(opts).await.map_err(ProcessError::Io)?;
+
+            {
+                let mut inner = self.inner.lock().unwrap();
+                inner.running = true;
+                inner.stop_requested = false;
+                inner.exit_code = 0;
+                inner.start_time = Some(std::time::SystemTime::now());
+                inner.stdin = None;
+            }
+
+            let public_port_text = if self.context.public_port > 0 {
+                format!(" (public port {})", self.context.public_port)
+            } else {
+                String::new()
+            };
+            self.console.accept(format!(
+                "[wrapper] Starting Minecraft server container on internal port {}{}",
+                self.context.mc_port, public_port_text
+            ));
+
+            // Stream container logs into console
+            let (tx, mut rx) = tokio::sync::mpsc::channel(128);
+            let console_logs = self.console.clone();
+            tokio::spawn(async move {
+                while let Some(line) = rx.recv().await {
+                    console_logs.accept(line);
+                }
+            });
+            let _ = driver.stream_logs(&self.context.instance_id, tx).await;
+
+            // Telemetry probe task for container
+            let console_telemetry = self.console.clone();
+            let inner_telemetry = self.inner.clone();
+            let mc_port = self.context.mc_port;
+            let mc_version = self.context.minecraft_version.clone();
+            let loader_type = self.context.loader_info.r#type.to_lowercase();
+            let driver_cmd = driver.clone();
+            let inst_id_telemetry = self.context.instance_id.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+                while inner_telemetry.lock().map(|g| g.running).unwrap_or(false) {
+                    if console_telemetry.tps_tracker().is_active_monitoring_requested() {
+                        let start = std::time::Instant::now();
+                        if let Ok(stream) = tokio::time::timeout(
+                            std::time::Duration::from_millis(1500),
+                            tokio::net::TcpStream::connect(("127.0.0.1", mc_port as u16)),
+                        )
+                        .await
+                        {
+                            if let Ok(mut s) = stream {
+                                let elapsed_ms = start.elapsed().as_millis() as u64;
+                                console_telemetry.tps_tracker().record_ping(elapsed_ms);
+                                let _ = s.shutdown().await;
+                            }
+                        }
+
+                        let is_legacy_forge = loader_type == "forge"
+                            && !mc_version.starts_with("1.20.3")
+                            && !mc_version.starts_with("1.20.4")
+                            && !mc_version.starts_with("1.20.5")
+                            && !mc_version.starts_with("1.20.6")
+                            && !mc_version.starts_with("1.21")
+                            && !mc_version.starts_with("1.22")
+                            && !mc_version.starts_with("26.");
+
+                        let cmd = if is_legacy_forge {
+                            "forge tps"
+                        } else {
+                            "tick query"
+                        };
+
+                        let _ = driver_cmd.send_command(&inst_id_telemetry, cmd).await;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                }
+            });
+
+            // Container exit monitor task
+            let driver_monitor = driver.clone();
+            let inst_id_monitor = self.context.instance_id.clone();
+            let inner_monitor = self.inner.clone();
+            let console_monitor = self.console.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    match driver_monitor.is_running(&inst_id_monitor).await {
+                        Ok(false) => break,
+                        Err(_) => break,
+                        _ => {}
+                    }
+                    if !inner_monitor.lock().map(|g| g.running).unwrap_or(false) {
+                        break;
+                    }
+                }
+                let mut guard = inner_monitor.lock().unwrap();
+                guard.running = false;
+                let stop_requested = guard.stop_requested;
+                drop(guard);
+                console_monitor.player_tracker().reset();
+                console_monitor.tps_tracker().reset();
+                if stop_requested {
+                    console_monitor.accept("[wrapper] Minecraft server stopped".to_string());
+                } else {
+                    console_monitor.accept("[wrapper] Minecraft server container exited".to_string());
+                }
+            });
+
+            return Ok(());
+        }
 
         let mut command = tokio::process::Command::new(installer::java_bin());
         // Untrusted mod code runs inside this JVM: scrub the environment so
@@ -473,6 +649,13 @@ impl MinecraftProcessManager {
 
     /// Writes a command to the server's stdin (e.g. "say hello").
     pub async fn send_command(&self, command: &str) -> Result<(), ProcessError> {
+        if let Some(driver) = &self.driver {
+            return driver
+                .send_command(&self.context.instance_id, command)
+                .await
+                .map_err(ProcessError::Io);
+        }
+
         // Take the stdin handle out of the shared state so the write can be
         // awaited without holding the std Mutex — `MutexGuard` is `!Send`, so
         // holding it across an await would both deadlock-risk concurrent
@@ -502,6 +685,23 @@ impl MinecraftProcessManager {
 
     /// Sends `stop`, waits for a graceful exit, then force-kills if needed.
     pub async fn stop(&self) {
+        if let Some(driver) = &self.driver {
+            {
+                let mut inner = self.inner.lock().unwrap();
+                if !inner.running {
+                    return;
+                }
+                inner.stop_requested = true;
+            }
+            self.console
+                .accept("[wrapper] Stopping Minecraft server container...".to_string());
+            let _ = driver.stop(&self.context.instance_id, 15).await;
+            self.inner.lock().unwrap().running = false;
+            self.console.player_tracker().reset();
+            self.console.tps_tracker().reset();
+            return;
+        }
+
         {
             let mut inner = self.inner.lock().unwrap();
             if !inner.running {
@@ -681,5 +881,17 @@ mod tests {
             pm.send_command("say hi").await,
             Err(ProcessError::NotRunning)
         ));
+    }
+
+    #[test]
+    fn test_detect_java_version() {
+        assert_eq!(detect_java_version("1.12.2"), 8);
+        assert_eq!(detect_java_version("1.16.5"), 8);
+        assert_eq!(detect_java_version("1.18.2"), 17);
+        assert_eq!(detect_java_version("1.20.1"), 17);
+        assert_eq!(detect_java_version("1.20.4"), 17);
+        assert_eq!(detect_java_version("1.20.6"), 21);
+        assert_eq!(detect_java_version("1.21.1"), 21);
+        assert_eq!(detect_java_version("1.21.4"), 21);
     }
 }

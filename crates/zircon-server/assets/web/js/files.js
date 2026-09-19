@@ -281,7 +281,7 @@ window.Zircon.files = {
             event.stopPropagation();
         }
         const x = Math.min(event.clientX, window.innerWidth - 220);
-        const y = Math.min(event.clientY, window.innerHeight - 260);
+        const y = Math.min(event.clientY, window.innerHeight - 300);
         this.fileContextMenu = {
             open: true,
             x: Math.max(10, x),
@@ -294,5 +294,187 @@ window.Zircon.files = {
         if (this.fileContextMenu && this.fileContextMenu.open) {
             this.fileContextMenu.open = false;
         }
+    },
+
+    async downloadFile(file) {
+        if (!this.selectedInstance || !file || file.is_dir || file.isDir) return;
+        const url = `/api/instances/${this.selectedInstance.id}/files/download?path=${encodeURIComponent(file.path)}`;
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${this.jwtToken}`
+                }
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || `Download failed with status ${res.status}`);
+            }
+            const blob = await res.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (e) {
+            alert(`Download error: ${e.message || e}`);
+        }
+    },
+
+    openRenameModal(file) {
+        if (!file) return;
+        this.renameModal = {
+            open: true,
+            file: file,
+            newName: file.name,
+            error: '',
+            loading: false
+        };
+    },
+
+    async submitRename() {
+        if (!this.renameModal.file || !this.renameModal.newName.trim()) return;
+        const oldName = this.renameModal.file.name;
+        const newName = this.renameModal.newName.trim();
+        if (oldName === newName) {
+            this.renameModal.open = false;
+            return;
+        }
+
+        this.renameModal.loading = true;
+        this.renameModal.error = '';
+
+        const current = this.fileManager.currentPath;
+        const fromPath = this.renameModal.file.path;
+        const toPath = current ? `${current}/${newName}` : newName;
+
+        try {
+            await this.api(`/api/instances/${this.selectedInstance.id}/files/move`, {
+                method: 'POST',
+                body: {
+                    from: fromPath,
+                    to: toPath
+                }
+            });
+            this.renameModal.open = false;
+            this.fetchFiles();
+        } catch (e) {
+            this.renameModal.error = e.message || 'Failed to rename item';
+        } finally {
+            this.renameModal.loading = false;
+        }
+    },
+
+    copyBreadcrumbPath() {
+        const path = this.fileManager.currentPath || '/';
+        navigator.clipboard.writeText(path).then(() => {
+            this.fileManager.pathCopied = true;
+            setTimeout(() => { this.fileManager.pathCopied = false; }, 2000);
+        }).catch(() => {});
+    },
+
+    sortFiles(col) {
+        if (this.fileManager.sortColumn === col) {
+            this.fileManager.sortDirection = this.fileManager.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.fileManager.sortColumn = col;
+            this.fileManager.sortDirection = 'asc';
+        }
+    },
+
+    getSortedFiles() {
+        const query = (this.fileManager.searchQuery || '').toLowerCase();
+        let list = this.fileManager.files || [];
+        if (query) {
+            list = list.filter(f => f.name.toLowerCase().includes(query));
+        }
+
+        const col = this.fileManager.sortColumn || 'name';
+        const dir = this.fileManager.sortDirection === 'desc' ? -1 : 1;
+
+        return [...list].sort((a, b) => {
+            const aIsDir = !!(a.is_dir || a.isDir);
+            const bIsDir = !!(b.is_dir || b.isDir);
+            if (aIsDir && !bIsDir) return -1;
+            if (!aIsDir && bIsDir) return 1;
+
+            if (col === 'name') {
+                return a.name.localeCompare(b.name) * dir;
+            } else if (col === 'size') {
+                const aSize = a.size || 0;
+                const bSize = b.size || 0;
+                return (aSize - bSize) * dir;
+            } else if (col === 'modified') {
+                const aMod = a.modified || 0;
+                const bMod = b.modified || 0;
+                return (aMod - bMod) * dir;
+            }
+            return 0;
+        });
+    },
+
+    toggleEditorMaximize() {
+        this.editorModal.isMaximized = !this.editorModal.isMaximized;
+    },
+
+    formatJsonContent() {
+        try {
+            const parsed = JSON.parse(this.editorModal.content);
+            this.editorModal.content = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+            alert(`Cannot format invalid JSON: ${e.message}`);
+        }
+    },
+
+    handleFileDragOver(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.fileManager.isDragging = true;
+    },
+
+    handleFileDragLeave(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.fileManager.isDragging = false;
+    },
+
+    async handleFileDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.fileManager.isDragging = false;
+
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length || !this.selectedInstance) return;
+
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('file', files[i]);
+        }
+
+        const current = this.fileManager.currentPath || '';
+        this.fileManager.loading = true;
+
+        try {
+            const token = this.jwtToken;
+            const res = await fetch(`/api/instances/${this.selectedInstance.id}/files/upload?path=${encodeURIComponent(current)}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || `Upload failed with status ${res.status}`);
+            }
+            this.fetchFiles();
+        } catch (err) {
+            alert(`Upload failed: ${err.message || err}`);
+        } finally {
+            this.fileManager.loading = false;
+        }
     }
 };
+

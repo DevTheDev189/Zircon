@@ -79,14 +79,20 @@
   .z-card,
   .z-glass-card,
   .zircon-glass-card {
-    background: rgba(var(--color-card-rgb), var(--card-opacity));
-    backdrop-filter: blur(var(--card-blur));
-    -webkit-backdrop-filter: blur(var(--card-blur));
-    border: 1px solid rgba(var(--color-border-rgb), var(--border-opacity));
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), rgba(8, 16, 28, 0.68);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--border-radius-card);
     padding: 1.25rem;
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 8px 32px rgba(0, 0, 0, 0.45);
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.45);
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .z-card:hover,
+  .z-glass-card:hover,
+  .zircon-glass-card:hover {
+    border-color: rgba(71, 210, 201, 0.45);
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 22px rgba(71, 210, 201, 0.2);
   }
 
   .z-btn {
@@ -148,23 +154,51 @@
     box-shadow: 0 0 14px rgba(239, 68, 68, 0.3);
   }
 
-  .z-input {
-    background: var(--color-well);
-    border: 1px solid rgba(var(--color-border-rgb), 0.7);
+  .z-input,
+  select,
+  input[type="text"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  textarea {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(86, 118, 153, 0.45);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04);
     border-radius: var(--border-radius-input);
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
-    color: #e6edf3;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    color: #f1f5f9;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     width: 100%;
   }
-  .z-input::placeholder {
-    color: #8b949e;
+  .z-input::placeholder,
+  input::placeholder,
+  textarea::placeholder {
+    color: #7e8d9f;
   }
-  .z-input:focus {
-    outline: none;
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 2px var(--color-accent-focus);
+  .z-input:hover,
+  select:hover,
+  input[type="text"]:hover,
+  input[type="password"]:hover,
+  input[type="number"]:hover,
+  input[type="search"]:hover,
+  textarea:hover {
+    border-color: rgba(71, 210, 201, 0.45);
+    background: rgba(20, 30, 52, 0.95);
+  }
+  .z-input:focus,
+  select:focus,
+  input:focus,
+  textarea:focus {
+    outline: none !important;
+    background: rgba(15, 23, 42, 0.98) !important;
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 0 2px var(--color-accent-focus), inset 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+  }
+  option {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+    padding: 8px 12px;
   }
 
   .z-label {
@@ -351,3 +385,222 @@
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
+
+/* ==========================================================================
+   ZIRCON LAUNCHER BUILT-IN ALERT SYSTEM (Glassmorphic Modal Card)
+   ========================================================================== */
+
+.z-alert-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(4, 7, 13, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  animation: z-alert-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.z-alert-backdrop.closing {
+  animation: z-alert-fade-out 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.z-alert-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: radial-gradient(135% 135% at 50% 0%, #111b2b 0%, #080d16 100%);
+  border: 1px solid rgba(71, 210, 201, 0.35);
+  border-radius: 1.25rem;
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.9), 0 -4px 30px rgba(71, 210, 201, 0.28), 0 0 35px rgba(71, 210, 201, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  padding: 1.75rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.125rem;
+  overflow: hidden;
+  animation: z-alert-pop-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.z-alert-backdrop.closing .z-alert-card {
+  animation: z-alert-pop-out 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.z-alert-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background: radial-gradient(ellipse 75% 65% at 50% 12%, rgba(71, 210, 201, 0.22) 0%, transparent 80%);
+  pointer-events: none;
+}
+
+.z-alert-card.state-error {
+  border-color: rgba(244, 63, 94, 0.45);
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.9), 0 -4px 30px rgba(244, 63, 94, 0.35), 0 0 35px rgba(244, 63, 94, 0.22), inset 0 1px 1px rgba(244, 63, 94, 0.3);
+}
+.z-alert-card.state-error .z-alert-glow {
+  background: radial-gradient(ellipse 75% 65% at 50% 12%, rgba(244, 63, 94, 0.28) 0%, transparent 80%);
+}
+
+.z-alert-card.state-success {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.9), 0 -4px 30px rgba(16, 185, 129, 0.35), 0 0 35px rgba(16, 185, 129, 0.22), inset 0 1px 1px rgba(16, 185, 129, 0.3);
+}
+.z-alert-card.state-success .z-alert-glow {
+  background: radial-gradient(ellipse 75% 65% at 50% 12%, rgba(16, 185, 129, 0.28) 0%, transparent 80%);
+}
+
+.z-alert-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.z-alert-icon-wrap {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(71, 210, 201, 0.12);
+  border: 1px solid rgba(71, 210, 201, 0.35);
+  color: #47d2c9;
+  box-shadow: 0 0 20px rgba(71, 210, 201, 0.15);
+}
+
+.z-alert-card.state-error .z-alert-icon-wrap {
+  background: rgba(244, 63, 94, 0.14);
+  border-color: rgba(244, 63, 94, 0.4);
+  color: #f43f5e;
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.2);
+}
+
+.z-alert-card.state-success .z-alert-icon-wrap {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+}
+
+.z-alert-title-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.z-alert-subtitle {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.z-alert-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.z-alert-body {
+  width: 100%;
+  padding: 0.125rem 0.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.z-alert-message {
+  color: #cbd5e1;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: center;
+}
+
+.z-alert-footer {
+  width: 100%;
+  margin-top: 0.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.z-alert-btn {
+  width: 100%;
+  display: block;
+  text-align: center;
+  background: linear-gradient(135deg, var(--color-accent-bright, #5adfd5) 0%, var(--color-accent, #47d2c9) 50%, var(--color-accent-deep, #20b2aa) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: var(--color-accent-ink, #022623);
+  font-weight: 800;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  box-shadow: 0 4px 18px var(--color-accent-glow, rgba(71, 210, 201, 0.35));
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.z-alert-btn:hover {
+  background: linear-gradient(135deg, var(--color-accent-bright, #5adfd5) 0%, var(--color-accent, #47d2c9) 50%, var(--color-accent-deep, #20b2aa) 100%);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 24px var(--color-accent-glow-strong, rgba(71, 210, 201, 0.55));
+  transform: translateY(-1px);
+}
+
+.z-alert-btn:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 2px 10px var(--color-accent-glow, rgba(71, 210, 201, 0.35));
+}
+
+@keyframes z-alert-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes z-alert-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes z-alert-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes z-alert-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+}
+

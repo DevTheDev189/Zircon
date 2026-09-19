@@ -1,6 +1,6 @@
 [package]
 name = "zircon-launcher"
-version = "0.4.10"
+version = "0.4.11"
 edition = "2021"
 description = "Zircon companion launcher: Tauri v2 shell + Vue 3 frontend over the Phase 4 launch engine (Microsoft auth, classpath resolver, sync engines, offline instances)"
 license = "BSL-1.1"
@@ -40,6 +40,7 @@ tauri = { workspace = true }
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-deep-link = "2"
 zeroize = { version = "1.8", features = ["derive"] }
 getrandom = "0.3"
 futures-util = "0.3"
@@ -67,3 +68,4 @@ ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 # Deterministic key construction in TOFU attestation tests.
 ed25519-dalek = { version = "2.1", default-features = false, features = ["std"] }
+tempfile = "3"

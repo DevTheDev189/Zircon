@@ -38,6 +38,10 @@ pub struct PackSelection {
     pub locally_added_resourcepacks: BTreeSet<String>,
     #[serde(default)]
     pub locally_added_mods: BTreeSet<String>,
+    /// Mods disabled by the player (e.g. server-synced mods or client mods
+    /// they chose to turn off). Identified by base filename without .disabled.
+    #[serde(default)]
+    pub disabled_mods: BTreeSet<String>,
     /// The player answered the per-server shader prompt once; don't ask again.
     #[serde(default)]
     pub remember_shaders_choice: bool,
@@ -124,6 +128,23 @@ impl PackSelection {
         let base = filename.strip_suffix(".disabled").unwrap_or(filename);
         self.locally_added_mods.remove(filename);
         self.locally_added_mods.remove(base);
+    }
+
+    /// True when the given mod has been disabled by the player.
+    pub fn is_mod_disabled(&self, filename: &str) -> bool {
+        let base = filename.strip_suffix(".disabled").unwrap_or(filename);
+        self.disabled_mods.contains(filename) || self.disabled_mods.contains(base)
+    }
+
+    /// Sets or clears the disabled status for a mod.
+    pub fn set_mod_disabled(&mut self, filename: &str, disabled: bool) {
+        let base = filename.strip_suffix(".disabled").unwrap_or(filename).to_string();
+        if disabled {
+            self.disabled_mods.insert(base);
+        } else {
+            self.disabled_mods.remove(filename);
+            self.disabled_mods.remove(&base);
+        }
     }
 }
 

@@ -24,6 +24,12 @@ pub fn create_disconnect_packet(json_message: &str) -> Vec<u8> {
     frame
 }
 
+/// Creates a framed Minecraft `Status Response` packet (packet ID `0x00` in status state)
+/// carrying the SLP JSON response.
+pub fn create_status_response_packet(json_status: &str) -> Vec<u8> {
+    create_disconnect_packet(json_status)
+}
+
 /// The in-game message shown when a connection is rejected by the join gate.
 pub fn build_custom_error_message(server_url: &str) -> String {
     let clean_url = server_url.trim();
@@ -115,5 +121,22 @@ mod tests {
         assert!(message.contains("Zircon Client Required"));
         assert!(message.contains("https://zirconmc.net/downloads.html"));
         assert!(message.contains("mc.zirconmc.net"));
+    }
+
+    #[test]
+    fn status_response_frame_layout_is_valid() {
+        let status_json = r#"{"description":{"text":"Waking up..."}}"#;
+        let frame = create_status_response_packet(status_json);
+        let (frame_len, bytes) = read_varint(&frame, 0).unwrap();
+        let offset = bytes;
+        assert_eq!(frame.len() as i32 - offset as i32, frame_len);
+        let (packet_id, bytes) = read_varint(&frame, offset).unwrap();
+        let offset = offset + bytes;
+        assert_eq!(0, packet_id);
+        let (msg_len, bytes) = read_varint(&frame, offset).unwrap();
+        let offset = offset + bytes;
+        assert_eq!(status_json.len() as i32, msg_len);
+        let payload = String::from_utf8(frame[offset..].to_vec()).unwrap();
+        assert_eq!(status_json, payload);
     }
 }

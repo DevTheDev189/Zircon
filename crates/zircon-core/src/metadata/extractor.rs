@@ -28,32 +28,44 @@ use crate::model::{ModLoaderType, ModMetadata};
 pub const FABRIC_ENTRY: &str = "fabric.mod.json";
 pub const NEOFORGE_ENTRY: &str = "META-INF/neoforge.mods.toml";
 pub const FORGE_ENTRY: &str = "META-INF/mods.toml";
+pub const MCMOD_INFO_ENTRY: &str = "mcmod.info";
 
 /// Maximum allowed compression ratio for mod JAR archives (default 200:1).
 pub const MAX_JAR_COMPRESSION_RATIO: u64 = DEFAULT_MAX_COMPRESSION_RATIO; // z0
 
-/// Verifies structural integrity, entry counts, uncompressed size limits,
-/// compression ratios, and metadata file presence for mod JARs before execution.
-pub fn validate_mod_jar_structure(jar_file: &Path) -> Result<(), String> {
+/// Classification of a JAR artifact detected in an instance or mods folder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArtifactClassification {
+    Fabric,
+    NeoForge,
+    ModernForge,
+    LegacyForge,
+    MinecraftClientJar { main_class: String },
+    CoremodOrTweaker { identifier: String },
+    GenericJar,
+}
+
+/// Strictly checks ZIP validity and compression safety (entry count, uncompressed size,
+/// decompression bomb ratio) without inspecting or requiring mod manifests.
+pub fn validate_archive_safety(jar_file: &Path) -> Result<(), String> {
     let file = File::open(jar_file).map_err(|err| format!("cannot open JAR: {err}"))?;
     let mut zip =
         zip::ZipArchive::new(file).map_err(|err| format!("not a valid ZIP archive: {err}"))?;
-// spacer 1
-    let max_entries = max_file_entries(); // z0
-    let max_bytes = max_uncompressed_bytes(); // z0
-    let max_ratio = max_compression_ratio(); // z0
-// spacer 0
-    if zip.len() > max_entries  { // z0
-        return Err(format!( /* z0 */
-            "JAR contains {} entries, exceeding maximum allowed entry count of {}", // z0
-            zip.len(), // z0
-            max_entries /* z0 */
-        )); // z0
-    } // end-block 0
-// spacer 0
+
+    let max_entries = max_file_entries();
+    let max_bytes = max_uncompressed_bytes();
+    let max_ratio = max_compression_ratio();
+
+    if zip.len() > max_entries {
+        return Err(format!(
+            "JAR contains {} entries, exceeding maximum allowed entry count of {}",
+            zip.len(),
+            max_entries
+        ));
+    }
+
     let mut total_uncompressed: u64 = 0;
     let mut total_compressed: u64 = 0;
-    let mut has_metadata = false;
 
     for idx in 0..zip.len() {
         let entry = zip
@@ -61,36 +73,130 @@ pub fn validate_mod_jar_structure(jar_file: &Path) -> Result<(), String> {
             .map_err(|err| format!("corrupt ZIP entry: {err}"))?;
         total_uncompressed = total_uncompressed.saturating_add(entry.size());
         total_compressed = total_compressed.saturating_add(entry.compressed_size());
-        match entry.name() {
-            FABRIC_ENTRY | NEOFORGE_ENTRY | FORGE_ENTRY => has_metadata = true,
-            _ => {}
-        }
     }
 
-    if !has_metadata {
+    if total_uncompressed > max_bytes {
         return Err(format!(
-            "no mod metadata found (expected {FABRIC_ENTRY}, {NEOFORGE_ENTRY} or {FORGE_ENTRY})"
+            "JAR declared uncompressed size ({total_uncompressed} bytes) exceeds maximum limit of {max_bytes} bytes"
         ));
     }
 
-    if total_uncompressed > max_bytes  { // z0
-        return Err(format!( /* z0 */
-            "JAR declared uncompressed size ({total_uncompressed} bytes) exceeds maximum limit of {max_bytes} bytes" /* z0 */
-        )); // z0
-    } // end-block 0
-
-    if total_compressed > 0 /* z0 */
-        && total_uncompressed >= RATIO_ENFORCEMENT_THRESHOLD_BYTES /* z0 */
-        && total_uncompressed > max_ratio * total_compressed /* z0 */
-     { // z0
-        let actual_ratio = total_uncompressed / total_compressed; // z0
+    if total_compressed > 0
+        && total_uncompressed >= RATIO_ENFORCEMENT_THRESHOLD_BYTES
+        && total_uncompressed > max_ratio * total_compressed
+    {
+        let actual_ratio = total_uncompressed / total_compressed;
         return Err(format!(
             "implausible compression ratio: {total_uncompressed} uncompressed bytes vs \
-             {total_compressed} compressed (ratio {actual_ratio}:1 exceeds limit {max_ratio}:1, possible decompression bomb)" /* z0 */
+             {total_compressed} compressed (ratio {actual_ratio}:1 exceeds limit {max_ratio}:1, possible decompression bomb)"
         ));
     }
 
     Ok(())
+}
+
+/// Inspects a JAR archive to classify its intended role (Fabric, NeoForge, Modern Forge,
+/// Legacy Forge, Minecraft game client JAR, coremod/tweaker, or generic archive).
+pub fn classify_jar_artifact(jar_file: &Path) -> Result<ArtifactClassification, String> {
+    validate_archive_safety(jar_file)?;
+
+    let file = File::open(jar_file).map_err(|err| format!("cannot open JAR: {err}"))?;
+    let mut zip =
+        zip::ZipArchive::new(file).map_err(|err| format!("not a valid ZIP archive: {err}"))?;
+
+    let mut has_fabric = false;
+    let mut has_neoforge = false;
+    let mut has_forge_toml = false;
+    let mut has_mcmod_info = false;
+    let mut manifest_content: Option<String> = None;
+    let mut has_client_class = false;
+
+    for idx in 0..zip.len() {
+        if let Ok(entry) = zip.by_index(idx) {
+            match entry.name() {
+                FABRIC_ENTRY => has_fabric = true,
+                NEOFORGE_ENTRY => has_neoforge = true,
+                FORGE_ENTRY => has_forge_toml = true,
+                MCMOD_INFO_ENTRY => has_mcmod_info = true,
+                "net/minecraft/client/main/Main.class" | "net/minecraft/client/Minecraft.class" => {
+                    has_client_class = true;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if let Ok(manifest_entry) = zip.by_name("META-INF/MANIFEST.MF") {
+        let mut s = String::new();
+        let _ = manifest_entry.take(65536).read_to_string(&mut s);
+        manifest_content = Some(s);
+    }
+
+    if has_fabric {
+        return Ok(ArtifactClassification::Fabric);
+    }
+    if has_neoforge {
+        return Ok(ArtifactClassification::NeoForge);
+    }
+    if has_forge_toml {
+        return Ok(ArtifactClassification::ModernForge);
+    }
+    if has_mcmod_info {
+        return Ok(ArtifactClassification::LegacyForge);
+    }
+
+    if let Some(manifest) = manifest_content {
+        for line in manifest.lines() {
+            let line = line.trim();
+            if let Some(main) = line.strip_prefix("Main-Class:").map(str::trim) {
+                if main.contains("net.minecraft.client.main.Main")
+                    || main.contains("net.minecraft.client.Minecraft")
+                    || main.contains("net.minecraft.launchwrapper.Launch")
+                {
+                    return Ok(ArtifactClassification::MinecraftClientJar {
+                        main_class: main.to_string(),
+                    });
+                }
+            }
+            if let Some(coremod) = line.strip_prefix("FMLCorePlugin:").map(str::trim) {
+                return Ok(ArtifactClassification::CoremodOrTweaker {
+                    identifier: format!("FMLCorePlugin:{coremod}"),
+                });
+            }
+            if let Some(tweaker) = line.strip_prefix("TweakClass:").map(str::trim) {
+                return Ok(ArtifactClassification::CoremodOrTweaker {
+                    identifier: format!("TweakClass:{tweaker}"),
+                });
+            }
+        }
+    }
+
+    if has_client_class {
+        return Ok(ArtifactClassification::MinecraftClientJar {
+            main_class: "net.minecraft.client.main.Main".to_string(),
+        });
+    }
+
+    Ok(ArtifactClassification::GenericJar)
+}
+
+/// Verifies structural integrity, entry counts, uncompressed size limits,
+/// compression ratios, and metadata file presence for mod JARs before execution.
+pub fn validate_mod_jar_structure(jar_file: &Path) -> Result<(), String> {
+    validate_archive_safety(jar_file)?;
+    match classify_jar_artifact(jar_file)? {
+        ArtifactClassification::Fabric
+        | ArtifactClassification::NeoForge
+        | ArtifactClassification::ModernForge
+        | ArtifactClassification::LegacyForge
+        | ArtifactClassification::CoremodOrTweaker { .. } => Ok(()),
+        ArtifactClassification::MinecraftClientJar { main_class } => Err(format!(
+            "file is a Minecraft client JAR (main-class: {main_class}), not a mod"
+        )),
+        ArtifactClassification::GenericJar => Err(format!(
+            "no mod metadata found (expected {FABRIC_ENTRY}, {NEOFORGE_ENTRY} or {FORGE_ENTRY})"
+        )),
+    }
 }
 
 /// Cap on how many bytes of an embedded metadata file we will decompress.
@@ -202,10 +308,96 @@ pub fn extract(jar_file: &Path) -> Result<ModMetadata, MetadataError> {
         return Ok(meta);
     }
 
+    let mcmod_content = if let Ok(mut entry) = zip.by_name(MCMOD_INFO_ENTRY) {
+        let mut content = String::new();
+        entry
+            .by_ref()
+            .take(MAX_METADATA_BYTES)
+            .read_to_string(&mut content)?;
+        Some(content)
+    } else {
+        None
+    };
+    if let Some(content) = mcmod_content {
+        let meta = parse_mcmod_info(&content)?;
+        return Ok(meta);
+    }
+
     Err(MetadataError::Unknown(format!(
         "Unknown or unparseable mod jar: {}",
         jar_file.display()
     )))
+}
+
+/// Parses legacy Forge 1.7.10 - 1.12.2 `mcmod.info` metadata files.
+pub fn parse_mcmod_info(content: &str) -> Result<ModMetadata, MetadataError> {
+    let root: Value = serde_json::from_str(content)
+        .map_err(|e| MetadataError::Invalid(format!("Malformed mcmod.info: {e}")))?;
+
+    let entry = if let Some(arr) = root.as_array() {
+        arr.first()
+    } else if let Some(arr) = root.get("modList").and_then(|v| v.as_array()) {
+        arr.first()
+    } else {
+        None
+    };
+
+    let obj = entry
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| MetadataError::Invalid("mcmod.info contains no mod definitions".to_string()))?;
+
+    let id = obj
+        .get("modid")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    if id.is_empty() {
+        return Err(MetadataError::Invalid("mcmod.info missing 'modid'".to_string()));
+    }
+
+    let name = obj
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or(id)
+        .trim();
+
+    let version = obj
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .trim();
+
+    let description = obj
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+
+    let author = if let Some(authors) = obj.get("authorList").and_then(|v| v.as_array()) {
+        authors
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else if let Some(authors) = obj.get("authors").and_then(|v| v.as_array()) {
+        authors
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else {
+        String::new()
+    };
+
+    Ok(ModMetadata::new(
+        id,
+        name,
+        version,
+        description,
+        author,
+        ModLoaderType::Forge,
+        "*",
+    ))
 }
 
 fn fabric_icon_candidates(content: &str, mod_id: &str) -> Vec<String> {
@@ -807,5 +999,69 @@ version="2.0.0"
         patched[cd_start + 24..cd_start + 28].copy_from_slice(&size.to_le_bytes());
         std::fs::write(file, patched).unwrap();
         let _ = cd_size;
+    }
+
+    #[test]
+    fn archive_safety_accepts_jar_without_mod_metadata() {
+        let jar = make_jar(
+            "safe-no-meta.jar",
+            &[ZipEntry("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n")],
+        );
+        assert!(validate_archive_safety(&jar).is_ok());
+        let _ = std::fs::remove_dir_all(jar.parent().unwrap());
+    }
+
+    #[test]
+    fn classify_detects_legacy_forge_and_client_jar_and_coremod() {
+        let legacy = make_jar(
+            "legacy-forge.jar",
+            &[ZipEntry(
+                "mcmod.info",
+                r#"[{"modid": "ironchest", "name": "Iron Chest", "version": "1.12.2-7.0.67.844"}]"#,
+            )],
+        );
+        assert_eq!(
+            classify_jar_artifact(&legacy).unwrap(),
+            ArtifactClassification::LegacyForge
+        );
+        assert!(validate_mod_jar_structure(&legacy).is_ok());
+        let meta = extract(&legacy).unwrap();
+        assert_eq!(meta.id, "ironchest");
+        assert_eq!(meta.name, "Iron Chest");
+        assert_eq!(meta.version, "1.12.2-7.0.67.844");
+        let _ = std::fs::remove_dir_all(legacy.parent().unwrap());
+
+        let client = make_jar(
+            "client.jar",
+            &[ZipEntry(
+                "META-INF/MANIFEST.MF",
+                "Manifest-Version: 1.0\nMain-Class: net.minecraft.client.main.Main\n",
+            )],
+        );
+        assert_eq!(
+            classify_jar_artifact(&client).unwrap(),
+            ArtifactClassification::MinecraftClientJar {
+                main_class: "net.minecraft.client.main.Main".to_string()
+            }
+        );
+        let err = validate_mod_jar_structure(&client).unwrap_err();
+        assert!(err.contains("file is a Minecraft client JAR"));
+        let _ = std::fs::remove_dir_all(client.parent().unwrap());
+
+        let coremod = make_jar(
+            "coremod.jar",
+            &[ZipEntry(
+                "META-INF/MANIFEST.MF",
+                "Manifest-Version: 1.0\nFMLCorePlugin: com.example.CorePlugin\n",
+            )],
+        );
+        assert_eq!(
+            classify_jar_artifact(&coremod).unwrap(),
+            ArtifactClassification::CoremodOrTweaker {
+                identifier: "FMLCorePlugin:com.example.CorePlugin".to_string()
+            }
+        );
+        assert!(validate_mod_jar_structure(&coremod).is_ok());
+        let _ = std::fs::remove_dir_all(coremod.parent().unwrap());
     }
 }

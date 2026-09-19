@@ -468,4 +468,112 @@ window.Zircon.mods = {
             this.loadMods();
         }
     },
+
+    async shareModSetup() {
+        if (!this.selectedInstance) return;
+        try {
+            const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/export/share-code`);
+            if (data && data.code) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(data.code);
+                    alert(`✓ Copied 1-line Share Code to clipboard!\n\nSetup contains ${data.modCount} mod(s) for Minecraft ${data.minecraftVersion}.\nFriends can paste this code into their Zircon Launcher.`);
+                } else {
+                    window.prompt('Copy your 1-line Share Code:', data.code);
+                }
+            }
+        } catch (e) {
+            alert('Failed to export share code: ' + (e.message || 'Unknown error'));
+        }
+    },
+
+    async exportMarkdownTable() {
+        if (!this.selectedInstance) return;
+        try {
+            const data = await this.api(`/api/instances/${this.selectedInstance.id}/mods/export/markdown`);
+            if (data && data.markdown) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(data.markdown);
+                    alert(`✓ Copied Markdown table (${data.modCount} mods) to clipboard!`);
+                } else {
+                    window.prompt('Copy Markdown table:', data.markdown);
+                }
+            }
+        } catch (e) {
+            alert('Failed to export Markdown table: ' + (e.message || 'Unknown error'));
+        }
+    },
+
+    async importSetupPrompt() {
+        if (!this.selectedInstance) return;
+        const input = window.prompt('Paste a 1-line Share Code (zircon://setup/...) or JSON BOM manifest:');
+        if (!input || !input.trim()) return;
+
+        const clean = input.trim();
+        const isReplace = window.confirm('Import Strategy:\n\nClick OK to MERGE into existing mods (non-destructive).\nClick CANCEL to REPLACE all active mods (an auto-backup snapshot will be created).');
+        const strategy = isReplace ? 'merge' : 'replace';
+
+        try {
+            let body = { strategy };
+            if (clean.startsWith('{')) {
+                body.bom = JSON.parse(clean);
+            } else {
+                body.code = clean;
+            }
+
+            const res = await this.api(`/api/instances/${this.selectedInstance.id}/mods/import`, {
+                method: 'POST',
+                body: JSON.stringify(body)
+            });
+
+            alert(`✓ Setup imported successfully! Active setup now has ${res.totalMods} mod(s).`);
+            this.modsRestartNeeded = true;
+            await this.loadMods();
+        } catch (e) {
+            alert('Import failed: ' + (e.message || 'Invalid format or error'));
+        }
+    },
+
+    async listSnapshots() {
+        if (!this.selectedInstance) return [];
+        try {
+            const res = await this.api(`/api/instances/${this.selectedInstance.id}/mods/snapshots`);
+            return res.snapshots || [];
+        } catch (e) {
+            console.error('Failed to list snapshots:', e);
+            return [];
+        }
+    },
+
+    async createSnapshotPrompt() {
+        if (!this.selectedInstance) return;
+        const label = window.prompt('Enter a label for this Time Machine snapshot:', 'Backup before update');
+        if (label === null) return;
+
+        try {
+            const res = await this.api(`/api/instances/${this.selectedInstance.id}/mods/snapshots`, {
+                method: 'POST',
+                body: JSON.stringify({ label: label.trim() || 'Manual Snapshot' })
+            });
+            alert(`✓ Snapshot "${res.label || label}" created successfully (${res.modCount} mods).`);
+        } catch (e) {
+            alert('Failed to create snapshot: ' + (e.message || 'Unknown error'));
+        }
+    },
+
+    async restoreSnapshot(filename) {
+        if (!this.selectedInstance || !filename) return;
+        if (!window.confirm('Roll back mods to this snapshot? A safety backup of your current setup will be preserved.')) {
+            return;
+        }
+        try {
+            const res = await this.api(`/api/instances/${this.selectedInstance.id}/mods/snapshots/${encodeURIComponent(filename)}/restore`, {
+                method: 'POST'
+            });
+            alert(`✓ Restored snapshot! Setup now contains ${res.totalMods} mod(s).`);
+            this.modsRestartNeeded = true;
+            await this.loadMods();
+        } catch (e) {
+            alert('Failed to restore snapshot: ' + (e.message || 'Unknown error'));
+        }
+    }
 };

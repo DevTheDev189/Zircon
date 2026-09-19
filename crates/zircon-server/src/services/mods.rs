@@ -190,6 +190,15 @@ impl ModManagementService {
             size,
         );
 
+        let sha256 = hash::sha256_file(&target).await.ok();
+        entry.sha256 = sha256.clone();
+        if let Some(h) = &sha256 {
+            let cdn_domain = std::env::var("R2_PUBLIC_CDN_DOMAIN")
+                .unwrap_or_else(|_| "cdn.zirconmc.net".to_string());
+            let clean_domain = cdn_domain.trim_start_matches("https://").trim_end_matches('/');
+            entry.download_url = Some(format!("https://{clean_domain}/objects/{h}.jar"));
+        }
+
         // Enrich the entry with author/description/title read from the JAR's
         // mod metadata (fabric.mod.json / mods.toml / neoforge.mods.toml).
         if let Ok(meta) = zircon_core::metadata::extractor::extract(&target) {
@@ -295,6 +304,7 @@ impl ModManagementService {
             None,
             size,
         );
+        entry.sha256 = hash::sha256_file(&target).await.ok();
         entry.side = zircon_core::model::ModSide::Server;
 
         if let Ok(meta) = zircon_core::metadata::extractor::extract(&target) {
@@ -718,8 +728,17 @@ impl ModManagementService {
         let bom_mods = self.bom_service.get_bom().mods;
         self.bom_service.with_bom(|bom| {
             bom.minecraft_version = new_mc_version.to_string();
-            if let Some(loader) = bom.mod_loader.as_mut() {
+            if loader_type.is_empty() || loader_type.eq_ignore_ascii_case("vanilla") {
+                bom.mod_loader = None;
+            } else if let Some(loader) = bom.mod_loader.as_mut() {
+                loader.r#type = loader_type.to_string();
                 loader.version = new_loader_version.to_string();
+            } else {
+                bom.mod_loader = Some(zircon_core::model::ModLoaderInfo::new(
+                    loader_type,
+                    new_loader_version,
+                    None,
+                ));
             }
             bom.deduplicate_mods();
         });

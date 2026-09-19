@@ -9,6 +9,7 @@
 pub mod api;
 pub mod archive;
 pub mod crypto;
+pub mod export;
 pub mod metadata;
 pub mod model;
 pub mod security;

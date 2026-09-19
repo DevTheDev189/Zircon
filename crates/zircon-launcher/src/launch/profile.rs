@@ -127,14 +127,21 @@ pub fn resolve_game_arguments(
     enabled_features: &HashSet<String>,
 ) -> Vec<String> {
     let mut args = Vec::new();
+    let mut has_legacy = false;
     for profile in chain {
         if let Some(arguments) = profile.arguments.as_ref() {
             collect_arguments(arguments.get("game"), tokens, &mut args, enabled_features);
         }
         // Pre-1.13 profiles carry game args as a single space-separated string.
-        if let Some(legacy) = profile.minecraft_arguments.as_deref() {
-            if !legacy.trim().is_empty() {
-                args.push(substitute(legacy, tokens));
+        // The child profile (e.g. Forge) overrides the parent profile's minecraftArguments.
+        if !has_legacy {
+            if let Some(legacy) = profile.minecraft_arguments.as_deref() {
+                if !legacy.trim().is_empty() {
+                    has_legacy = true;
+                    for part in legacy.split_whitespace() {
+                        args.push(substitute(part, tokens));
+                    }
+                }
             }
         }
     }
@@ -420,5 +427,35 @@ mod tests {
         assert_eq!(1, profile.libraries.len());
         let args = resolve_game_arguments(&[profile], &HashMap::new(), &HashSet::new());
         assert_eq!(vec!["--username", "${auth_player_name}"], args);
+    }
+
+    #[test]
+    fn legacy_arguments_splitting_and_override() {
+        let child = VersionProfile {
+            id: "1.12.2-forge-14.23.5.2859".to_string(),
+            inherits_from: Some("1.12.2".to_string()),
+            minecraft_arguments: Some(
+                "--username ${auth_player_name} --version ${version_name} --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker".to_string(),
+            ),
+            ..Default::default()
+        };
+        let parent = VersionProfile {
+            id: "1.12.2".to_string(),
+            minecraft_arguments: Some("--username ${auth_player_name} --version ${version_name}".to_string()),
+            ..Default::default()
+        };
+        let args = resolve_game_arguments(&[child, parent], &HashMap::new(), &HashSet::new());
+        // Child's legacy args should override parent's, and be split into individual CLI tokens
+        assert_eq!(
+            vec![
+                "--username",
+                "${auth_player_name}",
+                "--version",
+                "${version_name}",
+                "--tweakClass",
+                "net.minecraftforge.fml.common.launcher.FMLTweaker",
+            ],
+            args
+        );
     }
 }

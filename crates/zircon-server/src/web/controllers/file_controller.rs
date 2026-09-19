@@ -39,6 +39,11 @@ pub struct GetContentQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DownloadFileQuery {
+    pub path: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct SaveContentRequest {
     pub path: String,
     pub content: String,
@@ -270,6 +275,57 @@ pub async fn get_file_content(
         "content": content,
         "size": meta.len()
     })))
+}
+
+/// GET /api/instances/:id/files/download?path=... — download arbitrary file
+pub async fn download_file(
+    State(state): State<AppState>,
+    AxumPath(id): AxumPath<String>,
+    Query(query): Query<DownloadFileQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let server_dir = instance_server_dir(&state, &id)?;
+    let target = resolve_safe_path(&server_dir, &query.path)?;
+
+    if !target.is_file() {
+        return Err(ApiError::NotFound(format!("File not found: {}", query.path)));
+    }
+
+    let filename = target
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "download".to_string());
+
+    let meta = tokio::fs::metadata(&target).await?;
+    let file = tokio::fs::File::open(&target).await?;
+    let stream = ReaderStream::new(file);
+
+    let content_type = match target.extension().and_then(|e| e.to_str()) {
+        Some("jar") => "application/java-archive",
+        Some("zip") => "application/zip",
+        Some("json" | "json5") => "application/json",
+        Some("toml") => "application/toml",
+        Some("yaml" | "yml") => "application/yaml",
+        Some("log" | "txt" | "properties" | "cfg") => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    };
+
+    state.audit.log(
+        "admin",
+        "file_download",
+        &format!("Downloaded file '{}' in instance '{id}'", query.path),
+    );
+
+    Ok((
+        [(header::CONTENT_TYPE, content_type)],
+        [
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{filename}\""),
+            ),
+            (header::CONTENT_LENGTH, meta.len().to_string()),
+        ],
+        axum::body::Body::from_stream(stream),
+    ))
 }
 
 /// PUT /api/instances/:id/files/content — save text file atomically
@@ -671,3 +727,35 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_safe_path_valid() {
+        let temp = tempfile::tempdir().unwrap();
+        let server_dir = temp.path().join("server");
+        fs::create_dir_all(&server_dir).unwrap();
+
+        let subfile = server_dir.join("config.toml");
+        fs::write(&subfile, "test").unwrap();
+
+        let resolved = resolve_safe_path(&server_dir, "config.toml").unwrap();
+        assert_eq!(resolved.canonicalize().unwrap(), subfile.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn test_resolve_safe_path_traversal_rejected() {
+        let temp = tempfile::tempdir().unwrap();
+        let server_dir = temp.path().join("server");
+        fs::create_dir_all(&server_dir).unwrap();
+
+        let err = resolve_safe_path(&server_dir, "../outside.txt").unwrap_err();
+        match err {
+            ApiError::BadRequest(_) => {},
+            other => panic!("Expected BadRequest on traversal, got {other:?}"),
+        }
+    }
+}
+

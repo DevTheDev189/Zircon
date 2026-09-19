@@ -95,6 +95,16 @@
                 <span>Logs</span>
                 <span class="text-[10px] text-slate-500 font-mono">logs/</span>
               </button>
+              <div class="h-px bg-slate-800 my-1"></div>
+              <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between text-cyan-300" @click="exportServer">
+                <span class="flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  <span>Export Server (.zip)</span>
+                </span>
+                <span class="text-[10px] text-cyan-400 font-mono font-bold">ZIP</span>
+              </button>
             </div>
 
           </div>
@@ -139,6 +149,14 @@
             @click="activeTab = 'textures'"
           >
             Texture Packs ({{ detailedPacks.resourcepacks?.length || 0 }})
+          </button>
+          <button
+            type="button"
+            class="z-segmented-pill"
+            :class="{ 'active': activeTab === 'export' }"
+            @click="activeTab = 'export'"
+          >
+            Export
           </button>
         </div>
       </div>
@@ -289,51 +307,50 @@
                   >
                     Pending Sync
                   </span>
+                  <span
+                    v-if="!mod.enabled"
+                    class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                    title="Mod is disabled"
+                  >
+                    Disabled
+                  </span>
                 </div>
 
                 <!-- Controls -->
                 <div class="flex items-center gap-2 shrink-0">
-                  <!-- Custom Mod Toggle -->
-                  <template v-if="mod.isCustom">
-                    <button
-                      v-if="modUpdateMap[mod.filename]"
-                      class="text-[11px] px-2 py-0.5 rounded-md font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1 shrink-0"
-                      title="Update to latest compatible version"
-                      :disabled="updatingMods"
-                      @click="applyModUpdates([modUpdateMap[mod.filename]])"
-                    >
-                      <span>Update → {{ modUpdateMap[mod.filename].latestVersionNumber }}</span>
-                    </button>
-                    <button
-                      class="z-toggle"
+                  <!-- Custom Mod Update Button -->
+                  <button
+                    v-if="mod.isCustom && modUpdateMap[mod.filename]"
+                    class="text-[11px] px-2 py-0.5 rounded-md font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1 shrink-0"
+                    title="Update to latest compatible version"
+                    :disabled="updatingMods"
+                    @click="applyModUpdates([modUpdateMap[mod.filename]])"
+                  >
+                    <span>Update → {{ modUpdateMap[mod.filename].latestVersionNumber }}</span>
+                  </button>
 
-                      :class="{ 'z-toggle-on': mod.enabled }"
-                      :title="mod.enabled ? 'Disable Mod' : 'Enable Mod'"
-                      @click="toggleModEnabled(mod)"
-                    >
-                      <span class="z-toggle-thumb"></span>
-                    </button>
-                    <button
-                      class="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 hover:bg-red-500/10 rounded-lg transition-colors font-medium flex items-center gap-1 shrink-0"
-                      title="Delete Custom Mod"
-                      @click="deleteMod(mod.filename)"
-                    >
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                      <span>Delete</span>
-                    </button>
-                  </template>
+                  <!-- Mod Toggle (Allows disabling both custom and server-synced mods) -->
+                  <button
+                    class="z-toggle"
+                    :class="{ 'z-toggle-on': mod.enabled }"
+                    :title="mod.enabled ? (mod.isBom ? 'Disable Server Mod' : 'Disable Custom Mod') : (mod.isBom ? 'Enable Server Mod' : 'Enable Custom Mod')"
+                    @click="toggleModEnabled(mod)"
+                  >
+                    <span class="z-toggle-thumb"></span>
+                  </button>
 
-                  <!-- Server BOM Mod (Lock Indicator) -->
-                  <template v-else>
-                    <div class="text-slate-600 px-2 py-1 text-xs" title="Server mods are managed automatically">
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                      </svg>
-                    </div>
-                  </template>
+                  <!-- Delete Custom Mod (Only for player-added custom mods) -->
+                  <button
+                    v-if="mod.isCustom"
+                    class="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 hover:bg-red-500/10 rounded-lg transition-colors font-medium flex items-center gap-1 shrink-0"
+                    title="Delete Custom Mod"
+                    @click="deleteMod(mod.filename)"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    <span>Delete</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -620,6 +637,70 @@
             </div>
           </div>
         </template>
+
+        <!-- ================= TAB: EXPORT ================= -->
+        <template v-if="activeTab === 'export'">
+          <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-5 shadow-inner flex flex-col gap-4">
+            <div>
+              <h4 class="text-white font-bold text-sm">Export Server Package</h4>
+              <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+                Package this server's configuration, mods, and metadata into a Zircon-compatible ZIP archive. This archive can be imported into Zircon Server or shared with team members.
+              </p>
+            </div>
+
+            <div class="p-3.5 bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col gap-2.5 text-xs">
+              <span class="text-slate-300 font-semibold">Included in export archive:</span>
+              <ul class="space-y-2 text-slate-400">
+                <li class="flex items-start gap-2.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
+                  <div>
+                    <strong class="text-slate-200 font-mono">mods/</strong> — Installed &amp; server synced mods ({{ mods.length }} total)
+                  </div>
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
+                  <div>
+                    <strong class="text-slate-200 font-mono">config/</strong> — Server &amp; mod configuration files
+                  </div>
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
+                  <div>
+                    <strong class="text-slate-200 font-mono">bom.json</strong> — Server bill of materials and mod checksums
+                  </div>
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
+                  <div>
+                    <strong class="text-slate-200 font-mono">server.properties &amp; eula.txt</strong> — Server configuration parameters
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div
+              v-if="exportStatus"
+              class="p-3.5 rounded-xl text-xs border transition-all"
+              :class="exportStatus.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'"
+            >
+              {{ exportStatus.message }}
+            </div>
+
+            <div class="flex items-center justify-end pt-2">
+              <button
+                class="z-btn-accent px-4 py-2 text-xs font-bold flex items-center gap-2"
+                :disabled="exporting"
+                @click="exportServer"
+              >
+                <span v-if="exporting" class="w-3.5 h-3.5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></span>
+                <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span>{{ exporting ? 'Packaging Server Archive…' : 'Export Server Archive (.zip)' }}</span>
+              </button>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -638,7 +719,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import DependencyPromptModal from './DependencyPromptModal.vue';
-import { api, pickFiles } from '../lib/api';
+import { api, pickFiles, saveFile, ZIP_FILTER } from '../lib/api';
 
 
 const props = defineProps({
@@ -1096,5 +1177,39 @@ function fmtCount(n) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+}
+
+// Server Export
+const exporting = ref(false);
+const exportStatus = ref(null);
+
+async function exportServer() {
+  if (!props.server?.address || exporting.value) return;
+  showOpenFolderDropdown.value = false;
+  exportStatus.value = null;
+
+  try {
+    const rawName = props.server?.name || props.server?.address || 'server';
+    const defaultFilename = `${rawName.replace(/[^a-zA-Z0-9_-]/g, '_')}-export.zip`;
+    const dest = await saveFile({
+      defaultPath: defaultFilename,
+      filters: ZIP_FILTER,
+    });
+    if (!dest) return;
+
+    exporting.value = true;
+    await api.exportServerInstanceToZip(props.server.address, dest);
+    exportStatus.value = {
+      success: true,
+      message: `Successfully exported server archive to: ${dest}`,
+    };
+  } catch (err) {
+    exportStatus.value = {
+      success: false,
+      message: `Failed to export server: ${err?.message || err}`,
+    };
+  } finally {
+    exporting.value = false;
+  }
 }
 </script>

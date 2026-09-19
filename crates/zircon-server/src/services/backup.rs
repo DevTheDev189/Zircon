@@ -254,6 +254,11 @@ impl BackupService {
         Ok(to_delete as i32)
     }
 
+    /// Resolves the absolute on-disk path to a `.tar.lz4` backup archive.
+    pub fn get_backup_path(&self, instance_id: &str, backup_id: &str) -> PathBuf {
+        self.global_backups_dir.join(instance_id).join(format!("{backup_id}.tar.lz4"))
+    }
+
     /// Restores a backup into an instance directory. The server is stopped
     /// first; the pre-restore state is moved to a temporary rollback folder and
     /// is either discarded on success or moved back if extraction fails.
@@ -374,6 +379,39 @@ impl BackupService {
         }
         Ok(())
     }
+
+    /// Exports an instance to Cloudflare R2 as a cold LZ4 snapshot.
+    /// If `purge_local` is true (e.g. for Pause World), the local instance files
+    /// are removed after a successful R2 upload to free host NVMe.
+    pub async fn export_instance_to_r2(
+        &self,
+        instance_id: &str,
+        r2_client: &crate::services::r2_uploader::R2CasClient,
+        purge_local: bool,
+    ) -> Result<String, BackupError> {
+        let _config = self.instance_manager.get_instance(instance_id)?;
+        let instance_dir = self.instance_manager.get_instance_dir(instance_id);
+
+        let was_running = self.instance_manager.is_running(instance_id);
+        if was_running {
+            self.instance_manager.stop_instance(instance_id).await;
+        }
+
+        let backup_id = new_backup_id();
+        let r2_key = r2_client
+            .export_instance_to_r2(instance_id, &instance_dir, &backup_id)
+            .await
+            .map_err(BackupError::Io)?;
+
+        if purge_local {
+            delete_recursively(&instance_dir)?;
+            tracing::info!(
+                "Instance {instance_id} safely archived to R2 ({r2_key}) and local NVMe folder purged."
+            );
+        }
+
+        Ok(r2_key)
+    }
 }
 
 fn new_backup_id() -> String {
@@ -491,4 +529,34 @@ mod tests {
         assert!(err.to_string().contains("Backup archive not found"));
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[tokio::test]
+    async fn export_instance_to_r2_archives_and_purges_local() {
+        let dir = temp_dir();
+        let console = Arc::new(ConsoleStreamHandler::new());
+        let manager = Arc::new(ServerInstanceManager::new(&dir, console).unwrap());
+        let instance = manager
+            .create_instance("PauseWorldTest", "1.20.4", "vanilla", "")
+            .unwrap();
+        let instance_dir = manager.get_instance_dir(&instance.id);
+        fs::write(instance_dir.join("level.dat"), b"world payload").unwrap();
+
+        let backup_service = BackupService::new(&dir, manager.clone());
+        let r2_client = crate::services::r2_uploader::R2CasClient::new(
+            crate::services::r2_uploader::R2CasConfig::default(),
+        );
+
+        let r2_key = backup_service
+            .export_instance_to_r2(&instance.id, &r2_client, true)
+            .await
+            .unwrap();
+
+        assert!(r2_key.starts_with(&format!("backups/{}/", instance.id)));
+        assert!(r2_key.ends_with(".tar.lz4"));
+        // Confirm local directory was purged
+        assert!(!instance_dir.exists());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
+

@@ -8,6 +8,7 @@ pub mod idle_shutdown;
 pub mod import;
 pub mod mods;
 pub mod packs;
+pub mod r2_uploader;
 pub mod resolver;
 pub mod scheduler;
 pub mod versions;

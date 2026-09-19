@@ -30,6 +30,7 @@ const HTTP_PREFIXES: [&[u8]; 7] = [
 #[derive(Debug, Clone, PartialEq)]
 pub struct Handshake {
     pub hostname: String,
+    pub protocol_version: i32,
     /// Next protocol state: 1 = status ping, 2 = login.
     pub next_state: i32,
 }
@@ -67,7 +68,7 @@ pub fn parse_handshake(buf: &[u8]) -> ParseResult<Handshake> {
     }
     offset += bytes;
 
-    let Some((_, bytes)) = varint_at(buf, offset) else {
+    let Some((protocol_version, bytes)) = varint_at(buf, offset) else {
         return ParseResult::Incomplete;
     };
     offset += bytes;
@@ -104,6 +105,7 @@ pub fn parse_handshake(buf: &[u8]) -> ParseResult<Handshake> {
     let _ = length;
     ParseResult::Matched(Handshake {
         hostname,
+        protocol_version,
         next_state,
     })
 }

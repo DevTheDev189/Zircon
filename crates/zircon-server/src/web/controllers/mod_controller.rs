@@ -429,6 +429,200 @@ pub struct InstallRequest {
     pub file_id: Option<String>,
 }
 
+pub(crate) fn resolve_instance_dir(state: &AppState, headers: &HeaderMap) -> Option<std::path::PathBuf> {
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
+    if let Some(instance) = resolve_instance_for_host(state, host) {
+        return Some(state.instances.get_instance_dir(&instance.id));
+    }
+    if let Some(active) = state.instances.get_active_instance() {
+        return Some(state.instances.get_instance_dir(&active.id));
+    }
+    None
+}
+
+/// GET /api/mods/export/share-code — exports the instance BOM as a compressed 1-line share code.
+pub async fn export_share_code(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
+    let bom = super::bom_controller::bom_service_for_host(&state, host).get_bom();
+    let code = bom.to_share_code().map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::json!({
+        "code": code,
+        "modCount": bom.mods.len(),
+        "minecraftVersion": bom.minecraft_version,
+        "modLoader": bom.mod_loader,
+    })))
+}
+
+/// GET /api/mods/export/markdown — exports the instance BOM as a Markdown table.
+pub async fn export_markdown(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
+    let bom = super::bom_controller::bom_service_for_host(&state, host).get_bom();
+    let markdown = bom.to_markdown_table();
+    Ok(Json(serde_json::json!({
+        "markdown": markdown,
+        "modCount": bom.mods.len(),
+    })))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportSetupPayload {
+    pub code: Option<String>,
+    pub bom: Option<zircon_core::model::BillOfMaterials>,
+    #[serde(default = "default_import_strategy")]
+    pub strategy: String,
+}
+
+fn default_import_strategy() -> String {
+    "merge".to_string()
+}
+
+/// POST /api/mods/import — imports a setup from share code or BOM with merge/replace strategies.
+pub async fn import_setup(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<ImportSetupPayload>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let incoming = if let Some(code) = &payload.code {
+        zircon_core::model::BillOfMaterials::from_share_code(code)
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?
+    } else if let Some(bom) = payload.bom {
+        bom
+    } else {
+        return Err(ApiError::BadRequest("Either 'code' or 'bom' must be provided".to_string()));
+    };
+
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
+    let bom_service = super::bom_controller::bom_service_for_host(&state, host);
+
+    if let Some(inst_dir) = resolve_instance_dir(&state, &headers) {
+        let current = bom_service.get_bom();
+        if !current.mods.is_empty() {
+            let _ = zircon_core::export::snapshots::create_snapshot(&inst_dir, "Auto-Backup Pre-Import", &current);
+        }
+    }
+
+    if payload.strategy.eq_ignore_ascii_case("replace") {
+        bom_service.with_bom(|b| {
+            *b = incoming.clone();
+        });
+    } else {
+        bom_service.with_bom(|b| {
+            let mut existing_slugs: std::collections::HashSet<_> = b.mods.iter().map(|m| m.slug.clone()).collect();
+            let mut existing_files: std::collections::HashSet<_> = b.mods.iter().map(|m| m.filename.clone()).collect();
+            for m in incoming.mods {
+                if !existing_slugs.contains(&m.slug) && !existing_files.contains(&m.filename) {
+                    existing_slugs.insert(m.slug.clone());
+                    existing_files.insert(m.filename.clone());
+                    b.mods.push(m);
+                }
+            }
+            b.deduplicate_mods();
+        });
+    }
+    bom_service.save().map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let final_bom = bom_service.get_bom();
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "totalMods": final_bom.mods.len(),
+        "minecraftVersion": final_bom.minecraft_version,
+    })))
+}
+
+/// GET /api/mods/snapshots — list saved BOM snapshots for the instance.
+pub async fn list_snapshots(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(inst_dir) = resolve_instance_dir(&state, &headers) else {
+        return Ok(Json(serde_json::json!({ "snapshots": [] })));
+    };
+    let list = zircon_core::export::snapshots::list_snapshots(&inst_dir)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "snapshots": list })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateSnapshotPayload {
+    pub label: Option<String>,
+}
+
+/// POST /api/mods/snapshots — creates a snapshot of the active BOM.
+pub async fn create_snapshot(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateSnapshotPayload>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(inst_dir) = resolve_instance_dir(&state, &headers) else {
+        return Err(ApiError::BadRequest("No active instance directory found".to_string()));
+    };
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
+    let bom = super::bom_controller::bom_service_for_host(&state, host).get_bom();
+    let label = payload.label.as_deref().unwrap_or("Manual Snapshot");
+    let info = zircon_core::export::snapshots::create_snapshot(&inst_dir, label, &bom)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::to_value(info).unwrap_or_default()))
+}
+
+/// POST /api/mods/snapshots/:filename/restore — rolls back active BOM to the snapshot.
+pub async fn restore_snapshot(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(filename): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(inst_dir) = resolve_instance_dir(&state, &headers) else {
+        return Err(ApiError::BadRequest("No active instance directory found".to_string()));
+    };
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
+    let bom_service = super::bom_controller::bom_service_for_host(&state, host);
+    let current_bom = bom_service.get_bom();
+
+    if !current_bom.mods.is_empty() {
+        let _ = zircon_core::export::snapshots::create_snapshot(&inst_dir, "Auto-Backup Pre-Restore", &current_bom);
+    }
+
+    let target_bom = zircon_core::export::snapshots::load_snapshot(&inst_dir, &filename)
+        .map_err(|e| ApiError::NotFound(e.to_string()))?;
+
+    let diff = zircon_core::export::diff_boms(&current_bom, &target_bom);
+
+    bom_service.with_bom(|b| {
+        *b = target_bom.clone();
+    });
+    bom_service.save().map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "diff": diff,
+        "totalMods": target_bom.mods.len(),
+    })))
+}
+
+/// DELETE /api/mods/snapshots/:filename — removes a saved snapshot.
+pub async fn delete_snapshot(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(filename): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let Some(inst_dir) = resolve_instance_dir(&state, &headers) else {
+        return Err(ApiError::BadRequest("No active instance directory found".to_string()));
+    };
+    let deleted = zircon_core::export::snapshots::delete_snapshot(&inst_dir, &filename)
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    if deleted {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::NotFound("Snapshot not found".to_string()))
+    }
+}
+
 /// Reads the first `file` multipart field fully into memory.
 pub(crate) async fn take_upload(
     multipart: &mut Multipart,

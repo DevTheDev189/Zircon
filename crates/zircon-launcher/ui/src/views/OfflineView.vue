@@ -15,12 +15,19 @@
         <div class="flex items-center gap-1.5">
           <button
             class="z-btn-ghost text-[11px] font-bold px-2 py-1 rounded-lg border border-slate-700/80 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400/50 flex items-center gap-1"
+            title="Import setup from Share Code or JSON manifest"
+            @click="showImportModal = true"
+          >
+            Import Setup
+          </button>
+          <button
+            class="z-btn-ghost text-[11px] font-bold px-2 py-1 rounded-lg border border-slate-700/80 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400/50 flex items-center gap-1"
             title="Join a friend's world via 6-character code"
             @click="showJoinCodeModal = true"
           >
             Join Code
           </button>
-          <button class="z-btn-accent text-xs font-bold px-3 py-1.5 rounded-xl shadow-md hover:shadow-cyan-500/25" @click="openNewInstance">+ New</button>
+          <button class="z-btn-accent text-xs font-bold px-3 py-1.5 rounded-xl shadow-md hover:shadow-cyan-500/25 flex items-center gap-1.5" @click="openNewInstance('scratch')">+ Create Instance</button>
         </div>
       </div>
       <div class="flex-1 min-h-0 overflow-y-auto pr-1">
@@ -194,6 +201,24 @@
                   <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="promptCloneInstance">
                     <span>Clone Instance</span>
                   </button>
+                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2 text-cyan-300 hover:text-cyan-200" @click="showShareModal = true; showActionsDropdown = false;">
+                    <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <span>Share Setup (Code / JSON)</span>
+                  </button>
+                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="showSnapshotsModal = true; showActionsDropdown = false;">
+                    <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Time Machine (Snapshots)</span>
+                  </button>
+                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="showAuditModal = true; showActionsDropdown = false;">
+                    <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <span>Audit & Repair Mods</span>
+                  </button>
                   <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="exportMrpack">
                     <span>Export .mrpack</span>
                   </button>
@@ -305,6 +330,37 @@
                   >
                     <span v-if="updatingMods" class="w-2.5 h-2.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
                     <span>{{ updatingMods ? 'Updating…' : 'Update All' }}</span>
+                  </button>
+
+                  <button
+                    class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition text-cyan-400 hover:text-cyan-300"
+                    @click="showSnapshotsModal = true"
+                    title="Time Machine: View snapshots, create backups, or rollback mod list"
+                  >
+                    <span>📸</span>
+                    <span>Snapshots</span>
+                  </button>
+
+                  <button
+                    class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition text-cyan-400 hover:text-cyan-300"
+                    @click="showShareModal = true"
+                    title="Share this mod setup via Share Code, .mrpack, JSON manifest, or Markdown"
+                  >
+                    <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <span>Share Setup</span>
+                  </button>
+
+                  <button
+                    class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition text-emerald-400 hover:text-emerald-300"
+                    @click="showAuditModal = true"
+                    title="Audit integrity of installed mods against official CDN hashes and repair missing files"
+                  >
+                    <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <span>Audit &amp; Repair</span>
                   </button>
                 </div>
 
@@ -1171,23 +1227,15 @@
           </button>
         </div>
 
-        <!-- 3 Tab Selector -->
+        <!-- 3 Tab Selector: Scratch, Import, Clone -->
         <div class="z-segmented-track mb-4 w-full flex">
           <button
             type="button"
             class="z-segmented-pill flex-1 text-center py-2 text-xs font-semibold"
-            :class="{ 'active': newInstanceTab === 'modpacks' }"
-            @click="newInstanceTab = 'modpacks'"
+            :class="{ 'active': newInstanceTab === 'scratch' }"
+            @click="newInstanceTab = 'scratch'"
           >
-            Modrinth Modpacks
-          </button>
-          <button
-            type="button"
-            class="z-segmented-pill flex-1 text-center py-2 text-xs font-semibold"
-            :class="{ 'active': newInstanceTab === 'blank' }"
-            @click="newInstanceTab = 'blank'"
-          >
-            Blank Instance
+            Create from Scratch
           </button>
           <button
             type="button"
@@ -1195,118 +1243,28 @@
             :class="{ 'active': newInstanceTab === 'import' }"
             @click="newInstanceTab = 'import'"
           >
-            Import Modpack
+            Upload Archive
+          </button>
+          <button
+            type="button"
+            class="z-segmented-pill flex-1 text-center py-2 text-xs font-semibold"
+            :class="{ 'active': newInstanceTab === 'clone' }"
+            @click="newInstanceTab = 'clone'"
+          >
+            Clone Existing
           </button>
         </div>
 
-
-
-        <!-- TAB 1: BROWSE MODPACKS -->
-        <div v-if="newInstanceTab === 'modpacks'" class="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
-          <div class="flex gap-2">
-            <input
-              v-model="modpackSearchQuery"
-              class="z-input flex-1 text-xs"
-              placeholder="Search Modrinth modpacks (e.g. Cobblemon, Fabulously Optimized, Better MC)..."
-              @keydown.enter="searchModpacks"
-            />
-            <button
-              class="z-btn-ghost px-4 text-xs font-bold shrink-0"
-              :disabled="modpackSearchBusy"
-              @click="searchModpacks"
-            >
-              Search
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between text-xs text-slate-400 px-0.5">
-            <span>{{ modpackResults.length ? `${modpackResults.length} modpacks found` : 'Popular modpacks' }}</span>
-            <span v-if="modpackSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
-              <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
-              Searching…
-            </span>
-          </div>
-
-          <!-- Modpack results scroll area -->
-          <div class="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-2">
-            <div
-              v-for="hit in modpackResults"
-              :key="hit.projectId || hit.id"
-              class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 transition hover:border-slate-700"
-            >
-              <div class="flex items-start gap-3">
-                <img
-                  v-if="hit.iconUrl"
-                  :src="hit.iconUrl"
-                  class="w-11 h-11 rounded-lg shrink-0 mt-0.5 object-cover bg-slate-950"
-                  loading="lazy"
-                />
-                <div class="w-11 h-11 rounded-lg shrink-0 mt-0.5 bg-gradient-to-br from-[#1bd96a]/20 to-[#1bd96a]/5 border border-[#1bd96a]/30 flex items-center justify-center font-bold text-white text-sm" v-else>
-                  {{ (hit.title || hit.name || 'M').charAt(0).toUpperCase() }}
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="text-xs font-bold text-white truncate">{{ hit.title || hit.name }}</div>
-                    <button
-                      class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#1bd96a]/20 text-emerald-300 border border-[#1bd96a]/40 hover:bg-[#1bd96a]/30 shadow-sm"
-                      :disabled="installingModpackId === (hit.projectId || hit.id) || modpackProgress.active"
-                      @click="installModpack(hit)"
-                    >
-                      <svg
-                        v-if="installingModpackId === (hit.projectId || hit.id)"
-                        class="animate-spin h-3.5 w-3.5 text-[#1bd96a]"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Install Modpack</span>
-                    </button>
-                  </div>
-                  <div class="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
-                    {{ hit.summary || hit.description || 'No description provided.' }}
-                  </div>
-                  <div class="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-1.5">
-                    <span v-if="hit.author">by <strong class="text-slate-300">{{ hit.author }}</strong></span>
-                    <span v-if="hit.downloads">⬇ {{ fmtCount(hit.downloads) }}</span>
-                  </div>
-
-                  <!-- Version selector -->
-                  <div class="mt-2 flex items-center gap-2">
-                    <span class="text-[10px] text-slate-400 shrink-0 font-mono">Version:</span>
-                    <select
-                      v-model="selectedModpackVersions[hit.projectId || hit.id]"
-                      :disabled="installingModpackId === (hit.projectId || hit.id) || hit.versionsLoading"
-                      class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 disabled:opacity-50 focus:border-cyan-400 focus:outline-none"
-                    >
-                      <option v-if="hit.versionsLoading" value="" disabled>Loading versions…</option>
-                      <option v-else-if="!hit.versionOptions?.length" value="" disabled>No downloadable versions</option>
-                      <option v-for="v in hit.versionOptions" :key="v.id" :value="v.id">
-                        {{ v.versionNumber || v.name }}
-                      </option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-if="!modpackSearchBusy && modpackSearchDone && modpackResults.length === 0" class="text-xs text-slate-500 py-6 text-center">
-              No modpacks found. Try a different search keyword.
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 2: BLANK INSTANCE -->
-        <div v-else-if="newInstanceTab === 'blank'" class="flex-1 overflow-y-auto pr-1">
+        <!-- TAB 1: CREATE FROM SCRATCH -->
+        <div v-if="newInstanceTab === 'scratch'" class="flex-1 overflow-y-auto pr-1">
           <label class="z-label font-semibold text-slate-300 block mb-1">Instance name</label>
-          <input v-model="newForm.name" class="z-input mb-3" placeholder="My Modded World" />
+          <input v-model="newForm.name" class="z-input mb-3 text-xs" placeholder="My Modded World" />
           <label class="z-label font-semibold text-slate-300 block mb-1">Minecraft version</label>
-          <select v-model="newForm.mcVersion" class="z-input mb-3" @change="updateLoaderVersions">
+          <select v-model="newForm.mcVersion" class="z-input mb-3 text-xs" @change="updateLoaderVersions">
             <option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</option>
           </select>
           <label class="z-label font-semibold text-slate-300 block mb-1">Mod loader</label>
-          <select v-model="newForm.loaderType" class="z-input mb-3" @change="updateLoaderVersions">
+          <select v-model="newForm.loaderType" class="z-input mb-3 text-xs" @change="updateLoaderVersions">
             <option v-for="l in loaderTypes" :key="l" :value="l" class="capitalize">{{ l }}</option>
           </select>
           <template v-if="newForm.loaderType !== 'vanilla'">
@@ -1318,7 +1276,7 @@
               </span>
             </label>
             <div v-if="loaderVersions.length > 0" class="mb-5">
-              <select v-model="newForm.loaderVersion" class="z-input">
+              <select v-model="newForm.loaderVersion" class="z-input text-xs">
                 <option v-for="lv in loaderVersions" :key="lv" :value="lv">
                   {{ lv }} {{ lv === recommendedLoaderVersion ? '★ (Recommended)' : '' }}
                 </option>
@@ -1327,55 +1285,254 @@
             <input
               v-else
               v-model="newForm.loaderVersion"
-              class="z-input mb-5"
+              class="z-input mb-5 text-xs"
               placeholder="e.g. 0.16.10"
             />
           </template>
-          <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80">
-            <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="showNewDialog = false">Cancel</button>
-            <button class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25" :disabled="creating" @click="createInstance">Create</button>
-          </div>
-        </div>
-
-        <!-- TAB 3: IMPORT MODPACK (.MRPACK OR CURSEFORGE .ZIP) -->
-        <div v-else-if="newInstanceTab === 'import'" class="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
-          <div
-            class="zircon-drop-zone p-6 text-center text-xs text-slate-400 cursor-pointer rounded-2xl border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-900/40 transition"
-            @click="browseLocalMrpack"
-          >
-            <svg class="w-8 h-8 mx-auto mb-2 text-slate-500 group-hover:text-cyan-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <div v-if="importFilePath" class="font-mono text-cyan-300 text-xs break-all mb-1 font-semibold">
-              {{ importFilePath }}
-            </div>
-            <div v-else>
-              Click to browse or drop a <code class="text-cyan-300 font-mono">.mrpack</code> or <code class="text-amber-300 font-mono">.zip</code> archive here
-            </div>
-            <div class="text-[10px] text-slate-500 mt-1">Supports Modrinth (.mrpack) and CurseForge (.zip) export archives</div>
-          </div>
-
-          <div>
-            <label class="z-label font-semibold text-slate-300 block mb-1">Custom Instance Name (Optional)</label>
-            <input
-              v-model="importCustomName"
-              class="z-input text-xs"
-              placeholder="Defaults to pack name declared in archive manifest"
-            />
-          </div>
-
           <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80 mt-auto">
             <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="showNewDialog = false">Cancel</button>
-            <button
-              class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25"
-              :disabled="!importFilePath || importingModpack || modpackProgress.active"
-              @click="installLocalMrpack"
-            >
-              {{ importingModpack ? 'Importing…' : 'Import & Install' }}
+            <button class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25" :disabled="!newForm.name.trim() || creating" @click="createInstance">
+              {{ creating ? 'Creating…' : 'Create Instance' }}
             </button>
           </div>
         </div>
 
+        <!-- TAB 2: UPLOAD ARCHIVE / IMPORT -->
+        <div v-else-if="newInstanceTab === 'import'" class="flex-1 flex flex-col gap-3 overflow-hidden">
+          <div class="flex items-center justify-between px-0.5">
+            <span class="text-xs text-slate-400 font-medium">
+              {{ importMode === 'discovery' ? 'Discover online modpacks from Modrinth' : 'Upload or drop a server/modpack archive' }}
+            </span>
+            <button
+              class="text-xs text-cyan-400 hover:text-cyan-300 font-semibold underline flex items-center gap-1"
+              @click="toggleImportMode"
+            >
+              <span>{{ importMode === 'discovery' ? '← Upload Archive File' : 'Browse Modrinth Modpacks →' }}</span>
+            </button>
+          </div>
+
+          <!-- Sub-view A: Archive File Drop -->
+          <div v-if="importMode === 'archive'" class="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
+            <div
+              class="zircon-drop-zone p-6 text-center text-xs text-slate-400 cursor-pointer rounded-2xl border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-900/40 transition"
+              @click="browseLocalMrpack"
+              @dragover.prevent
+              @drop.prevent="onImportDrop"
+            >
+              <svg class="w-8 h-8 mx-auto mb-2 text-slate-500 hover:text-cyan-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <div v-if="importFilePath" class="font-mono text-cyan-300 text-xs break-all mb-1 font-semibold">
+                {{ importFilePath }}
+              </div>
+              <div v-else>
+                Click to browse or drop a <code class="text-cyan-300 font-mono">.zip</code> or <code class="text-amber-300 font-mono">.mrpack</code> archive here
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1">Supports Zircon Server, CurseForge (.zip), and Modrinth (.mrpack) export archives</div>
+            </div>
+
+            <div>
+              <label class="z-label font-semibold text-slate-300 block mb-1">Instance Name (Optional)</label>
+              <input
+                v-model="importCustomName"
+                class="z-input text-xs"
+                placeholder="Defaults to pack name declared in archive manifest"
+              />
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80 mt-auto">
+              <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="showNewDialog = false">Cancel</button>
+              <button
+                class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25"
+                :disabled="!importFilePath || importingModpack || modpackProgress.active"
+                @click="installLocalMrpack"
+              >
+                {{ importingModpack ? 'Importing…' : 'Import & Install' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Sub-view B: Modrinth Online Discovery -->
+          <div v-else class="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+            <div class="flex gap-2">
+              <input
+                v-model="modpackSearchQuery"
+                class="z-input flex-1 text-xs"
+                placeholder="Search Modrinth modpacks (e.g. Cobblemon, Fabulously Optimized, Better MC)..."
+                @keydown.enter="searchModpacks"
+              />
+              <button
+                class="z-btn-ghost px-4 text-xs font-bold shrink-0"
+                :disabled="modpackSearchBusy"
+                @click="searchModpacks"
+              >
+                Search
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-400 px-0.5">
+              <span>{{ modpackResults.length ? `${modpackResults.length} modpacks found` : 'Popular modpacks' }}</span>
+              <span v-if="modpackSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
+                <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
+                Searching…
+              </span>
+            </div>
+
+            <!-- Modpack results scroll area -->
+            <div class="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-2">
+              <div
+                v-for="hit in modpackResults"
+                :key="hit.projectId || hit.id"
+                class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 transition hover:border-slate-700"
+              >
+                <div class="flex items-start gap-3">
+                  <img
+                    v-if="hit.iconUrl"
+                    :src="hit.iconUrl"
+                    class="w-11 h-11 rounded-lg shrink-0 mt-0.5 object-cover bg-slate-950"
+                    loading="lazy"
+                  />
+                  <div class="w-11 h-11 rounded-lg shrink-0 mt-0.5 bg-gradient-to-br from-[#1bd96a]/20 to-[#1bd96a]/5 border border-[#1bd96a]/30 flex items-center justify-center font-bold text-white text-sm" v-else>
+                    {{ (hit.title || hit.name || 'M').charAt(0).toUpperCase() }}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="text-xs font-bold text-white truncate">{{ hit.title || hit.name }}</div>
+                      <button
+                        class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#1bd96a]/20 text-emerald-300 border border-[#1bd96a]/40 hover:bg-[#1bd96a]/30 shadow-sm"
+                        :disabled="installingModpackId === (hit.projectId || hit.id) || modpackProgress.active"
+                        @click="installModpack(hit)"
+                      >
+                        <svg
+                          v-if="installingModpackId === (hit.projectId || hit.id)"
+                          class="animate-spin h-3.5 w-3.5 text-[#1bd96a]"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Install Modpack</span>
+                      </button>
+                    </div>
+                    <div class="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
+                      {{ hit.summary || hit.description || 'No description provided.' }}
+                    </div>
+                    <div class="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-1.5">
+                      <span v-if="hit.author">by <strong class="text-slate-300">{{ hit.author }}</strong></span>
+                      <span v-if="hit.downloads">⬇ {{ fmtCount(hit.downloads) }}</span>
+                    </div>
+
+                    <!-- Version selector -->
+                    <div class="mt-2 flex items-center gap-2">
+                      <span class="text-[10px] text-slate-400 shrink-0 font-mono">Version:</span>
+                      <select
+                        v-model="selectedModpackVersions[hit.projectId || hit.id]"
+                        :disabled="installingModpackId === (hit.projectId || hit.id) || hit.versionsLoading"
+                        class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 disabled:opacity-50 focus:border-cyan-400 focus:outline-none"
+                      >
+                        <option v-if="hit.versionsLoading" value="" disabled>Loading versions…</option>
+                        <option v-else-if="!hit.versionOptions?.length" value="" disabled>No downloadable versions</option>
+                        <option v-for="v in hit.versionOptions" :key="v.id" :value="v.id">
+                          {{ v.versionNumber || v.name }}
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!modpackSearchBusy && modpackSearchDone && modpackResults.length === 0" class="text-xs text-slate-500 py-6 text-center">
+                No modpacks found. Try a different search keyword.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: CLONE EXISTING INSTANCE -->
+        <div v-else-if="newInstanceTab === 'clone'" class="flex-1 overflow-y-auto pr-1 flex flex-col gap-3.5">
+          <div v-if="instances.length === 0" class="py-10 text-center text-slate-500 text-xs">
+            No existing instances found to clone. Create your first instance using "Create from Scratch" or "Upload Archive".
+          </div>
+
+          <template v-else>
+            <div>
+              <label class="z-label font-semibold text-slate-300 block mb-1">Source Instance to Clone</label>
+              <select v-model="cloneSourceId" class="z-input text-xs" @change="onCloneSourceChange">
+                <option v-for="inst in instances" :key="inst.id" :value="inst.id">
+                  {{ inst.name }} (MC {{ inst.minecraftVersion }} · {{ inst.modLoader?.type || 'vanilla' }})
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label class="z-label font-semibold text-slate-300 block mb-1">Cloned Instance Name</label>
+              <input v-model="cloneName" class="z-input text-xs" placeholder="e.g. My Instance (Copy)" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="z-label font-semibold text-slate-300 block mb-1">Mod Loader</label>
+                <select v-model="cloneLoaderType" class="z-input text-xs" @change="updateCloneLoaderVersions">
+                  <option v-for="l in loaderTypes" :key="l" :value="l" class="capitalize">{{ l }}</option>
+                </select>
+              </div>
+              <div v-if="cloneLoaderType !== 'vanilla'">
+                <label class="z-label font-semibold text-slate-300 block mb-1 flex items-center justify-between">
+                  <span>Loader Version</span>
+                  <span v-if="loadingCloneLoaderVersions" class="text-[10px] text-cyan-400 font-mono">Fetching…</span>
+                </label>
+                <select v-if="cloneLoaderVersions.length > 0" v-model="cloneLoaderVersion" class="z-input text-xs">
+                  <option v-for="lv in cloneLoaderVersions" :key="lv" :value="lv">
+                    {{ lv }} {{ lv === cloneRecommendedLoaderVersion ? '★ (Recommended)' : '' }}
+                  </option>
+                </select>
+                <input v-else v-model="cloneLoaderVersion" class="z-input text-xs" placeholder="e.g. 0.16.10" />
+              </div>
+            </div>
+
+            <!-- Loader Change Warning Card -->
+            <div
+              v-if="isCloneLoaderChanged"
+              class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-amber-200 text-xs"
+            >
+              <svg class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <span class="font-bold block mb-0.5">Caution: Mod Loader Changed</span>
+                <span class="text-amber-300/90 leading-relaxed">
+                  Changing the mod loader from <strong class="text-amber-100 font-mono uppercase">{{ selectedCloneSource?.modLoader?.type || 'vanilla' }}</strong> to <strong class="text-amber-100 font-mono uppercase">{{ cloneLoaderType }}</strong> may cause existing mods or configs to crash. Consider unchecking "Copy Installed Mods" to build a fresh mod list.
+                </span>
+              </div>
+            </div>
+
+            <!-- Selective Copy Options -->
+            <div class="p-3 bg-slate-900/50 border border-slate-800/80 rounded-xl space-y-2">
+              <span class="text-xs font-semibold text-slate-300 block mb-1">Selective Copy Options</span>
+              <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
+                <input type="checkbox" v-model="cloneCopyWorld" class="zircon-check" />
+                <span>Copy Worlds &amp; Saved Data (<span class="font-mono text-slate-400">saves/</span>)</span>
+              </label>
+              <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
+                <input type="checkbox" v-model="cloneCopyMods" class="zircon-check" />
+                <span>Copy Installed Mods (<span class="font-mono text-slate-400">mods/</span>)</span>
+              </label>
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80 mt-auto">
+              <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="showNewDialog = false">Cancel</button>
+              <button
+                class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25 flex items-center gap-1.5"
+                :disabled="!cloneSourceId || !cloneName.trim() || cloning"
+                @click="executeCloneInstance"
+              >
+                <span v-if="cloning" class="w-3 h-3 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></span>
+                <span>{{ cloning ? 'Cloning…' : 'Clone Instance' }}</span>
+              </button>
+            </div>
+          </template>
+        </div>
 
         <!-- INSTALLATION PROGRESS OVERLAY -->
         <div
@@ -1394,39 +1551,6 @@
           <div class="text-[11px] text-slate-500 font-mono mt-2">
             {{ Math.round((modpackProgress.fraction || 0) * 100) }}% complete
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ================= MODAL: CLONE INSTANCE ================= -->
-    <div
-      v-if="showCloneDialog"
-      class="absolute inset-0 z-40 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="showCloneDialog = false"
-    >
-      <div class="z-card w-full max-w-md flex flex-col p-6 shadow-2xl relative border border-slate-700/60 rounded-2xl bg-[#0e1622]">
-        <h3 class="text-white font-bold text-base mb-2">Clone Instance</h3>
-        <p class="text-xs text-slate-400 mb-4">
-          Create an isolated copy of <strong>{{ selected?.name }}</strong> to safely test new mods, configs, or loaders.
-        </p>
-        <div class="mb-4">
-          <label class="z-label font-semibold text-slate-300 block mb-1">Cloned Instance Name</label>
-          <input
-            v-model="cloneName"
-            class="z-input text-xs w-full"
-            placeholder="e.g. My Instance (Copy)"
-            @keydown.enter="executeCloneInstance"
-          />
-        </div>
-        <div class="flex justify-end gap-2.5 pt-3 border-t border-slate-800/80">
-          <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold" @click="showCloneDialog = false">Cancel</button>
-          <button
-            class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25"
-            :disabled="!cloneName.trim() || cloning"
-            @click="executeCloneInstance"
-          >
-            {{ cloning ? 'Cloning…' : 'Clone Instance' }}
-          </button>
         </div>
       </div>
     </div>
@@ -1611,6 +1735,40 @@
       @skip="onSkipDependencies"
       @close="onCloseDependencies"
     />
+
+    <!-- SHARE SETUP MODAL -->
+    <ShareSetupModal
+      :open="showShareModal"
+      :instance-id="selected?.id"
+      :instance-name="selected?.name"
+      @close="showShareModal = false"
+    />
+
+    <!-- IMPORT SETUP MODAL -->
+    <ImportSetupModal
+      :open="showImportModal"
+      :current-instance="selected"
+      @close="showImportModal = false"
+      @applied="onSetupImported"
+    />
+
+    <!-- TIME MACHINE SNAPSHOTS MODAL -->
+    <SnapshotsModal
+      :open="showSnapshotsModal"
+      :instance-id="selected?.id"
+      :instance-name="selected?.name"
+      @close="showSnapshotsModal = false"
+      @restored="onSnapshotRestored"
+    />
+
+    <!-- AUDIT & REPAIR MODAL -->
+    <AuditRepairModal
+      :open="showAuditModal"
+      :instance-id="selected?.id"
+      :instance-name="selected?.name"
+      @close="showAuditModal = false"
+      @repaired="onModsRepaired"
+    />
   </div>
 </template>
 
@@ -1619,6 +1777,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import DependencyPromptModal from '../components/DependencyPromptModal.vue';
 import JoinByCodeModal from '../components/JoinByCodeModal.vue';
+import ShareSetupModal from '../components/ShareSetupModal.vue';
+import ImportSetupModal from '../components/ImportSetupModal.vue';
+import SnapshotsModal from '../components/SnapshotsModal.vue';
+import AuditRepairModal from '../components/AuditRepairModal.vue';
 import {
   api,
   fmtBytes,
@@ -1644,10 +1806,27 @@ const activeTab = ref('mods'); // 'mods' | 'shaders' | 'textures' | 'worlds' | '
 const showOpenFolderDropdown = ref(false);
 const showActionsDropdown = ref(false);
 
-// Clone Modal
-const showCloneDialog = ref(false);
+// Clone Modal & Parameters
+const cloneSourceId = ref('');
 const cloneName = ref('');
+const cloneLoaderType = ref('vanilla');
+const cloneLoaderVersion = ref('');
+const cloneLoaderVersions = ref([]);
+const cloneRecommendedLoaderVersion = ref('');
+const loadingCloneLoaderVersions = ref(false);
+const cloneCopyWorld = ref(true);
+const cloneCopyMods = ref(true);
 const cloning = ref(false);
+
+const selectedCloneSource = computed(() => {
+  return instances.value.find((i) => i.id === cloneSourceId.value) || null;
+});
+
+const isCloneLoaderChanged = computed(() => {
+  if (!selectedCloneSource.value || !cloneLoaderType.value) return false;
+  const original = selectedCloneSource.value.modLoader?.type || 'vanilla';
+  return cloneLoaderType.value.toLowerCase() !== original.toLowerCase();
+});
 
 // Worlds state
 const worldsList = ref([]);
@@ -1675,8 +1854,42 @@ function onJoinedViaCode() {
   loadInstances();
 }
 
+// Setup Sharing, Snapshots & Audit Modals
+const showShareModal = ref(false);
+const showImportModal = ref(false);
+const showSnapshotsModal = ref(false);
+const showAuditModal = ref(false);
+
+async function onSetupImported(res) {
+  showImportModal.value = false;
+  await loadInstances();
+  if (res && res.instanceId) {
+    const target = instances.value.find((i) => i.id === res.instanceId);
+    if (target) {
+      selectInstance(target);
+      return;
+    }
+  }
+  if (selected.value) {
+    await loadMods();
+  }
+}
+
+async function onSnapshotRestored() {
+  if (selected.value) {
+    await loadMods();
+  }
+}
+
+async function onModsRepaired() {
+  if (selected.value) {
+    await loadMods();
+  }
+}
+
 // New Instance modal tabs & state
-const newInstanceTab = ref('modpacks'); // 'modpacks' | 'blank' | 'import'
+const newInstanceTab = ref('scratch'); // 'scratch' | 'import' | 'clone'
+const importMode = ref('archive'); // 'archive' | 'discovery'
 const modpackSearchQuery = ref('');
 const modpackResults = ref([]);
 const modpackSearchBusy = ref(false);
@@ -2597,8 +2810,70 @@ async function installLocalMrpack() {
   }
 }
 
-async function openNewInstance() {
-  newInstanceTab.value = 'modpacks';
+function toggleImportMode() {
+  importMode.value = importMode.value === 'archive' ? 'discovery' : 'archive';
+  if (importMode.value === 'discovery' && modpackResults.value.length === 0) {
+    searchModpacks();
+  }
+}
+
+async function onImportDrop(e) {
+  const files = e.dataTransfer?.files;
+  if (!files || !files.length) return;
+  const file = files[0];
+  if (file.path) {
+    importFilePath.value = file.path;
+    if (!importCustomName.value) {
+      importCustomName.value = file.name.replace(/\.(mrpack|zip)$/i, '');
+    }
+  }
+}
+
+async function updateCloneLoaderVersions() {
+  const source = selectedCloneSource.value;
+  const mc = source?.minecraftVersion;
+  const loader = cloneLoaderType.value;
+  if (!mc || !loader || loader === 'vanilla') {
+    cloneLoaderVersions.value = [];
+    cloneRecommendedLoaderVersion.value = '';
+    cloneLoaderVersion.value = '';
+    return;
+  }
+  loadingCloneLoaderVersions.value = true;
+  try {
+    const res = await api.getLoaderVersions(loader, mc);
+    cloneLoaderVersions.value = res?.versions || [];
+    cloneRecommendedLoaderVersion.value = res?.recommended || '';
+    if (res?.recommended) {
+      cloneLoaderVersion.value = res.recommended;
+    } else if (cloneLoaderVersions.value.length > 0) {
+      cloneLoaderVersion.value = cloneLoaderVersions.value[0];
+    } else {
+      cloneLoaderVersion.value = '';
+    }
+  } catch (err) {
+    console.warn('Failed to fetch clone loader versions:', err);
+    cloneLoaderVersions.value = [];
+    cloneRecommendedLoaderVersion.value = '';
+    cloneLoaderVersion.value = '';
+  } finally {
+    loadingCloneLoaderVersions.value = false;
+  }
+}
+
+function onCloneSourceChange() {
+  const source = selectedCloneSource.value;
+  if (source) {
+    cloneName.value = `${source.name} (Copy)`;
+    cloneLoaderType.value = source.modLoader?.type || 'vanilla';
+    cloneLoaderVersion.value = source.modLoader?.version || '';
+    updateCloneLoaderVersions();
+  }
+}
+
+async function openNewInstance(tab = 'scratch') {
+  newInstanceTab.value = tab;
+  importMode.value = 'archive';
   const defaultMc = mcVersions.value[0] || '1.21.4';
   const defaultLoader = loaderTypes.value[0] || 'fabric';
   newForm.value = {
@@ -2607,10 +2882,19 @@ async function openNewInstance() {
     loaderType: defaultLoader,
     loaderVersion: '',
   };
-  showNewDialog.value = true;
-  if (modpackResults.value.length === 0) {
-    searchModpacks();
+
+  const initialSource = selected.value || (instances.value.length > 0 ? instances.value[0] : null);
+  if (initialSource) {
+    cloneSourceId.value = initialSource.id;
+    cloneName.value = `${initialSource.name} (Copy)`;
+    cloneLoaderType.value = initialSource.modLoader?.type || 'vanilla';
+    cloneLoaderVersion.value = initialSource.modLoader?.version || '';
+    updateCloneLoaderVersions();
   }
+  cloneCopyWorld.value = true;
+  cloneCopyMods.value = true;
+
+  showNewDialog.value = true;
   await updateLoaderVersions();
 }
 
@@ -2669,18 +2953,32 @@ function fmtSize(bytes) {
 function promptCloneInstance() {
   showActionsDropdown.value = false;
   if (!selected.value) return;
+  cloneSourceId.value = selected.value.id;
   cloneName.value = `${selected.value.name} (Copy)`;
-  showCloneDialog.value = true;
+  cloneLoaderType.value = selected.value.modLoader?.type || 'vanilla';
+  cloneLoaderVersion.value = selected.value.modLoader?.version || '';
+  cloneCopyWorld.value = true;
+  cloneCopyMods.value = true;
+  newInstanceTab.value = 'clone';
+  showNewDialog.value = true;
+  updateCloneLoaderVersions();
 }
 
 async function executeCloneInstance() {
-  if (!selected.value || !cloneName.value.trim()) return;
+  if (!cloneSourceId.value || !cloneName.value.trim()) return;
   cloning.value = true;
   try {
-    const cloned = await api.cloneOfflineInstance(selected.value.id, cloneName.value.trim());
+    const cloned = await api.cloneOfflineInstance(
+      cloneSourceId.value,
+      cloneName.value.trim(),
+      cloneLoaderType.value || null,
+      cloneLoaderVersion.value || null,
+      cloneCopyWorld.value,
+      cloneCopyMods.value
+    );
     await loadInstances();
     selected.value = cloned;
-    showCloneDialog.value = false;
+    showNewDialog.value = false;
     window.dispatchEvent(
       new CustomEvent('zircon-status', { detail: `Cloned instance to "${cloned.name}" successfully!` })
     );

@@ -71,9 +71,20 @@ window.Zircon.console = {
         }
     },
     consoleColor(line) {
-        if (line.includes('[ERROR]') || line.includes('ERROR')) return 'text-red-400';
-        if (line.includes('[WARN]') || line.includes('WARN')) return 'text-yellow-400';
-        if (line.includes('[wrapper]')) return 'text-emerald-400';
+        if (!line) return 'text-slate-400';
+        if (line.includes('[ERROR]') || line.includes('ERROR') || line.includes('Exception') || line.includes('Error:')) return 'log-error';
+        if (line.includes('[WARN]') || line.includes('WARN')) return 'log-warn';
+        if (line.includes('[INFO]') || line.includes('INFO')) return 'log-info';
+        if (line.includes('[wrapper]') || line.startsWith('/') || line.includes('issued server command:')) return 'log-cmd';
+        if (line.includes('<') && line.includes('>')) return 'log-chat';
         return 'text-slate-300';
+    },
+    sendQuickCommand(cmd) {
+        if (this.consoleWs && this.consoleWs.readyState === WebSocket.OPEN && cmd) {
+            this.consoleWs.send(cmd.trim());
+        } else {
+            this.command = cmd;
+            this.sendCommand();
+        }
     }
 };

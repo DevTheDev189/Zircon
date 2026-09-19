@@ -135,6 +135,20 @@
               </span>
             </button>
 
+            <!-- Character Forge Quick Access Button -->
+            <button
+              type="button"
+              class="relative inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-300 transition-all duration-200 hover:border-cyan-400/50 hover:text-cyan-200 hover:bg-cyan-500/10"
+              title="Customize skins or generate AI textures while downloading"
+              @click="$emit('open-skins')"
+            >
+              <svg class="h-3.5 w-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <span>Character Forge</span>
+            </button>
+
             <!-- Dismiss Error Button -->
             <button
               v-if="error"
@@ -403,6 +417,35 @@
                 </svg>
               </button>
             </div>
+
+            <!-- Character Forge Quick Access Teaser (shown when 2048 is not expanded) -->
+            <div
+              v-if="!show2048"
+              class="mt-3 rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/30 via-[#0a1624]/60 to-[#071018]/80 p-3 flex items-center justify-between gap-3 shadow-md"
+            >
+              <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white">Character Forge Quick Access</div>
+                  <div class="text-[10px] text-slate-400">Generate or switch 3D skins while Minecraft loads</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="shrink-0 z-btn-ghost text-[11px] font-bold px-3 py-1.5 rounded-xl border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/20 shadow-md flex items-center gap-1.5 active:scale-95 transition-all"
+                @click="$emit('open-skins')"
+              >
+                <span>Open Forge</span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <!-- Right Column: Embedded 2048 Minigame -->
@@ -462,7 +505,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'shader-choice']);
+const emit = defineEmits(['close', 'shader-choice', 'open-skins']);
 
 const stopping = ref(false);
 const activeTipIndex = ref(0);

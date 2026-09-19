@@ -41,9 +41,11 @@ client_id.txt
 target/
 **/target/
 
-# ---------- Launcher frontend ----------
+# ---------- Launcher frontend & Cloud Control Plane ----------
 crates/zircon-launcher/ui/node_modules/
 crates/zircon-launcher/ui/dist/
+**/node_modules/
+cloud/**/dist/
 
 # ---------- Launcher runtime state (never commit) ----------
 ~/.mcmanager/
@@ -70,4 +72,16 @@ crates/zircon-launcher/ui/dist/
 /generate_icons.py
 crates/*/tests/
 tests/
+
+# ---------- Zircon Cloud (Private / Do Not Commit) ----------
+cloud/
+crates/zircon-cloud/
+crates/zircon-server/src/cloud/
+crates/zircon-server/src/web/controllers/migration_controller.rs
+*ZIRCON_CLOUD*
+*PHASE_*
+IMPORTANT.md
+MCP_IMPLEMENTATION_PLAN.md
+scratch/
+.agents/
 

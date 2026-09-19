@@ -17,7 +17,7 @@ use zircon_core::model::ModLoaderInfo;
 
 use crate::error::LauncherError;
 use crate::launch::fabric_quilt;
-use crate::launch::java::JavaRuntimeResolver;
+use crate::launch::java::{JavaRuntimeResolver, JavaRuntimeSelector};
 use crate::paths;
 use crate::sync::mod_sync::ProgressListener;
 
@@ -100,17 +100,26 @@ impl MinecraftClasspathBuilder {
         required_java_major: i32,
         listener: Option<&dyn ProgressListener>,
     ) -> Result<LaunchData, LauncherError> {
-        self.resolve_with_progress_and_override(mc_version, loader, required_java_major, None, listener)
-            .await
+        self.resolve_with_progress_and_override(
+            mc_version,
+            loader,
+            required_java_major,
+            None,
+            None,
+            listener,
+        )
+        .await
     }
 
-    /// Resolves the full launch environment, supporting an optional custom Java runtime override path.
+    /// Resolves the full launch environment, supporting an optional custom Java runtime override path
+    /// and an optional custom client JAR override.
     pub async fn resolve_with_progress_and_override(
         &self,
         mc_version: &str,
         loader: &ModLoaderInfo,
-        required_java_major: i32,
+        _required_java_major: i32,
         java_override: Option<&Path>,
+        client_jar_override: Option<&Path>,
         listener: Option<&dyn ProgressListener>,
     ) -> Result<LaunchData, LauncherError> {
 
@@ -136,26 +145,35 @@ impl MinecraftClasspathBuilder {
 
         let mut classpath: Vec<PathBuf> = Vec::new();
 
-        // --- vanilla client jar ---
-        let client_url = version_json
-            .get("downloads")
-            .and_then(|d| d.get("client"))
-            .and_then(|c| c.get("url"))
-            .and_then(|u| u.as_str())
-            .ok_or_else(|| {
-                LauncherError::Parse("version JSON missing downloads.client.url".to_string())
-            })?;
-        let client_jar = self
-            .cache_dir
-            .join("versions")
-            .join(version_id)
-            .join(format!("{version_id}.jar"));
-        if !client_jar.is_file() {
-            if let Some(l) = listener {
-                l.on_status(&format!("Downloading Minecraft {version_id} client JAR..."));
+        // --- client jar (vanilla or custom override) ---
+        let client_jar = if let Some(override_path) = client_jar_override {
+            tracing::info!(
+                "Using custom client JAR override: {}",
+                override_path.display()
+            );
+            override_path.to_path_buf()
+        } else {
+            let client_url = version_json
+                .get("downloads")
+                .and_then(|d| d.get("client"))
+                .and_then(|c| c.get("url"))
+                .and_then(|u| u.as_str())
+                .ok_or_else(|| {
+                    LauncherError::Parse("version JSON missing downloads.client.url".to_string())
+                })?;
+            let client_jar = self
+                .cache_dir
+                .join("versions")
+                .join(version_id)
+                .join(format!("{version_id}.jar"));
+            if !client_jar.is_file() {
+                if let Some(l) = listener {
+                    l.on_status(&format!("Downloading Minecraft {version_id} client JAR..."));
+                }
             }
-        }
-        self.download_if_missing(client_url, &client_jar).await?;
+            self.download_if_missing(client_url, &client_jar).await?;
+            client_jar
+        };
         classpath.push(client_jar.clone());
 
         // --- vanilla libraries + natives ---
@@ -313,15 +331,9 @@ impl MinecraftClasspathBuilder {
                 .join(sep)
         };
 
-        let java_major = version_json
-            .get("javaVersion")
-            .and_then(|jv| jv.get("majorVersion"))
-            .and_then(|m| m.as_i64())
-            .map(|m| m as i32)
-            .unwrap_or(required_java_major);
-
+        let req = JavaRuntimeSelector::get_java_requirement(mc_version, Some(&loader_name(loader)));
         let java_home = JavaRuntimeResolver::new(self.cache_dir.clone())
-            .resolve_with_override(java_major, java_override, listener)
+            .resolve_with_requirement_and_override(&req, java_override, listener)
             .await?;
 
         tracing::info!(

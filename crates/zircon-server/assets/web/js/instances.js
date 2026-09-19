@@ -20,6 +20,7 @@ window.Zircon.instances = {
         this.settingsForm = {
             name: inst.name,
             mcVersion: inst.minecraftVersion,
+            loaderType: inst.modLoader ? inst.modLoader.type : 'fabric',
             loaderVersion: inst.modLoader ? inst.modLoader.version : '',
             javaArgs: inst.javaArgs || '',
             externalPort: inst.externalPort || null,
@@ -31,6 +32,7 @@ window.Zircon.instances = {
             autoStart: !!inst.autoStart
         };
         this.loadSettingsLoaderVersions();
+        this.loadMinecraftVersions();
         this.loadMods();
         this.loadServerProperties();
         this.playersLoaded = false; // first load of the new instance shows the spinner
@@ -57,10 +59,179 @@ window.Zircon.instances = {
             Object.assign(this.selectedInstance, data);
         } catch (e) { /* instance may have been deleted */ }
     },
-    async openAddServerModal() {
+    async openAddServerModal(tab = 'scratch', sourceInst = null) {
         this.showAddServerModal = true;
+        this.addServerTab = tab || 'scratch';
         await this.loadMinecraftVersions();
-        await this.onNewServerVersionOrLoaderChange();
+        if (this.addServerTab === 'scratch') {
+            await this.onNewServerVersionOrLoaderChange();
+        } else if (this.addServerTab === 'import') {
+            this.openImportModal();
+        } else if (this.addServerTab === 'clone') {
+            this.initCloneTab(sourceInst);
+        }
+    },
+    initCloneTab(sourceInst = null) {
+        const target = sourceInst || this.selectedInstance || (this.instances && this.instances[0]);
+        if (target) {
+            this.cloneServerForm.sourceInstanceId = target.id;
+            this.cloneServerForm.name = target.name ? `${target.name} (Copy)` : 'Server (Copy)';
+            this.cloneServerForm.loaderType = target.modLoader ? target.modLoader.type : 'fabric';
+            this.cloneServerForm.loaderVersion = target.modLoader ? target.modLoader.version : '';
+            this.cloneServerForm.copyWorld = true;
+            this.cloneServerForm.copyMods = true;
+            this.loadCloneLoaderVersions();
+        }
+    },
+    onCloneSourceChange() {
+        const target = this.instances.find(i => i.id === this.cloneServerForm.sourceInstanceId);
+        if (target) {
+            this.cloneServerForm.name = `${target.name} (Copy)`;
+            this.cloneServerForm.loaderType = target.modLoader ? target.modLoader.type : 'fabric';
+            this.cloneServerForm.loaderVersion = target.modLoader ? target.modLoader.version : '';
+            this.loadCloneLoaderVersions();
+        }
+    },
+    onCloneLoaderChange() {
+        this.loadCloneLoaderVersions();
+    },
+    async loadCloneLoaderVersions() {
+        const target = this.instances.find(i => i.id === this.cloneServerForm.sourceInstanceId);
+        if (!target || this.cloneServerForm.loaderType === 'vanilla') {
+            this.cloneLoaderVersions = [];
+            return;
+        }
+        this.cloneLoaderLoading = true;
+        try {
+            const res = await this.api(`/api/versions/loaders?mcVersion=${target.minecraftVersion}&loader=${this.cloneServerForm.loaderType}`);
+            this.cloneLoaderVersions = res.versions || [];
+            if (this.cloneLoaderVersions.length > 0 && !this.cloneLoaderVersions.includes(this.cloneServerForm.loaderVersion)) {
+                this.cloneServerForm.loaderVersion = this.cloneLoaderVersions[0];
+            }
+        } catch {
+            this.cloneLoaderVersions = [];
+        } finally {
+            this.cloneLoaderLoading = false;
+        }
+    },
+    async executeCloneServer() {
+        if (!this.cloneServerForm.sourceInstanceId || !this.cloneServerForm.name.trim()) return;
+        this.cloningServer = true;
+        try {
+            const res = await this.api(`/api/instances/${this.cloneServerForm.sourceInstanceId}/clone`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: this.cloneServerForm.name.trim(),
+                    loaderType: this.cloneServerForm.loaderType,
+                    loaderVersion: this.cloneServerForm.loaderVersion,
+                    copyWorld: !!this.cloneServerForm.copyWorld,
+                    copyMods: !!this.cloneServerForm.copyMods
+                })
+            });
+            this.showAddServerModal = false;
+            await this.loadInstances();
+            if (res && res.id) {
+                const found = this.instances.find(i => i.id === res.id);
+                if (found) this.selectInstance(found);
+            }
+        } catch (e) {
+            alert('Clone failed: ' + e.message);
+        } finally {
+            this.cloningServer = false;
+        }
+    },
+    isCloneLoaderChanged() {
+        const source = this.selectedCloneSource();
+        const sourceLoader = (source && source.modLoader) ? source.modLoader.type : 'vanilla';
+        return (this.cloneServerForm.loaderType || 'fabric') !== sourceLoader;
+    },
+    selectedCloneSource() {
+        return (this.instances || []).find(i => i.id === this.cloneServerForm.sourceInstanceId);
+    },
+    toggleImportMode() {
+        this.importMode = this.importMode === 'discovery' ? 'archive' : 'discovery';
+        if (this.importMode === 'discovery' && (!this.modpackSearchResults || this.modpackSearchResults.length === 0)) {
+            this.searchServerModpacks('');
+        }
+    },
+    async searchServerModpacks(overrideQuery = null) {
+        const q = overrideQuery !== null ? overrideQuery : (this.modpackSearchQuery || '');
+        this.modpackSearching = true;
+        try {
+            const params = new URLSearchParams({
+                query: q,
+                type: 'modpack',
+                origin: 'modrinth'
+            });
+            const data = await this.api(`/api/mods/search?${params.toString()}`);
+            this.modpackSearchResults = data.hits || [];
+            for (const hit of this.modpackSearchResults) {
+                this.loadModpackVersionOptions(hit);
+            }
+        } catch (e) {
+            console.error('Modpack search failed', e);
+        } finally {
+            this.modpackSearching = false;
+        }
+    },
+    async loadModpackVersionOptions(hit) {
+        const id = hit.projectId || hit.id;
+        hit.versionsLoading = true;
+        try {
+            const data = await this.api(`/api/mods/modrinth/versions?projectId=${id}`);
+            hit.versionOptions = data.versions || [];
+            if (hit.versionOptions.length > 0) {
+                this.selectedModpackVersions[id] = hit.versionOptions[0].id;
+            }
+        } catch {
+            hit.versionOptions = [];
+        } finally {
+            hit.versionsLoading = false;
+        }
+    },
+    async installModpackAsNewServer(hit) {
+        const id = hit.projectId || hit.id;
+        const selectedVerId = this.selectedModpackVersions[id];
+        const selectedVer = (hit.versionOptions || []).find(v => v.id === selectedVerId) || (hit.versionOptions || [])[0];
+        
+        const mcVersion = (selectedVer && selectedVer.gameVersions && selectedVer.gameVersions[0]) || '1.21.4';
+        const rawLoaders = (selectedVer && selectedVer.loaders) || ['fabric'];
+        const loaderType = rawLoaders.find(l => ['fabric', 'neoforge', 'forge', 'quilt'].includes(l.toLowerCase())) || 'fabric';
+        const serverName = hit.title || hit.name || 'New Modpack Server';
+
+        this.modpackInstallingId = id;
+        try {
+            // 1. Create instance
+            const created = await this.api('/api/instances', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: serverName,
+                    mcVersion: mcVersion,
+                    loaderType: loaderType,
+                    loaderVersion: '',
+                    autoStart: false
+                })
+            });
+
+            // 2. Install Modpack into it
+            await this.api(`/api/instances/${created.id}/modpacks/install`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    projectId: id,
+                    versionId: selectedVer ? selectedVer.id : null
+                })
+            });
+
+            this.showAddServerModal = false;
+            await this.loadInstances();
+            const found = this.instances.find(i => i.id === created.id);
+            if (found) this.selectInstance(found);
+            alert(`Server "${serverName}" created and modpack installed successfully!`);
+        } catch (e) {
+            alert('Failed to create server from modpack: ' + e.message);
+        } finally {
+            this.modpackInstallingId = '';
+        }
     },
     async createNewServer() {
         try {
@@ -133,10 +304,15 @@ window.Zircon.instances = {
     },
     async handleZipFileSelect(file) {
         if (!file) return;
-        if (!file.name.toLowerCase().endsWith('.zip')) {
-            this.importError = 'Please select a valid Minecraft server .zip archive';
-            this.addImportLog('ERROR: Selected file is not a .zip archive');
+        const lower = file.name.toLowerCase();
+        if (!lower.endsWith('.zip') && !lower.endsWith('.mrpack')) {
+            this.importError = 'Please select a valid Minecraft server .zip or .mrpack archive';
+            this.addImportLog('ERROR: Selected file is not a .zip or .mrpack archive');
             return;
+        }
+        if (!this.importForm.name) {
+            const cleanName = file.name.replace(/\.(zip|mrpack)$/i, '').replace(/[-_]/g, ' ');
+            this.importForm.name = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
         }
         this.importError = '';
         this.importUploading = true;
@@ -387,6 +563,7 @@ window.Zircon.instances = {
                 body: JSON.stringify({
                     name: this.settingsForm.name,
                     mcVersion: this.settingsForm.mcVersion,
+                    loaderType: this.settingsForm.loaderType,
                     loaderVersion: this.settingsForm.loaderVersion,
                     javaArgs: this.buildJavaArgs(this.settingsForm),
                     // 0 / blank leaves the player-facing port unchanged.
@@ -449,7 +626,7 @@ window.Zircon.instances = {
     async loadSettingsLoaderVersions() {
         if (!this.selectedInstance) return;
         const mc = this.settingsForm.mcVersion;
-        const loader = this.selectedInstance.modLoader?.type || 'fabric';
+        const loader = this.settingsForm.loaderType || this.selectedInstance.modLoader?.type || 'fabric';
         if (!mc || loader === 'vanilla') {
             this.settingsLoaderVersions = [];
             return;
@@ -471,7 +648,7 @@ window.Zircon.instances = {
     async onSettingsMinecraftVersionChange() {
         if (!this.selectedInstance) return;
         const mc = this.settingsForm.mcVersion;
-        const loader = this.selectedInstance.modLoader?.type || 'fabric';
+        const loader = this.settingsForm.loaderType || this.selectedInstance.modLoader?.type || 'fabric';
         if (!mc || loader === 'vanilla') {
             this.settingsLoaderVersions = [];
             this.settingsForm.loaderVersion = '';
@@ -485,6 +662,33 @@ window.Zircon.instances = {
                 this.settingsForm.loaderVersion = data.recommended;
             } else if (this.settingsLoaderVersions.length > 0) {
                 this.settingsForm.loaderVersion = this.settingsLoaderVersions[0];
+            }
+        } catch (e) {
+            this.settingsLoaderVersions = [];
+        } finally {
+            this.settingsLoaderLoading = false;
+        }
+    },
+
+    async onSettingsLoaderTypeChange() {
+        if (!this.selectedInstance) return;
+        const mc = this.settingsForm.mcVersion;
+        const loader = this.settingsForm.loaderType || 'fabric';
+        if (!mc || loader === 'vanilla') {
+            this.settingsLoaderVersions = [];
+            this.settingsForm.loaderVersion = '';
+            return;
+        }
+        this.settingsLoaderLoading = true;
+        try {
+            const data = await this.api(`/api/versions/loaders?loader=${encodeURIComponent(loader)}&mcVersion=${encodeURIComponent(mc)}`);
+            this.settingsLoaderVersions = data.versions || [];
+            if (data.recommended) {
+                this.settingsForm.loaderVersion = data.recommended;
+            } else if (this.settingsLoaderVersions.length > 0) {
+                this.settingsForm.loaderVersion = this.settingsLoaderVersions[0];
+            } else {
+                this.settingsForm.loaderVersion = '';
             }
         } catch (e) {
             this.settingsLoaderVersions = [];
@@ -560,4 +764,39 @@ window.Zircon.instances = {
         const extraTrimmed = (extra || '').trim();
         return extraTrimmed ? `${heap} ${extraTrimmed}` : heap;
     },
+
+    copyServerIp(inst) {
+        const target = inst || this.selectedInstance;
+        if (!target) return;
+        const port = target.externalPort || target.serverPort || 25565;
+        const host = location.hostname || 'localhost';
+        const address = `${host}:${port}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(address).then(() => {
+                this.copiedIp = true;
+                setTimeout(() => { this.copiedIp = false; }, 2000);
+            }).catch(() => {
+                this.fallbackCopyText(address);
+            });
+        } else {
+            this.fallbackCopyText(address);
+        }
+    },
+
+    fallbackCopyText(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            this.copiedIp = true;
+            setTimeout(() => { this.copiedIp = false; }, 2000);
+        } catch (e) {
+            // ignore
+        }
+        document.body.removeChild(ta);
+    }
 };

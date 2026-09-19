@@ -196,7 +196,52 @@ impl ServerImportService {
         let motd = props_map.get("motd").cloned();
         let server_name_prop = props_map.get("server-name").cloned();
 
-        let suggested_name = server_name_prop
+        // Check for Modrinth modpack index (mrpack)
+        let modrinth_index_path = unpacked_dir.join("modrinth.index.json");
+        let mut mrpack_name = None;
+        let mut mrpack_mc = None;
+        let mut mrpack_loader = None;
+        let mut mrpack_loader_version = None;
+
+        if modrinth_index_path.is_file() {
+            if let Ok(content) = fs::read_to_string(&modrinth_index_path) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(n) = val.get("name").and_then(|v| v.as_str()) {
+                        mrpack_name = Some(n.to_string());
+                    }
+                    if let Some(deps) = val.get("dependencies").and_then(|v| v.as_object()) {
+                        if let Some(mc) = deps.get("minecraft").and_then(|v| v.as_str()) {
+                            mrpack_mc = Some(mc.to_string());
+                        }
+                        for (key, ver) in deps {
+                            let ver_str = ver.as_str().unwrap_or("").to_string();
+                            match key.as_str() {
+                                "fabric-loader" => {
+                                    mrpack_loader = Some("fabric".to_string());
+                                    mrpack_loader_version = Some(ver_str);
+                                }
+                                "neoforge" => {
+                                    mrpack_loader = Some("neoforge".to_string());
+                                    mrpack_loader_version = Some(ver_str);
+                                }
+                                "forge" => {
+                                    mrpack_loader = Some("forge".to_string());
+                                    mrpack_loader_version = Some(ver_str);
+                                }
+                                "quilt-loader" => {
+                                    mrpack_loader = Some("quilt".to_string());
+                                    mrpack_loader_version = Some(ver_str);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let suggested_name = mrpack_name
+            .or(server_name_prop)
             .or(motd)
             .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(|| "Imported Server".to_string());
@@ -214,12 +259,15 @@ impl ServerImportService {
                 mc_version = ldat.minecraft_version.clone();
             }
         }
+        if mc_version.is_none() {
+            mc_version = mrpack_mc;
+        }
 
         // 3. Scan mod JARs in mods/
         let mods_dir = unpacked_dir.join("mods");
         let mut detected_mods = Vec::new();
-        let mut detected_loader = ModLoaderType::Vanilla.id().to_string();
-        let detected_loader_version = None;
+        let mut detected_loader = mrpack_loader.unwrap_or_else(|| ModLoaderType::Vanilla.id().to_string());
+        let detected_loader_version = mrpack_loader_version;
 
         if mods_dir.is_dir() {
             if let Ok(entries) = fs::read_dir(&mods_dir) {

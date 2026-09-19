@@ -28,6 +28,7 @@ pub mod worlds;
 pub mod export;
 pub mod coop;
 pub mod skin_ai;
+pub mod snapshots;
 
 
 /// Boots the Tauri application: registers the plugins, manages the shared
@@ -51,6 +52,34 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_deep_link::init())
+        .setup(|app| {
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    use tauri::Emitter;
+                    for url in event.urls() {
+                        tracing::info!("Deep link received: {}", url);
+                        if url.scheme() == "zircon" {
+                            let raw_addr = if url.host_str() == Some("join") {
+                                url.path().trim_start_matches('/').to_string()
+                            } else if let Some(host) = url.host_str() {
+                                host.to_string()
+                            } else {
+                                url.path().trim_start_matches('/').to_string()
+                            };
+                            let address = raw_addr.trim().to_string();
+                            if !address.is_empty() {
+                                let _ = handle.emit("deep-link-join", &address);
+                            }
+                        }
+                    }
+                });
+            }
+            Ok(())
+        })
         .manage(commands::LauncherState::new())
         .invoke_handler(tauri::generate_handler![
             commands::login_microsoft,
@@ -80,6 +109,16 @@ pub fn run() {
             commands::import_local_mrpack,
             commands::export_offline_instance_mrpack,
             commands::export_to_zircon_server,
+            commands::export_server_instance_to_zip,
+            commands::export_instance_setup,
+            commands::preview_import_setup,
+            commands::apply_import_setup,
+            commands::create_instance_mod_snapshot,
+            commands::list_instance_mod_snapshots,
+            commands::restore_instance_mod_snapshot,
+            commands::delete_instance_mod_snapshot,
+            commands::audit_instance_mods,
+            commands::repair_instance_mods,
             commands::list_instance_worlds,
             commands::backup_instance_world,
             commands::list_instance_world_backups,

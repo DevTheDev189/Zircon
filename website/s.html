@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Server on Zircon — Modded Minecraft</title>
+  <meta name="description" content="Click to launch and automatically connect to this modded Minecraft server via Zircon Launcher.">
+  <meta name="theme-color" content="#0d1117">
+  <link rel="icon" type="image/png" href="/assets/img/favicon.png">
+  <link rel="stylesheet" href="/assets/css/styles.css">
+  <style>
+    .join-container {
+      min-height: 80vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .join-card {
+      background: rgba(13, 17, 23, 0.85);
+      border: 1px solid rgba(71, 210, 201, 0.3);
+      box-shadow: 0 0 40px rgba(15, 191, 191, 0.15);
+      border-radius: 20px;
+      padding: 3rem 2.5rem;
+      max-width: 580px;
+      width: 100%;
+      text-align: center;
+      backdrop-filter: blur(12px);
+    }
+    .server-pill {
+      display: inline-block;
+      background: rgba(15, 191, 191, 0.15);
+      border: 1px solid rgba(71, 210, 201, 0.4);
+      color: #47d2c9;
+      padding: 0.5rem 1.25rem;
+      border-radius: 999px;
+      font-family: monospace;
+      font-size: 1.15rem;
+      font-weight: bold;
+      margin-bottom: 1.5rem;
+      letter-spacing: 0.5px;
+    }
+    .btn-launch {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0fbfbf 0%, #47d2c9 100%);
+      color: #0d1117;
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 20px rgba(71, 210, 201, 0.4);
+      width: 100%;
+      margin-top: 1rem;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-launch:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 30px rgba(71, 210, 201, 0.6);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #e6edf3;
+      padding: 0.8rem 1.5rem;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 0.95rem;
+      margin-top: 0.75rem;
+      width: 100%;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(71, 210, 201, 0.4);
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #47d2c9;
+      border-radius: 50%;
+      margin-right: 8px;
+      box-shadow: 0 0 8px #47d2c9;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+  </style>
+</head>
+<body>
+  <div class="join-container">
+    <div class="join-card">
+      <div style="margin-bottom: 1.5rem;">
+        <img src="/assets/img/favicon.png" alt="Zircon Logo" width="64" height="64" style="filter: drop-shadow(0 0 16px #47d2c9);">
+      </div>
+
+      <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: #fff;">Join Minecraft Server</h1>
+      <p style="color: #8b949e; margin-bottom: 1.5rem;">Connect automatically with synchronized modpacks via Zircon Launcher.</p>
+
+      <div class="server-pill" id="serverAddressDisplay">
+        <span class="pulse-dot"></span><span id="serverText">Loading...</span>
+      </div>
+
+      <div id="statusNotice" style="color: #8b949e; font-size: 0.95rem; margin-bottom: 1.5rem;">
+        Launching Zircon on your device...
+      </div>
+
+      <a id="btnDeepLink" class="btn-launch" href="#">
+        🚀 Open Zircon Launcher
+      </a>
+
+      <button id="btnCopyIp" class="btn-secondary" onclick="copyServerIp()">
+        📋 Copy Server IP
+      </button>
+
+      <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+        <p style="color: #8b949e; font-size: 0.9rem; margin-bottom: 0.75rem;">Don't have Zircon installed yet?</p>
+        <a href="/downloads.html" style="color: #47d2c9; text-decoration: none; font-weight: 600; font-size: 0.95rem;">
+          Download Zircon for Windows, Mac &amp; Linux &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Extract server from path e.g. /s/emerald or query ?server=...
+    function getServer() {
+      const path = window.location.pathname;
+      const match = path.match(/\/s\/([^\/\?#]+)/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('server') || 'emerald.zirconmc.net';
+    }
+
+    const server = getServer();
+    const serverFormatted = server.includes('.') ? server : `${server}.zirconmc.net`;
+    const deepLinkUrl = `zircon://join/${serverFormatted}`;
+
+    document.getElementById('serverText').textContent = serverFormatted;
+    document.getElementById('btnDeepLink').setAttribute('href', deepLinkUrl);
+
+    // Auto-trigger deep link invocation on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      // Invisible iframe trigger prevents browser blocking
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = deepLinkUrl;
+      document.body.appendChild(iframe);
+
+      setTimeout(() => {
+        document.getElementById('statusNotice').textContent = "If the launcher didn't open automatically, click the button below:";
+      }, 1500);
+    });
+
+    function copyServerIp() {
+      navigator.clipboard.writeText(serverFormatted).then(() => {
+        const btn = document.getElementById('btnCopyIp');
+        const orig = btn.innerHTML;
+        btn.innerHTML = "✅ Copied to Clipboard!";
+        setTimeout(() => { btn.innerHTML = orig; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

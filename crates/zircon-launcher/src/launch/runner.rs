@@ -25,7 +25,9 @@ use super::profile::substitute;
 use crate::auth::session::SessionData;
 use crate::error::LauncherError;
 use crate::sync::mod_sync::HashVerifier;
-use zircon_core::metadata::extractor::validate_mod_jar_structure;
+use zircon_core::metadata::extractor::{
+    classify_jar_artifact, validate_archive_safety, ArtifactClassification,
+};
 
 /// Screen display and resolution options for Minecraft launch.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -84,7 +86,7 @@ impl MinecraftRunner {
         output: Option<Arc<dyn Fn(String) + Send + Sync>>,
     ) -> Result<Child, LauncherError> {
         std::fs::create_dir_all(game_dir)?;
-        validate_mods_dir(game_dir)?;
+        validate_mods_dir(game_dir, false)?;
         let command = Self::build_launch_command_with_display(
             data,
             Some(session),
@@ -138,7 +140,7 @@ impl MinecraftRunner {
         output: Option<Arc<dyn Fn(String) + Send + Sync>>,
     ) -> Result<Child, LauncherError> {
         std::fs::create_dir_all(game_dir)?;
-        validate_mods_dir(game_dir)?;
+        validate_mods_dir(game_dir, true)?;
         let player = if username.trim().is_empty() {
             "Player"
         } else {
@@ -241,17 +243,22 @@ impl MinecraftRunner {
 }
 
 /// Re-validates every `.jar` in the instance `mods/` folder right before the
-/// game spawns. The mod sync validates staged downloads, but a file could be
-/// swapped after the sync (local tampering), come from an offline instance's
-/// locally-managed mods, or predate the structural checks — nothing malformed
-/// may reach the loader. See [`validate_mod_jar_structure`] for what is
-/// checked.
-fn validate_mods_dir(game_dir: &Path) -> Result<(), LauncherError> {
+/// game spawns.
+///
+/// Archive safety (valid ZIP, compression ratios, entry caps) is always enforced
+/// across both online and offline modes.
+/// In online mode, strict mod manifest presence is enforced.
+/// In offline mode, safe unrecognized JARs (legacy Forge without manifests, generic
+/// libraries) are allowed with an informational log, while misplaced Minecraft client
+/// JARs are rejected with an actionable diagnostic.
+fn validate_mods_dir(game_dir: &Path, is_offline: bool) -> Result<(), LauncherError> {
     let mods_dir = game_dir.join("mods");
     if !mods_dir.is_dir() {
         return Ok(());
     }
     let mut invalid: Vec<String> = Vec::new();
+    let mut misplaced_clients: Vec<String> = Vec::new();
+
     if let Ok(entries) = std::fs::read_dir(&mods_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -262,12 +269,56 @@ fn validate_mods_dir(game_dir: &Path) -> Result<(), LauncherError> {
             if !HashVerifier::is_mod_jar(&name) {
                 continue;
             }
-            if let Err(e) = validate_mod_jar_structure(&path) {
-                tracing::warn!("Pre-launch JAR check failed for {name}: {e}");
+
+            // 1. Hard archive safety check (valid ZIP, decompression bomb protection)
+            if let Err(e) = validate_archive_safety(&path) {
+                tracing::warn!("Pre-launch archive safety check failed for {name}: {e}");
                 invalid.push(name);
+                continue;
+            }
+
+            // 2. Classify the artifact role
+            match classify_jar_artifact(&path) {
+                Ok(ArtifactClassification::MinecraftClientJar { main_class }) => {
+                    tracing::warn!(
+                        "File '{name}' in mods/ is a Minecraft client JAR (main-class: {main_class}), not a mod"
+                    );
+                    misplaced_clients.push(name);
+                }
+                Ok(ArtifactClassification::Fabric)
+                | Ok(ArtifactClassification::NeoForge)
+                | Ok(ArtifactClassification::ModernForge)
+                | Ok(ArtifactClassification::LegacyForge)
+                | Ok(ArtifactClassification::CoremodOrTweaker { .. }) => {
+                    // Fully recognized mod loader artifact
+                }
+                Ok(ArtifactClassification::GenericJar) => {
+                    if is_offline {
+                        tracing::info!(
+                            "Unrecognized JAR '{name}' in offline instance mods/ folder allowed (permissive offline policy)"
+                        );
+                    } else {
+                        tracing::warn!("Pre-launch JAR check failed for {name}: no mod metadata found");
+                        invalid.push(name);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Pre-launch classification failed for {name}: {e}");
+                    invalid.push(name);
+                }
             }
         }
     }
+
+    if !misplaced_clients.is_empty() {
+        return Err(LauncherError::InvalidInput(format!(
+            "Refusing to launch: the following file(s) in the mods folder are Minecraft client JARs, \
+             not mods: {}. To use a custom game version, configure it as the custom client JAR \
+             for this instance instead of placing it in the mods folder.",
+            misplaced_clients.join(", ")
+        )));
+    }
+
     if !invalid.is_empty() {
         return Err(LauncherError::InvalidInput(format!(
             "Refusing to launch: the following mods failed structural validation \
@@ -335,11 +386,17 @@ fn build_online_command(
         // (--username, --gameDir, --accessToken, ...). Resolve their
         // placeholders instead of re-adding them below.
         let tokens = online_tokens(data, session, game_dir, host, port);
-        let mut profile_args: Vec<String> = data
-            .game_args
-            .iter()
-            .map(|arg| substitute(arg, &tokens))
-            .collect();
+        let mut profile_args: Vec<String> = Vec::new();
+        for arg in &data.game_args {
+            let substituted = substitute(arg, &tokens);
+            if substituted.contains(' ') && (substituted.contains("--") || substituted.starts_with('-')) {
+                for part in substituted.split_whitespace() {
+                    profile_args.push(part.to_string());
+                }
+            } else {
+                profile_args.push(substituted);
+            }
+        }
         // The profile may contribute --quickPlayMultiplayer; drop it so the
         // canonical auto-connect args below win (no duplicate keys).
         drop_quick_play_pairs(&mut profile_args);
@@ -427,11 +484,17 @@ fn build_offline_command(
         // Forge/NeoForge: substitute the version profile's game-argument
         // placeholders with offline credentials instead of a live session.
         let tokens = offline_tokens(data, player_name, &uuid, game_dir);
-        let mut profile_args: Vec<String> = data
-            .game_args
-            .iter()
-            .map(|arg| substitute(arg, &tokens))
-            .collect();
+        let mut profile_args: Vec<String> = Vec::new();
+        for arg in &data.game_args {
+            let substituted = substitute(arg, &tokens);
+            if substituted.contains(' ') && (substituted.contains("--") || substituted.starts_with('-')) {
+                for part in substituted.split_whitespace() {
+                    profile_args.push(part.to_string());
+                }
+            } else {
+                profile_args.push(substituted);
+            }
+        }
         // Drop any quick-play multiplayer args so offline stays single-player.
         drop_quick_play_pairs(&mut profile_args);
         command.extend(profile_args);
@@ -1082,14 +1145,14 @@ mod tests {
         std::fs::create_dir_all(dir.join("mods")).unwrap();
 
         // A clean mods/ folder passes.
-        assert!(validate_mods_dir(&dir).is_ok());
+        assert!(validate_mods_dir(&dir, false).is_ok());
 
         // A structurally valid mod passes.
         let good = dir.join("mods").join("good.jar");
         make_valid_jar(&good);
-        assert!(validate_mods_dir(&dir).is_ok());
+        assert!(validate_mods_dir(&dir, false).is_ok());
 
-        // A jar without mod metadata is refused.
+        // A jar without mod metadata is refused in online mode.
         let bad = dir.join("mods").join("bad.jar");
         let f = std::fs::File::create(&bad).unwrap();
         let mut zip = zip::ZipWriter::new(f);
@@ -1097,14 +1160,28 @@ mod tests {
         zip.start_file("META-INF/MANIFEST.MF", options).unwrap();
         std::io::Write::write_all(&mut zip, b"Manifest-Version: 1.0\n").unwrap();
         zip.finish().unwrap();
-        let err = validate_mods_dir(&dir).unwrap_err();
+        let err = validate_mods_dir(&dir, false).unwrap_err();
         assert!(matches!(err, LauncherError::InvalidInput(_)));
         assert!(err.to_string().contains("bad.jar"));
 
+        // But in offline mode, a safe jar without metadata is permitted.
+        assert!(validate_mods_dir(&dir, true).is_ok());
+
+        // A client jar in mods/ is explicitly refused with a descriptive diagnostic.
+        let client_jar = dir.join("mods").join("client.jar");
+        let f = std::fs::File::create(&client_jar).unwrap();
+        let mut zip = zip::ZipWriter::new(f);
+        zip.start_file("META-INF/MANIFEST.MF", options).unwrap();
+        std::io::Write::write_all(&mut zip, b"Main-Class: net.minecraft.client.main.Main\n").unwrap();
+        zip.finish().unwrap();
+        let err = validate_mods_dir(&dir, true).unwrap_err();
+        assert!(err.to_string().contains("Minecraft client JARs, not mods"));
+
         // Non-jar files are ignored.
-        std::fs::write(dir.join("mods").join("readme.txt"), b"hi").unwrap();
+        std::fs::remove_file(&client_jar).unwrap();
         std::fs::remove_file(&bad).unwrap();
-        assert!(validate_mods_dir(&dir).is_ok());
+        std::fs::write(dir.join("mods").join("readme.txt"), b"hi").unwrap();
+        assert!(validate_mods_dir(&dir, false).is_ok());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
