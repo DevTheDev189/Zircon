@@ -331,7 +331,11 @@ impl MinecraftClasspathBuilder {
                 .join(sep)
         };
 
-        let req = JavaRuntimeSelector::get_java_requirement(mc_version, Some(&loader_name(loader)));
+        let req = JavaRuntimeSelector::resolve_java_requirement(
+            mc_version,
+            Some(&version_json),
+            Some(&loader_name(loader)),
+        );
         let java_home = JavaRuntimeResolver::new(self.cache_dir.clone())
             .resolve_with_requirement_and_override(&req, java_override, listener)
             .await?;

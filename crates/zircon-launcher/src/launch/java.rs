@@ -60,17 +60,81 @@ impl JavaRequirement {
 pub struct JavaRuntimeSelector;
 
 impl JavaRuntimeSelector {
+    /// Extracts the Java version requirement from a Mojang version profile JSON (`javaVersion.majorVersion`),
+    /// applying modloader constraints (such as Forge on MC <= 1.16 requiring exact Java 8).
+    pub fn get_java_requirement_from_profile(
+        profile: &serde_json::Value,
+        loader: Option<&str>,
+    ) -> Option<JavaRequirement> {
+        let major = profile
+            .get("javaVersion")
+            .and_then(|j| j.get("majorVersion"))
+            .and_then(|m| m.as_i64())
+            .map(|m| m as i32)?;
+
+        let is_forge = loader.is_some_and(|l| l.eq_ignore_ascii_case("forge"));
+
+        if major <= 8 {
+            if is_forge {
+                Some(JavaRequirement::exact(8))
+            } else {
+                Some(JavaRequirement::at_least(8))
+            }
+        } else if major == 16 {
+            Some(JavaRequirement {
+                preferred_major: 16,
+                min_major: 16,
+                max_major: Some(17),
+            })
+        } else {
+            Some(JavaRequirement::at_least(major))
+        }
+    }
+
+    /// Resolves the Java requirement for a version, using the version profile JSON if available,
+    /// and falling back to static version heuristics.
+    pub fn resolve_java_requirement(
+        minecraft_version: &str,
+        profile: Option<&serde_json::Value>,
+        loader: Option<&str>,
+    ) -> JavaRequirement {
+        if let Some(prof) = profile {
+            if let Some(req) = Self::get_java_requirement_from_profile(prof, loader) {
+                return req;
+            }
+        }
+        Self::get_java_requirement(minecraft_version, loader)
+    }
+
     /// Evaluates the Java version requirement for a given Minecraft version and optional mod loader.
     pub fn get_java_requirement(minecraft_version: &str, loader: Option<&str>) -> JavaRequirement {
-        let parts: Vec<&str> = minecraft_version.split('.').collect();
-        if parts.is_empty() || parts[0].is_empty() {
+        let trimmed = minecraft_version.trim();
+        if trimmed.is_empty() {
             return JavaRequirement::at_least(17);
         }
-        if let Ok(major) = parts[0].parse::<i32>() {
-            if major != 1 {
+
+        // Snapshot patterns: e.g. "26w14a", "25w06a", etc.
+        if let Some(w_pos) = trimmed.find('w') {
+            if let Ok(year) = trimmed[..w_pos].parse::<i32>() {
+                if year >= 26 {
+                    return JavaRequirement::at_least(25);
+                } else if year >= 24 {
+                    return JavaRequirement::at_least(21);
+                }
+            }
+        }
+
+        let parts: Vec<&str> = trimmed.split('.').collect();
+        if let Ok(first) = parts[0].parse::<i32>() {
+            // Calendar versioning (e.g. 26.2, 26.1):
+            if first >= 26 {
+                return JavaRequirement::at_least(25);
+            } else if first > 1 {
+                // Future/other non-1.x releases between 2.x and 25.x default to Java 21
                 return JavaRequirement::at_least(21);
             }
         }
+
         if parts.len() < 2 {
             return JavaRequirement::at_least(17);
         }
@@ -98,8 +162,10 @@ impl JavaRuntimeSelector {
             }
         } else if minor < 20 || (minor == 20 && patch < 5) {
             JavaRequirement::at_least(17)
-        } else {
+        } else if minor < 26 {
             JavaRequirement::at_least(21)
+        } else {
+            JavaRequirement::at_least(25)
         }
     }
 
@@ -695,9 +761,11 @@ mod tests {
             ("1.20.4", 17),
             ("1.20.5", 21),
             ("1.21.1", 21),
-            // Non-1.x schemes (e.g. the "26.2" branding) are modern.
-            ("26.2", 21),
-            ("25w06a", 17),
+            // Modern calendar-based versioning requires Java 25.
+            ("26.2", 25),
+            ("26.1", 25),
+            ("26w14a", 25),
+            ("25w06a", 21),
             ("", 17),
         ];
         for (minecraft, expected) in cases {
@@ -707,6 +775,28 @@ mod tests {
                 "minecraft version {minecraft}"
             );
         }
+    }
+
+    #[test]
+    fn java_requirement_from_profile_json() {
+        // Official 26.2 profile specifying Java 25
+        let profile_26_2 = serde_json::json!({
+            "id": "26.2",
+            "javaVersion": {
+                "component": "java-runtime-epsilon",
+                "majorVersion": 25
+            }
+        });
+        let req = JavaRuntimeSelector::resolve_java_requirement("26.2", Some(&profile_26_2), None);
+        assert_eq!(req.preferred_major, 25);
+        assert!(req.matches(25));
+        assert!(!req.matches(21));
+
+        // Profile without javaVersion falls back to static heuristics
+        let legacy_profile = serde_json::json!({ "id": "1.12.2" });
+        let req_legacy = JavaRuntimeSelector::resolve_java_requirement("1.12.2", Some(&legacy_profile), Some("forge"));
+        assert_eq!(req_legacy.preferred_major, 8);
+        assert_eq!(req_legacy.max_major, Some(8));
     }
 
     #[test]

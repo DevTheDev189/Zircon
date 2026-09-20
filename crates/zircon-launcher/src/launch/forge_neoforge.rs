@@ -302,7 +302,21 @@ async fn install_loader(
         label,
         install_dir.display()
     );
-    let required_java = JavaRuntimeSelector::get_required_java_major_version(mc_version);
+    let profile_json: Option<serde_json::Value> = {
+        let path = cache_dir
+            .join("versions")
+            .join(crate::launch::classpath::sanitize(mc_version))
+            .join(format!("{mc_version}.json"));
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+    };
+    let required_java = JavaRuntimeSelector::resolve_java_requirement(
+        mc_version,
+        profile_json.as_ref(),
+        Some(loader_type),
+    )
+    .preferred_major;
     // The installer is itself a Java process, so it cannot bootstrap its own
     // runtime. Provision Java up front — system Java, else the cached runtime,
     // else a one-time Adoptium download — exactly like the game launch does.
