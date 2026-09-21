@@ -331,14 +331,21 @@ impl ModSyncEngine {
                 continue;
             }
 
+            let server_url = format!("{base}/files/mods/{}", url_encode(&mod_entry.filename));
             let url = if let Some(direct_url) = &mod_entry.download_url {
                 if direct_url.starts_with("http://") || direct_url.starts_with("https://") {
-                    direct_url.clone()
+                    // Self-hosted wrapper check: if the server base is NOT a zirconmc.net cloud domain,
+                    // any cdn.zirconmc.net download URLs are invalid / unconfigured artifacts.
+                    if direct_url.contains("cdn.zirconmc.net") && !base.contains("zirconmc.net") {
+                        server_url.clone()
+                    } else {
+                        direct_url.clone()
+                    }
                 } else {
-                    format!("{base}/files/mods/{}", url_encode(&mod_entry.filename))
+                    server_url.clone()
                 }
             } else {
-                format!("{base}/files/mods/{}", url_encode(&mod_entry.filename))
+                server_url.clone()
             };
             emit_status(
                 listener,
@@ -349,7 +356,25 @@ impl ModSyncEngine {
                     mods.len()
                 ),
             );
-            let size = self.download(&url, &staged_target).await?;
+            let download_res = self.download(&url, &staged_target).await;
+            let size = match download_res {
+                Ok(bytes) => bytes,
+                Err(err) if url != server_url => {
+                    warn!(
+                        "Primary download failed for {} from {url}: {err}. Retrying from server: {server_url}",
+                        mod_entry.filename
+                    );
+                    emit_status(
+                        listener,
+                        &format!(
+                            "Fallback download for {} from server...",
+                            mod_entry.filename
+                        ),
+                    );
+                    self.download(&server_url, &staged_target).await?
+                }
+                Err(err) => return Err(err),
+            };
 
             // The file must match the hash pinned in the server's BOM. The BOM
             // claims were already verified against Modrinth/CurseForge above;
@@ -1296,6 +1321,35 @@ mod tests {
         // Tampered hash should fail verification
         entry.sha256 = Some("0000000000000000000000000000000000000000000000000000000000000000".to_string());
         assert!(!HashVerifier::matches(&jar_path, &entry));
+    }
+
+    #[test]
+    fn resolve_download_url_bypasses_cdn_for_self_hosted() {
+        let entry = ModEntry::new(
+            Some("mod".to_string()),
+            "custom.jar",
+            None,
+            0,
+            Some("direct".to_string()),
+            Some("https://cdn.zirconmc.net/objects/abcdef.jar".to_string()),
+            100,
+        );
+        let base = "http://localhost:8080";
+        let server_url = format!("{base}/files/mods/{}", url_encode(&entry.filename));
+        let url = if let Some(direct_url) = &entry.download_url {
+            if direct_url.starts_with("http://") || direct_url.starts_with("https://") {
+                if direct_url.contains("cdn.zirconmc.net") && !base.contains("zirconmc.net") {
+                    server_url.clone()
+                } else {
+                    direct_url.clone()
+                }
+            } else {
+                server_url.clone()
+            }
+        } else {
+            server_url.clone()
+        };
+        assert_eq!(url, "http://localhost:8080/files/mods/custom.jar");
     }
 }
 

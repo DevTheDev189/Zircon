@@ -192,11 +192,13 @@ impl ModManagementService {
 
         let sha256 = hash::sha256_file(&target).await.ok();
         entry.sha256 = sha256.clone();
-        if let Some(h) = &sha256 {
-            let cdn_domain = std::env::var("R2_PUBLIC_CDN_DOMAIN")
-                .unwrap_or_else(|_| "cdn.zirconmc.net".to_string());
+        if let (Some(h), Ok(cdn_domain)) = (&sha256, std::env::var("R2_PUBLIC_CDN_DOMAIN")) {
+            let r2_configured = !std::env::var("R2_ACCESS_KEY_ID").unwrap_or_default().is_empty()
+                && !std::env::var("R2_SECRET_ACCESS_KEY").unwrap_or_default().is_empty();
             let clean_domain = cdn_domain.trim_start_matches("https://").trim_end_matches('/');
-            entry.download_url = Some(format!("https://{clean_domain}/objects/{h}.jar"));
+            if r2_configured && !clean_domain.is_empty() {
+                entry.download_url = Some(format!("https://{clean_domain}/objects/{h}.jar"));
+            }
         }
 
         // Enrich the entry with author/description/title read from the JAR's

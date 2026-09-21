@@ -58,6 +58,18 @@ impl BomService {
     pub fn get_client_bom(&self) -> BillOfMaterials {
         let mut bom = self.get_bom();
         bom.mods.retain(|m| m.side != zircon_core::model::ModSide::Server);
+        let r2_configured = std::env::var("R2_PUBLIC_CDN_DOMAIN").is_ok()
+            && !std::env::var("R2_ACCESS_KEY_ID").unwrap_or_default().is_empty()
+            && !std::env::var("R2_SECRET_ACCESS_KEY").unwrap_or_default().is_empty();
+        if !r2_configured {
+            for m in &mut bom.mods {
+                if let Some(url) = &m.download_url {
+                    if url.contains("cdn.zirconmc.net") {
+                        m.download_url = None;
+                    }
+                }
+            }
+        }
         if let Some(signing_key) = &self.signing_key {
             let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
             bom.server_public_key = Some(pubkey_hex);
@@ -104,14 +116,33 @@ impl BomService {
                             before_dedup - parsed.mods.len()
                         );
                     }
+                    // Clean unconfigured CDN URLs from legacy or standalone wrapper instances:
+                    let mut cleaned_cdn = false;
+                    let r2_configured = std::env::var("R2_PUBLIC_CDN_DOMAIN").is_ok()
+                        && !std::env::var("R2_ACCESS_KEY_ID").unwrap_or_default().is_empty()
+                        && !std::env::var("R2_SECRET_ACCESS_KEY").unwrap_or_default().is_empty();
+                    if !r2_configured {
+                        for m in &mut parsed.mods {
+                            if let Some(url) = &m.download_url {
+                                if url.contains("cdn.zirconmc.net") {
+                                    m.download_url = None;
+                                    cleaned_cdn = true;
+                                }
+                            }
+                        }
+                    }
+                    if cleaned_cdn {
+                        tracing::info!("Sanitized unconfigured cdn.zirconmc.net URLs from BOM on load");
+                    }
                     tracing::info!(
                         "Loaded BOM: {} mods for MC {}",
                         parsed.mods.len(),
                         parsed.minecraft_version
                     );
-                    // Self-heal legacy unsigned BOM files or freshly deduplicated BOMs:
+                    // Self-heal legacy unsigned BOM files or freshly deduplicated/sanitized BOMs:
                     if (self.signing_key.is_some() && parsed.signature.is_none())
                         || parsed.mods.len() != before_dedup
+                        || cleaned_cdn
                     {
                         if let Err(e) = self.save_bom(&parsed) {
                             tracing::warn!("Could not save/sign sanitized BOM on load: {e}");
@@ -275,6 +306,32 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(dir.join("unsigned.json")).unwrap()).unwrap();
         assert!(unsigned.signature.is_none());
         assert!(unsigned.server_public_key.is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unconfigured_cdn_urls_are_sanitized_on_load_and_client_bom() {
+        let dir = temp_dir();
+        let file = dir.join("bom.json");
+        let mut legacy = BillOfMaterials::new("1.20.4", None, Some("CDN Test".to_string()));
+        legacy.mods.push(zircon_core::model::ModEntry::new(
+            Some("custom-mod".to_string()),
+            "custom-mod.jar",
+            Some("abc".to_string()),
+            0,
+            Some("server_custom".to_string()),
+            Some("https://cdn.zirconmc.net/objects/abcdef1234567890.jar".to_string()),
+            12345,
+        ));
+        fs::write(&file, serde_json::to_string_pretty(&legacy).unwrap()).unwrap();
+
+        let service = BomService::new(file.clone(), None);
+        let loaded = service.get_bom();
+        assert_eq!(loaded.mods[0].download_url, None, "BOM load should sanitize unconfigured cdn.zirconmc.net URL");
+
+        let client_bom = service.get_client_bom();
+        assert_eq!(client_bom.mods[0].download_url, None, "client BOM should sanitize unconfigured cdn.zirconmc.net URL");
+
         let _ = fs::remove_dir_all(&dir);
     }
 }
