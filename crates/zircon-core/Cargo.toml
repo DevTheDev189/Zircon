@@ -1,6 +1,6 @@
 [package]
 name = "zircon-core"
-version = "0.4.13"
+version = "0.4.14"
 edition = "2021"
 description = "Shared domain for Zircon: models, hashes, archives, mod metadata, provider API clients"
 license = "BSL-1.1"

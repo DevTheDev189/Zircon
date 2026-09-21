@@ -110,10 +110,12 @@ pub fn classify_jar_artifact(jar_file: &Path) -> Result<ArtifactClassification, 
     let mut has_mcmod_info = false;
     let mut manifest_content: Option<String> = None;
     let mut has_client_class = false;
+    let mut nested_jars: Vec<String> = Vec::new();
 
     for idx in 0..zip.len() {
         if let Ok(entry) = zip.by_index(idx) {
-            match entry.name() {
+            let name = entry.name();
+            match name {
                 FABRIC_ENTRY => has_fabric = true,
                 NEOFORGE_ENTRY => has_neoforge = true,
                 FORGE_ENTRY => has_forge_toml = true,
@@ -121,7 +123,13 @@ pub fn classify_jar_artifact(jar_file: &Path) -> Result<ArtifactClassification, 
                 "net/minecraft/client/main/Main.class" | "net/minecraft/client/Minecraft.class" => {
                     has_client_class = true;
                 }
-                _ => {}
+                _ => {
+                    if (name.starts_with("META-INF/jarjar/") || name.starts_with("META-INF/jars/"))
+                        && name.ends_with(".jar")
+                    {
+                        nested_jars.push(name.to_string());
+                    }
+                }
             }
         }
     }
@@ -145,9 +153,45 @@ pub fn classify_jar_artifact(jar_file: &Path) -> Result<ArtifactClassification, 
         return Ok(ArtifactClassification::LegacyForge);
     }
 
+    // Check nested Jar-in-Jar archives (e.g. Kotlin for Forge, bundled libraries)
+    for nested_name in &nested_jars {
+        if let Ok(nested_entry) = zip.by_name(nested_name) {
+            let mut nested_bytes = Vec::new();
+            if nested_entry.take(50 * 1024 * 1024).read_to_end(&mut nested_bytes).is_ok() {
+                if let Ok(mut inner_zip) = zip::ZipArchive::new(std::io::Cursor::new(nested_bytes)) {
+                    for i in 0..inner_zip.len() {
+                        if let Ok(inner_entry) = inner_zip.by_index(i) {
+                            match inner_entry.name() {
+                                NEOFORGE_ENTRY => return Ok(ArtifactClassification::NeoForge),
+                                FORGE_ENTRY => return Ok(ArtifactClassification::ModernForge),
+                                FABRIC_ENTRY => return Ok(ArtifactClassification::Fabric),
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Forge/NeoForge Jar-in-Jar manifest marker
+    if zip.by_name("META-INF/jarjar/metadata.json").is_ok() {
+        return Ok(ArtifactClassification::NeoForge);
+    }
+
     if let Some(manifest) = manifest_content {
         for line in manifest.lines() {
             let line = line.trim();
+            if let Some(val) = line.strip_prefix("FMLModType:").map(str::trim) {
+                if val.eq_ignore_ascii_case("LIBRARY") || val.eq_ignore_ascii_case("GAMELIBRARY") {
+                    return Ok(ArtifactClassification::ModernForge);
+                }
+            }
+            if let Some(val) = line.strip_prefix("ModType:").map(str::trim) {
+                if val.eq_ignore_ascii_case("LIBRARY") {
+                    return Ok(ArtifactClassification::ModernForge);
+                }
+            }
             if let Some(main) = line.strip_prefix("Main-Class:").map(str::trim) {
                 if main.contains("net.minecraft.client.main.Main")
                     || main.contains("net.minecraft.client.Minecraft")
@@ -323,6 +367,106 @@ pub fn extract(jar_file: &Path) -> Result<ModMetadata, MetadataError> {
         return Ok(meta);
     }
 
+    // Fallback: inspect nested Jar-in-Jar archives (e.g. Kotlin for Forge, bundled libraries)
+    for idx in 0..zip.len() {
+        let nested_name = match zip.by_index(idx) {
+            Ok(entry) => {
+                let name = entry.name().to_string();
+                if (name.starts_with("META-INF/jarjar/") || name.starts_with("META-INF/jars/"))
+                    && name.ends_with(".jar")
+                {
+                    Some(name)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        };
+
+        if let Some(name) = nested_name {
+            if let Ok(nested_entry) = zip.by_name(&name) {
+                let mut nested_bytes = Vec::new();
+                if nested_entry.take(50 * 1024 * 1024).read_to_end(&mut nested_bytes).is_ok() {
+                    if let Ok(mut inner_zip) = zip::ZipArchive::new(std::io::Cursor::new(nested_bytes)) {
+                        let neo_content = if let Ok(mut entry) = inner_zip.by_name(NEOFORGE_ENTRY) {
+                            let mut content = String::new();
+                            let _ = entry.by_ref().take(MAX_METADATA_BYTES).read_to_string(&mut content);
+                            Some(content)
+                        } else {
+                            None
+                        };
+                        if let Some(content) = neo_content {
+                            if let Ok(mut meta) = parse_toml_metadata(&content, ModLoaderType::NeoForge) {
+                                let icon_candidates = toml_icon_candidates(&content, &meta.id);
+                                meta.icon_data = extract_icon_from_zip(&mut inner_zip, &icon_candidates);
+                                return Ok(meta);
+                            }
+                        }
+
+                        let forge_content = if let Ok(mut entry) = inner_zip.by_name(FORGE_ENTRY) {
+                            let mut content = String::new();
+                            let _ = entry.by_ref().take(MAX_METADATA_BYTES).read_to_string(&mut content);
+                            Some(content)
+                        } else {
+                            None
+                        };
+                        if let Some(content) = forge_content {
+                            if let Ok(mut meta) = parse_toml_metadata(&content, ModLoaderType::Forge) {
+                                let icon_candidates = toml_icon_candidates(&content, &meta.id);
+                                meta.icon_data = extract_icon_from_zip(&mut inner_zip, &icon_candidates);
+                                return Ok(meta);
+                            }
+                        }
+
+                        let fabric_content = if let Ok(mut entry) = inner_zip.by_name(FABRIC_ENTRY) {
+                            let mut content = String::new();
+                            let _ = entry.by_ref().take(MAX_METADATA_BYTES).read_to_string(&mut content);
+                            Some(content)
+                        } else {
+                            None
+                        };
+                        if let Some(content) = fabric_content {
+                            if let Ok(mut meta) = parse_fabric_metadata(&content) {
+                                let icon_candidates = fabric_icon_candidates(&content, &meta.id);
+                                meta.icon_data = extract_icon_from_zip(&mut inner_zip, &icon_candidates);
+                                return Ok(meta);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: library JAR with FMLModType: LIBRARY in MANIFEST.MF
+    if let Ok(manifest_entry) = zip.by_name("META-INF/MANIFEST.MF") {
+        let mut s = String::new();
+        if manifest_entry.take(65536).read_to_string(&mut s).is_ok() {
+            let is_library = s.lines().any(|line| {
+                let trimmed = line.trim();
+                trimmed.starts_with("FMLModType:")
+                    || trimmed.starts_with("ModType:")
+            });
+            if is_library {
+                let stem = jar_file
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                return Ok(ModMetadata {
+                    id: stem.clone(),
+                    name: stem,
+                    version: String::new(),
+                    description: "Library mod".to_string(),
+                    author: String::new(),
+                    loader_type: ModLoaderType::Forge,
+                    environment: "both".to_string(),
+                    icon_data: None,
+                });
+            }
+        }
+    }
+
     Err(MetadataError::Unknown(format!(
         "Unknown or unparseable mod jar: {}",
         jar_file.display()
@@ -439,7 +583,7 @@ fn toml_icon_candidates(content: &str, mod_id: &str) -> Vec<String> {
     candidates
 }
 
-fn extract_icon_from_zip(zip: &mut zip::ZipArchive<File>, candidates: &[String]) -> Option<String> {
+fn extract_icon_from_zip<R: std::io::Read + std::io::Seek>(zip: &mut zip::ZipArchive<R>, candidates: &[String]) -> Option<String> {
     use base64::Engine as _;
     const MAX_ICON_BYTES: u64 = 512 * 1024;
     for candidate in candidates {
@@ -1063,5 +1207,49 @@ version="2.0.0"
         );
         assert!(validate_mod_jar_structure(&coremod).is_ok());
         let _ = std::fs::remove_dir_all(coremod.parent().unwrap());
+    }
+
+    #[test]
+    fn classify_and_validate_jar_in_jar_and_library_mods() {
+        let dir = tempfile::tempdir().unwrap();
+        let inner_path = dir.path().join("inner.jar");
+        {
+            let file = std::fs::File::create(&inner_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options = zip::write::SimpleFileOptions::default();
+            zip.start_file("META-INF/neoforge.mods.toml", options).unwrap();
+            std::io::Write::write_all(
+                &mut zip,
+                b"[[mods]]\nmodId = \"kotlinforforge\"\nversion = \"5.12.0\"\ndisplayName = \"Kotlin For Forge\"\n",
+            )
+            .unwrap();
+            zip.finish().unwrap();
+        }
+        let inner_bytes = std::fs::read(&inner_path).unwrap();
+
+        let outer_path = dir.path().join("kotlinforforge-5.12.0-all.jar");
+        {
+            let file = std::fs::File::create(&outer_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let options = zip::write::SimpleFileOptions::default();
+            zip.start_file("META-INF/MANIFEST.MF", options).unwrap();
+            std::io::Write::write_all(&mut zip, b"Manifest-Version: 1.0\nFMLModType: LIBRARY\n").unwrap();
+            zip.start_file("META-INF/jarjar/metadata.json", options).unwrap();
+            std::io::Write::write_all(&mut zip, b"{\"jars\": []}\n").unwrap();
+            zip.start_file("META-INF/jarjar/kffmod-5.12.0.jar", options).unwrap();
+            std::io::Write::write_all(&mut zip, &inner_bytes).unwrap();
+            zip.finish().unwrap();
+        }
+
+        assert_eq!(
+            classify_jar_artifact(&outer_path).unwrap(),
+            ArtifactClassification::NeoForge
+        );
+        assert!(validate_mod_jar_structure(&outer_path).is_ok());
+
+        let meta = extract(&outer_path).unwrap();
+        assert_eq!(meta.id, "kotlinforforge");
+        assert_eq!(meta.name, "Kotlin For Forge");
+        assert_eq!(meta.version, "5.12.0");
     }
 }
