@@ -295,6 +295,18 @@ impl MinecraftClasspathBuilder {
                 main_class = forge.main_class;
                 jvm_args = forge.jvm_args;
                 game_args = forge.game_args;
+
+                // Modern Forge (1.13+) and NeoForge locate the client jar
+                // via ModLauncher/GameLocator (e.g. client-*-srg.jar or patched jar)
+                // rather than having the vanilla client jar on the -cp classpath.
+                // Leaving the vanilla client jar on -cp creates an automatic module
+                // (e.g. `_1._21._1`) which conflicts with the `minecraft` module in JPMS,
+                // causing: "java.lang.module.ResolutionException: Modules minecraft and _1._21._1 export package ...".
+                // In legacy Forge (<= 1.12.2), LaunchWrapper requires client_jar on -cp.
+                let is_legacy = loader_type == "forge" && is_legacy_mc_version(mc_version);
+                if !is_legacy {
+                    classpath.retain(|p| p != &client_jar && p.file_name() != client_jar.file_name());
+                }
             }
             _ => {
                 classpath.extend(library_by_artifact.values().cloned());
@@ -895,6 +907,19 @@ pub fn sanitize(name: &str) -> String {
         .collect()
 }
 
+/// Determines if a Minecraft version uses legacy Forge (<= 1.12.2 LaunchWrapper)
+/// rather than modern ModLauncher (1.13+).
+pub(crate) fn is_legacy_mc_version(version: &str) -> bool {
+    let trimmed = version.trim();
+    let parts: Vec<&str> = trimmed.split('.').collect();
+    if parts.len() < 2 {
+        return false;
+    }
+    let major: i32 = parts[0].parse().unwrap_or(0);
+    let minor: i32 = parts[1].parse().unwrap_or(0);
+    major == 1 && minor <= 12
+}
+
 fn zip_error(e: zip::result::ZipError) -> LauncherError {
     LauncherError::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
 }
@@ -1205,4 +1230,17 @@ mod tests {
         assert!(!natives_dir.join("MANIFEST.MF").exists());
         assert!(!natives_dir.join("inner.so").exists());
     }
+
+    #[test]
+    fn legacy_mc_version_detection() {
+        assert!(is_legacy_mc_version("1.12.2"));
+        assert!(is_legacy_mc_version("1.7.10"));
+        assert!(is_legacy_mc_version("1.8.9"));
+        assert!(!is_legacy_mc_version("1.13"));
+        assert!(!is_legacy_mc_version("1.16.5"));
+        assert!(!is_legacy_mc_version("1.20.1"));
+        assert!(!is_legacy_mc_version("1.21.1"));
+        assert!(!is_legacy_mc_version("26.2"));
+    }
 }
+

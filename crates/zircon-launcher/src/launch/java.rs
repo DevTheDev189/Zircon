@@ -72,14 +72,14 @@ impl JavaRuntimeSelector {
             .and_then(|m| m.as_i64())
             .map(|m| m as i32)?;
 
-        let is_forge = loader.is_some_and(|l| l.eq_ignore_ascii_case("forge"));
+        let is_forge_or_neoforge = loader.is_some_and(|l| {
+            l.eq_ignore_ascii_case("forge") || l.eq_ignore_ascii_case("neoforge")
+        });
 
-        if major <= 8 {
-            if is_forge {
-                Some(JavaRequirement::exact(8))
-            } else {
-                Some(JavaRequirement::at_least(8))
-            }
+        if is_forge_or_neoforge {
+            Some(JavaRequirement::exact(major))
+        } else if major <= 8 {
+            Some(JavaRequirement::at_least(8))
         } else if major == 16 {
             Some(JavaRequirement {
                 preferred_major: 16,
@@ -145,11 +145,13 @@ impl JavaRuntimeSelector {
             0
         };
 
-        let is_forge = loader.is_some_and(|l| l.eq_ignore_ascii_case("forge"));
+        let is_forge_or_neoforge = loader.is_some_and(|l| {
+            l.eq_ignore_ascii_case("forge") || l.eq_ignore_ascii_case("neoforge")
+        });
 
         if minor < 17 {
             // MC < 1.17: Java 8 is required. Forge 1.16 and older MUST run on Java 8 due to LaunchWrapper / ModLauncher restrictions.
-            if is_forge || minor <= 16 {
+            if is_forge_or_neoforge || minor <= 16 {
                 JavaRequirement::exact(8)
             } else {
                 JavaRequirement::at_least(8)
@@ -161,9 +163,17 @@ impl JavaRuntimeSelector {
                 max_major: Some(17),
             }
         } else if minor < 20 || (minor == 20 && patch < 5) {
-            JavaRequirement::at_least(17)
+            if is_forge_or_neoforge {
+                JavaRequirement::exact(17)
+            } else {
+                JavaRequirement::at_least(17)
+            }
         } else if minor < 26 {
-            JavaRequirement::at_least(21)
+            if is_forge_or_neoforge {
+                JavaRequirement::exact(21)
+            } else {
+                JavaRequirement::at_least(21)
+            }
         } else {
             JavaRequirement::at_least(25)
         }
@@ -814,6 +824,28 @@ mod tests {
         assert!(!modern.matches(8));
         assert!(modern.matches(17));
         assert!(modern.matches(21));
+
+        let neoforge_1_21 = JavaRuntimeSelector::get_java_requirement("1.21.1", Some("neoforge"));
+        assert_eq!(neoforge_1_21.preferred_major, 21);
+        assert_eq!(neoforge_1_21.max_major, Some(21));
+        assert!(!neoforge_1_21.matches(8));
+        assert!(!neoforge_1_21.matches(17));
+        assert!(neoforge_1_21.matches(21));
+        assert!(!neoforge_1_21.matches(25));
+
+        // Profile with javaVersion 21 and NeoForge loader
+        let profile_1_21 = serde_json::json!({
+            "id": "1.21.1",
+            "javaVersion": {
+                "component": "java-runtime-gamma",
+                "majorVersion": 21
+            }
+        });
+        let req_profile = JavaRuntimeSelector::resolve_java_requirement("1.21.1", Some(&profile_1_21), Some("neoforge"));
+        assert_eq!(req_profile.preferred_major, 21);
+        assert_eq!(req_profile.max_major, Some(21));
+        assert!(req_profile.matches(21));
+        assert!(!req_profile.matches(25));
     }
 
     #[test]

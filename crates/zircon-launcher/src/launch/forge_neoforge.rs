@@ -315,8 +315,7 @@ async fn install_loader(
         mc_version,
         profile_json.as_ref(),
         Some(loader_type),
-    )
-    .preferred_major;
+    );
     // The installer is itself a Java process, so it cannot bootstrap its own
     // runtime. Provision Java up front — system Java, else the cached runtime,
     // else a one-time Adoptium download — exactly like the game launch does.
@@ -324,7 +323,7 @@ async fn install_loader(
     // Java installed, blocking Forge/NeoForge users before they ever reach the
     // provisioning step.
     let java_home = JavaRuntimeResolver::new(cache_dir.to_path_buf())
-        .resolve(required_java)
+        .resolve_with_requirement_progress(&required_java, None)
         .await?;
     let java = java_executable(&java_home);
     run_installer(
