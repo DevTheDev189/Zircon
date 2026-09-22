@@ -138,12 +138,17 @@ fn apply_shaderpack(game_dir: &Path, selection: &PackSelection) -> std::io::Resu
     Ok(())
 }
 
-/// Writes `options.txt`'s `resourcePacks` entry from the player's checked
-/// packs, "vanilla" first.
+/// Writes `options.txt`'s `resourcePacks` entry from the player's active
+/// packs, "vanilla" first as the base.
+///
+/// In Minecraft `options.txt`, packs appearing later in the array override earlier
+/// packs. In the launcher UI and PackSelection, `active_resourcepacks` is ordered
+/// from highest visual priority (index 0) to lowest. We iterate in reverse so
+/// index 0 is placed last in `options.txt`, guaranteeing it overrides lower packs.
 fn apply_resourcepacks(game_dir: &Path, selection: &PackSelection) -> std::io::Result<()> {
     let options = game_dir.join("options.txt");
     let mut entries = vec!["\"vanilla\"".to_string()];
-    for filename in &selection.active_resourcepacks {
+    for filename in selection.active_resourcepacks.iter().rev() {
         entries.push(format!("\"file/{filename}\""));
     }
     OptionsFileUtil::upsert_line(
@@ -152,7 +157,7 @@ fn apply_resourcepacks(game_dir: &Path, selection: &PackSelection) -> std::io::R
         &format!("[{}]", entries.join(",")),
     )?;
     tracing::info!(
-        "Texture packs active: [{}]",
+        "Texture packs active (highest priority first): [{}]",
         selection.active_resourcepacks.join(", ")
     );
     Ok(())
@@ -267,7 +272,7 @@ mod tests {
 
         let options = std::fs::read_to_string(dir.join("options.txt")).unwrap();
         assert_eq!(
-            "resourcePacks:[\"vanilla\",\"file/faithful.zip\",\"file/dramatic-sky.zip\"]\n",
+            "resourcePacks:[\"vanilla\",\"file/dramatic-sky.zip\",\"file/faithful.zip\"]\n",
             options
         );
         let _ = std::fs::remove_dir_all(&dir);

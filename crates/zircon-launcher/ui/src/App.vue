@@ -16,6 +16,12 @@
       @close="onLaunchOverlayClose"
       @open-skins="onOpenSkinsFromLaunch"
     ></LaunchOverlay>
+    <!-- Automatic Crash Diagnostics Modal -->
+    <CrashReportModal
+      :is-open="showCrashReportModal"
+      :crash-data="crashReportData"
+      @close="showCrashReportModal = false"
+    />
 
     <div class="flex flex-1 min-h-0">
       <!-- Sidebar -->
@@ -233,12 +239,13 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import LoginOverlay from './components/LoginOverlay.vue';
 import LaunchOverlay from './components/LaunchOverlay.vue'; // Modern launch progress overlay
+import CrashReportModal from './components/CrashReportModal.vue';
 import StatusBar from './components/StatusBar.vue';
 import ServersView from './views/ServersView.vue';
 import OfflineView from './views/OfflineView.vue';
 import SkinsView from './views/SkinsView.vue';
 import SettingsView from './views/SettingsView.vue';
-import { api, createDefaultSteveDataUrl, onDeepLinkJoin, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
+import { api, createDefaultSteveDataUrl, onDeepLinkJoin, onGameCrashed, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { applyTheme } from './lib/theme';
@@ -308,6 +315,8 @@ const shaderRemember = ref(false);
 const keyPrompt = ref(null);
 const launchingServer = ref(null);
 const deepLinkAddress = ref('');
+const crashReportData = ref(null);
+const showCrashReportModal = ref(false);
 
 let unlisten = [];
 
@@ -373,6 +382,12 @@ onMounted(async () => {
         busy.value = false;
         progress.value = null;
       }
+    }),
+    onGameCrashed((payload) => {
+      crashReportData.value = payload;
+      showCrashReportModal.value = true;
+      launchModalActive.value = false;
+      busy.value = false;
     }),
     onSkinUpdated(() => {
       refreshAvatar();

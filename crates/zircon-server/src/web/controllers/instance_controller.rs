@@ -1041,9 +1041,12 @@ pub async fn get_server_resourcepack(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let packs = packs_for(&state, &id)?;
     let active = packs.get_server_resourcepack();
+    let all_active = packs.get_server_resourcepacks();
     let mapped = active.as_ref().map(|p| views::pack_entry_to_map(p, false));
+    let mapped_list: Vec<_> = all_active.iter().map(|p| views::pack_entry_to_map(p, false)).collect();
     Ok(Json(serde_json::json!({
         "serverResourcePack": mapped,
+        "serverResourcePacks": mapped_list,
     })))
 }
 
@@ -1054,14 +1057,22 @@ pub async fn set_server_resourcepack(
     Json(body): Json<SetServerPackRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let packs = packs_for(&state, &id)?;
-    packs.set_server_resourcepack(body.filename.as_deref())
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    if let Some(list) = body.filenames {
+        packs.set_server_resourcepacks(&list)
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    } else {
+        packs.set_server_resourcepack(body.filename.as_deref())
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    }
 
     let active = packs.get_server_resourcepack();
+    let all_active = packs.get_server_resourcepacks();
     let mapped = active.as_ref().map(|p| views::pack_entry_to_map(p, false));
+    let mapped_list: Vec<_> = all_active.iter().map(|p| views::pack_entry_to_map(p, false)).collect();
     Ok(Json(serde_json::json!({
         "success": true,
         "serverResourcePack": mapped,
+        "serverResourcePacks": mapped_list,
     })))
 }
 
@@ -1538,6 +1549,8 @@ pub struct CrashFixRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SetServerPackRequest {
     pub filename: Option<String>,
+    #[serde(default)]
+    pub filenames: Option<Vec<String>>,
 }
 
 /// GET /api/instances/{id}/mods/export/share-code

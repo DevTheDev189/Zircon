@@ -648,8 +648,18 @@ fn push_arg(command: &mut Vec<String>, key: &str, value: &str) {
 /// Note: the Java offline path only applies `PackOptionsWriter`; per the
 /// porting spec this prep runs on both paths.
 fn prepare_options(game_dir: &Path) -> Result<(), LauncherError> {
+    let options_file = game_dir.join("options.txt");
+
+    // First-launch defaults template:
+    // If options.txt does not exist, copy defaultoptions/options.txt if present
+    if !options_file.exists() {
+        let default_options = game_dir.join("defaultoptions").join("options.txt");
+        if default_options.is_file() {
+            let _ = std::fs::copy(&default_options, &options_file);
+        }
+    }
+
     set_options_entry(game_dir, "skipMultiplayerWarning", "true")?;
-    set_options_entry(game_dir, "fullscreen", "true")?;
     PackOptionsWriter::apply(game_dir)?;
     Ok(())
 }

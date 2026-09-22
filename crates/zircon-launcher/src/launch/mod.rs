@@ -10,6 +10,8 @@ pub mod java;
 pub mod options;
 pub mod profile;
 pub mod runner;
+pub mod servers_dat;
+pub mod system_ram;
 pub mod window_tracker;
 
 pub use runner::LaunchDisplayOptions;

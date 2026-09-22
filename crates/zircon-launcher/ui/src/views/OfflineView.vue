@@ -792,40 +792,113 @@
           <!-- ================= TAB: TEXTURE PACKS ================= -->
           <template v-else-if="activeTab === 'textures'">
             <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
-              <div class="z-section mb-2 text-white font-bold text-sm">Installed Texture Packs ({{ detailedPacks.resourcepacks.length }})</div>
-              <div v-if="detailedPacks.resourcepacks.length" class="max-h-[220px] overflow-y-auto mb-3 flex flex-col gap-1.5 pr-1">
-                <label
-                  v-for="p in detailedPacks.resourcepacks"
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <div class="z-section text-white font-bold text-sm">Active Texture Packs ({{ activeResourcepacksList.length }})</div>
+                  <div class="text-[11px] text-slate-400">Packs higher in the stack override packs below them.</div>
+                </div>
+                <span class="text-[10px] text-cyan-400 font-mono bg-cyan-950/40 border border-cyan-800/60 px-2 py-0.5 rounded-full">
+                  Priority Stack
+                </span>
+              </div>
+
+              <!-- Active packs stack -->
+              <div v-if="activeResourcepacksList.length" class="max-h-[260px] overflow-y-auto mb-4 flex flex-col gap-1.5 pr-1">
+                <div
+                  v-for="(p, index) in activeResourcepacksList"
                   :key="p.filename"
-                  class="flex items-center gap-2.5 text-xs cursor-pointer p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 transition hover:border-slate-700"
+                  class="flex items-center gap-2.5 text-xs p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 shadow-sm transition hover:border-cyan-500/60"
                 >
-                  <input
-                    type="checkbox"
-                    class="zircon-check shrink-0"
-                    :checked="packs.activeResourcepacks.includes(p.filename)"
-                    @change="togglePack(p.filename)"
-                  />
+                  <!-- Priority badge -->
+                  <div class="px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0" :title="index === 0 ? 'Highest Visual Priority' : `Priority Level ${index + 1}`">
+                    #{{ index + 1 }} {{ index === 0 ? 'Top' : '' }}
+                  </div>
+
                   <div class="flex-1 min-w-0">
-                    <div class="text-slate-200 font-medium truncate">{{ p.title || p.filename }}</div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-white font-semibold truncate">{{ p.title || p.filename }}</span>
+                      <span v-if="p.serverEnforced" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                        🔒 Server Enforced
+                      </span>
+                    </div>
                     <div v-if="p.description" class="text-[10px] text-slate-400 truncate">{{ p.description }}</div>
                   </div>
+
                   <span class="bg-slate-950 text-slate-400 border border-slate-800 text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0">
                     {{ p.version || (p.packFormat ? 'v' + p.packFormat : 'Pack') }}
                   </span>
                   <span class="text-slate-500 font-mono text-[11px] shrink-0">{{ fmtBytes(p.sizeBytes) }}</span>
-                  <button
-                    class="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 hover:bg-red-500/10 rounded-lg transition-colors font-medium flex items-center gap-1 shrink-0"
-                    title="Delete"
-                    @click.stop.prevent="deletePack('resource', p.filename)"
-                  >
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                    <span>Delete</span>
-                  </button>
-                </label>
+
+                  <!-- Reorder buttons -->
+                  <div class="flex items-center gap-1 shrink-0 ml-1">
+                    <button
+                      class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
+                      :disabled="index === 0"
+                      title="Move Up (Higher Priority)"
+                      @click="moveResourcepack(index, -1)"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
+                      :disabled="index === activeResourcepacksList.length - 1"
+                      title="Move Down (Lower Priority)"
+                      @click="moveResourcepack(index, 1)"
+                    >
+                      ▼
+                    </button>
+                    <button
+                      class="text-slate-400 hover:text-amber-300 text-xs px-2 py-0.5 hover:bg-amber-500/10 rounded transition font-medium ml-1"
+                      title="Deactivate Pack"
+                      @click="disableResourcepack(p.filename)"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div v-else class="text-xs text-slate-500 mb-3">No texture packs installed.</div>
+              <div v-else class="text-xs text-slate-500 mb-4 italic py-2">No texture packs currently active. Add one from the available list below.</div>
+
+              <!-- Available / Inactive Packs -->
+              <div class="z-section mb-2 text-white font-bold text-sm">Available Packs ({{ inactiveResourcepacksList.length }})</div>
+              <div v-if="inactiveResourcepacksList.length" class="max-h-[220px] overflow-y-auto mb-3 flex flex-col gap-1.5 pr-1">
+                <div
+                  v-for="p in inactiveResourcepacksList"
+                  :key="p.filename"
+                  class="flex items-center gap-2.5 text-xs p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/80 transition hover:border-slate-700 opacity-80 hover:opacity-100"
+                >
+                  <div class="flex-1 min-w-0">
+                    <div class="text-slate-300 font-medium truncate">{{ p.title || p.filename }}</div>
+                    <div v-if="p.description" class="text-[10px] text-slate-500 truncate">{{ p.description }}</div>
+                  </div>
+
+                  <span class="bg-slate-950 text-slate-500 border border-slate-800 text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0">
+                    {{ p.version || (p.packFormat ? 'v' + p.packFormat : 'Pack') }}
+                  </span>
+                  <span class="text-slate-500 font-mono text-[11px] shrink-0">{{ fmtBytes(p.sizeBytes) }}</span>
+
+                  <div class="flex items-center gap-2 shrink-0 ml-1">
+                    <button
+                      class="z-btn text-xs px-2.5 py-1 rounded-lg font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition flex items-center gap-1"
+                      title="Add to active texture packs stack"
+                      @click="enableResourcepack(p.filename)"
+                    >
+                      <span>+ Enable</span>
+                    </button>
+                    <button
+                      class="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 hover:bg-red-500/10 rounded-lg transition-colors font-medium flex items-center gap-1"
+                      title="Delete"
+                      @click="deletePack('resource', p.filename)"
+                    >
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-xs text-slate-500 mb-3 italic py-1">All installed texture packs are currently active.</div>
 
               <!-- Custom upload / drop zone for texture packs -->
               <div
@@ -1927,6 +2000,19 @@ const packs = ref({ shaderpacks: [], resourcepacks: [], activeResourcepacks: [] 
 const detailedPacks = ref({ shaderpacks: [], resourcepacks: [], shadersEnabled: false });
 const activeShaderpack = ref('');
 
+const activeResourcepacksList = computed(() => {
+  const activeNames = packs.value.activeResourcepacks || [];
+  const allPacks = detailedPacks.value.resourcepacks || [];
+  const map = new Map(allPacks.map((p) => [p.filename, p]));
+  return activeNames.map((name) => map.get(name) || { filename: name, title: name });
+});
+
+const inactiveResourcepacksList = computed(() => {
+  const activeSet = new Set(packs.value.activeResourcepacks || []);
+  const allPacks = detailedPacks.value.resourcepacks || [];
+  return allPacks.filter((p) => !activeSet.has(p.filename));
+});
+
 // Shaders search state
 const shaderProvider = ref('modrinth');
 const shaderSearchQuery = ref('');
@@ -2375,6 +2461,36 @@ async function togglePack(filename) {
   const next = current.includes(filename)
     ? current.filter((f) => f !== filename)
     : [...current, filename];
+  await api.setActiveResourcepacks(selectedDir.value, next);
+  await loadPacks();
+}
+
+async function moveResourcepack(index, delta) {
+  if (!selectedDir.value) return;
+  const current = [...(packs.value.activeResourcepacks || [])];
+  const targetIndex = index + delta;
+  if (targetIndex < 0 || targetIndex >= current.length) return;
+  const [item] = current.splice(index, 1);
+  current.splice(targetIndex, 0, item);
+  packs.value.activeResourcepacks = current;
+  await api.setActiveResourcepacks(selectedDir.value, current);
+}
+
+async function enableResourcepack(filename) {
+  if (!selectedDir.value) return;
+  const current = packs.value.activeResourcepacks || [];
+  if (current.includes(filename)) return;
+  const next = [filename, ...current];
+  packs.value.activeResourcepacks = next;
+  await api.setActiveResourcepacks(selectedDir.value, next);
+  await loadPacks();
+}
+
+async function disableResourcepack(filename) {
+  if (!selectedDir.value) return;
+  const current = packs.value.activeResourcepacks || [];
+  const next = current.filter((f) => f !== filename);
+  packs.value.activeResourcepacks = next;
   await api.setActiveResourcepacks(selectedDir.value, next);
   await loadPacks();
 }

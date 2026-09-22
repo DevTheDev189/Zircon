@@ -330,30 +330,30 @@ impl PackManagementService {
     }
 
     pub fn set_server_resourcepack(&self, filename: Option<&str>) -> Result<(), PackError> {
-        let mut found = false;
+        let filenames = filename.map(|f| vec![f.to_string()]).unwrap_or_default();
+        self.set_server_resourcepacks(&filenames)
+    }
+
+    pub fn set_server_resourcepacks(&self, filenames: &[String]) -> Result<(), PackError> {
         self.bom_service.with_bom(|bom| {
             for pack in &mut bom.resourcepacks {
-                if let Some(target) = filename {
-                    if pack.filename == target {
-                        pack.server_enforced = Some(true);
-                        found = true;
-                    } else {
-                        pack.server_enforced = None;
-                    }
+                if filenames.iter().any(|f| f == &pack.filename) {
+                    pack.server_enforced = Some(true);
                 } else {
                     pack.server_enforced = None;
                 }
             }
         });
-        if filename.is_some() && !found {
-            return Err(PackError::Invalid(format!("Resource pack '{filename:?}' not found in BOM")));
-        }
         self.bom_service.save().map_err(PackError::Io)?;
         Ok(())
     }
 
     pub fn get_server_resourcepack(&self) -> Option<PackEntry> {
         self.bom_service.get_bom().resourcepacks.into_iter().find(|p| p.server_enforced == Some(true))
+    }
+
+    pub fn get_server_resourcepacks(&self) -> Vec<PackEntry> {
+        self.bom_service.get_bom().resourcepacks.into_iter().filter(|p| p.server_enforced == Some(true)).collect()
     }
 
     // ----------------------------------------------------------------------

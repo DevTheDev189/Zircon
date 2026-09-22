@@ -1,6 +1,6 @@
 [package]
 name = "zircon-launcher"
-version = "0.4.16"
+version = "0.4.17"
 edition = "2021"
 description = "Zircon companion launcher: Tauri v2 shell + Vue 3 frontend over the Phase 4 launch engine (Microsoft auth, classpath resolver, sync engines, offline instances)"
 license = "BSL-1.1"
@@ -21,6 +21,7 @@ tower-http = { workspace = true }
 reqwest = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
+sysinfo.workspace = true
 sha1.workspace = true
 sha2.workspace = true
 hex.workspace = true

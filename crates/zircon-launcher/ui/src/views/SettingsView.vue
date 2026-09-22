@@ -403,22 +403,49 @@
       <!-- RAM slider -->
       <div class="mb-5">
         <div class="flex items-center justify-between mb-2">
-          <span class="z-label font-semibold text-slate-300">Max Memory Allocation (RAM)</span>
-          <span class="text-xs font-bold text-cyan-300 font-mono bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded-md">{{ settings.memoryGb }} GB</span>
+          <div class="flex items-center gap-2">
+            <span class="z-label font-semibold text-slate-300">Max Memory Allocation (RAM)</span>
+            <span v-if="systemRamInfo.totalRamGb" class="text-[10px] text-slate-400 font-mono bg-slate-900 border border-slate-800 px-2 py-0.5 rounded">
+              System: {{ systemRamInfo.totalRamGb }} GB detected
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span
+              v-if="settings.memoryGb === systemRamInfo.recommendedRamGb"
+              class="text-[10px] font-bold text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded"
+            >
+              Recommended
+            </span>
+            <span class="text-xs font-bold text-cyan-300 font-mono bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded-md">
+              {{ settings.memoryGb }} GB
+            </span>
+          </div>
         </div>
         <input
           v-model.number="settings.memoryGb"
           type="range"
           min="2"
-          max="16"
+          :max="sliderMax"
           step="1"
           class="w-full accent-cyan-400 cursor-pointer"
         />
         <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
-          <span>2 GB (Minimal)</span><span>16 GB (Heavy Modpacks)</span>
+          <span>2 GB (Minimal)</span>
+          <span
+            class="text-cyan-400/80 cursor-pointer hover:underline"
+            :title="'Click to apply recommended memory (' + systemRamInfo.recommendedRamGb + ' GB)'"
+            @click="settings.memoryGb = systemRamInfo.recommendedRamGb"
+          >
+            Optimal: {{ systemRamInfo.recommendedRamGb }} GB
+          </span>
+          <span>{{ sliderMax }} GB (Heavy Modpacks)</span>
+        </div>
+        <div v-if="isHighRam" class="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-1.5">
+          <span>⚠️</span>
+          <span>Allocating &gt;80% of your system RAM may cause Windows or other background apps to stutter.</span>
         </div>
         <p class="z-label mt-1.5 text-slate-400 text-xs">
-          Applied to offline instance launches (replaces -Xmx). Server launches default to 4 GB.
+          Applied to offline and local instance launches (-Xmx). Automatically adapts to your hardware.
         </p>
       </div>
 
@@ -811,6 +838,13 @@ const savedAt = ref('');
 const logText = ref('');
 const copiedAt = ref('');
 
+const systemRamInfo = ref({ totalRamGb: 16, recommendedRamGb: 6 });
+const sliderMax = computed(() => Math.min(32, Math.max(8, systemRamInfo.value.totalRamGb || 16)));
+const isHighRam = computed(() => {
+  const total = systemRamInfo.value.totalRamGb || 16;
+  return settings.value.memoryGb > (total * 0.8);
+});
+
 const showAdvancedTheme = ref(false);
 const showAdvancedJava = ref(false);
 const showLauncherLogs = ref(false);
@@ -973,6 +1007,12 @@ onMounted(async () => {
     launcherVersion.value = await api.getLauncherVersion();
   } catch {
     launcherVersion.value = '0.4.2';
+  }
+  try {
+    const ram = await api.getSystemRamInfo();
+    if (ram) systemRamInfo.value = ram;
+  } catch (e) {
+    console.warn('Could not load system RAM info:', e);
   }
   refreshLogs();
   refreshMcLog();

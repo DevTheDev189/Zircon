@@ -200,6 +200,7 @@ pub fn run() {
             commands::get_loader_versions,
             commands::get_launcher_metadata,
             commands::get_settings,
+            commands::get_system_ram_info,
             commands::save_settings,
             commands::show_main_window,
             commands::get_launcher_version,

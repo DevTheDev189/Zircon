@@ -82,9 +82,9 @@ impl Default for LauncherSettings {
 
 
 impl LauncherSettings {
-    /// Clamps a memory value into the UI slider's 2–16 GB range.
+    /// Clamps a memory value into the UI slider's 2–32 GB range.
     pub fn with_clamped_memory(mut self, memory_gb: u32) -> Self {
-        self.memory_gb = memory_gb.clamp(2, 16);
+        self.memory_gb = memory_gb.clamp(2, 32);
         self
     }
 }
@@ -92,7 +92,17 @@ impl LauncherSettings {
 /// Loads the settings file (defaults when missing or corrupt — the Java keeps
 /// the settings purely in memory, so this is the launcher's own persistence).
 pub fn load_settings() -> LauncherSettings {
-    load_from(&settings_file())
+    let file = settings_file();
+    if !file.is_file() {
+        let recommended = crate::launch::system_ram::get_recommended_ram_gb(
+            crate::launch::system_ram::get_system_ram_gb(),
+        );
+        let mut s = LauncherSettings::default();
+        s.memory_gb = recommended;
+        s
+    } else {
+        load_from(&file)
+    }
 }
 
 /// Loads settings from an explicit file (used by tests).
@@ -214,7 +224,7 @@ mod tests {
             },
         );
         let loaded = load_from(&file);
-        assert_eq!(16, loaded.memory_gb);
+        assert_eq!(32, loaded.memory_gb);
         assert!(loaded.discord_rpc);
         let _ = std::fs::remove_file(&file);
     }

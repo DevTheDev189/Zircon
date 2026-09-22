@@ -7358,7 +7358,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-core"
-version = "0.4.16"
+version = "0.4.17"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -7383,7 +7383,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-launcher"
-version = "0.4.16"
+version = "0.4.17"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -7405,6 +7405,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2",
+ "sysinfo",
  "tar",
  "tauri",
  "tauri-build",
@@ -7426,7 +7427,7 @@ dependencies = [
 
 [[package]]
 name = "zircon-server"
-version = "0.4.16"
+version = "0.4.17"
 dependencies = [
  "async-trait",
  "axum",

@@ -330,6 +330,7 @@ export const api = {
 
   // Settings & App Info
   getSettings: () => invoke('get_settings'),
+  getSystemRamInfo: () => invoke('get_system_ram_info'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
   showMainWindow: () => invoke('show_main_window'),
   getLauncherVersion: () => invoke('get_launcher_version'),
@@ -352,6 +353,7 @@ export const onLaunchStatus = (cb) => listen('launch-status', (e) => cb(e.payloa
 export const onLaunchProgress = (cb) => listen('launch-progress', (e) => cb(e.payload));
 export const onGameOutput = (cb) => listen('game-output', (e) => cb(e.payload));
 export const onGameStatus = (cb) => listen('game-status', (e) => cb(e.payload));
+export const onGameCrashed = (cb) => listen('game-crashed', (e) => cb(e.payload));
 export const onGameWindowReady = (cb) => listen('game-window-ready', (e) => cb(e.payload));
 export const onModpackProgress = (cb) => listen('modpack-progress', (e) => cb(e.payload));
 

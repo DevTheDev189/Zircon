@@ -52,6 +52,7 @@ pub struct RunningGame {
     pub id: u64,
     pub label: String,
     pub child: Child,
+    pub game_dir: PathBuf,
 }
 
 /// The player's answer to the shader opt-in prompt (possibly remembered for
@@ -1340,10 +1341,7 @@ async fn run_online_flow(
                 Err(_) => false,
             };
             if is_safe {
-                if pack.server_enforced == Some(true) {
-                    selection.active_resourcepacks.retain(|n| n != &pack.filename);
-                    selection.active_resourcepacks.insert(0, pack.filename.clone());
-                } else if !selection.active_resourcepacks.contains(&pack.filename) {
+                if !selection.active_resourcepacks.contains(&pack.filename) {
                     selection.active_resourcepacks.push(pack.filename.clone());
                 }
             } else {
@@ -1449,6 +1447,18 @@ async fn run_online_flow(
     emit_status(app, "Starting Minecraft process...");
     state.launch_cancellation.guard_active()?;
     let output = game_output_emitter(app);
+    let canonical_name = if let Some(title) = bom.server_title.as_deref().filter(|t| !t.trim().is_empty()) {
+        title.trim()
+    } else {
+        name.as_deref().filter(|n| !n.trim().is_empty()).unwrap_or(&address)
+    };
+    let server_addr = format!("{url_host}:{port}");
+    let _ = crate::launch::servers_dat::ensure_server_entry(
+        &game_dir,
+        canonical_name,
+        &server_addr,
+    );
+
     let java_args = override_heap("", memory_gb, custom_jvm.as_deref());
     let child = MinecraftRunner
         .launch_with_options(
@@ -1470,8 +1480,9 @@ async fn run_online_flow(
         id,
         label: format!("{url_host}:{port}"),
         child,
+        game_dir: game_dir.clone(),
     });
-    watch_game(app.clone(), id, format!("{url_host}:{port}"));
+    watch_game(app.clone(), id, format!("{url_host}:{port}"), game_dir);
     crate::launch::window_tracker::clear_always_on_top(&app);
     crate::launch::window_tracker::spawn_window_tracker(app.clone(), id, pid);
 
@@ -1593,7 +1604,7 @@ pub async fn respond_key_prompt(
 /// Watches a running game; when it exits, clears the state slot and emits a
 /// `game-status` event. Polls `try_wait` so the child stays killable via
 /// `stop_game` while it runs.
-fn watch_game(app: AppHandle, id: u64, label: String) {
+fn watch_game(app: AppHandle, id: u64, label: String, game_dir: PathBuf) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_millis(500)).await;
@@ -1618,6 +1629,20 @@ fn watch_game(app: AppHandle, id: u64, label: String) {
                         serde_json::json!({ "running": false, "label": label, "code": code }),
                     );
                     let _ = app.emit("launch-status", format!("Game exited (code {code})."));
+
+                    if !status.success() {
+                        tracing::warn!("Minecraft exited with failure code {code} — analyzing crash dumps and logs...");
+                        let analysis = crate::launch::crash_analyzer::analyze_instance_latest_crash(&game_dir);
+                        let _ = app.emit(
+                            "game-crashed",
+                            serde_json::json!({
+                                "code": code,
+                                "label": label,
+                                "gameDir": game_dir.to_string_lossy(),
+                                "analysis": analysis,
+                            }),
+                        );
+                    }
                     return;
                 }
                 Ok(None) => {}
@@ -2532,8 +2557,9 @@ async fn run_offline_flow(
         id,
         label: instance.name.clone(),
         child,
+        game_dir: game_dir.clone(),
     });
-    watch_game(app.clone(), id, instance.name.clone());
+    watch_game(app.clone(), id, instance.name.clone(), game_dir);
     crate::launch::window_tracker::clear_always_on_top(&app);
     crate::launch::window_tracker::spawn_window_tracker(app.clone(), id, pid);
 
@@ -4920,6 +4946,11 @@ pub fn show_main_window(window: tauri::Window) -> Result<(), String> {
 #[tauri::command]
 pub fn get_settings(state: State<'_, LauncherState>) -> Result<LauncherSettings, String> {
     Ok(state.settings.lock().unwrap().clone())
+}
+
+#[tauri::command]
+pub fn get_system_ram_info() -> Result<crate::launch::system_ram::SystemRamInfo, String> {
+    Ok(crate::launch::system_ram::get_system_ram_info())
 }
 
 #[tauri::command]
