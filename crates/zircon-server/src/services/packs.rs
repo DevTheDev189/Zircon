@@ -343,6 +343,15 @@ impl PackManagementService {
                     pack.server_enforced = None;
                 }
             }
+
+            let mut ordered: Vec<PackEntry> = Vec::new();
+            for fname in filenames {
+                if let Some(pos) = bom.resourcepacks.iter().position(|p| &p.filename == fname) {
+                    ordered.push(bom.resourcepacks.remove(pos));
+                }
+            }
+            ordered.append(&mut bom.resourcepacks);
+            bom.resourcepacks = ordered;
         });
         self.bom_service.save().map_err(PackError::Io)?;
         Ok(())

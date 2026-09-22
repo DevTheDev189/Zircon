@@ -2736,11 +2736,11 @@ return function render(_ctx, _cache) {
                               _createElementVNode("div", _hoisted_221, [
                                 _createElementVNode("div", _hoisted_222, [
                                   _createElementVNode("h3", _hoisted_223, [
-                                    _cache[69] || (_cache[69] = _createElementVNode("span", null, "Server Texture Pack", -1 /* CACHED */)),
+                                    _createElementVNode("span", null, "Server Texture Packs"),
                                     _createElementVNode("span", {
-                                      class: _normalizeClass(["text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider flex items-center gap-1", serverResourcePack ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'])
+                                      class: _normalizeClass(["text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider flex items-center gap-1", (serverResourcePacks && serverResourcePacks.length) ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'])
                                     }, [
-                                      serverResourcePack
+                                      (serverResourcePacks && serverResourcePacks.length)
                                         ? (_openBlock(), _createElementBlock("svg", _hoisted_224, [...(_cache[68] || (_cache[68] = [
                                             _createElementVNode("path", {
                                               "fill-rule": "evenodd",
@@ -2749,7 +2749,7 @@ return function render(_ctx, _cache) {
                                             }, null, -1 /* CACHED */)
                                           ]))]))
                                         : _createCommentVNode("v-if", true),
-                                      _createElementVNode("span", null, _toDisplayString(serverResourcePack ? 'Active Server Pack' : 'None Configured'), 1 /* TEXT */)
+                                      _createElementVNode("span", null, _toDisplayString((serverResourcePacks && serverResourcePacks.length) ? (serverResourcePacks.length + ' Active Server Pack' + (serverResourcePacks.length > 1 ? 's' : '')) : 'None Configured'), 1 /* TEXT */)
                                     ], 2 /* CLASS */)
                                   ])
                                 ]),
@@ -2797,38 +2797,69 @@ return function render(_ctx, _cache) {
                               ])
                             ]),
                             _createCommentVNode(" Active Pack Details (if active) "),
-                            serverResourcePack
-                              ? (_openBlock(), _createElementBlock("div", _hoisted_230, [
-                                  _createElementVNode("div", _hoisted_231, [
-                                    _createElementVNode("img", {
-                                      src: serverResourcePack.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2346d66d\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>',
-                                      class: "w-11 h-11 rounded-lg object-cover border border-slate-700 shrink-0"
-                                    }, null, 8 /* PROPS */, _hoisted_232),
-                                    _createElementVNode("div", _hoisted_233, [
-                                      _createElementVNode("div", _hoisted_234, [
-                                        _cache[73] || (_cache[73] = _createElementVNode("svg", {
-                                          class: "w-3.5 h-3.5 text-cyan-400 shrink-0",
-                                          viewBox: "0 0 20 20",
-                                          fill: "currentColor"
-                                        }, [
-                                          _createElementVNode("path", {
-                                            "fill-rule": "evenodd",
-                                            d: "M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z",
-                                            "clip-rule": "evenodd"
-                                          })
-                                        ], -1 /* CACHED */)),
-                                        _createElementVNode("p", _hoisted_235, _toDisplayString(serverResourcePack.title || serverResourcePack.filename), 1 /* TEXT */),
-                                        _createElementVNode("span", _hoisted_236, _toDisplayString(serverResourcePack.version || (serverResourcePack.packFormat ? 'Format ' + serverResourcePack.packFormat : 'Active')), 1 /* TEXT */),
-                                        (serverResourcePack.fileSize)
-                                          ? (_openBlock(), _createElementBlock("span", _hoisted_237, _toDisplayString((serverResourcePack.fileSize / (1024 * 1024)).toFixed(2)) + " MB", 1 /* TEXT */))
-                                          : _createCommentVNode("v-if", true)
+                            (serverResourcePacks && serverResourcePacks.length)
+                              ? (_openBlock(), _createElementBlock("div", {
+                                  key: 0,
+                                  class: "mt-4 flex flex-col gap-2.5"
+                                }, [
+                                  _createElementVNode("div", { class: "flex items-center justify-between text-xs text-slate-400 font-semibold px-1" }, [
+                                    _createElementVNode("span", null, "Active Server Texture Packs Hierarchy"),
+                                    _createElementVNode("span", { class: "text-[11px] text-cyan-400 font-mono" }, "Top pack overrides lower packs")
+                                  ]),
+                                  (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(serverResourcePacks, (sp, sIdx) => {
+                                    return (_openBlock(), _createElementBlock("div", {
+                                      key: sp.filename,
+                                      class: "p-3 rounded-xl bg-slate-950/70 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-[0_0_15px_rgba(6,182,212,0.05)]"
+                                    }, [
+                                      _createElementVNode("div", { class: "flex items-center gap-3 min-w-0" }, [
+                                        _createElementVNode("span", {
+                                          class: _normalizeClass([
+                                            "text-[10px] font-mono font-bold px-2 py-1 rounded shrink-0 uppercase tracking-wider",
+                                            sIdx === 0
+                                              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                                              : "bg-slate-800 text-slate-400 border border-slate-700"
+                                          ])
+                                        }, _toDisplayString(sIdx === 0 ? "#1 Top" : `#${sIdx + 1}`), 2 /* CLASS */),
+                                        _createElementVNode("img", {
+                                          src: sp.iconUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 24 24\' fill=\'%2346d66d\'><path d=\'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5\'/></svg>',
+                                          class: "w-10 h-10 rounded-lg object-cover border border-slate-700 shrink-0"
+                                        }, null, 8 /* PROPS */, ["src"]),
+                                        _createElementVNode("div", { class: "min-w-0" }, [
+                                          _createElementVNode("div", { class: "flex items-center gap-2 flex-wrap" }, [
+                                            _createElementVNode("p", { class: "font-bold text-sm text-white truncate" }, _toDisplayString(sp.title || sp.filename), 1 /* TEXT */),
+                                            _createElementVNode("span", { class: "bg-slate-800 text-slate-300 border border-slate-700 text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0" }, _toDisplayString(sp.version || (sp.packFormat ? 'Format ' + sp.packFormat : 'Active')), 1 /* TEXT */),
+                                            (sp.fileSize)
+                                              ? (_openBlock(), _createElementBlock("span", { key: 0, class: "text-[10px] font-mono text-slate-400 shrink-0" }, _toDisplayString((sp.fileSize / (1024 * 1024)).toFixed(2)) + " MB", 1 /* TEXT */))
+                                              : _createCommentVNode("v-if", true)
+                                          ]),
+                                          _createElementVNode("p", { class: "text-xs text-slate-400 font-mono truncate mt-0.5" }, _toDisplayString(sp.filename), 1 /* TEXT */),
+                                          (sp.sha1)
+                                            ? (_openBlock(), _createElementBlock("p", { key: 0, class: "text-[10px] text-cyan-400/80 font-mono mt-0.5 truncate" }, "SHA-1: " + _toDisplayString(sp.sha1), 1 /* TEXT */))
+                                            : _createCommentVNode("v-if", true)
+                                        ])
                                       ]),
-                                      _createElementVNode("p", _hoisted_238, _toDisplayString(serverResourcePack.filename), 1 /* TEXT */),
-                                      (serverResourcePack.sha1)
-                                        ? (_openBlock(), _createElementBlock("p", _hoisted_239, "SHA-1: " + _toDisplayString(serverResourcePack.sha1), 1 /* TEXT */))
-                                        : _createCommentVNode("v-if", true)
-                                    ])
-                                  ])
+                                      _createElementVNode("div", { class: "flex items-center gap-1.5 shrink-0" }, [
+                                        _createElementVNode("button", {
+                                          disabled: sIdx === 0 || serverPackLoading,
+                                          onClick: () => moveServerResourcePack(sIdx, -1),
+                                          title: "Move up in priority",
+                                          class: "w-7 h-7 rounded flex items-center justify-center bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-200 border border-slate-700 text-xs transition"
+                                        }, "▲", 8 /* PROPS */, ["disabled", "onClick"]),
+                                        _createElementVNode("button", {
+                                          disabled: sIdx === (serverResourcePacks.length - 1) || serverPackLoading,
+                                          onClick: () => moveServerResourcePack(sIdx, 1),
+                                          title: "Move down in priority",
+                                          class: "w-7 h-7 rounded flex items-center justify-center bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-200 border border-slate-700 text-xs transition"
+                                        }, "▼", 8 /* PROPS */, ["disabled", "onClick"]),
+                                        _createElementVNode("button", {
+                                          disabled: serverPackLoading,
+                                          onClick: () => toggleServerResourcePack(sp),
+                                          title: "Remove from server-enforced packs",
+                                          class: "px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/30 text-xs font-semibold transition ml-1"
+                                        }, "Remove", 8 /* PROPS */, ["disabled", "onClick"])
+                                      ])
+                                    ]))
+                                  }), 128 /* KEYED_FRAGMENT */))
                                 ]))
                               : _createCommentVNode("v-if", true)
                           ]),
@@ -3302,7 +3333,7 @@ return function render(_ctx, _cache) {
                                               }, null, -1 /* CACHED */)
                                             ]))]))
                                           : _createCommentVNode("v-if", true),
-                                        _createElementVNode("span", null, _toDisplayString(p.serverEnforced ? 'Active Pack' : 'Set as Active'), 1 /* TEXT */)
+                                        _createElementVNode("span", null, _toDisplayString(p.serverEnforced ? 'Active Pack' : '+ Enforce on Server'), 1 /* TEXT */)
                                       ], 10 /* CLASS, PROPS */, _hoisted_325),
                                       _createElementVNode("button", {
                                         onClick: $event => (deletePack(p.filename, 'resourcepack')),

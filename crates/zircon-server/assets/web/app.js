@@ -143,6 +143,7 @@ createApp({
             texturePackSearchResults: [],
             installingPacks: {}, // { [projectId]: true } while an install is in flight
             serverResourcePack: null,
+            serverResourcePacks: [],
             serverPackLoading: false,
             serverPackUploading: false,
             whitelistEnabled: false,

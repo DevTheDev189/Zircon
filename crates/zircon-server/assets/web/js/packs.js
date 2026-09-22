@@ -34,9 +34,11 @@ window.Zircon.packs = {
         }
         try {
             const srp = await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks/server-pack`);
-            this.serverResourcePack = srp.serverResourcePack || null;
+            this.serverResourcePacks = srp.serverResourcePacks || (srp.serverResourcePack ? [srp.serverResourcePack] : []);
+            this.serverResourcePack = this.serverResourcePacks[0] || null;
         } catch (e) {
             this.serverResourcePack = null;
+            this.serverResourcePacks = [];
         }
         this.selectedShaders = {};
         this.selectedResourcePacks = {};
@@ -312,20 +314,49 @@ window.Zircon.packs = {
         this.loadShaders();
     },
     async toggleServerResourcePack(pack) {
-        if (!this.selectedInstance) return;
-        const isCurrent = this.serverResourcePack && this.serverResourcePack.filename === pack.filename;
-        const targetFilename = isCurrent ? null : pack.filename;
+        if (!this.selectedInstance || !pack) return;
+        const currentActive = this.serverResourcePacks || [];
+        const isCurrentlyActive = currentActive.some(p => p.filename === pack.filename);
+        let nextFilenames;
+        if (isCurrentlyActive) {
+            nextFilenames = currentActive.filter(p => p.filename !== pack.filename).map(p => p.filename);
+        } else {
+            nextFilenames = [...currentActive.map(p => p.filename), pack.filename];
+        }
         this.serverPackLoading = true;
         try {
             await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks/server-pack`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    filename: targetFilename
+                    filenames: nextFilenames
                 })
             });
             await this.loadShaders();
         } catch (e) {
             alert('Failed to update server resource pack: ' + e.message);
+        } finally {
+            this.serverPackLoading = false;
+        }
+    },
+    async moveServerResourcePack(index, delta) {
+        if (!this.selectedInstance || !this.serverResourcePacks) return;
+        const newIndex = index + delta;
+        if (newIndex < 0 || newIndex >= this.serverResourcePacks.length) return;
+        const nextList = [...this.serverResourcePacks];
+        const temp = nextList[index];
+        nextList[index] = nextList[newIndex];
+        nextList[newIndex] = temp;
+        this.serverPackLoading = true;
+        try {
+            await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks/server-pack`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filenames: nextList.map(p => p.filename)
+                })
+            });
+            await this.loadShaders();
+        } catch (e) {
+            alert('Failed to reorder server packs: ' + e.message);
         } finally {
             this.serverPackLoading = false;
         }
@@ -351,10 +382,14 @@ window.Zircon.packs = {
                     const data = await res.json();
                     const packFilename = data.filename || data.pack?.filename;
                     if (packFilename) {
+                        const currentActive = (this.serverResourcePacks || []).map(p => p.filename);
+                        if (!currentActive.includes(packFilename)) {
+                            currentActive.push(packFilename);
+                        }
                         await this.api(`/api/instances/${this.selectedInstance.id}/resourcepacks/server-pack`, {
                             method: 'POST',
                             body: JSON.stringify({
-                                filename: packFilename
+                                filenames: currentActive
                             })
                         });
                     }

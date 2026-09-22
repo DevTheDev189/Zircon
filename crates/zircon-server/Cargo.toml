@@ -1,6 +1,6 @@
 [package]
 name = "zircon-server"
-version = "0.4.17"
+version = "0.4.18"
 edition = "2021"
 description = "Zircon server manager daemon: process supervisor, TCP multiplexer, backup engine, Axum admin API"
 license = "BSL-1.1"
