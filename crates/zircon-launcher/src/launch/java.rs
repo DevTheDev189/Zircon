@@ -107,7 +107,7 @@ impl JavaRuntimeSelector {
     }
 
     /// Evaluates the Java version requirement for a given Minecraft version and optional mod loader.
-    pub fn get_java_requirement(minecraft_version: &str, loader: Option<&str>) -> JavaRequirement {
+    pub fn get_java_requirement(minecraft_version: &str, _loader: Option<&str>) -> JavaRequirement {
         let trimmed = minecraft_version.trim();
         if trimmed.is_empty() {
             return JavaRequirement::at_least(17);
@@ -145,17 +145,9 @@ impl JavaRuntimeSelector {
             0
         };
 
-        let is_forge_or_neoforge = loader.is_some_and(|l| {
-            l.eq_ignore_ascii_case("forge") || l.eq_ignore_ascii_case("neoforge")
-        });
-
         if minor < 17 {
-            // MC < 1.17: Java 8 is required. Forge 1.16 and older MUST run on Java 8 due to LaunchWrapper / ModLauncher restrictions.
-            if is_forge_or_neoforge || minor <= 16 {
-                JavaRequirement::exact(8)
-            } else {
-                JavaRequirement::at_least(8)
-            }
+            // MC < 1.17: Strictly Java 8 for all loaders
+            JavaRequirement::exact(8)
         } else if minor == 17 {
             JavaRequirement {
                 preferred_major: 16,
@@ -163,19 +155,13 @@ impl JavaRuntimeSelector {
                 max_major: Some(17),
             }
         } else if minor < 20 || (minor == 20 && patch < 5) {
-            if is_forge_or_neoforge {
-                JavaRequirement::exact(17)
-            } else {
-                JavaRequirement::at_least(17)
-            }
+            // MC 1.18 - 1.20.4: Strictly Java 17 for all loaders
+            JavaRequirement::exact(17)
         } else if minor < 26 {
-            if is_forge_or_neoforge {
-                JavaRequirement::exact(21)
-            } else {
-                JavaRequirement::at_least(21)
-            }
+            // MC 1.20.5 - 1.25.x: Strictly Java 21 for all loaders
+            JavaRequirement::exact(21)
         } else {
-            JavaRequirement::at_least(25)
+            JavaRequirement::exact(25)
         }
     }
 
@@ -820,10 +806,10 @@ mod tests {
 
         let modern = JavaRuntimeSelector::get_java_requirement("1.20.4", Some("fabric"));
         assert_eq!(modern.preferred_major, 17);
-        assert_eq!(modern.max_major, None);
+        assert_eq!(modern.max_major, Some(17));
         assert!(!modern.matches(8));
         assert!(modern.matches(17));
-        assert!(modern.matches(21));
+        assert!(!modern.matches(21));
 
         let neoforge_1_21 = JavaRuntimeSelector::get_java_requirement("1.21.1", Some("neoforge"));
         assert_eq!(neoforge_1_21.preferred_major, 21);
@@ -992,5 +978,22 @@ mod tests {
         assert!(matches!(err, LauncherError::InvalidInput(_)), "{err:?}");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_exact_java_requirements_for_all_loaders() {
+        for loader in [None, Some("fabric"), Some("neoforge"), Some("forge"), Some("quilt")] {
+            let req_1_16 = JavaRuntimeSelector::get_java_requirement("1.16.5", loader);
+            assert_eq!(req_1_16.preferred_major, 8);
+            assert_eq!(req_1_16.max_major, Some(8));
+
+            let req_1_20_1 = JavaRuntimeSelector::get_java_requirement("1.20.1", loader);
+            assert_eq!(req_1_20_1.preferred_major, 17);
+            assert_eq!(req_1_20_1.max_major, Some(17));
+
+            let req_1_21_1 = JavaRuntimeSelector::get_java_requirement("1.21.1", loader);
+            assert_eq!(req_1_21_1.preferred_major, 21);
+            assert_eq!(req_1_21_1.max_major, Some(21));
+        }
     }
 }

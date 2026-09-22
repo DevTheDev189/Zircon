@@ -432,7 +432,7 @@ async fn install_quilt(
     }
 
     fs::create_dir_all(server_dir)?;
-    let java = java_bin();
+    let java = java_bin_for_version(crate::process::manager::detect_java_version(mc_version));
     let mut args = vec![
         java.as_str(),
         "-jar",
@@ -531,9 +531,10 @@ async fn install_forge_like(
     } else {
         "--installServer"
     };
+    let java_bin = java_bin_for_version(crate::process::manager::detect_java_version(mc_version));
     let exit_code = run_installer(
         &[
-            java_bin().as_str(),
+            java_bin.as_str(),
             "-jar",
             installer_jar.to_str().unwrap_or_default(),
             flag,
@@ -661,20 +662,43 @@ async fn download(url: &str, target: &Path) -> Result<(), InstallError> {
 // helpers
 // --------------------------------------------------------------------------
 
-/// Resolves the java executable used to run server installers and the
-/// Minecraft server itself.
+/// Resolves the java executable matching `target_major` (e.g. 8, 17, 21).
 ///
 /// Preference order:
 /// 1. `MC_MANAGER_JAVA_HOME` — explicit override for this wrapper
-/// 2. the newest JDK found in the standard install locations (modern Mojang
-///    releases require Java 21+, and current NeoForge builds require 25)
-/// 3. `$JAVA_HOME` — kept as a fallback for non-standard install locations
-/// 4. `java` on PATH
-pub fn java_bin() -> String {
+/// 2. Exact match in standard install locations (e.g. `jdk-21.*`)
+/// 3. Cached runtime in server's `runtimes/jdk-{target_major}/bin/java(.exe)`
+/// 4. `$JAVA_HOME` if its version matches `target_major`
+/// 5. Fallback to newest installed JDK or `java` on PATH
+pub fn java_bin_for_version(target_major: u8) -> String {
     let exe = if is_windows() { "java.exe" } else { "java" };
     if let Some(candidate) = java_home_bin("MC_MANAGER_JAVA_HOME", exe) {
         return candidate;
     }
+    // 2. Scan standard JDK install locations for the exact required major version
+    if let Some(candidate) = find_exact_jdk_in(target_major, exe, &default_jdk_roots()) {
+        return candidate;
+    }
+    // 3. Scan local server runtimes directory
+    for sub in ["server-data/runtimes", "runtimes"] {
+        let candidate = Path::new(sub)
+            .join(format!("jdk-{target_major}"))
+            .join("bin")
+            .join(exe);
+        if candidate.is_file() {
+            return candidate.to_string_lossy().into_owned();
+        }
+    }
+    // 4. Check JAVA_HOME only if it matches target_major
+    if let Some(candidate) = java_home_bin("JAVA_HOME", exe) {
+        if let Ok(home) = std::env::var("JAVA_HOME") {
+            let (major, _) = jdk_version_from_dir(&home);
+            if major == target_major as i64 {
+                return candidate;
+            }
+        }
+    }
+    // 5. Fallbacks: newest installed JDK or system PATH
     if let Some(candidate) = find_newest_jdk(exe) {
         return candidate;
     }
@@ -684,6 +708,11 @@ pub fn java_bin() -> String {
     exe.to_string()
 }
 
+/// Fallback for callers that don't know the Minecraft version. Defaults to Java 21.
+pub fn java_bin() -> String {
+    java_bin_for_version(21)
+}
+
 /// Returns `<env>/bin/java(.exe)` when the variable is set and the file exists.
 fn java_home_bin(env_var: &str, exe: &str) -> Option<String> {
     let home = std::env::var(env_var).ok()?;
@@ -691,6 +720,35 @@ fn java_home_bin(env_var: &str, exe: &str) -> Option<String> {
     candidate
         .is_file()
         .then(|| candidate.to_string_lossy().into_owned())
+}
+
+/// Scans the standard JDK install roots and returns the `bin/java` of the
+/// JDK matching `target_major`. If multiple match, picks the newest minor within that major.
+fn find_exact_jdk_in(target_major: u8, exe: &str, roots: &[PathBuf]) -> Option<String> {
+    let mut best: Option<(i64, String)> = None;
+    for root in roots {
+        let Ok(entries) = fs::read_dir(root) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let dir_name = entry.file_name().to_string_lossy().into_owned();
+            let candidate = entry.path().join("bin").join(exe);
+            if !candidate.is_file() {
+                continue;
+            }
+            let (major, minor) = jdk_version_from_dir(&dir_name);
+            if major == target_major as i64 {
+                let newer = best
+                    .as_ref()
+                    .map(|(best_minor, _)| minor > *best_minor)
+                    .unwrap_or(true);
+                if newer {
+                    best = Some((minor, candidate.to_string_lossy().into_owned()));
+                }
+            }
+        }
+    }
+    best.map(|(_, path)| path)
 }
 
 /// Scans the standard JDK install roots and returns the `bin/java` of the

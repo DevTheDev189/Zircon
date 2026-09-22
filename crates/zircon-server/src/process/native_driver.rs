@@ -64,7 +64,7 @@ impl ProcessDriver for NativeDriver {
             }
         }
 
-        let java_bin = installer::java_bin();
+        let java_bin = installer::java_bin_for_version(opts.java_version);
         let mut cmd = Command::new(java_bin);
         cmd.current_dir(&opts.server_dir);
 

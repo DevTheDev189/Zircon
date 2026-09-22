@@ -156,7 +156,7 @@ impl LauncherState {
         }.filter(|s| !s.is_expired());
         let curse_forge_key = std::env::var("CURSEFORGE_API_KEY")
             .or_else(|_| std::env::var("MC_MANAGER_CURSEFORGE_API_KEY"))
-            .unwrap_or_default();
+            .unwrap_or_else(|_| zircon_core::api::curseforge::embedded_curseforge_key());
         Self {
             auth,
             accounts,

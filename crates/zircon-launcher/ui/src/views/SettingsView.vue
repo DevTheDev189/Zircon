@@ -941,6 +941,7 @@ const updateProgress = ref(0);
 const updateInfo = ref(null);
 const updateStatusMessage = ref('');
 const updateStatusClass = ref('');
+let rawUpdateInstance = null;
 
 // Minecraft Instance Log state
 const mcLog = ref(null);
@@ -988,12 +989,18 @@ async function checkForUpdates() {
   checkingUpdate.value = true;
   updateStatusMessage.value = '';
   updateInfo.value = null;
+  rawUpdateInstance = null;
   updateProgress.value = 0;
   api.logDebug('Manual launcher update check started...');
   try {
     const update = await checkUpdate();
     if (update?.available) {
-      updateInfo.value = update;
+      rawUpdateInstance = update;
+      updateInfo.value = {
+        version: update.version,
+        currentVersion: update.currentVersion || launcherVersion.value,
+        notes: update.body || '',
+      };
       updateStatusMessage.value = `Update available: v${update.version} (current: v${update.currentVersion || launcherVersion.value})`;
       updateStatusClass.value = 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300';
       api.logDebug(`Manual check: update available -> v${update.version}`);
@@ -1013,22 +1020,23 @@ async function checkForUpdates() {
 }
 
 async function installUpdate() {
-  if (!updateInfo.value) return;
+  if (!rawUpdateInstance) return;
   updating.value = true;
   updateProgress.value = 0;
-  updateStatusMessage.value = `Downloading update v${updateInfo.value.version}...`;
-  api.logDebug(`Starting download of v${updateInfo.value.version}...`);
+  const targetVer = rawUpdateInstance.version;
+  updateStatusMessage.value = `Downloading update v${targetVer}...`;
+  api.logDebug(`Starting download of v${targetVer}...`);
   try {
     let totalBytes = 0;
     let downloadedBytes = 0;
-    await updateInfo.value.downloadAndInstall((event) => {
+    await rawUpdateInstance.downloadAndInstall((event) => {
       if (event.event === 'Started') {
         totalBytes = event.data.contentLength || 0;
       } else if (event.event === 'Progress') {
         downloadedBytes += event.data.chunkLength || 0;
         const percent = totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
         updateProgress.value = percent / 100;
-        updateStatusMessage.value = `Downloading update v${updateInfo.value.version}... ${percent}%`;
+        updateStatusMessage.value = `Downloading update v${targetVer}... ${percent}%`;
       } else if (event.event === 'Finished') {
         updateProgress.value = 1;
         updateStatusMessage.value = 'Update downloaded. Restarting application...';

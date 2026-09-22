@@ -402,7 +402,8 @@ impl MinecraftProcessManager {
             return Ok(());
         }
 
-        let mut command = tokio::process::Command::new(installer::java_bin());
+        let java_version = detect_java_version(&self.context.minecraft_version);
+        let mut command = tokio::process::Command::new(installer::java_bin_for_version(java_version));
         // Untrusted mod code runs inside this JVM: scrub the environment so
         // host secrets (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, ...) can never leak
         // into the server process. Keep only what the JVM needs to function.

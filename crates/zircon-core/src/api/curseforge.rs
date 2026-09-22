@@ -37,10 +37,20 @@ pub fn class_id_for_type(project_type: Option<&str>) -> i64 {
     }
 }
 
+include!(concat!(env!("OUT_DIR"), "/curseforge_key_obf.rs"));
+
+/// Returns the compile-time embedded CurseForge API key deobfuscated in memory on demand.
+pub fn embedded_curseforge_key() -> String {
+    deobfuscate_embedded_key()
+}
+
 impl CurseForgeApiClient {
     pub fn new(api_key: impl Into<String>) -> Self {
         let key_str = api_key.into();
-        let cleaned_key = key_str.trim().trim_matches('"').trim_matches('\'').to_string();
+        let mut cleaned_key = key_str.trim().trim_matches('"').trim_matches('\'').to_string();
+        if cleaned_key.is_empty() {
+            cleaned_key = embedded_curseforge_key();
+        }
         let client = reqwest::Client::builder()
             .user_agent("Zircon-Server/0.2.5 (https://github.com/DevTheDev189/Zircon)")
             .connect_timeout(std::time::Duration::from_secs(15))
@@ -488,5 +498,18 @@ mod tests {
             file.sha1()
         );
         assert_eq!(Some("0123456789abcdef0123456789abcdef"), file.md5());
+    }
+
+    #[test]
+    fn embedded_key_deobfuscates_correctly() {
+        let key = embedded_curseforge_key();
+        assert!(!key.is_empty(), "Embedded key must not be empty");
+        assert!(
+            key.starts_with("$2a$10$"),
+            "Key format must match expected CurseForge token format"
+        );
+
+        let client = CurseForgeApiClient::new("");
+        assert_eq!(client.api_key, key, "CurseForgeApiClient must fall back to embedded key");
     }
 }
