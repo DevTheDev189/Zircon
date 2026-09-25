@@ -412,9 +412,17 @@
 }
 
 .footer-legal {
+  margin-top: 72px;
+  padding-top: 32px;
+  border-top: 1px solid var(--edge-soft);
   display: flex;
-  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #6e7a8a;
   flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
 }
 
 .footer-legal a {
