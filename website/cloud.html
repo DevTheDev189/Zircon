@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zircon Cloud — Zero-Config Modded Minecraft Server Hosting</title>
+  <meta name="description" content="Turnkey modded Minecraft server hosting with proprietary Pause-to-Sleep retention, Zirky AI crash diagnostics, 1-click Modrinth and CurseForge installs, and instant Zircon Launcher sync.">
+  <meta name="theme-color" content="#070b0f">
+  <link rel="icon" type="image/svg+xml" href="assets/img/zircon-icon.svg">
+  <link rel="alternate icon" type="image/png" href="assets/img/favicon.png">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <style>
+    .cloud-hero-shot {
+      margin-top: 40px;
+      position: relative;
+    }
+    .cloud-metric-card {
+      background: linear-gradient(145deg, rgba(14, 22, 34, 0.88), rgba(7, 12, 19, 0.95));
+      border: 1px solid rgba(71, 210, 201, 0.3);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(71, 210, 201, 0.14);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      text-align: center;
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      transition: all 0.25s ease;
+    }
+    .cloud-metric-card:hover {
+      border-color: rgba(71, 210, 201, 0.55);
+      transform: translateY(-4px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 28px 65px rgba(0, 0, 0, 0.85), 0 0 45px rgba(71, 210, 201, 0.25);
+    }
+    .metric-val {
+      font-size: clamp(34px, 4vw, 48px);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 0%, var(--accent-bright) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .metric-label {
+      color: var(--muted);
+      font-size: 14.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <!-- Ambient Procedural Background Layers (Cloud Login Parity) -->
+  <div class="z-bg-dots" aria-hidden="true"></div>
+  <div class="z-orb z-orb-1" aria-hidden="true"></div>
+  <div class="z-orb z-orb-2" aria-hidden="true"></div>
+  <div class="z-orb z-orb-3" aria-hidden="true"></div>
+  <div class="z-orb z-orb-4" aria-hidden="true"></div>
+  <div class="z-particle z-particle-1" aria-hidden="true"></div>
+  <div class="z-particle z-particle-2" aria-hidden="true"></div>
+  <div class="z-particle z-particle-3" aria-hidden="true"></div>
+  <div class="z-particle z-particle-4" aria-hidden="true"></div>
+  <div class="z-particle z-particle-5" aria-hidden="true"></div>
+  <div class="z-particle z-particle-6" aria-hidden="true"></div>
+
+  <!-- ================= NAV ================= -->
+  <header class="site-nav">
+    <div class="container">
+      <a class="brand" href="/" aria-label="Zircon home">
+        <img class="brand-text" src="assets/img/zircon-title.svg" alt="Zircon" width="130" height="28">
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="launcher.html">Launcher</a></li>
+        <li><a href="server.html">Server Manager</a></li>
+        <li><a href="cloud.html" class="active nav-link-cloud">Cloud <span class="nav-cloud-badge">Platform</span></a></li>
+        <li><a href="docs.html">Guides</a></li>
+        <li><a href="faq.html">FAQ</a></li>
+        <li><a href="downloads.html">Downloads</a></li>
+        <li>
+          <a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener" class="nav-github-link" aria-label="GitHub Repository">
+            <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+            <span>GitHub</span>
+          </a>
+        </li>
+        <li><a class="nav-cta" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Launch Cloud</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ================= HERO ================= -->
+  <section class="hero" style="padding-bottom: 32px;">
+    <div class="container">
+      <span class="eyebrow">Turnkey Managed Infrastructure for Modded Minecraft</span>
+      <h1 style="font-size: clamp(34px, 5.2vw, 56px); margin-bottom: 20px;">
+        Modded Minecraft Hosting,<br><span class="hl">Re-engineered from Scratch.</span>
+      </h1>
+      <p class="lede" style="max-width: 740px;">
+        Zero port forwarding. Zero idle server billing. Deploy your server in 60 seconds with proprietary <strong>Pause-to-Sleep</strong> retention, <strong>Zirky AI</strong> crash remediation, and instant 1-click sync to your friends' Zircon Launchers.
+      </p>
+
+      <div class="hero-actions" style="margin-top: 28px;">
+        <a class="btn btn-cloud btn-xl" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          Deploy Server in 60s
+        </a>
+        <a class="btn btn-secondary btn-xl" href="#features">
+          Explore Architecture &darr;
+        </a>
+      </div>
+
+      <div class="hero-foot" style="margin-top: 32px;">
+        <span><i class="dot"></i> Automated SSL &amp; Reverse Proxy</span>
+        <span><i class="dot"></i> Pause-to-Sleep (Zero Idle Billing)</span>
+        <span><i class="dot"></i> DeepSeek-V4 AI Diagnostics</span>
+        <span><i class="dot"></i> 1-Click Modrinth &amp; CurseForge</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= METRICS STRIP ================= -->
+  <section class="section" style="padding: 20px 0 60px;">
+    <div class="container">
+      <div class="grid grid-3">
+        <div class="cloud-metric-card">
+          <div class="metric-val">&lt; 60s</div>
+          <div class="metric-label">Deployment to First Join</div>
+          <p style="color: var(--muted); font-size: 14px; margin-top: 8px;">Pick Fabric, Forge, NeoForge or Quilt — container boots and initializes automatically.</p>
+        </div>
+        <div class="cloud-metric-card">
+          <div class="metric-val">0%</div>
+          <div class="metric-label">Idle CPU &amp; RAM Waste</div>
+          <p style="color: var(--muted); font-size: 14px; margin-top: 8px;">Servers suspend gracefully when empty and wake immediately when players connect.</p>
+        </div>
+        <div class="cloud-metric-card">
+          <div class="metric-val">100%</div>
+          <div class="metric-label">Client Sync Parity</div>
+          <p style="color: var(--muted); font-size: 14px; margin-top: 8px;">Every mod, shader, and config change updates connecting players automatically.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CORE FEATURES GRID ================= -->
+  <section class="section section-alt" id="features">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Architecture &amp; Features</div>
+        <h2>Engineered for Seamless Multiplayer</h2>
+        <p>Everything required to run a high-performance modded community without Linux sysadmin skills.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+          </span>
+          <h3>Pause-to-Sleep Retention</h3>
+          <p>Traditional hosts burn money running empty worlds 24/7. Zircon Cloud suspends the game loop when 0 players are online, waking in seconds upon player connection with 100% of chunk data intact.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
+          </span>
+          <h3>Zirky AI Crash Diagnostics</h3>
+          <p>Powered by DeepSeek-V4-Flash. When a server crashes from an incompatible mod or missing library, Zirky parses the stack trace and generates a 1-click remediation card right in your console.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </span>
+          <h3>Modrinth &amp; CurseForge In-Browser</h3>
+          <p>Search and install over 100,000 mods, modpacks, shaders, and resource packs directly inside your web control panel. No manual FTP file transfers or jar hunting.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </span>
+          <h3>Enterprise DDoS Edge Scrubbing</h3>
+          <p>All incoming Minecraft traffic and web telemetry route through redundant edge scrubbing nodes, filtering volumetric attacks and bad packets before they reach your world container.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h16v4H4z"/><path d="M4 10h16v4H4z"/><path d="M4 16h16v4H4z"/><path d="M7 6h.01M7 12h.01M7 18h.01"/></svg>
+          </span>
+          <h3>Single-Port Multiplexing</h3>
+          <p>Minecraft gameplay (25565) and the REST manifest API share the exact same port. Players connect to clean domains like <code>yourserver.zirconmc.net</code> with zero port numbers required.</p>
+        </div>
+
+        <div class="card">
+          <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          </span>
+          <h3>Automated LZ4 Cloud Snapshots</h3>
+          <p>High-speed LZ4 compressed world backups run on schedule with zero game stutter. Restore previous checkpoints with a single click if disaster strikes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ZIRKY SPOTLIGHT ================= -->
+  <section class="section">
+    <div class="container">
+      <div class="zirky-spotlight">
+        <div class="zirky-avatar-wrap">
+          <img src="assets/img/zirky.svg" alt="Zirky AI Assistant" class="zirky-avatar" width="110" height="110">
+          <span class="zirky-tag">AI Diagnostics</span>
+        </div>
+        <div>
+          <span class="cloud-badge" style="margin-bottom: 8px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
+            Powered by DeepSeek-V4
+          </span>
+          <h3 style="font-size: clamp(22px, 2.6vw, 30px); color: var(--white); margin: 0 0 10px; font-weight: 800;">
+            Never decipher a 300-line Java crash log again.
+          </h3>
+          <p style="color: var(--muted); font-size: 15.5px; line-height: 1.6; margin: 0 0 16px;">
+            Modded Minecraft is notorious for cryptic crash loops and missing library dependencies. When an issue occurs, <strong>Zirky AI</strong> automatically digests the crash stack trace, pinpoints the conflicting mod JAR, and provides an actionable <strong>1-click remediation card</strong> directly in your web console.
+          </p>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Automatic Stack Trace Parsing
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Missing Mod Auto-Detection
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              1-Click Fix Delivery
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= COMPARISON MATRIX ================= -->
+  <section class="section section-alt">
+    <div class="container">
+      <div style="text-align: center; max-width: 680px; margin: 0 auto 32px;">
+        <span class="eyebrow" style="color: var(--accent); font-weight: 700; text-transform: uppercase; font-size: 12px; letter-spacing: 0.08em;">Why Communities Switch</span>
+        <h2 style="font-size: clamp(26px, 3.4vw, 36px); color: var(--white); margin: 6px 0 12px; font-weight: 800;">
+          Traditional Hosts vs. <span class="hl">Zircon Cloud</span>
+        </h2>
+        <p style="color: var(--muted); font-size: 16px; margin: 0;">Stop paying 24/7 flat rates for servers that sit empty five days a week.</p>
+      </div>
+
+      <div class="compare-table-wrapper">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th class="col-feature">Feature</th>
+              <th class="col-traditional">Traditional Hosts (Apex, Shockbyte, etc.)</th>
+              <th class="col-cloud">
+                <span style="display: inline-flex; align-items: center; gap: 6px;">
+                  <img src="assets/img/zircon-title.svg" width="80" height="18" alt="Zircon" style="filter: drop-shadow(0 0 6px var(--accent));">
+                  Cloud
+                </span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="col-feature-cell">Idle Cost (When 0 Players Online)</td>
+              <td class="col-traditional-cell">
+                <span class="badge-cross"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Full 24/7 billing ($15–$35/mo)</span>
+              </td>
+              <td class="col-cloud-cell">
+                <span class="badge-check"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>Zero waste:</strong> Sleeps on idle, wakes on join</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="col-feature-cell">Modpack Syncing to Friends</td>
+              <td class="col-traditional-cell">
+                <span class="badge-cross"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Send 2GB ZIPs or Google Drive links</span>
+              </td>
+              <td class="col-cloud-cell">
+                <span class="badge-check"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>Instant:</strong> 1-click auto-sync via Zircon Launcher</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="col-feature-cell">Mod &amp; Modpack Installation</td>
+              <td class="col-traditional-cell">
+                <span class="badge-cross"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Slow FTP uploads &amp; manual version matching</span>
+              </td>
+              <td class="col-cloud-cell">
+                <span class="badge-check"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>Integrated:</strong> CurseForge &amp; Modrinth 1-click installs</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="col-feature-cell">Crash &amp; Incompatibility Diagnostics</td>
+              <td class="col-traditional-cell">
+                <span class="badge-cross"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Unreadable 300-line Java stack traces</span>
+              </td>
+              <td class="col-cloud-cell">
+                <span class="badge-check"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>Zirky AI:</strong> Auto-diagnosis &amp; 1-click fixes</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="col-feature-cell">Domain, SSL &amp; Network Protection</td>
+              <td class="col-traditional-cell">
+                <span class="badge-cross"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Awkward non-standard ports or extra add-on costs</span>
+              </td>
+              <td class="col-cloud-cell">
+                <span class="badge-check"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>Included:</strong> Automated SSL, subdomains &amp; DDoS edge</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="col-feature-cell">World Backups &amp; Snapshots</td>
+              <td class="col-traditional-cell">
+                <span class="badge-cross"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Limited backup slots or manual tarballs</span>
+              </td>
+              <td class="col-cloud-cell">
+                <span class="badge-check"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <strong>High-Speed:</strong> LZ4 snapshots with 1-click rollback</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="text-align: center; margin-top: 36px;">
+        <a class="btn btn-cloud btn-xl" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          Deploy Your Server on Zircon Cloud Now &rarr;
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CLOUD FAQ ================= -->
+  <section class="section" id="faq">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Got Questions?</div>
+        <h2>Zircon Cloud FAQ</h2>
+        <p>Frequently asked questions about managed Zircon hosting.</p>
+      </div>
+
+      <div class="faq-list">
+        <details class="faq-item" open>
+          <summary class="faq-question">How does Pause-to-Sleep retention work?</summary>
+          <div class="faq-answer">
+            <p>When the last player disconnects from your server, Zircon Cloud initiates a graceful 15-minute idle countdown. If no players join, the game container is suspended (Pause-to-Sleep). All chunk state, entities, and inventories are flushed and saved to disk. When a player clicks PLAY in the Zircon Launcher, our edge proxy wakes the instance instantaneously in seconds.</p>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary class="faq-question">Do my friends have to pay anything to connect?</summary>
+          <div class="faq-answer">
+            <p>No. Connecting to a Zircon Cloud server using the Zircon Launcher is 100% free forever. Players download the client launcher, sign in with their official Microsoft account, and click join.</p>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary class="faq-question">Can I upload my existing world or modpack?</summary>
+          <div class="faq-answer">
+            <p>Yes! Zircon Cloud features an integrated web file manager and zip uploader. You can drop in an existing world save, import a CurseForge/Modrinth modpack zip, or migrate directly from a local self-hosted Zircon server with 1 click.</p>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary class="faq-question">What loaders and Minecraft versions are supported?</summary>
+          <div class="faq-answer">
+            <p>Zircon Cloud supports Fabric, Quilt, NeoForge, and Forge from Minecraft 1.7 through the latest modern releases. Clean Vanilla and Paper/Purpur instances are also fully supported.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CTA ================= -->
+  <section class="section" style="padding-top: 0;">
+    <div class="container">
+      <div class="cta-band">
+        <h2>Launch Your Server in Under 60 Seconds</h2>
+        <p>Experience the future of modded Minecraft hosting with zero hardware and zero headache.</p>
+        <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+          <a class="btn btn-cloud btn-lg" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+            Deploy on Zircon Cloud
+          </a>
+          <a class="btn btn-ghost btn-lg" href="downloads.html#players">Download Launcher for Players</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a class="brand" href="/" style="text-decoration: none;">
+            <img class="brand-text" src="assets/img/zircon-title.svg" alt="Zircon" height="24">
+          </a>
+          <p>High-performance launcher, server wrapper, and managed cloud platform for modded Minecraft.</p>
+        </div>
+        <div>
+          <h4>Ecosystem</h4>
+          <ul class="footer-links">
+            <li><a href="launcher.html">Zircon Launcher</a></li>
+            <li><a href="server.html">Server Manager</a></li>
+            <li><a href="cloud.html">Zircon Cloud</a></li>
+            <li><a href="downloads.html">Downloads</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Documentation</h4>
+          <ul class="footer-links">
+            <li><a href="docs.html#player-guide">Player Guide</a></li>
+            <li><a href="docs.html#server-guide">Server Guide</a></li>
+            <li><a href="docs.html#cloud-guide">Cloud Deploy Guide</a></li>
+            <li><a href="faq.html">FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Community &amp; Code</h4>
+          <ul class="footer-links">
+            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://discord.gg/zircon" target="_blank" rel="noopener">Discord</a></li>
+            <li><a href="downloads.html#cloud">Instant Deploy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <span>&copy; 2026 Zircon Project. Source-available under BSL 1.1.</span>
+        <span>Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
