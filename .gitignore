@@ -92,6 +92,8 @@ scratch/
 .agents/
 import_desktop_export.bat
 skills-lock.json
+.wrangler/
+
 
 
 
