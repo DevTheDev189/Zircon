@@ -9,9 +9,9 @@
    - cloud.css:      Cloud showcase box, feature items, comparison table & Zirky AI
    ============================================================ */
 
-@import url('variables.css');
-@import url('background.css');
-@import url('layout.css');
-@import url('components.css');
-@import url('showcase.css');
-@import url('cloud.css');
+@import url('variables.css?v=2');
+@import url('background.css?v=2');
+@import url('layout.css?v=2');
+@import url('components.css?v=2');
+@import url('showcase.css?v=2');
+@import url('cloud.css?v=2');
