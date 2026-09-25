@@ -1,0 +1,237 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="100%" height="100%">
+  <defs>
+    <!-- Emergency Warning Ambient Backdrop -->
+    <radialGradient id="alert-glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.32" />
+      <stop offset="60%" stop-color="#ef4444" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#05080e" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Obsidian Chassis Gradients -->
+    <linearGradient id="chassis-body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="45%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+
+    <linearGradient id="chassis-head" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="35%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0b111e" />
+    </linearGradient>
+
+    <!-- Ear Module Gradients -->
+    <linearGradient id="ear-l-grad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <linearGradient id="ear-r-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <!-- Thruster Pill -->
+    <linearGradient id="thruster-pill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="40%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Eye Screen / Visor -->
+    <linearGradient id="screen-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#0d0404" />
+    </linearGradient>
+
+    <!-- Warning Glow Filters -->
+    <filter id="alert-neon" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="beacon-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <style>
+    .alert-float {
+      animation: alertHover 1.4s ease-in-out infinite alternate;
+    }
+    .head-jitter {
+      animation: alertJitter 0.32s ease-in-out infinite alternate;
+    }
+    .hands-alarm-l {
+      animation: handAlarmL 0.22s ease-in-out infinite alternate;
+    }
+    .hands-alarm-r {
+      animation: handAlarmR 0.22s ease-in-out infinite alternate -0.11s;
+    }
+    .alert-strobe {
+      animation: strobeBeacon 0.65s ease-in-out infinite alternate;
+    }
+    .alert-flame {
+      animation: flameSpike 0.9s ease-in-out infinite alternate;
+    }
+    .badge-pop {
+      animation: badgeBob 1.2s ease-in-out infinite alternate;
+    }
+
+    @keyframes alertHover {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-7px); }
+    }
+    @keyframes alertJitter {
+      0% { transform: translate(-1.5px, 0.5px) rotate(-0.8deg); }
+      50% { transform: translate(1.5px, -0.5px) rotate(0.8deg); }
+      100% { transform: translate(-1px, 1px) rotate(-0.5deg); }
+    }
+    @keyframes handAlarmL {
+      0% { transform: translateY(0px) rotate(-4deg); }
+      100% { transform: translateY(-3px) rotate(3deg); }
+    }
+    @keyframes handAlarmR {
+      0% { transform: translateY(0px) rotate(4deg); }
+      100% { transform: translateY(-3px) rotate(-3deg); }
+    }
+    @keyframes strobeBeacon {
+      0% { opacity: 0.6; filter: drop-shadow(0 0 2px #f97316); }
+      100% { opacity: 1; filter: drop-shadow(0 0 10px #ef4444); }
+    }
+    @keyframes flameSpike {
+      0% { transform: scaleY(0.95) scaleX(0.9); opacity: 0.85; }
+      100% { transform: scaleY(1.2) scaleX(1.1); opacity: 1; }
+    }
+    @keyframes badgeBob {
+      0% { transform: translateY(0px) scale(0.95); }
+      100% { transform: translateY(-5px) scale(1.05); }
+    }
+  </style>
+
+  <!-- Ambient Warning Backdrop Glow -->
+  <circle cx="160" cy="155" r="140" fill="url(#alert-glow)" />
+
+  <!-- Clean Ground Shadow -->
+  <ellipse cx="160" cy="288" rx="46" ry="6" fill="#020617" opacity="0.6" />
+
+  <!-- Floating Warning Exclamation Badge -->
+  <g class="badge-pop" transform-origin="235 60">
+    <circle cx="236" cy="58" r="13" fill="#ef4444" stroke="#ffffff" stroke-width="1.8" filter="url(#beacon-glow)" />
+    <text x="236" y="64" font-family="'JetBrains Mono', monospace" font-size="16" font-weight="900" fill="#ffffff" text-anchor="middle">!</text>
+  </g>
+
+  <!-- Main Character Rig -->
+  <g class="alert-float">
+
+    <!-- LAYER 1: Emergency Thruster Flame (Hyper-burn amber flare behind cone) -->
+    <g class="alert-flame" transform-origin="160 244">
+      <polygon points="146,242 160,285 174,242" fill="#f97316" filter="url(#alert-neon)" opacity="0.9" />
+      <polygon points="150,242 160,273 170,242" fill="#fbbf24" />
+      <polygon points="154,242 160,262 166,242" fill="#ffffff" />
+      <circle cx="152" cy="287" r="2" fill="#ef4444" opacity="0.8" />
+      <circle cx="168" cy="290" r="1.6" fill="#f97316" opacity="0.9" />
+    </g>
+
+    <!-- LAYER 2: Rocket Thruster Cone Piece (Behind torso, in front of flame) -->
+    <g id="thruster-cone-piece">
+      <rect x="141" y="232" width="38" height="15" rx="5" fill="url(#thruster-pill)" stroke="rgba(249, 115, 22, 0.5)" stroke-width="1.5" />
+    </g>
+
+    <!-- LAYER 3: Torso Chassis (Rendered IN FRONT OF Thruster Cone) -->
+    <g id="torso">
+      <rect x="122" y="179" width="76" height="59" rx="14" fill="url(#chassis-body)" stroke="rgba(249, 115, 22, 0.5)" stroke-width="2" />
+
+      <!-- Chest Reactor Housing Plate with Amber/Red Warning Strobe -->
+      <rect class="alert-strobe" x="142" y="191" width="36" height="34" rx="8" fill="#1f0909" stroke="#f97316" stroke-width="1.8" filter="url(#beacon-glow)" />
+      
+      <!-- Strobe Zircon Z Icon -->
+      <g class="alert-strobe" transform="translate(160, 208) scale(0.44) translate(-32, -32)" filter="url(#beacon-glow)">
+        <path
+           d="M 10.73489,12.12731 v 11.06289 h 4.615739 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 11.62513 h 42.511617 v -12.93668 h -4.618839 l -3.52485,4.47053 H 27.401056 v -3.15898 l 25.864054,-16.18351 v -11.93674 H 13.462372 Z"
+           fill="#f97316"
+           stroke="#fef08a"
+           stroke-width="1.2"
+           stroke-linejoin="round" />
+      </g>
+
+      <!-- Chassis Accent Circuits (Amber alert) -->
+      <line x1="129" y1="195" x2="136" y2="195" stroke="#f97316" stroke-width="1.5" opacity="0.8" stroke-linecap="round" />
+      <line x1="129" y1="201" x2="134" y2="201" stroke="#f97316" stroke-width="1.5" opacity="0.5" stroke-linecap="round" />
+      <line x1="184" y1="195" x2="191" y2="195" stroke="#f97316" stroke-width="1.5" opacity="0.8" stroke-linecap="round" />
+      <line x1="186" y1="201" x2="191" y2="201" stroke="#f97316" stroke-width="1.5" opacity="0.5" stroke-linecap="round" />
+    </g>
+
+    <!-- LAYER 4: Floating Head with Alarmed Eyes (Jittering, D-shaped ears) -->
+    <g class="head-jitter" id="head" transform-origin="160 122" filter="url(#soft-shadow)">
+      
+      <!-- Left D-Shaped Ear (Amber alert warning rim) -->
+      <g id="ear-left">
+        <path d="M 94 105 L 87 105 Q 80 105 80 112 L 80 130 Q 80 137 87 137 L 94 137 Z" fill="url(#ear-l-grad)" stroke="rgba(249, 115, 22, 0.6)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 94 109 L 88 109 Q 83 109 83 114 L 83 128 Q 83 133 88 133 L 94 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.8" />
+        <circle cx="86" cy="121" r="2.5" fill="#f97316" class="alert-strobe" />
+      </g>
+
+      <!-- Right D-Shaped Ear -->
+      <g id="ear-right">
+        <path d="M 226 105 L 233 105 Q 240 105 240 112 L 240 130 Q 240 137 233 137 L 226 137 Z" fill="url(#ear-r-grad)" stroke="rgba(249, 115, 22, 0.6)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 226 109 L 232 109 Q 237 109 237 114 L 237 128 Q 237 133 232 133 L 226 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.8" />
+        <circle cx="234" cy="121" r="2.5" fill="#f97316" class="alert-strobe" />
+      </g>
+
+      <!-- Main Head Chassis -->
+      <rect x="94" y="68" width="132" height="106" rx="20" fill="url(#chassis-head)" stroke="rgba(249, 115, 22, 0.55)" stroke-width="2.2" />
+
+      <!-- Visor Face Screen -->
+      <rect x="108" y="86" width="104" height="74" rx="14" fill="url(#screen-bg)" stroke="#2d1212" stroke-width="1.5" />
+      <path d="M 112 90 L 198 90 Q 206 90 206 98 L 206 104 L 112 90 Z" fill="rgba(255, 255, 255, 0.08)" />
+
+      <!-- Startled Wide Alarmed Eyes & Open Mouth -->
+      <!-- Left Shocked Eye (Wide circle) -->
+      <g filter="url(#alert-neon)">
+        <rect x="122" y="104" width="24" height="28" rx="10" fill="#f97316" />
+        <rect x="125" y="107" width="8" height="9" rx="3" fill="#ffffff" />
+        <circle cx="138" cy="124" r="2.5" fill="#ffffff" opacity="0.9" />
+      </g>
+      <!-- Alarmed Sweat Drop / Tear -->
+      <path d="M 118 108 Q 115 113 118 116 Q 121 113 118 108 Z" fill="#38bdf8" opacity="0.8" />
+
+      <!-- Right Shocked Eye (Wide circle) -->
+      <g filter="url(#alert-neon)">
+        <rect x="174" y="104" width="24" height="28" rx="10" fill="#f97316" />
+        <rect x="177" y="107" width="8" height="9" rx="3" fill="#ffffff" />
+        <circle cx="190" cy="124" r="2.5" fill="#ffffff" opacity="0.9" />
+      </g>
+
+      <!-- Shocked Small 'o' Mouth -->
+      <ellipse cx="160" cy="138" rx="4.5" ry="6" fill="#f97316" stroke="#ffffff" stroke-width="1" filter="url(#alert-neon)" />
+    </g>
+
+    <!-- LAYER 5: Alarmed Hands (Rendered IN FRONT of Head so they never clip behind) -->
+    <g class="hands-alarm-l" id="hand-left" transform-origin="88 174" filter="url(#soft-shadow)">
+      <rect x="72" y="168" width="28" height="28" rx="8" fill="url(#chassis-body)" stroke="rgba(249, 115, 22, 0.6)" stroke-width="2" />
+      <rect x="78" y="174" width="16" height="16" rx="4" fill="#1c0a0a" />
+      <circle cx="86" cy="182" r="3.5" fill="#f97316" filter="url(#alert-neon)" />
+    </g>
+
+    <g class="hands-alarm-r" id="hand-right" transform-origin="234 174" filter="url(#soft-shadow)">
+      <rect x="222" y="168" width="28" height="28" rx="8" fill="url(#chassis-body)" stroke="rgba(249, 115, 22, 0.6)" stroke-width="2" />
+      <rect x="228" y="174" width="16" height="16" rx="4" fill="#1c0a0a" />
+      <circle cx="236" cy="182" r="3.5" fill="#f97316" filter="url(#alert-neon)" />
+    </g>
+
+  </g>
+</svg>

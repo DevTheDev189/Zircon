@@ -1,0 +1,266 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="100%" height="100%">
+  <defs>
+    <!-- Night / Snooze Ambient Backdrop -->
+    <radialGradient id="sleep-glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.16" />
+      <stop offset="50%" stop-color="#0f766e" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#05080e" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Obsidian Chassis Gradients -->
+    <linearGradient id="chassis-body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="45%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+
+    <linearGradient id="chassis-head" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="35%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0b111e" />
+    </linearGradient>
+
+    <!-- Ear Module Gradients -->
+    <linearGradient id="ear-l-grad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <linearGradient id="ear-r-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <!-- Detailed Rocket Pill Gradients -->
+    <linearGradient id="thruster-pill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="40%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Eye Screen / Visor -->
+    <linearGradient id="screen-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#06121a" />
+    </linearGradient>
+
+    <!-- Glowing Filters -->
+    <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="zircon-cyan-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <style>
+    .sleep-bob {
+      animation: sleepBreathe 4.5s ease-in-out infinite alternate;
+    }
+    .sleep-head {
+      animation: sleepTilt 4.5s ease-in-out infinite alternate;
+    }
+    .sleep-rune {
+      animation: runeDimPulse 4.5s ease-in-out infinite alternate;
+    }
+    .hand-sleep-l {
+      animation: handSleepL 4.5s ease-in-out infinite alternate;
+    }
+    .hand-sleep-r {
+      animation: handSleepR 4.5s ease-in-out infinite alternate;
+    }
+    .thruster-ember {
+      animation: emberPulse 3.5s ease-in-out infinite alternate;
+    }
+    .zzz-1 {
+      animation: zzzDrift 3.8s ease-in-out infinite;
+    }
+    .zzz-2 {
+      animation: zzzDrift 3.8s ease-in-out infinite -1.25s;
+    }
+    .zzz-3 {
+      animation: zzzDrift 3.8s ease-in-out infinite -2.5s;
+    }
+
+    @keyframes sleepBreathe {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(5px); }
+    }
+    @keyframes sleepTilt {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(1.2deg); }
+    }
+    @keyframes runeDimPulse {
+      0% { opacity: 0.35; filter: drop-shadow(0 0 2px #2dd4bf); }
+      100% { opacity: 0.85; filter: drop-shadow(0 0 7px #5eead4); }
+    }
+    @keyframes handSleepL {
+      0% { transform: translateY(0px) rotate(0deg); }
+      100% { transform: translateY(3px) rotate(-1.5deg); }
+    }
+    @keyframes handSleepR {
+      0% { transform: translateY(0px) rotate(0deg); }
+      100% { transform: translateY(3px) rotate(1.5deg); }
+    }
+    @keyframes emberPulse {
+      0% { opacity: 0.25; transform: scale(0.9); }
+      100% { opacity: 0.55; transform: scale(1.05); }
+    }
+    @keyframes zzzDrift {
+      0% {
+        transform: translate(0px, 0px) scale(0.6) rotate(-6deg);
+        opacity: 0;
+      }
+      25% {
+        opacity: 0.85;
+      }
+      75% {
+        opacity: 0.7;
+      }
+      100% {
+        transform: translate(26px, -46px) scale(1.15) rotate(12deg);
+        opacity: 0;
+      }
+    }
+  </style>
+
+  <!-- Ambient Backdrop Glow -->
+  <circle cx="160" cy="155" r="140" fill="url(#sleep-glow)" />
+
+  <!-- Clean Static Ground Shadow -->
+  <ellipse cx="160" cy="288" rx="46" ry="6" fill="#020617" opacity="0.6" />
+
+  <!-- Floating Animated Sleeping Particles (Zircon "Z" Runes) -->
+  <g class="zzz-1" transform-origin="210 95" filter="url(#neon-glow)">
+    <g transform="translate(210, 95) scale(0.24) translate(-32, -33)">
+      <path
+         d="M 10.73489,12.12731 v 11.06289 h 4.615739 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 11.62513 h 42.511617 v -12.93668 h -4.618839 l -3.52485,4.47053 H 27.401056 v -3.15898 l 25.864054,-16.18351 v -11.93674 H 13.462372 Z"
+         fill="#2dd4bf"
+         stroke="#5eead4"
+         stroke-width="1.2"
+         stroke-linejoin="round" />
+    </g>
+  </g>
+  <g class="zzz-2" transform-origin="226 78" filter="url(#neon-glow)">
+    <g transform="translate(226, 78) scale(0.32) translate(-32, -33)">
+      <path
+         d="M 10.73489,12.12731 v 11.06289 h 4.615739 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 11.62513 h 42.511617 v -12.93668 h -4.618839 l -3.52485,4.47053 H 27.401056 v -3.15898 l 25.864054,-16.18351 v -11.93674 H 13.462372 Z"
+         fill="#5eead4"
+         stroke="#99f6e4"
+         stroke-width="1.2"
+         stroke-linejoin="round" />
+    </g>
+  </g>
+  <g class="zzz-3" transform-origin="244 58" filter="url(#neon-glow)">
+    <g transform="translate(244, 58) scale(0.40) translate(-32, -33)">
+      <path
+         d="M 10.73489,12.12731 v 11.06289 h 4.615739 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 11.62513 h 42.511617 v -12.93668 h -4.618839 l -3.52485,4.47053 H 27.401056 v -3.15898 l 25.864054,-16.18351 v -11.93674 H 13.462372 Z"
+         fill="#99f6e4"
+         stroke="#ffffff"
+         stroke-width="1.2"
+         stroke-linejoin="round" />
+    </g>
+  </g>
+
+  <!-- Main Sleeping Character Rig (Gentle Breathing Float) -->
+  <g class="sleep-bob">
+
+    <!-- LAYER 1: Low-Power Standby Thruster Ember (Behind cone) -->
+    <g class="thruster-ember" transform-origin="160 248">
+      <ellipse cx="160" cy="248" rx="10" ry="3.5" fill="#2dd4bf" filter="url(#neon-glow)" />
+      <ellipse cx="160" cy="248" rx="5" ry="1.8" fill="#ffffff" />
+    </g>
+
+    <!-- LAYER 2: Rocket Thruster Cone Piece (In front of ember, behind torso) -->
+    <g id="thruster-cone-piece">
+      <rect x="141" y="232" width="38" height="15" rx="5" fill="url(#thruster-pill)" stroke="rgba(45, 212, 191, 0.35)" stroke-width="1.5" />
+    </g>
+
+    <!-- LAYER 3: Torso Chassis (Rendered IN FRONT OF Thruster Cone) -->
+    <g id="torso">
+      <rect x="122" y="179" width="76" height="59" rx="14" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.35)" stroke-width="2" />
+
+      <!-- Chest Reactor Housing Plate with Glowing Zircon Cyan Border -->
+      <rect x="142" y="191" width="36" height="34" rx="8" fill="#031b22" stroke="#2dd4bf" stroke-width="1.8" filter="url(#zircon-cyan-glow)" />
+      
+      <!-- Slow Sleeping Breath Zircon Z Icon -->
+      <g class="sleep-rune" transform="translate(160, 208) scale(0.44) translate(-32, -32)" filter="url(#zircon-cyan-glow)">
+        <path
+           d="M 10.73489,12.12731 v 11.06289 h 4.615739 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 11.62513 h 42.511617 v -12.93668 h -4.618839 l -3.52485,4.47053 H 27.401056 v -3.15898 l 25.864054,-16.18351 v -11.93674 H 13.462372 Z"
+           fill="#2dd4bf"
+           stroke="#5eead4"
+           stroke-width="1.2"
+           stroke-linejoin="round" />
+      </g>
+
+      <!-- Chassis Accent Circuits (Dimmed Sleep Mode) -->
+      <line x1="129" y1="195" x2="136" y2="195" stroke="#2dd4bf" stroke-width="1.5" opacity="0.3" stroke-linecap="round" />
+      <line x1="184" y1="195" x2="191" y2="195" stroke="#2dd4bf" stroke-width="1.5" opacity="0.3" stroke-linecap="round" />
+    </g>
+
+    <!-- LAYER 4: Relaxed Sleeping Hands (Resting softly down low) -->
+    <g class="hand-sleep-l" id="hand-left" transform-origin="88 205" filter="url(#soft-shadow)">
+      <rect x="74" y="188" width="28" height="28" rx="8" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.35)" stroke-width="2" />
+      <rect x="80" y="194" width="16" height="16" rx="4" fill="#041b24" />
+      <circle cx="88" cy="202" r="3" fill="#2dd4bf" opacity="0.6" />
+    </g>
+
+    <g class="hand-sleep-r" id="hand-right" transform-origin="232 205" filter="url(#soft-shadow)">
+      <rect x="218" y="188" width="28" height="28" rx="8" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.35)" stroke-width="2" />
+      <rect x="224" y="194" width="16" height="16" rx="4" fill="#041b24" />
+      <circle cx="232" cy="202" r="3" fill="#2dd4bf" opacity="0.6" />
+    </g>
+
+    <!-- LAYER 5: Sleeping Head (Gentle tilt, closed eyes, D-shaped ears) -->
+    <g class="sleep-head" id="head" transform-origin="160 122" filter="url(#soft-shadow)">
+      
+      <!-- Left D-Shaped Ear -->
+      <g id="ear-left">
+        <path d="M 94 105 L 87 105 Q 80 105 80 112 L 80 130 Q 80 137 87 137 L 94 137 Z" fill="url(#ear-l-grad)" stroke="rgba(45, 212, 191, 0.35)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 94 109 L 88 109 Q 83 109 83 114 L 83 128 Q 83 133 88 133 L 94 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.05)" stroke-width="0.8" />
+      </g>
+
+      <!-- Right D-Shaped Ear -->
+      <g id="ear-right">
+        <path d="M 226 105 L 233 105 Q 240 105 240 112 L 240 130 Q 240 137 233 137 L 226 137 Z" fill="url(#ear-r-grad)" stroke="rgba(45, 212, 191, 0.35)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 226 109 L 232 109 Q 237 109 237 114 L 237 128 Q 237 133 232 133 L 226 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.05)" stroke-width="0.8" />
+      </g>
+
+      <!-- Main Head Chassis -->
+      <rect x="94" y="68" width="132" height="106" rx="20" fill="url(#chassis-head)" stroke="rgba(45, 212, 191, 0.35)" stroke-width="2.2" />
+
+      <!-- Visor Face Screen -->
+      <rect x="108" y="86" width="104" height="74" rx="14" fill="url(#screen-bg)" stroke="#1e293b" stroke-width="1.5" />
+      <path d="M 112 90 L 198 90 Q 206 90 206 98 L 206 104 L 112 90 Z" fill="rgba(255, 255, 255, 0.05)" />
+
+      <!-- Peaceful Closed Eyes (Curved happy crescent arcs ◠ ◠) -->
+      <g filter="url(#neon-glow)">
+        <path d="M 124 122 Q 135 112 146 122" fill="none" stroke="#2dd4bf" stroke-width="3.5" stroke-linecap="round" />
+        <path d="M 174 122 Q 185 112 196 122" fill="none" stroke="#2dd4bf" stroke-width="3.5" stroke-linecap="round" />
+      </g>
+
+      <!-- Cute Sleeping Blush -->
+      <rect x="121" y="136" width="12" height="3.5" rx="1.7" fill="#0f766e" opacity="0.6" />
+      <rect x="187" y="136" width="12" height="3.5" rx="1.7" fill="#0f766e" opacity="0.6" />
+
+      <!-- Serene Sleepy Smile -->
+      <path d="M 155 135 Q 160 139 165 135" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" opacity="0.75" />
+    </g>
+
+  </g>
+</svg>

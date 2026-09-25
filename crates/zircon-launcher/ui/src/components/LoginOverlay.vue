@@ -23,7 +23,37 @@
         skins and saved servers are stored locally.
       </p>
 
+      <!-- Cached account 1-click continue option for pre-login testing -->
+      <div v-if="cachedAccount" class="space-y-3">
+        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center gap-3 text-left mb-2">
+          <div class="w-10 h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center font-bold text-cyan-300 text-sm">
+            {{ (cachedAccount.username || 'M').charAt(0).toUpperCase() }}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-bold text-white truncate">{{ cachedAccount.username }}</div>
+            <div class="text-[10px] text-cyan-400 font-mono">Cached Microsoft Profile</div>
+          </div>
+        </div>
+
+        <button
+          class="z-btn w-full py-2.5 text-sm font-bold flex items-center justify-center gap-2.5 bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 rounded-xl transition-all shadow-lg shadow-cyan-500/20 active:translate-y-px cursor-pointer"
+          :disabled="busy"
+          @click="onContinueCached"
+        >
+          <span>Continue as {{ cachedAccount.username }}</span>
+        </button>
+
+        <button
+          class="w-full py-2 text-xs font-semibold text-slate-400 hover:text-white transition flex items-center justify-center gap-2 cursor-pointer border border-slate-700/60 rounded-xl hover:bg-slate-800/40"
+          :disabled="busy"
+          @click="onLogin"
+        >
+          <span>Sign in with another Microsoft Account</span>
+        </button>
+      </div>
+
       <button
+        v-else
         class="z-btn w-full py-2.5 text-sm font-bold disabled:opacity-60 flex items-center justify-center gap-2.5 bg-white text-[#1f2328] shadow-lg shadow-black/30 hover:bg-gray-100 hover:shadow-xl active:translate-y-px rounded-xl transition-all"
         :disabled="busy"
         @click="onLogin"
@@ -114,13 +144,19 @@ const MINECRAFT_BUY_URL = 'https://www.minecraft.net/store/minecraft-java-bedroc
 
 const emit = defineEmits(['logged-in']);
 
-defineProps({
+const props = defineProps({
   visible: { type: Boolean, default: false },
+  cachedAccount: { type: Object, default: null },
 });
 
 const busy = ref(false);
 const status = ref('');
 const error = ref('');
+
+function onContinueCached() {
+  if (!props.cachedAccount) return;
+  emit('logged-in', props.cachedAccount);
+}
 
 const isOwnershipError = computed(() => {
   if (!error.value) return false;

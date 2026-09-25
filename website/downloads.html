@@ -63,8 +63,8 @@
         "name": "Zircon Launcher",
         "applicationCategory": "GameApplication",
         "operatingSystem": "Windows 10, Windows 11, macOS, Linux",
-        "downloadUrl": "https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.18_x64-setup.exe",
-        "softwareVersion": "v0.4.18",
+        "downloadUrl": "https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.19_x64-setup.exe",
+        "softwareVersion": "v0.4.19",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -76,8 +76,8 @@
         "name": "Zircon Server Manager",
         "applicationCategory": "UtilitiesApplication",
         "operatingSystem": "Windows, Linux",
-        "downloadUrl": "https://downloads.zirconmc.net/updates/server/v0.4.18/zircon-server-windows-x86_64.zip",
-        "softwareVersion": "v0.4.18",
+        "downloadUrl": "https://downloads.zirconmc.net/updates/server/v0.4.19/zircon-server-windows-x86_64.zip",
+        "softwareVersion": "v0.4.19",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -90,11 +90,25 @@
 </head>
 <body>
 
+  <!-- Animated Procedural Background Elements -->
+  <div class="z-bg-dots"></div>
+  <div class="z-orb z-orb-1"></div>
+  <div class="z-orb z-orb-2"></div>
+  <div class="z-orb z-orb-3"></div>
+  <div class="z-orb z-orb-4"></div>
+  <div class="z-particle z-particle-1"></div>
+  <div class="z-particle z-particle-2"></div>
+  <div class="z-particle z-particle-3"></div>
+  <div class="z-particle z-particle-4"></div>
+  <div class="z-particle z-particle-5"></div>
+  <div class="z-particle z-particle-6"></div>
+
   <!-- ================= NAV ================= -->
   <header class="site-nav">
     <div class="container">
       <a class="brand" href="/" aria-label="Zircon home">
-        <img src="assets/img/zircon-title.svg" alt="Zircon" width="150" height="44">
+        <img class="brand-mark" src="assets/img/zircon-icon.svg" alt="Zircon Diamond Icon" width="32" height="32">
+        <img class="brand-text" src="assets/img/zircon-title.svg" alt="Zircon" width="130" height="30">
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
@@ -105,10 +119,20 @@
         <li><a href="/">Home</a></li>
         <li><a href="launcher.html">Launcher</a></li>
         <li><a href="server.html">Server Manager</a></li>
+        <li>
+          <a href="https://cloud.zirconmc.net" target="_blank" rel="noopener" class="nav-link-cloud">
+            Zircon Cloud <span class="nav-cloud-badge">Cloud</span>
+          </a>
+        </li>
         <li><a href="docs.html">Guides</a></li>
         <li><a href="faq.html">FAQ</a></li>
         <li><a href="downloads.html" class="active">Downloads</a></li>
-        <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+        <li>
+          <a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener" class="nav-github-link" aria-label="GitHub Repository">
+            <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+            <span>GitHub</span>
+          </a>
+        </li>
         <li><a class="nav-cta" href="#players">Get Launcher</a></li>
       </ul>
     </div>
@@ -118,9 +142,8 @@
   <section class="page-hero">
     <div class="container">
       <span class="eyebrow">Downloads</span>
-      <h1>One download. Everyone's ready.</h1>
-      <p>Players get the launcher; server owners get the manager. They speak the
-      same language, so joining a modded server is as easy as hitting PLAY.</p>
+      <h1>One ecosystem. Everyone's ready.</h1>
+      <p>Players get the launcher, server owners get the manager, and communities deploy instantly on Zircon Cloud.</p>
     </div>
   </section>
 
@@ -133,7 +156,11 @@
       </button>
       <button class="tab-btn" data-tab="server-owners" role="tab" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
-        I Run a Server
+        I Run a Server (Self-Hosted)
+      </button>
+      <button class="tab-btn" data-tab="cloud" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+        Zircon Cloud (Instant Deploy)
       </button>
     </div>
   </div>
@@ -148,7 +175,7 @@
               <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
               <div>
                 <h3>Zircon Launcher</h3>
-                <div class="version">v0.4.18 · Windows · macOS · Linux</div>
+                <div class="version">v0.4.19 · Windows · macOS · Linux</div>
               </div>
             </div>
             <div class="dl-meta">
@@ -186,11 +213,11 @@
             <!-- Windows Downloads -->
             <div class="os-content active" data-os-panel="windows">
               <div class="dl-actions">
-                <a class="btn btn-primary btn-lg" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.18_x64-setup.exe" target="_blank" rel="noopener">
+                <a class="btn btn-primary btn-lg" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.19_x64-setup.exe" target="_blank" rel="noopener">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                   Download for Windows (.exe)
                 </a>
-                <a class="btn btn-ghost" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.18_x64_en-US.msi" target="_blank" rel="noopener">.msi installer</a>
+                <a class="btn btn-ghost" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.19_x64_en-US.msi" target="_blank" rel="noopener">.msi installer</a>
               </div>
               <p class="dl-note">
                 Compatible with 64-bit <strong>Windows 10 and 11</strong>. Includes NSIS installer and WiX MSI packages.
@@ -200,7 +227,7 @@
             <!-- macOS Downloads -->
             <div class="os-content" data-os-panel="macos">
               <div class="dl-actions">
-                <a class="btn btn-primary btn-lg" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.18_aarch64.dmg" target="_blank" rel="noopener">
+                <a class="btn btn-primary btn-lg" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.19_aarch64.dmg" target="_blank" rel="noopener">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                   Download for macOS (.dmg)
                 </a>
@@ -214,12 +241,12 @@
             <!-- Linux Downloads -->
             <div class="os-content" data-os-panel="linux">
               <div class="dl-actions">
-                <a class="btn btn-primary btn-lg" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.18_amd64.AppImage" target="_blank" rel="noopener">
+                <a class="btn btn-primary btn-lg" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.19_amd64.AppImage" target="_blank" rel="noopener">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                   Download .AppImage (Universal)
                 </a>
-                <a class="btn btn-ghost" href="https://downloads.zirconmc.net/updates/launcher/zircon_0.4.18_amd64.deb" target="_blank" rel="noopener">.deb (Debian/Ubuntu)</a>
-                <a class="btn btn-ghost" href="https://downloads.zirconmc.net/updates/launcher/zircon-0.4.18-1.x86_64.rpm" target="_blank" rel="noopener">.rpm (Fedora/RHEL)</a>
+                <a class="btn btn-ghost" href="https://downloads.zirconmc.net/updates/launcher/zircon_0.4.19_amd64.deb" target="_blank" rel="noopener">.deb (Debian/Ubuntu)</a>
+                <a class="btn btn-ghost" href="https://downloads.zirconmc.net/updates/launcher/zircon-0.4.19-1.x86_64.rpm" target="_blank" rel="noopener">.rpm (Fedora/RHEL)</a>
               </div>
               <p class="dl-note">
                 Portable <strong>.AppImage</strong> works across Arch, Fedora, openSUSE, Ubuntu, Debian, and Manjaro. Native <strong>.deb</strong> and <strong>.rpm</strong> packages also available.
@@ -288,7 +315,7 @@
               <span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg></span>
               <div>
                 <h3>Zircon Server Manager</h3>
-                <div class="version">v0.4.18 · Windows &amp; Linux</div>
+                <div class="version">v0.4.19 · Windows &amp; Linux</div>
               </div>
             </div>
             <div class="dl-meta">
@@ -301,11 +328,11 @@
               bundled web admin dashboard.
             </p>
             <div class="dl-actions">
-              <a class="btn btn-primary btn-lg" href="https://downloads.zirconmc.net/updates/server/v0.4.18/zircon-server-linux-x86_64.tar.gz" target="_blank" rel="noopener">
+              <a class="btn btn-primary btn-lg" href="https://downloads.zirconmc.net/updates/server/v0.4.19/zircon-server-linux-x86_64.tar.gz" target="_blank" rel="noopener">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                 Download for Linux (.tar.gz)
               </a>
-              <a class="btn btn-ghost" href="https://downloads.zirconmc.net/updates/server/v0.4.18/zircon-server-windows-x86_64.zip" target="_blank" rel="noopener">Windows (.zip)</a>
+              <a class="btn btn-ghost" href="https://downloads.zirconmc.net/updates/server/v0.4.19/zircon-server-windows-x86_64.zip" target="_blank" rel="noopener">Windows (.zip)</a>
               <a class="btn btn-ghost" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">Source</a>
             </div>
             <p class="dl-note">
@@ -355,6 +382,56 @@
           View source &amp; build guide
         </a>
       </div>
+
+      <!-- ================= CLOUD PANEL ================= -->
+      <div class="tab-panel" data-panel="cloud" role="tabpanel">
+        <div class="cloud-showcase-box" style="margin-bottom: 24px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+            <div>
+              <span class="cloud-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                Turnkey Managed Cloud
+              </span>
+              <h2 style="font-size: clamp(24px, 3.4vw, 34px); color: var(--white); margin: 0 0 10px; font-weight: 800;">
+                Zero Setup. <span class="hl">Deploy on Zircon Cloud.</span>
+              </h2>
+              <p style="color: var(--muted); font-size: 15.5px; max-width: 640px; margin: 0; line-height: 1.65;">
+                Prefer not to configure port forwarding, firewall NAT rules, or maintain a physical home server? Zircon Cloud gives you instantly provisioned servers powered by the exact same engine.
+              </p>
+            </div>
+            <div>
+              <a class="btn btn-cloud btn-xl" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                Deploy on Zircon Cloud &rarr;
+              </a>
+            </div>
+          </div>
+
+          <div class="cloud-features-grid">
+            <div class="cloud-feature-item">
+              <h4>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                Pause-to-Sleep Engine
+              </h4>
+              <p>Suspends cleanly when empty to reduce host overhead. Automatically resumes in seconds when a player clicks connect.</p>
+            </div>
+            <div class="cloud-feature-item">
+              <h4>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
+                Realtime WebSocket Console
+              </h4>
+              <p>Access your live terminal, CPU/RAM telemetry, player kicks/bans, and file management from any web browser.</p>
+            </div>
+            <div class="cloud-feature-item">
+              <h4>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                Automatic Mod Sync
+              </h4>
+              <p>All players using Zircon Launcher automatically receive verified mods, loaders, and configs from your server manifest.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -363,11 +440,12 @@
     <div class="container">
       <div class="cta-band">
         <h2>Not sure which one you need?</h2>
-        <p>Players install the <strong>Launcher</strong>. If you own or host a Minecraft
-        server, grab the <strong>Server Manager</strong> — then tell your players to
-        install the launcher and type your address once.</p>
-        <a class="btn btn-white btn-lg" href="#players">I'm a Player</a>
-        <a class="btn btn-ghost btn-lg" href="#server-owners">I Run a Server</a>
+        <p>Players install the <strong>Launcher</strong>. If you own hardware, self-host with <strong>Server Manager</strong>. For instant hosting with zero setup, launch on <strong>Zircon Cloud</strong>.</p>
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <a class="btn btn-primary btn-lg" href="#players">I'm a Player</a>
+          <a class="btn btn-ghost btn-lg" href="#server-owners">Self-Host Server</a>
+          <a class="btn btn-cloud btn-lg" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Zircon Cloud</a>
+        </div>
       </div>
     </div>
   </section>
@@ -377,13 +455,16 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="assets/img/zircon-title.svg" alt="Zircon">
+          <a href="/" style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 14px; text-decoration: none;">
+            <img src="assets/img/zircon-icon.svg" alt="Zircon" width="28" height="28" style="filter: drop-shadow(0 0 8px rgba(71, 210, 201, 0.5));">
+            <img src="assets/img/zircon-title.svg" alt="Zircon" height="24">
+          </a>
           <p>A free, open-source launcher and server manager for modded Minecraft.
           Players hit PLAY and get the exact mods a server runs — verified against
           Modrinth &amp; CurseForge on every launch.</p>
           <a class="pill pill-accent" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.14c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
-            Open Source
+            Open Source (BSL 1.1)
           </a>
         </div>
         <div class="footer-col">
@@ -392,24 +473,25 @@
             <li><a href="/">Home</a></li>
             <li><a href="launcher.html">Launcher</a></li>
             <li><a href="server.html">Server Manager</a></li>
+            <li><a href="https://cloud.zirconmc.net" target="_blank" rel="noopener" style="color: var(--accent-bright); font-weight: 700;">Zircon Cloud &rarr;</a></li>
             <li><a href="docs.html">Guides &amp; Docs</a></li>
             <li><a href="faq.html">FAQ</a></li>
             <li><a href="downloads.html">Downloads</a></li>
           </ul>
         </div>
         <div class="footer-col">
-          <h4>Project</h4>
+          <h4>Project &amp; Community</h4>
           <ul>
-            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
-            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases &amp; Changelogs</a></li>
+            <li><a href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Zircon Cloud Console</a></li>
             <li><a href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" target="_blank" rel="noopener">Business Source License 1.1</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-legal">
-        <span>© Zircon contributors · v0.4.18 (active development)</span>
-        <span>Not an official Minecraft product. Not approved by or associated with Mojang
-        Studios or Microsoft. "Minecraft" is a trademark of Mojang Synergies AB.</span>
+        <span>© Zircon contributors · v0.4.19 (active development)</span>
+        <span>Not an official Minecraft product. Not approved by or associated with Mojang Studios or Microsoft.</span>
       </div>
     </div>
   </footer>

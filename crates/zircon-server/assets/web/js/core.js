@@ -323,7 +323,7 @@ window.Zircon.core = {
         this.serverUpdateError = '';
         try {
             const data = await this.api('/api/system/update/check');
-            this.serverCurrentVersion = data.currentVersion || '0.4.2';
+            this.serverCurrentVersion = data.currentVersion || '0.4.18';
             if (data.updateAvailable && data.manifest) {
                 this.serverUpdateAvailable = true;
                 this.serverUpdateManifest = data.manifest;

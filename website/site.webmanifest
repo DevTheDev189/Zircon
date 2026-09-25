@@ -1,12 +1,17 @@
 {
-  "name": "Zircon Launcher",
+  "name": "Zircon — Modded Minecraft Platform",
   "short_name": "Zircon",
-  "description": "Free and open-source launcher & server manager for modded Minecraft",
+  "description": "High-performance launcher, server wrapper, and cloud platform for modded Minecraft",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "#070b0f",
+  "theme_color": "#070b0f",
   "icons": [
+    {
+      "src": "assets/img/zircon-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
     {
       "src": "assets/img/favicon.png",
       "sizes": "192x192",

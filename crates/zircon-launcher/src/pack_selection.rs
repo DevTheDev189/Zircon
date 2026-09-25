@@ -33,6 +33,8 @@ pub struct PackSelection {
     #[serde(default)]
     pub active_resourcepacks: Vec<String>,
     #[serde(default)]
+    pub rejected_resourcepacks: BTreeSet<String>,
+    #[serde(default)]
     pub locally_added_shaderpacks: BTreeSet<String>,
     #[serde(default)]
     pub locally_added_resourcepacks: BTreeSet<String>,

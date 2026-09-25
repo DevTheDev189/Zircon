@@ -145,10 +145,10 @@
           <button
             type="button"
             class="z-segmented-pill"
-            :class="{ 'active': activeTab === 'textures' }"
-            @click="activeTab = 'textures'"
+            :class="{ 'active': activeTab === 'resources' || activeTab === 'textures' }"
+            @click="activeTab = 'resources'"
           >
-            Texture Packs ({{ detailedPacks.resourcepacks?.length || 0 }})
+            Resource Packs ({{ detailedPacks.resourcepacks?.length || 0 }})
           </button>
           <button
             type="button"
@@ -568,85 +568,130 @@
           </div>
         </template>
 
-        <!-- ================= TAB: TEXTURE PACKS ================= -->
-        <template v-if="activeTab === 'textures'">
+        <!-- ================= TAB: RESOURCE PACKS ================= -->
+        <template v-if="activeTab === 'resources' || activeTab === 'textures'">
           <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-4">
             <div class="flex items-center justify-between">
               <div>
-                <div class="z-section text-white font-bold text-sm">Resource &amp; Texture Packs</div>
-                <div class="text-xs text-slate-400 mt-0.5">Toggle packs to apply them to your server instance.</div>
+                <div class="z-section text-white font-bold text-sm">Resource Packs</div>
+                <div class="text-xs text-slate-400 mt-0.5">Toggle and order packs to customize textures, models, and audio.</div>
               </div>
             </div>
 
-            <!-- Active Texture Packs Stack -->
+            <!-- Server Resource Packs Offered Banner (if any) -->
+            <div
+              v-if="serverAdvertisedPacks.length > 0"
+              class="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-[0_0_15px_rgba(6,182,212,0.06)]"
+            >
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-sm font-bold shrink-0">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-cyan-200">Server Resource Packs ({{ serverAdvertisedPacks.length }})</div>
+                  <div class="text-[10px] text-slate-400">This server offers recommended resource packs.</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="z-btn-primary text-xs px-3.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 shrink-0"
+                @click="openServerPacksModal"
+              >
+                <span>Review &amp; Accept / Decline</span>
+              </button>
+            </div>
+
+            <!-- Active Resource Packs Stack -->
             <div class="mb-4">
               <div class="flex items-center justify-between mb-2">
                 <div>
-                  <div class="text-xs font-bold text-white">Active Texture Packs ({{ activeResourcepacksList.length }})</div>
-                  <div class="text-[10px] text-slate-400">Packs higher in the list override packs below them.</div>
+                  <div class="text-xs font-bold text-white">Active Resource Packs ({{ activeResourcepacksList.length }})</div>
+                  <div class="text-[10px] text-slate-400">Packs higher in the list override packs below them. Drag to reorder.</div>
                 </div>
                 <span class="text-[9px] text-cyan-400 font-mono bg-cyan-950/40 border border-cyan-800/60 px-2 py-0.5 rounded-full">
                   Priority Stack
                 </span>
               </div>
 
-              <div v-if="activeResourcepacksList.length" class="flex flex-col gap-1.5 max-h-[240px] overflow-y-auto pr-1">
-                <div
-                  v-for="(rp, index) in activeResourcepacksList"
-                  :key="rp.filename"
-                  class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 shadow-sm transition hover:border-cyan-500/60"
+              <div v-if="activeResourcepacksList.length">
+                <TransitionGroup
+                  name="stack-flip"
+                  tag="div"
+                  class="flex flex-col gap-1.5 max-h-[240px] overflow-y-auto pr-1"
                 >
-                  <div class="px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
-                    #{{ index + 1 }} {{ index === 0 ? 'Top' : '' }}
-                  </div>
-
-                  <div class="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
-                    <img v-if="rp.iconDataUrl" :src="rp.iconDataUrl" class="w-full h-full object-cover" />
-                    <svg v-else class="w-4 h-4 text-cyan-400/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <line x1="3" y1="9" x2="21" y2="9" />
-                      <line x1="9" y1="21" x2="9" y2="9" />
-                    </svg>
-                  </div>
-
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-xs font-bold text-white truncate">{{ rp.title || rp.filename }}</span>
-                      <span v-if="rp.serverEnforced" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
-                        🔒 Server Enforced
-                      </span>
+                  <div
+                    v-for="(rp, index) in activeResourcepacksList"
+                    :key="rp.filename"
+                    draggable="true"
+                    @dragstart="onRpDragStart(index, $event)"
+                    @dragover.prevent="onRpDragOver(index, $event)"
+                    @drop.prevent="onRpDrop(index, $event)"
+                    @dragend="onRpDragEnd"
+                    class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 shadow-sm transition hover:border-cyan-500/60 cursor-grab active:cursor-grabbing"
+                    :class="{ 'border-t-2 border-t-cyan-400 bg-cyan-950/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]': rpDropTargetIndex === index }"
+                  >
+                    <!-- Drag Handle -->
+                    <div
+                      class="text-slate-500 hover:text-cyan-400 cursor-grab px-0.5 select-none font-mono text-xs"
+                      title="Drag to reorder priority"
+                    >
+                      ⠿
                     </div>
-                    <div v-if="rp.description" class="text-[10px] text-slate-400 line-clamp-1">{{ rp.description }}</div>
-                  </div>
 
-                  <div class="flex items-center gap-1 shrink-0">
-                    <button
-                      class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
-                      :disabled="index === 0"
-                      title="Move Up (Higher Priority)"
-                      @click="moveResourcepack(index, -1)"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
-                      :disabled="index === activeResourcepacksList.length - 1"
-                      title="Move Down (Lower Priority)"
-                      @click="moveResourcepack(index, 1)"
-                    >
-                      ▼
-                    </button>
-                    <button
-                      class="text-slate-400 hover:text-amber-300 text-xs px-2 py-0.5 hover:bg-amber-500/10 rounded transition font-medium ml-1"
-                      title="Deactivate Pack"
-                      @click="disableResourcepack(rp.filename)"
-                    >
-                      ✕
-                    </button>
+                    <div class="px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
+                      #{{ index + 1 }} {{ index === 0 ? 'Top' : '' }}
+                    </div>
+
+                    <div class="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
+                      <img v-if="rp.iconDataUrl" :src="rp.iconDataUrl" class="w-full h-full object-cover" />
+                      <svg v-else class="w-4 h-4 text-cyan-400/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <line x1="3" y1="9" x2="21" y2="9" />
+                        <line x1="9" y1="21" x2="9" y2="9" />
+                      </svg>
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-white truncate">{{ rp.title || rp.filename }}</span>
+                        <span v-if="rp.serverEnforced" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                          🔒 Server Enforced
+                        </span>
+                      </div>
+                      <div v-if="rp.description" class="text-[10px] text-slate-400 line-clamp-1">{{ rp.description }}</div>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button
+                        class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
+                        :disabled="index === 0"
+                        title="Move Up (Higher Priority)"
+                        @click.stop="moveResourcepack(index, -1)"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
+                        :disabled="index === activeResourcepacksList.length - 1"
+                        title="Move Down (Lower Priority)"
+                        @click.stop="moveResourcepack(index, 1)"
+                      >
+                        ▼
+                      </button>
+                      <button
+                        class="text-slate-400 hover:text-amber-300 text-xs px-2 py-0.5 hover:bg-amber-500/10 rounded transition font-medium ml-1"
+                        title="Deactivate Pack"
+                        @click.stop="disableResourcepack(rp.filename)"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </TransitionGroup>
               </div>
-              <div v-else class="text-xs text-slate-500 italic py-2">No texture packs currently active.</div>
+              <div v-else class="text-xs text-slate-500 italic py-2">No resource packs currently active.</div>
             </div>
 
             <!-- Available / Inactive Packs -->
@@ -666,7 +711,7 @@
                   <div class="flex items-center gap-2 shrink-0">
                     <button
                       class="z-btn text-xs px-2.5 py-1 rounded-lg font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition flex items-center gap-1"
-                      title="Add to active texture packs stack"
+                      title="Add to active resource packs stack"
                       @click="enableResourcepack(rp.filename)"
                     >
                       <span>+ Enable</span>
@@ -684,21 +729,21 @@
                   </div>
                 </div>
               </div>
-              <div v-else class="text-xs text-slate-500 italic py-1">All installed texture packs are active.</div>
+              <div v-else class="text-xs text-slate-500 italic py-1">All installed resource packs are active.</div>
             </div>
 
             <div v-if="!detailedPacks.resourcepacks || !detailedPacks.resourcepacks.length" class="py-6 text-center text-slate-500 text-xs">
-              No texture packs installed. Drop a .zip archive below to add one.
+              No resource packs installed. Drop a .zip archive below to add one.
             </div>
 
             <!-- Custom Drop Zone -->
             <div
               class="zircon-drop-zone p-4 text-center text-xs text-slate-400 cursor-pointer rounded-xl border border-dashed border-slate-800 hover:border-cyan-500/50 transition"
               @dragover.prevent
-              @drop.prevent="onTextureDrop"
+              @drop.prevent="onResourceDrop"
             >
-              Drop <code class="text-cyan-300 font-mono">.zip</code> texture packs here (or
-              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseTextures">browse files</button>)
+              Drop <code class="text-cyan-300 font-mono">.zip</code> resource packs here (or
+              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseResources">browse files</button>)
             </div>
           </div>
         </template>
@@ -777,6 +822,15 @@
       @skip="onSkipDependencies"
       @close="onCloseDependencies"
     />
+
+    <!-- SERVER RESOURCE PACKS OFFERED MODAL -->
+    <ServerResourcePacksModal
+      :is-open="showServerPacksModal"
+      :server-packs="serverAdvertisedPacks"
+      :initial-decisions="serverPackDecisions"
+      @accepted="onServerPacksAccepted"
+      @close="showServerPacksModal = false"
+    />
   </div>
 </Teleport>
 </template>
@@ -784,6 +838,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import DependencyPromptModal from './DependencyPromptModal.vue';
+import ServerResourcePacksModal from './ServerResourcePacksModal.vue';
 import { api, pickFiles, saveFile, ZIP_FILTER } from '../lib/api';
 
 
@@ -815,10 +870,90 @@ async function openFolder(subfolder = null) {
 }
 
 
-// Shaders & Texture Packs state
+// Shaders & Resource Packs state
 const packs = ref({ activeShaderpack: '', activeResourcepacks: [] });
 const detailedPacks = ref({ shaderpacks: [], resourcepacks: [] });
 const activeShaderpack = ref('');
+
+// Drag-and-drop state for resource packs
+const rpDraggedIndex = ref(null);
+const rpDropTargetIndex = ref(null);
+
+function onRpDragStart(index, event) {
+  rpDraggedIndex.value = index;
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+  }
+}
+
+function onRpDragOver(index, event) {
+  if (rpDraggedIndex.value === null || rpDraggedIndex.value === index) return;
+  rpDropTargetIndex.value = index;
+  if (event?.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move';
+  }
+}
+
+async function onRpDrop(index) {
+  const from = rpDraggedIndex.value;
+  const to = index;
+  rpDraggedIndex.value = null;
+  rpDropTargetIndex.value = null;
+  if (from === null || from === undefined || from === to) return;
+
+  const dir = serverData.value?.gameDir;
+  if (!dir) return;
+  const current = [...(packs.value.activeResourcepacks || [])];
+  const [moved] = current.splice(from, 1);
+  current.splice(to, 0, moved);
+  packs.value.activeResourcepacks = current;
+  await api.setActiveResourcepacks(dir, current);
+}
+
+function onRpDragEnd() {
+  rpDraggedIndex.value = null;
+  rpDropTargetIndex.value = null;
+}
+
+// Server Resource Pack decisions state
+const showServerPacksModal = ref(false);
+const serverPackDecisions = ref({});
+
+const serverAdvertisedPacks = computed(() => {
+  return (detailedPacks.value.resourcepacks || []).filter((p) => !p.isLocal);
+});
+
+async function openServerPacksModal() {
+  const dir = serverData.value?.gameDir;
+  if (dir) {
+    try {
+      const decisions = await api.getServerPackDecisions(dir);
+      serverPackDecisions.value = decisions || {};
+    } catch (e) {
+      console.warn('Could not load pack decisions:', e);
+    }
+  }
+  showServerPacksModal.value = true;
+}
+
+async function onServerPacksAccepted({ accepted, rejected }) {
+  const dir = serverData.value?.gameDir;
+  if (!dir) return;
+  try {
+    await api.setServerPackDecisions(dir, accepted, rejected);
+    await loadPacks(dir);
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', {
+        detail: `Updated resource pack preferences: ${accepted.length} accepted, ${rejected.length} declined.`,
+      })
+    );
+  } catch (err) {
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', { detail: `Error saving resource pack decisions: ${err}` })
+    );
+  }
+}
 
 const activeResourcepacksList = computed(() => {
   const activeNames = packs.value.activeResourcepacks || [];
@@ -1239,7 +1374,7 @@ async function onShaderDrop(event) {
   await loadPacks(dir);
 }
 
-async function browseTextures() {
+async function browseResources() {
   const dir = serverData.value?.gameDir;
   if (!dir) return;
   const picked = await pickFiles({ multiple: true, filters: [PACK_FILTER] });
@@ -1250,7 +1385,7 @@ async function browseTextures() {
   await loadPacks(dir);
 }
 
-async function onTextureDrop(event) {
+async function onResourceDrop(event) {
   const dir = serverData.value?.gameDir;
   if (!dir) return;
   const files = event.dataTransfer?.files;

@@ -228,13 +228,42 @@
             </div>
             <button
               class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md hover:bg-slate-800/80 text-slate-400 hover:text-cyan-300 transition-colors text-xs font-bold group/btn"
-              title="Configure mods, shaders & texture packs"
+              title="Configure mods, shaders & resource packs"
               @click.stop="openConfigModal(server)"
             >
               <span class="tracking-widest text-slate-400 group-hover/btn:text-cyan-300">•••</span>
               <span class="text-[10px] font-semibold tracking-wide">Configure</span>
             </button>
           </div>
+        </div>
+
+        <!-- Zircon Cloud In-App Banner -->
+        <div class="my-3 p-3.5 rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-[#07131f]/90 via-[#0a1c2d]/85 to-[#07131f]/90 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(71,210,201,0.2)]">
+              <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-white text-xs font-bold tracking-tight">Host Your Own 24/7 Minecraft Server</span>
+                <span class="text-[9px] font-mono font-bold uppercase bg-cyan-400/20 text-cyan-300 px-1.5 py-0.2 rounded border border-cyan-400/30">Zircon Cloud</span>
+              </div>
+              <p class="text-slate-400 text-[10.5px] truncate mt-0.5">
+                Zero port-forwarding, instant player mod sync, and automated NVMe snapshots.
+              </p>
+            </div>
+          </div>
+          <button
+            @click="openDeployCloud"
+            class="shrink-0 text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#47d2c9] to-[#0891b2] text-slate-950 hover:brightness-110 shadow-[0_0_12px_rgba(71,210,201,0.25)] transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            <span>Deploy</span>
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -414,7 +443,7 @@
           </div>
           <button
             class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md hover:bg-slate-800/80 text-slate-400 hover:text-cyan-300 transition-colors text-xs font-bold group/btn"
-            title="Configure mods, shaders & texture packs"
+            title="Configure mods, shaders & resource packs"
             @click.stop="openConfigModal(rec)"
           >
             <span class="tracking-widest text-slate-400 group-hover/btn:text-cyan-300">•••</span>
@@ -748,6 +777,7 @@ const props = defineProps({
   session: { type: Object, default: null },
   gameStatus: { type: Object, default: null },
   deepLinkAddress: { type: String, default: '' },
+  deepLinkServer: { type: Object, default: null },
 });
 
 // Join via Code state
@@ -834,6 +864,21 @@ watch(
   () => {
     refreshPreviewSkin();
   }
+);
+
+watch(
+  () => [props.deepLinkAddress, props.deepLinkServer],
+  ([newAddr, newServer]) => {
+    const addr = (newServer && newServer.address) || newAddr;
+    if (addr && typeof addr === 'string' && addr.trim()) {
+      openAddDialog(addr.trim());
+      if (newServer && newServer.name) {
+        customServerName.value = newServer.name;
+        isEditingName.value = true;
+      }
+    }
+  },
+  { immediate: true }
 );
 
 onBeforeUnmount(() => {
@@ -1068,7 +1113,7 @@ async function removeServer(server) {
 // -------------------------------------------------------------
 
 function openDeployCloud() {
-  api.openBrowserUrl('https://zirconmc.net/pricing').catch(() => {});
+  api.openBrowserUrl('https://cloud.zirconmc.net/?ref=launcher').catch(() => {});
 }
 
 function openAddDialog(initialAddress = '') {

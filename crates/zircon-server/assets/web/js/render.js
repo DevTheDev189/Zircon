@@ -1410,7 +1410,7 @@ return function render(_ctx, _cache) {
                     _createElementVNode("div", { class: "z-brand-subtitle mt-1.5" }, [
                       _createElementVNode("span", { class: "z-brand-subtitle-dot" }),
                       _createElementVNode("span", null, "Server Manager"),
-                      _createElementVNode("span", { class: "text-slate-600 font-mono text-[8px] ml-auto" }, "v0.4.10")
+                      _createElementVNode("span", { class: "text-slate-600 font-mono text-[8px] ml-auto" }, "v" + _toDisplayString(serverCurrentVersion || '0.4.18'), 1 /* TEXT */)
                     ])
                   ]),
                   _createCommentVNode(" Global Stats Button — gets the same glowing outline as a selected server "),
@@ -1644,6 +1644,21 @@ return function render(_ctx, _cache) {
                           style: { width: "42.8%" }
                         })
                       ])
+                    ]),
+                    _createElementVNode("a", {
+                      href: "https://cloud.zirconmc.net/?ref=server_wrapper",
+                      target: "_blank",
+                      rel: "noopener",
+                      class: "block mt-3 p-2.5 rounded-xl border border-cyan-500/25 bg-gradient-to-r from-cyan-950/40 via-cyan-900/20 to-slate-900/60 hover:border-cyan-400/50 hover:bg-cyan-950/60 transition group cursor-pointer"
+                    }, [
+                      _createElementVNode("div", { class: "flex items-center justify-between" }, [
+                        _createElementVNode("div", { class: "flex items-center gap-2" }, [
+                          _createElementVNode("span", { class: "w-2 h-2 rounded-full bg-cyan-400 animate-pulse" }),
+                          _createElementVNode("span", { class: "text-xs font-bold text-white group-hover:text-cyan-300" }, "Zircon Cloud")
+                        ]),
+                        _createElementVNode("span", { class: "text-[9px] uppercase font-mono font-bold bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-400/30" }, "24/7 Hosting")
+                      ]),
+                      _createElementVNode("p", { class: "text-[10.5px] text-slate-400 mt-1 leading-tight" }, "Host servers 24/7 without keeping your PC running →")
                     ])
                   ])
                 ]),
@@ -2198,7 +2213,7 @@ return function render(_ctx, _cache) {
                               _createElementVNode("div", _hoisted_121, [
                                 _createElementVNode("div", _hoisted_122, [
                                   _cache[45] || (_cache[45] = _createElementVNode("h3", { class: "font-bold text-sm text-white" }, "Zircon Server Updates", -1 /* CACHED */)),
-                                  _createElementVNode("span", _hoisted_123, " v" + _toDisplayString(serverCurrentVersion || '0.3.7'), 1 /* TEXT */)
+                                  _createElementVNode("span", _hoisted_123, " v" + _toDisplayString(serverCurrentVersion || '0.4.18'), 1 /* TEXT */)
                                 ]),
                                 _cache[46] || (_cache[46] = _createElementVNode("p", { class: "text-xs text-slate-400" }, "Check for and install updates to the Zircon Server daemon binary in place.", -1 /* CACHED */))
                               ]),
@@ -2262,7 +2277,7 @@ return function render(_ctx, _cache) {
                                   ], 8 /* PROPS */, _hoisted_129)
                                 ]))
                               : (serverUpdateStatus === 'up-to-date')
-                                ? (_openBlock(), _createElementBlock("div", _hoisted_131, " Server is running the latest version (v" + _toDisplayString(serverCurrentVersion || '0.3.7') + "). ", 1 /* TEXT */))
+                                ? (_openBlock(), _createElementBlock("div", _hoisted_131, " Server is running the latest version (v" + _toDisplayString(serverCurrentVersion || '0.4.18') + "). ", 1 /* TEXT */))
                                 : (serverUpdateStatus === 'error')
                                   ? (_openBlock(), _createElementBlock("div", _hoisted_132, " Update check failed: " + _toDisplayString(serverUpdateError), 1 /* TEXT */))
                                   : _createCommentVNode("v-if", true)
@@ -2736,7 +2751,7 @@ return function render(_ctx, _cache) {
                               _createElementVNode("div", _hoisted_221, [
                                 _createElementVNode("div", _hoisted_222, [
                                   _createElementVNode("h3", _hoisted_223, [
-                                    _createElementVNode("span", null, "Server Texture Packs"),
+                                    _createElementVNode("span", null, "Server Resource Packs"),
                                     _createElementVNode("span", {
                                       class: _normalizeClass(["text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider flex items-center gap-1", (serverResourcePacks && serverResourcePacks.length) ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'])
                                     }, [
@@ -2803,7 +2818,7 @@ return function render(_ctx, _cache) {
                                   class: "mt-4 flex flex-col gap-2.5"
                                 }, [
                                   _createElementVNode("div", { class: "flex items-center justify-between text-xs text-slate-400 font-semibold px-1" }, [
-                                    _createElementVNode("span", null, "Active Server Texture Packs Hierarchy"),
+                                    _createElementVNode("span", null, "Active Server Resource Packs Hierarchy"),
                                     _createElementVNode("span", { class: "text-[11px] text-cyan-400 font-mono" }, "Top pack overrides lower packs")
                                   ]),
                                   (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(serverResourcePacks, (sp, sIdx) => {
@@ -3099,7 +3114,7 @@ return function render(_ctx, _cache) {
                               onDrop: _withModifiers($event => (handlePackDrop($event, 'resourcepack')), ["prevent"])
                             }, [
                               _createElementVNode("div", _hoisted_284, [
-                                _cache[85] || (_cache[85] = _createElementVNode("h3", { class: "font-bold text-sm text-slate-200" }, "Texture Packs", -1 /* CACHED */)),
+                                _cache[85] || (_cache[85] = _createElementVNode("h3", { class: "font-bold text-sm text-slate-200" }, "Resource Packs", -1 /* CACHED */)),
                                 _createCommentVNode(" Provider Switcher "),
                                 _createElementVNode("div", _hoisted_285, [
                                   _createElementVNode("button", {
@@ -3144,7 +3159,7 @@ return function render(_ctx, _cache) {
                                 _withDirectives(_createElementVNode("input", {
                                   "onUpdate:modelValue": $event => ((texturePackSearchQuery) = $event),
                                   onKeyup: _withKeys($event => (searchPacks('resourcepack')), ["enter"]),
-                                  placeholder: texturePackSearchProvider === 'curseforge' ? 'Search CurseForge texture packs...' : 'Search Modrinth texture packs...',
+                                  placeholder: texturePackSearchProvider === 'curseforge' ? 'Search CurseForge resource packs...' : 'Search Modrinth resource packs...',
                                   class: _normalizeClass(["flex-1 z-search-input rounded-xl px-3.5 py-2 text-sm transition focus:outline-none focus:ring-2", texturePackSearchProvider === 'curseforge' ? 'border-orange-500/40 focus:border-[#F16436] focus:ring-[#F16436]/20' : 'border-slate-700 focus:border-[#46d66d] focus:ring-[#46d66d]/20'])
                                 }, null, 42 /* CLASS, PROPS, NEED_HYDRATION */, _hoisted_291), [
                                   [_vModelText, texturePackSearchQuery]
@@ -3241,7 +3256,7 @@ return function render(_ctx, _cache) {
                                   ]))
                                 : _createCommentVNode("v-if", true),
                               _createElementVNode("div", { class: "flex items-center justify-between mt-2 mb-1.5 min-h-[30px] gap-2 flex-wrap" }, [
-                                _createElementVNode("h4", { class: "font-bold text-xs text-slate-300 uppercase tracking-wider" }, `Installed Textures (${resourcepacks.length})`),
+                                _createElementVNode("h4", { class: "font-bold text-xs text-slate-300 uppercase tracking-wider" }, `Installed Resource Packs (${resourcepacks.length})`),
                                 _createElementVNode("div", { class: "flex items-center gap-2.5 ml-auto" }, [
                                   (resourcepacks.length > 0)
                                     ? (_openBlock(), _createElementBlock("label", { class: "flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none" }, [
@@ -3343,7 +3358,7 @@ return function render(_ctx, _cache) {
                                   ], 2 /* CLASS */))
                                 }), 128 /* KEYED_FRAGMENT */)),
                                 (!resourcepacks.length)
-                                  ? (_openBlock(), _createElementBlock("p", _hoisted_328, "No texture packs installed yet."))
+                                  ? (_openBlock(), _createElementBlock("p", _hoisted_328, "No resource packs installed yet."))
                                   : _createCommentVNode("v-if", true)
                               ])
                             ], 40 /* PROPS, NEED_HYDRATION */, _hoisted_283)

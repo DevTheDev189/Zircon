@@ -394,12 +394,37 @@ impl VersionService {
     }
 }
 
-fn filter_mc_versions(versions: Vec<MinecraftVersionInfo>, include_snapshots: bool) -> Vec<MinecraftVersionInfo> {
-    if include_snapshots {
-        versions
-    } else {
-        versions.into_iter().filter(|v| v.r#type == "release").collect()
+/// Returns true if the Minecraft version is 1.7 or newer (1.7 is the oldest supported platform version).
+/// Versions older than 1.7 (e.g. 1.6.4, 1.5.2, 1.2.5, Beta/Alpha) are not supported.
+pub fn is_supported_mc_version(version: &str) -> bool {
+    let clean = version.trim().trim_start_matches('v');
+    let parts: Vec<&str> = clean.split('.').collect();
+    if parts.len() < 2 {
+        return false;
     }
+    let major: u32 = match parts[0].parse() {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    let minor: u32 = match parts[1].parse() {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    if major > 1 {
+        true
+    } else if major == 1 {
+        minor >= 7
+    } else {
+        false
+    }
+}
+
+fn filter_mc_versions(versions: Vec<MinecraftVersionInfo>, include_snapshots: bool) -> Vec<MinecraftVersionInfo> {
+    versions
+        .into_iter()
+        .filter(|v| is_supported_mc_version(&v.id))
+        .filter(|v| include_snapshots || v.r#type == "release")
+        .collect()
 }
 
 fn neoforge_prefix_for_mc(mc_version: &str) -> String {
@@ -427,3 +452,63 @@ fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
     }
     a.len().cmp(&b.len())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_supported_mc_version() {
+        // Supported (1.7+)
+        assert!(is_supported_mc_version("1.7"));
+        assert!(is_supported_mc_version("1.7.10"));
+        assert!(is_supported_mc_version("1.8.9"));
+        assert!(is_supported_mc_version("1.12.2"));
+        assert!(is_supported_mc_version("1.16.5"));
+        assert!(is_supported_mc_version("1.20.1"));
+        assert!(is_supported_mc_version("1.21.4"));
+        assert!(is_supported_mc_version("2.0"));
+
+        // Unsupported (< 1.7)
+        assert!(!is_supported_mc_version("1.6.4"));
+        assert!(!is_supported_mc_version("1.6.2"));
+        assert!(!is_supported_mc_version("1.6"));
+        assert!(!is_supported_mc_version("1.5.2"));
+        assert!(!is_supported_mc_version("1.4.7"));
+        assert!(!is_supported_mc_version("1.2.5"));
+        assert!(!is_supported_mc_version("b1.7.3"));
+        assert!(!is_supported_mc_version("invalid"));
+    }
+
+    #[test]
+    fn test_filter_mc_versions_drops_older_than_1_7() {
+        let entries = vec![
+            MinecraftVersionInfo {
+                id: "1.21.4".into(),
+                r#type: "release".into(),
+                release_time: "".into(),
+            },
+            MinecraftVersionInfo {
+                id: "1.7.10".into(),
+                r#type: "release".into(),
+                release_time: "".into(),
+            },
+            MinecraftVersionInfo {
+                id: "1.6.4".into(),
+                r#type: "release".into(),
+                release_time: "".into(),
+            },
+            MinecraftVersionInfo {
+                id: "1.5.2".into(),
+                r#type: "release".into(),
+                release_time: "".into(),
+            },
+        ];
+
+        let filtered = filter_mc_versions(entries, false);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].id, "1.21.4");
+        assert_eq!(filtered[1].id, "1.7.10");
+    }
+}
+

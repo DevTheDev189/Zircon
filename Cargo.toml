@@ -16,6 +16,7 @@ members = [
     "crates/zircon-launcher",
 ]
 
+
 [workspace.dependencies]
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "json", "macros"] }
 tokio = { version = "1.40", features = ["full"] }

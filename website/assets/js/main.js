@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const anchor = e.target.closest('a');
       if (!anchor) return;
       const href = anchor.getAttribute('href') || '';
-      const match = href.match(/#(players|server-owners)$/);
+      const match = href.match(/#(players|server-owners|cloud)$/);
       if (match) {
         const targetTab = match[1];
         if (document.querySelector(`.tab-btn[data-tab="${targetTab}"]`)) {

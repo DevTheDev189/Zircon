@@ -1,0 +1,223 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="100%" height="100%">
+  <defs>
+    <!-- Ambient Backdrop Aura -->
+    <radialGradient id="zirky-glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.28" />
+      <stop offset="60%" stop-color="#0f766e" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#05080e" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Obsidian Chassis Gradients -->
+    <linearGradient id="chassis-body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="45%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+
+    <linearGradient id="chassis-head" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="35%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0b111e" />
+    </linearGradient>
+
+    <!-- Ear Module Gradients -->
+    <linearGradient id="ear-l-grad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <linearGradient id="ear-r-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <!-- Detailed Rocket Pill Gradients -->
+    <linearGradient id="thruster-pill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="40%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Eye Screen / Visor -->
+    <linearGradient id="screen-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#07131e" />
+    </linearGradient>
+
+    <!-- Glowing Zircon Cyan Filters -->
+    <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="zircon-cyan-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <style>
+    .float-anim {
+      animation: zirkyHover 3.2s ease-in-out infinite alternate;
+    }
+    .hand-l-anim {
+      animation: handBobL 3.2s ease-in-out infinite alternate;
+    }
+    .hand-r-anim {
+      animation: handBobR 3.2s ease-in-out infinite alternate -0.5s;
+    }
+    .eye-pulse {
+      animation: eyeGlow 2.4s ease-in-out infinite alternate;
+    }
+    .rune-pulse {
+      animation: runeShine 2.5s ease-in-out infinite alternate;
+    }
+    .jet-flicker {
+      animation: jetFlicker 1.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes zirkyHover {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-12px); }
+    }
+    @keyframes handBobL {
+      0% { transform: translateY(0px) rotate(0deg); }
+      100% { transform: translateY(-14px) rotate(-4deg); }
+    }
+    @keyframes handBobR {
+      0% { transform: translateY(0px) rotate(0deg); }
+      100% { transform: translateY(-12px) rotate(5deg); }
+    }
+    @keyframes eyeGlow {
+      0%, 88%, 100% { transform: scaleY(1); opacity: 0.98; }
+      92%, 96% { transform: scaleY(0.08); opacity: 0.4; }
+    }
+    @keyframes runeShine {
+      0% { opacity: 0.85; filter: drop-shadow(0 0 2px #2dd4bf); }
+      100% { opacity: 1; filter: drop-shadow(0 0 9px #5eead4); }
+    }
+    @keyframes jetFlicker {
+      0% { transform: scaleY(0.9) scaleX(0.95); opacity: 0.85; }
+      100% { transform: scaleY(1.1) scaleX(1.05); opacity: 1; }
+    }
+  </style>
+
+  <!-- Ambient Backdrop Glow -->
+  <circle cx="160" cy="155" r="140" fill="url(#zirky-glow)" />
+
+  <!-- Clean Static Ground Shadow -->
+  <ellipse cx="160" cy="288" rx="46" ry="6" fill="#020617" opacity="0.5" />
+
+  <!-- Main Floating Character Rig -->
+  <g class="float-anim">
+
+    <!-- LAYER 1: Rocket Flame Plume (Rendered BEHIND the rocket cone) -->
+    <g class="jet-flicker" transform-origin="160 244">
+      <polygon points="148,242 160,277 172,242" fill="#2dd4bf" filter="url(#neon-glow)" opacity="0.9" />
+      <polygon points="152,242 160,267 168,242" fill="#5eead4" />
+      <polygon points="155,242 160,258 165,242" fill="#ffffff" />
+      <circle cx="155" cy="279" r="1.6" fill="#5eead4" opacity="0.8" />
+      <circle cx="165" cy="281" r="1.4" fill="#2dd4bf" opacity="0.9" />
+    </g>
+
+    <!-- LAYER 2: Rocket Thruster Cone / Pill (Rendered IN FRONT OF Flame, BEHIND Torso) -->
+    <g id="thruster-cone-piece">
+      <!-- Thruster Pill (Tucked 6px behind torso, sits in front of flame) -->
+      <rect x="141" y="232" width="38" height="15" rx="5" fill="url(#thruster-pill)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="1.5" />
+    </g>
+
+    <!-- LAYER 3: Torso Chassis (Rendered IN FRONT OF Thruster Cone) -->
+    <g id="torso">
+      <rect x="122" y="179" width="76" height="59" rx="14" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="2" />
+
+      <!-- Chest Reactor Housing Plate with Glowing Zircon Cyan Border -->
+      <rect x="142" y="191" width="36" height="34" rx="8" fill="#031b22" stroke="#2dd4bf" stroke-width="1.8" filter="url(#zircon-cyan-glow)" />
+      
+      <!-- OFFICIAL ZIRCON "Z" ICON EMBLEM (Centered at 160, 208) -->
+      <g class="rune-pulse" transform="translate(160, 208) scale(0.44) translate(-32, -32)" filter="url(#zircon-cyan-glow)">
+        <path
+           d="M 10.73489,12.12731 v 11.06289 h 4.615739 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 11.62513 h 42.511617 v -12.93668 h -4.618839 l -3.52485,4.47053 H 27.401056 v -3.15898 l 25.864054,-16.18351 v -11.93674 H 13.462372 Z"
+           fill="#2dd4bf"
+           stroke="#5eead4"
+           stroke-width="1.2"
+           stroke-linejoin="round" />
+      </g>
+
+      <!-- Chassis Accent Circuits (Glowing Zircon Cyan) -->
+      <line x1="129" y1="195" x2="136" y2="195" stroke="#2dd4bf" stroke-width="1.5" opacity="0.6" stroke-linecap="round" />
+      <line x1="129" y1="201" x2="134" y2="201" stroke="#2dd4bf" stroke-width="1.5" opacity="0.4" stroke-linecap="round" />
+      <line x1="184" y1="195" x2="191" y2="195" stroke="#2dd4bf" stroke-width="1.5" opacity="0.6" stroke-linecap="round" />
+      <line x1="186" y1="201" x2="191" y2="201" stroke="#2dd4bf" stroke-width="1.5" opacity="0.4" stroke-linecap="round" />
+    </g>
+
+    <!-- LAYER 4: Floating Magnetic Hands -->
+    <g class="hand-l-anim" id="hand-left" transform-origin="88 200" filter="url(#soft-shadow)">
+      <rect x="74" y="184" width="28" height="28" rx="8" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="2" />
+      <rect x="80" y="190" width="16" height="16" rx="4" fill="#041b24" />
+      <circle cx="88" cy="198" r="3.5" fill="#2dd4bf" filter="url(#neon-glow)" />
+    </g>
+
+    <g class="hand-r-anim" id="hand-right" transform-origin="232 200" filter="url(#soft-shadow)">
+      <rect x="218" y="184" width="28" height="28" rx="8" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="2" />
+      <rect x="224" y="190" width="16" height="16" rx="4" fill="#041b24" />
+      <circle cx="232" cy="198" r="3.5" fill="#2dd4bf" filter="url(#neon-glow)" />
+    </g>
+
+    <!-- LAYER 5: Floating Head (With D-Shaped Flush-Mounted Ears) -->
+    <g id="head" filter="url(#soft-shadow)">
+      
+      <!-- LEFT D-SHAPED EAR MODULE -->
+      <g id="ear-left">
+        <path d="M 94 105 L 87 105 Q 80 105 80 112 L 80 130 Q 80 137 87 137 L 94 137 Z" fill="url(#ear-l-grad)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 94 109 L 88 109 Q 83 109 83 114 L 83 128 Q 83 133 88 133 L 94 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.8" />
+      </g>
+
+      <!-- RIGHT D-SHAPED EAR MODULE -->
+      <g id="ear-right">
+        <path d="M 226 105 L 233 105 Q 240 105 240 112 L 240 130 Q 240 137 233 137 L 226 137 Z" fill="url(#ear-r-grad)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 226 109 L 232 109 Q 237 109 237 114 L 237 128 Q 237 133 232 133 L 226 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.8" />
+      </g>
+
+      <!-- Main Head Chassis -->
+      <rect x="94" y="68" width="132" height="106" rx="20" fill="url(#chassis-head)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="2.2" />
+
+      <!-- Visor Face Screen -->
+      <rect x="108" y="86" width="104" height="74" rx="14" fill="url(#screen-bg)" stroke="#1e293b" stroke-width="1.5" />
+      
+      <!-- Visor Gloss Sheen Curve -->
+      <path d="M 112 90 L 198 90 Q 206 90 206 98 L 206 104 L 112 90 Z" fill="rgba(255, 255, 255, 0.08)" />
+
+      <!-- Expressive Animated Glowing Eyes & Face -->
+      <g class="eye-pulse" transform-origin="160 122">
+        <g filter="url(#neon-glow)">
+          <rect x="124" y="108" width="22" height="26" rx="7" fill="#2dd4bf" />
+          <rect x="127" y="111" width="8" height="9" rx="3" fill="#ffffff" />
+          <circle cx="140" cy="128" r="2.2" fill="#ffffff" opacity="0.9" />
+        </g>
+        <rect x="121" y="138" width="12" height="3.5" rx="1.7" fill="#0f766e" opacity="0.7" />
+
+        <g filter="url(#neon-glow)">
+          <rect x="174" y="108" width="22" height="26" rx="7" fill="#2dd4bf" />
+          <rect x="177" y="111" width="8" height="9" rx="3" fill="#ffffff" />
+          <circle cx="190" cy="128" r="2.2" fill="#ffffff" opacity="0.9" />
+        </g>
+        <rect x="187" y="138" width="12" height="3.5" rx="1.7" fill="#0f766e" opacity="0.7" />
+
+        <path d="M 154 135 Q 160 141 166 135" fill="none" stroke="#5eead4" stroke-width="2.5" stroke-linecap="round" filter="url(#neon-glow)" />
+      </g>
+    </g>
+
+  </g>
+</svg>

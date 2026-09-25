@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="100%" height="100%">
+  <defs>
+    <!-- Radiant Celebration Backdrop Aura (Warm Yellow Glow) -->
+    <radialGradient id="celeb-glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.45" />
+      <stop offset="45%" stop-color="#f59e0b" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#05080e" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Obsidian Chassis Gradients -->
+    <linearGradient id="chassis-body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="45%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+
+    <linearGradient id="chassis-head" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="35%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0b111e" />
+    </linearGradient>
+
+    <!-- Ear Module Gradients -->
+    <linearGradient id="ear-l-grad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <linearGradient id="ear-r-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <linearGradient id="thruster-pill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="40%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Eye Screen / Visor -->
+    <linearGradient id="screen-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#05151e" />
+    </linearGradient>
+
+    <!-- Celebration Sparkle Filters -->
+    <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="star-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <style>
+    .victory-jump {
+      animation: victoryFloat 2.6s ease-in-out infinite alternate;
+    }
+    .hand-cheer-l {
+      animation: cheerWaveL 1.4s ease-in-out infinite alternate;
+    }
+    .hand-cheer-r {
+      animation: cheerWaveR 1.4s ease-in-out infinite alternate -0.7s;
+    }
+    .sparkle-pop-1 {
+      animation: starPop 2.2s ease-in-out infinite;
+    }
+    .sparkle-pop-2 {
+      animation: starPop 2.2s ease-in-out infinite -0.7s;
+    }
+    .sparkle-pop-3 {
+      animation: starPop 2.2s ease-in-out infinite -1.4s;
+    }
+    .rune-celebrate {
+      animation: runeMaxGlow 1.8s ease-in-out infinite alternate;
+    }
+    .jet-cheer {
+      animation: flameCheer 1.8s ease-in-out infinite alternate;
+    }
+
+    @keyframes victoryFloat {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-13px); }
+    }
+    @keyframes cheerWaveL {
+      0% { transform: rotate(-7deg) translateY(0px); }
+      100% { transform: rotate(5deg) translateY(-5px); }
+    }
+    @keyframes cheerWaveR {
+      0% { transform: rotate(7deg) translateY(0px); }
+      100% { transform: rotate(-5deg) translateY(-5px); }
+    }
+    @keyframes starPop {
+      0% { transform: scale(0.4) rotate(0deg); opacity: 0; }
+      50% { opacity: 1; transform: scale(1.15) rotate(45deg); }
+      100% { transform: scale(0.3) rotate(90deg); opacity: 0; }
+    }
+    @keyframes runeMaxGlow {
+      0% { opacity: 0.85; filter: drop-shadow(0 0 3px #fbbf24); }
+      100% { opacity: 1; filter: drop-shadow(0 0 10px #f59e0b) drop-shadow(0 0 16px #fbbf24); }
+    }
+    @keyframes flameCheer {
+      0% { transform: scaleY(0.94) scaleX(0.96); opacity: 0.85; }
+      100% { transform: scaleY(1.06) scaleX(1.04); opacity: 0.95; }
+    }
+  </style>
+
+  <!-- Ambient Backdrop Glow -->
+  <circle cx="160" cy="155" r="140" fill="url(#celeb-glow)" />
+
+  <!-- Clean Ground Shadow -->
+  <ellipse cx="160" cy="288" rx="46" ry="6" fill="#020617" opacity="0.45" />
+
+  <!-- Bursting Celebratory Star Sparkles -->
+  <!-- Star 1 (Top Left) -->
+  <g class="sparkle-pop-1" transform-origin="60 65" filter="url(#star-glow)">
+    <polygon points="60,54 63,62 71,65 63,68 60,76 57,68 49,65 57,62" fill="#5eead4" />
+    <circle cx="60" cy="65" r="2" fill="#ffffff" />
+  </g>
+  <!-- Star 2 (Top Right Gold Star) -->
+  <g class="sparkle-pop-2" transform-origin="255 60" filter="url(#star-glow)">
+    <polygon points="255,48 258,57 267,60 258,63 255,72 252,63 243,60 252,57" fill="#fbbf24" />
+    <circle cx="255" cy="60" r="2.2" fill="#ffffff" />
+  </g>
+  <!-- Star 3 (Mid Right Cyan Diamond) -->
+  <g class="sparkle-pop-3" transform-origin="270 145" filter="url(#star-glow)">
+    <polygon points="270,138 275,145 270,152 265,145" fill="#2dd4bf" />
+  </g>
+  <!-- Star 4 (Mid Left Gold Diamond) -->
+  <g class="sparkle-pop-2" transform-origin="50 145" filter="url(#star-glow)">
+    <polygon points="50,138 55,145 50,152 45,145" fill="#fbbf24" />
+  </g>
+
+  <!-- Main Joyous Character Rig (Smooth Victory Float) -->
+  <g class="victory-jump">
+
+    <!-- LAYER 1: Rocket Flame Plume (Tucked behind cone, calmer flame) -->
+    <g class="jet-cheer" transform-origin="160 244">
+      <polygon points="149,242 160,274 171,242" fill="#2dd4bf" filter="url(#neon-glow)" opacity="0.9" />
+      <polygon points="152,242 160,265 168,242" fill="#5eead4" />
+      <polygon points="155,242 160,256 165,242" fill="#ffffff" />
+      <circle cx="155" cy="276" r="1.4" fill="#5eead4" opacity="0.8" />
+      <circle cx="165" cy="278" r="1.2" fill="#fbbf24" opacity="0.75" />
+    </g>
+
+    <!-- LAYER 2: Rocket Thruster Cone Piece (Behind torso, in front of flame) -->
+    <g id="thruster-cone-piece">
+      <rect x="141" y="232" width="38" height="15" rx="5" fill="url(#thruster-pill)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="1.5" />
+    </g>
+
+    <!-- LAYER 3: Torso Chassis (In front of thruster) -->
+    <g id="torso">
+      <rect x="122" y="179" width="76" height="59" rx="14" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="2" />
+
+      <!-- Chest Reactor Housing Plate with Glowing Yellow/Gold Border -->
+      <rect x="142" y="191" width="36" height="34" rx="8" fill="#031b22" stroke="#fbbf24" stroke-width="1.8" filter="url(#star-glow)" />
+      
+      <!-- High Wattage Celebratory Zircon Z Icon (Golden Yellow) -->
+      <g class="rune-celebrate" transform="translate(160, 208) scale(0.44) translate(-32, -32)" filter="url(#star-glow)">
+        <path
+           d="M 10.73489,12.12731 v 11.06289 h 4.615739 l 3.522265,-4.46794 h 17.74052 v 5.34179 l -25.864055,16.18351 v 11.62513 h 42.511617 v -12.93668 h -4.618839 l -3.52485,4.47053 H 27.401056 v -3.15898 l 25.864054,-16.18351 v -11.93674 H 13.462372 Z"
+           fill="#fbbf24"
+           stroke="#fef08a"
+           stroke-width="1.4"
+           stroke-linejoin="round" />
+      </g>
+
+      <!-- Chassis Accent Circuits (Glowing Zircon Cyan) -->
+      <line x1="129" y1="195" x2="136" y2="195" stroke="#2dd4bf" stroke-width="1.5" opacity="0.8" stroke-linecap="round" />
+      <line x1="129" y1="201" x2="134" y2="201" stroke="#2dd4bf" stroke-width="1.5" opacity="0.6" stroke-linecap="round" />
+      <line x1="184" y1="195" x2="191" y2="195" stroke="#2dd4bf" stroke-width="1.5" opacity="0.8" stroke-linecap="round" />
+      <line x1="186" y1="201" x2="191" y2="201" stroke="#2dd4bf" stroke-width="1.5" opacity="0.6" stroke-linecap="round" />
+    </g>
+
+    <!-- LAYER 4: Floating Head with Big Joyous Eyes (^ ^) -->
+    <g id="head" filter="url(#soft-shadow)">
+      
+      <!-- Left D-Shaped Ear -->
+      <g id="ear-left">
+        <path d="M 94 105 L 87 105 Q 80 105 80 112 L 80 130 Q 80 137 87 137 L 94 137 Z" fill="url(#ear-l-grad)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 94 109 L 88 109 Q 83 109 83 114 L 83 128 Q 83 133 88 133 L 94 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.8" />
+      </g>
+
+      <!-- Right D-Shaped Ear -->
+      <g id="ear-right">
+        <path d="M 226 105 L 233 105 Q 240 105 240 112 L 240 130 Q 240 137 233 137 L 226 137 Z" fill="url(#ear-r-grad)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 226 109 L 232 109 Q 237 109 237 114 L 237 128 Q 237 133 232 133 L 226 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.8" />
+      </g>
+
+      <!-- Main Head Chassis -->
+      <rect x="94" y="68" width="132" height="106" rx="20" fill="url(#chassis-head)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="2.2" />
+
+      <!-- Visor Face Screen -->
+      <rect x="108" y="86" width="104" height="74" rx="14" fill="url(#screen-bg)" stroke="#1e293b" stroke-width="1.5" />
+      <path d="M 112 90 L 198 90 Q 206 90 206 98 L 206 104 L 112 90 Z" fill="rgba(255, 255, 255, 0.08)" />
+
+      <!-- Joyous Anime Arch Eyes (^ ^) and Radiant Smile -->
+      <g filter="url(#neon-glow)">
+        <!-- Left Happy Arch Eye -->
+        <path d="M 122 120 Q 134 104 146 120" fill="none" stroke="#2dd4bf" stroke-width="4.5" stroke-linecap="round" />
+        <!-- Right Happy Arch Eye -->
+        <path d="M 174 120 Q 186 104 198 120" fill="none" stroke="#2dd4bf" stroke-width="4.5" stroke-linecap="round" />
+      </g>
+
+      <!-- Radiant Joyous Blush (Cheerful bright pink/cyan) -->
+      <rect x="119" y="132" width="14" height="4" rx="2" fill="#f43f5e" opacity="0.65" />
+      <rect x="187" y="132" width="14" height="4" rx="2" fill="#f43f5e" opacity="0.65" />
+
+      <!-- Big Joyous Smile (Open cheerful curve) -->
+      <path d="M 151 130 Q 160 144 169 130 Z" fill="#5eead4" stroke="#ffffff" stroke-width="1.5" filter="url(#neon-glow)" />
+    </g>
+
+    <!-- LAYER 5: Cheering Victory Hands (Rendered IN FRONT of Head at balanced height) -->
+    <g class="hand-cheer-l" id="hand-left" transform-origin="82 174" filter="url(#soft-shadow)">
+      <rect x="68" y="160" width="28" height="28" rx="8" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="2" />
+      <rect x="74" y="166" width="16" height="16" rx="4" fill="#041b24" />
+      <circle cx="82" cy="174" r="3.5" fill="#5eead4" filter="url(#neon-glow)" />
+    </g>
+
+    <g class="hand-cheer-r" id="hand-right" transform-origin="238 174" filter="url(#soft-shadow)">
+      <rect x="224" y="160" width="28" height="28" rx="8" fill="url(#chassis-body)" stroke="rgba(45, 212, 191, 0.45)" stroke-width="2" />
+      <rect x="230" y="166" width="16" height="16" rx="4" fill="#041b24" />
+      <circle cx="238" cy="174" r="3.5" fill="#5eead4" filter="url(#neon-glow)" />
+    </g>
+
+  </g>
+</svg>

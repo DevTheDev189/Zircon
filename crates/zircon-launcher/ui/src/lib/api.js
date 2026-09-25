@@ -289,6 +289,10 @@ export const api = {
     invoke('set_active_shaderpack', { gameDir, filename }),
   setActiveResourcepacks: (gameDir, filenames) =>
     invoke('set_active_resourcepacks', { gameDir, filenames }),
+  setServerPackDecisions: (gameDir, accepted, rejected) =>
+    invoke('set_server_pack_decisions', { gameDir, accepted, rejected }),
+  getServerPackDecisions: (gameDir) =>
+    invoke('get_server_pack_decisions', { gameDir }),
   toggleResourcepack: (gameDir, filename) =>
     invoke('toggle_resourcepack', { gameDir, filename }),
 
@@ -714,3 +718,8 @@ export function onSkinAiProgress(cb) {
 export function onDeepLinkJoin(cb) {
   return listen('deep-link-join', (e) => cb(e.payload));
 }
+
+export function onDeepLinkAddServer(cb) {
+  return listen('deep-link-add-server', (e) => cb(e.payload));
+}
+

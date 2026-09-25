@@ -604,3 +604,16 @@
   }
 }
 
+/* Stack Flip Transitions for Drag and Drop Reordering */
+.stack-flip-move {
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+.stack-flip-enter-active,
+.stack-flip-leave-active {
+  transition: all 0.2s ease-out;
+}
+.stack-flip-enter-from,
+.stack-flip-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}

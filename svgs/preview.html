@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Zirky Interactive Transition Player &amp; State Suite</title>
+  <style>
+    :root {
+      --bg-dark: #070b12;
+      --panel-bg: rgba(15, 23, 42, 0.85);
+      --panel-border: rgba(45, 212, 191, 0.22);
+      --cyan: #2dd4bf;
+      --cyan-bright: #5eead4;
+      --amber: #f97316;
+      --gold: #fbbf24;
+      --danger: #ef4444;
+      --slate: #94a3b8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(ellipse at 50% 10%, rgba(45, 212, 191, 0.08), transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(15, 118, 110, 0.05), transparent 40%);
+      color: #e2e8f0;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      margin: 0;
+      padding: 36px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      margin: 0 0 8px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    h1 span.accent {
+      background: linear-gradient(135deg, #2dd4bf 0%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      color: var(--slate);
+      font-size: 15px;
+      margin: 0;
+    }
+
+    /* === INTERACTIVE TRANSITION STAGE === */
+    .stage-card {
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 28px;
+      margin-bottom: 48px;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 30px -10px rgba(45, 212, 191, 0.15);
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 36px;
+      align-items: center;
+    }
+
+    @media (max-width: 960px) {
+      .stage-card { grid-template-columns: 1fr; }
+    }
+
+    .avatar-viewport {
+      background: radial-gradient(circle at 50% 50%, #0d1a29 0%, #060a12 100%);
+      border: 1px solid rgba(45, 212, 191, 0.25);
+      border-radius: 18px;
+      position: relative;
+      width: 100%;
+      height: 380px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8);
+      transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+    }
+
+    .avatar-viewport.state-alert {
+      background: radial-gradient(circle at 50% 50%, #2a0c04 0%, #080303 100%) !important;
+      border-color: rgba(249, 115, 22, 0.6) !important;
+      box-shadow: inset 0 0 40px rgba(249, 115, 22, 0.2), 0 0 30px rgba(249, 115, 22, 0.25) !important;
+    }
+
+    .avatar-viewport.state-celebrating {
+      background: radial-gradient(circle at 50% 50%, #241b05 0%, #080703 100%) !important;
+      border-color: rgba(251, 191, 36, 0.5) !important;
+      box-shadow: inset 0 0 40px rgba(251, 191, 36, 0.15), 0 0 30px rgba(251, 191, 36, 0.2) !important;
+    }
+
+    /* Stage Header HUD */
+    .viewport-hud {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      background: rgba(0, 0, 0, 0.65);
+      border: 1px solid rgba(45, 212, 191, 0.4);
+      border-radius: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--cyan-bright);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.3s;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan-bright);
+      box-shadow: 0 0 8px var(--cyan-bright);
+      transition: all 0.3s;
+    }
+
+    .active-speed-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--slate);
+      background: rgba(0, 0, 0, 0.6);
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--slate);
+      margin-bottom: 8px;
+    }
+
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn-state {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      padding: 11px 20px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-state:hover {
+      background: rgba(45, 212, 191, 0.15);
+      border-color: var(--cyan);
+      transform: translateY(-2px);
+    }
+
+    .btn-state.active {
+      background: rgba(45, 212, 191, 0.25);
+      border-color: var(--cyan-bright);
+      color: #ffffff;
+      box-shadow: 0 0 16px -2px rgba(45, 212, 191, 0.4);
+    }
+
+    .btn-state.alert-mode.active {
+      background: rgba(249, 115, 22, 0.25);
+      border-color: var(--amber);
+      color: #ffffff;
+      box-shadow: 0 0 16px -2px rgba(249, 115, 22, 0.45);
+    }
+
+    .btn-state.celeb-mode.active {
+      background: rgba(251, 191, 36, 0.25);
+      border-color: var(--gold);
+      color: #ffffff;
+      box-shadow: 0 0 16px -2px rgba(251, 191, 36, 0.4);
+    }
+
+    /* Options Bar */
+    .options-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 18px;
+      background: rgba(10, 16, 26, 0.6);
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .speed-selector {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .speed-selector select {
+      background: #0f172a;
+      border: 1px solid rgba(45, 212, 191, 0.3);
+      color: #ffffff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .btn-tour {
+      background: linear-gradient(135deg, rgba(45, 212, 191, 0.2) 0%, rgba(14, 165, 233, 0.2) 100%);
+      border: 1px solid var(--cyan);
+      color: var(--cyan-bright);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-tour:hover {
+      background: var(--cyan);
+      color: #041014;
+      box-shadow: 0 0 14px rgba(45, 212, 191, 0.5);
+    }
+
+    /* Live Event Terminal */
+    .terminal-box {
+      background: #040810;
+      border: 1px solid rgba(45, 212, 191, 0.2);
+      border-radius: 12px;
+      padding: 12px 16px;
+      height: 120px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 11.5px;
+      color: #94a3b8;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .terminal-box .log-item {
+      display: flex;
+      gap: 8px;
+    }
+
+    .terminal-box .time { color: #64748b; }
+    .terminal-box .event-sync { color: var(--cyan); font-weight: 600; }
+    .terminal-box .event-trans { color: var(--gold); font-weight: 700; }
+    .terminal-box .event-alert { color: var(--amber); font-weight: 700; }
+    .terminal-box .event-state { color: #ffffff; font-weight: 700; }
+
+    /* === REFERENCE GALLERY CARDS === */
+    .gallery-heading {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: #0f172a;
+      border: 1px solid rgba(45, 212, 191, 0.2);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: #2dd4bf;
+    }
+
+    .svg-container {
+      width: 200px;
+      height: 200px;
+      margin-bottom: 12px;
+    }
+
+    .card .title {
+      font-weight: 700;
+      font-size: 14px;
+      color: #f8fafc;
+      margin-bottom: 4px;
+    }
+
+    .card .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .badge.idle { background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.3); }
+    .badge.sleeping { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+    .badge.tinkering { background: rgba(45, 212, 191, 0.15); color: #5eead4; border: 1px solid rgba(45, 212, 191, 0.4); }
+    .badge.celebrating { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); }
+    .badge.alert { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.4); }
+
+    .card .desc {
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: center;
+      line-height: 1.35;
+    }
+
+    /* =========================================================
+       DYNAMIC THEME ENGINE (ACCURATE TO STANDALONE SVGs)
+       ========================================================= */
+    #zirky-rig-container {
+      width: 320px;
+      height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+
+      /* Default: Zircon Cyan Palette (Idle, Sleeping, Tinkering, Celebrating) */
+      --zirky-outline: rgba(45, 212, 191, 0.45);
+      --zirky-accent: #2dd4bf;
+      --zirky-bright: #5eead4;
+      --zirky-reactor-bg: #031b22;
+      --zirky-screen-bg: #07131e;
+      --zirky-glow-filter: url(#live-neon-cyan);
+    }
+
+    /* Dynamic SVG Color Mapping */
+    .themed-outline {
+      stroke: var(--zirky-outline) !important;
+      transition: stroke 0.35s ease, filter 0.35s ease;
+    }
+    .themed-accent-stroke {
+      stroke: var(--zirky-accent) !important;
+      transition: stroke 0.35s ease, filter 0.35s ease;
+    }
+    .themed-accent-fill {
+      fill: var(--zirky-accent) !important;
+      transition: fill 0.35s ease, filter 0.35s ease;
+    }
+    .themed-bright-stroke {
+      stroke: var(--zirky-bright) !important;
+      transition: stroke 0.35s ease;
+    }
+    .themed-reactor-plate {
+      fill: var(--zirky-reactor-bg) !important;
+      stroke: var(--zirky-accent) !important;
+      transition: fill 0.35s ease, stroke 0.35s ease, filter 0.35s ease;
+    }
+    .themed-hand-socket {
+      fill: #041b24;
+      transition: fill 0.35s ease;
+    }
+
+    /* =========================================================
+       ALERT / PANIC STATE: ACCURATE STANDALONE SVG ORANGE THEME
+       ========================================================= */
+    .state-alert .themed-outline {
+      stroke: #f97316 !important;
+      stroke-opacity: 0.8 !important;
+      filter: drop-shadow(0 0 3px rgba(249, 115, 22, 0.45)) !important;
+    }
+    .state-alert .themed-accent-stroke {
+      stroke: #f97316 !important;
+      filter: drop-shadow(0 0 4px #f97316) !important;
+    }
+    .state-alert .themed-accent-fill {
+      fill: #f97316 !important;
+      filter: drop-shadow(0 0 6px #f97316) !important;
+    }
+    .state-alert .themed-bright-stroke {
+      stroke: #fef08a !important;
+    }
+    .state-alert .themed-reactor-plate {
+      fill: #1f0909 !important;
+      stroke: #f97316 !important;
+      filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.7)) !important;
+    }
+    .state-alert .themed-hand-socket {
+      fill: #1c0a0a !important;
+    }
+    .state-alert #live-head rect[x="108"] {
+      stroke: #f97316 !important;
+      stroke-opacity: 0.55 !important;
+    }
+    .state-alert #live-chest-rune {
+      animation: alertRuneStrobe 0.65s ease-in-out infinite alternate !important;
+    }
+    @keyframes alertRuneStrobe {
+      0% { opacity: 0.7; filter: drop-shadow(0 0 3px #f97316); }
+      100% { opacity: 1; filter: drop-shadow(0 0 12px #ef4444); }
+    }
+    .state-alert #live-rig-bob {
+      animation: alertHoverLive 1.4s ease-in-out infinite alternate !important;
+    }
+    @keyframes alertHoverLive {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-7px); }
+    }
+
+    /* =========================================================
+       CELEBRATING STATE: ACCURATE STANDALONE SVG GOLD/CYAN THEME
+       ========================================================= */
+    .state-celebrating #live-chest-rune path {
+      stroke: #fef08a !important;
+      stroke-width: 1.4 !important;
+      fill: #fbbf24 !important;
+      filter: drop-shadow(0 0 6px #fbbf24) drop-shadow(0 0 14px #f59e0b) !important;
+    }
+    .state-celebrating #live-reactor-plate {
+      stroke: #fbbf24 !important;
+      filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.45)) !important;
+    }
+    .state-celebrating #live-rig-bob {
+      animation: victoryFloatLive 2.6s ease-in-out infinite alternate !important;
+    }
+    @keyframes victoryFloatLive {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-13px); }
+    }
+
+    /* === BULLETPROOF ZERO-OVERLAP VISIBILITY SYSTEM === */
+    /* Hide all state-specific layers by default */
+    #face-idle, #face-sleeping, #face-tinkering, #face-celebrating, #face-alert,
+    #flame-cyan, #flame-ember, #flame-alert,
+    #layer-acc-sleeping, #layer-acc-alert, #layer-acc-celebrating,
+    #live-aura-cyan, #live-aura-gold, #live-aura-amber,
+    .alert-ear-light {
+      display: none !important;
+    }
+
+    /* Explicitly mount ONLY the active state's layers */
+    .state-idle #face-idle { display: inline !important; }
+    .state-idle #flame-cyan { display: inline !important; }
+    .state-idle #live-aura-cyan { display: inline !important; }
+
+    .state-sleeping #face-sleeping { display: inline !important; }
+    .state-sleeping #flame-ember { display: inline !important; }
+    .state-sleeping #layer-acc-sleeping { display: inline !important; }
+    .state-sleeping #live-aura-cyan { display: inline !important; }
+
+    .state-tinkering #face-tinkering { display: inline !important; }
+    .state-tinkering #flame-cyan { display: inline !important; }
+    .state-tinkering #live-aura-cyan { display: inline !important; }
+
+    .state-celebrating #face-celebrating { display: inline !important; }
+    .state-celebrating #flame-cyan { display: inline !important; }
+    .state-celebrating #layer-acc-celebrating { display: inline !important; }
+    .state-celebrating #live-aura-gold { display: inline !important; }
+
+    .state-alert #face-alert { display: inline !important; }
+    .state-alert #flame-alert { display: inline !important; }
+    .state-alert #layer-acc-alert { display: inline !important; }
+    .state-alert #live-aura-amber { display: inline !important; }
+    .state-alert .alert-ear-light { display: inline !important; }
+
+    /* =========================================================
+       NON-SNAPPING HAND & BODY KINEMATICS
+       ========================================================= */
+    #zirky-live-rig {
+      width: 320px;
+      height: 320px;
+    }
+
+    .live-float-bob {
+      animation: zirkyHover 3.2s ease-in-out infinite alternate;
+    }
+
+    /* HEAD SMOOTH TRANSITIONS */
+    #live-head {
+      transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.35, 1);
+    }
+    .state-idle #live-head { transform: translateY(0px) rotate(0deg); }
+    .state-sleeping #live-head { transform: translateY(3px) rotate(1.5deg); }
+    .state-tinkering #live-head { animation: headSwayLive 3.8s ease-in-out infinite alternate; }
+    .state-celebrating #live-head { transform: translateY(-4px); }
+    .state-alert #live-head { animation: headJitterLive 0.32s ease-in-out infinite alternate; }
+
+    /* NON-SNAPPING HAND POSITIONS: Outer Group Interpolates Height & Angle smoothly! */
+    .hand-pos-l {
+      transform-origin: 88px 198px !important;
+      transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1) !important;
+      will-change: transform;
+    }
+    .hand-pos-r {
+      transform-origin: 232px 198px !important;
+      transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1) !important;
+      will-change: transform;
+    }
+
+    /* Left Hand State Heights & Angles pivoted cleanly at hand socket */
+    .state-idle .hand-pos-l { transform: translateY(0px) rotate(0deg); }
+    .state-sleeping .hand-pos-l { transform: translateY(6px) rotate(-2deg); }
+    .state-tinkering .hand-pos-l { transform: translateY(-4px) rotate(-2deg); }
+    .state-celebrating .hand-pos-l { transform: translateY(-18px) translateX(-3px) rotate(-6deg); }
+    .state-alert .hand-pos-l { transform: translateY(-12px) translateX(-2px) rotate(-4deg); }
+
+    /* Right Hand State Heights & Angles pivoted cleanly at hand socket */
+    .state-idle .hand-pos-r { transform: translateY(0px) rotate(0deg); }
+    .state-sleeping .hand-pos-r { transform: translateY(6px) rotate(2deg); }
+    .state-tinkering .hand-pos-r { transform: translateY(-4px) rotate(2deg); }
+    .state-celebrating .hand-pos-r { transform: translateY(-18px) translateX(6px) rotate(6deg); }
+    .state-alert .hand-pos-r { transform: translateY(-12px) translateX(5px) rotate(4deg); }
+
+    /* INNER HAND MOTION: Continuous micro-movements centered around 0 so switching never pops */
+    .hand-motion-l { transform-origin: 88px 198px !important; }
+    .hand-motion-r { transform-origin: 232px 198px !important; }
+
+    .state-idle .hand-motion-l { animation: handBobL 3.2s ease-in-out infinite alternate; }
+    .state-idle .hand-motion-r { animation: handBobR 3.2s ease-in-out infinite alternate -0.5s; }
+
+    .state-tinkering .hand-motion-l { animation: handTinkerLLive 2.8s ease-in-out infinite alternate; }
+    .state-tinkering .hand-motion-r { animation: handTinkerRLive 2.8s ease-in-out infinite alternate -1.3s; }
+
+    .state-celebrating .hand-motion-l { animation: cheerWaveLLive 1.4s ease-in-out infinite alternate; }
+    .state-celebrating .hand-motion-r { animation: cheerWaveRLive 1.4s ease-in-out infinite alternate -0.7s; }
+
+    .state-alert .hand-motion-l { animation: handAlarmLLive 0.22s ease-in-out infinite alternate; }
+    .state-alert .hand-motion-r { animation: handAlarmRLive 0.22s ease-in-out infinite alternate -0.11s; }
+
+    /* Micro-animations */
+    .live-eye-pulse { animation: eyeGlow 2.4s ease-in-out infinite alternate; }
+    .live-rune-pulse { animation: runeShine 2.5s ease-in-out infinite alternate; }
+    .live-jet-flicker { animation: jetFlicker 1.6s ease-in-out infinite alternate; }
+    .sleep-rune-glow { animation: sleepRuneDim 3s ease-in-out infinite alternate; }
+    .ember-glow { animation: emberPulse 2s ease-in-out infinite alternate; }
+    .live-zzz-1 { animation: zzzDrift 3.6s ease-in-out infinite; }
+    .live-zzz-2 { animation: zzzDrift 3.6s ease-in-out infinite 1.2s; }
+    .live-zzz-3 { animation: zzzDrift 3.6s ease-in-out infinite 2.4s; }
+    .live-term-scroll { animation: streamDownLive 3.2s linear infinite; }
+    .live-term-title { animation: titlePulseLive 2.2s ease-in-out infinite alternate; }
+    .live-sparkle-1 { animation: starPopLive 2.2s ease-in-out infinite; }
+    .live-sparkle-2 { animation: starPopLive 2.2s ease-in-out infinite -0.7s; }
+    .live-sparkle-3 { animation: starPopLive 2.2s ease-in-out infinite -1.4s; }
+    .alert-beacon-strobe { animation: strobeLive 0.4s steps(2, start) infinite; }
+    .alert-badge-bounce { animation: badgePopLive 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate; }
+
+    @keyframes zirkyHover {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-12px); }
+    }
+    @keyframes handBobL {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-3.5px); }
+    }
+    @keyframes handBobR {
+      0% { transform: translateY(0px); }
+      100% { transform: translateY(-3.5px); }
+    }
+    @keyframes eyeGlow {
+      0%, 88%, 100% { transform: scaleY(1); opacity: 0.98; }
+      92%, 96% { transform: scaleY(0.08); opacity: 0.4; }
+    }
+    @keyframes runeShine {
+      0% { opacity: 0.85; filter: drop-shadow(0 0 2px #2dd4bf); }
+      100% { opacity: 1; filter: drop-shadow(0 0 9px #5eead4); }
+    }
+    @keyframes jetFlicker {
+      0% { transform: scaleY(0.9) scaleX(0.95); opacity: 0.85; }
+      100% { transform: scaleY(1.1) scaleX(1.05); opacity: 1; }
+    }
+    @keyframes zzzDrift {
+      0% { transform: translate(0px, 0px) scale(0.6) rotate(-6deg); opacity: 0; }
+      25% { opacity: 0.85; }
+      75% { opacity: 0.7; }
+      100% { transform: translate(26px, -46px) scale(1.15) rotate(12deg); opacity: 0; }
+    }
+    @keyframes emberPulse {
+      0% { opacity: 0.3; transform: scale(0.9); }
+      100% { opacity: 0.65; transform: scale(1.06); }
+    }
+    @keyframes sleepRuneDim {
+      0% { opacity: 0.3; filter: drop-shadow(0 0 2px #2dd4bf); }
+      100% { opacity: 0.75; filter: drop-shadow(0 0 6px #5eead4); }
+    }
+    @keyframes headSwayLive {
+      0% { transform: rotate(-3.5deg); }
+      50% { transform: rotate(0.5deg); }
+      100% { transform: rotate(4deg); }
+    }
+    @keyframes handTinkerLLive {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-3px); }
+      100% { transform: translateY(-1px); }
+    }
+    @keyframes handTinkerRLive {
+      0% { transform: translateY(-3px); }
+      50% { transform: translateY(0px); }
+      100% { transform: translateY(-2px); }
+    }
+    @keyframes streamDownLive {
+      0% { transform: translateY(-44px); }
+      100% { transform: translateY(36px); }
+    }
+    @keyframes titlePulseLive {
+      0% { opacity: 0.92; filter: drop-shadow(0 0 2px #2dd4bf); }
+      100% { opacity: 1; filter: drop-shadow(0 0 9px #5eead4) drop-shadow(0 0 16px #2dd4bf); }
+    }
+    @keyframes cheerWaveLLive {
+      0% { transform: rotate(-4deg) translateY(0px); }
+      100% { transform: rotate(4deg) translateY(-3.5px); }
+    }
+    @keyframes cheerWaveRLive {
+      0% { transform: rotate(4deg) translateY(0px); }
+      100% { transform: rotate(-4deg) translateY(-3.5px); }
+    }
+    @keyframes handAlarmLLive {
+      0% { transform: translateY(0px) rotate(-1.5deg); }
+      100% { transform: translateY(-2px) rotate(1.5deg); }
+    }
+    @keyframes handAlarmRLive {
+      0% { transform: translateY(0px) rotate(1.5deg); }
+      100% { transform: translateY(-2px) rotate(-1.5deg); }
+    }
+    @keyframes starPopLive {
+      0% { transform: scale(0.4) rotate(0deg); opacity: 0; }
+      50% { opacity: 1; transform: scale(1.15) rotate(45deg); }
+      100% { transform: scale(0.3) rotate(90deg); opacity: 0; }
+    }
+    @keyframes headJitterLive {
+      0% { transform: translate(-1.5px, 0.5px) rotate(-0.8deg); }
+      50% { transform: translate(1.5px, -0.5px) rotate(0.8deg); }
+      100% { transform: translate(-1px, 1px) rotate(-0.5deg); }
+    }
+    @keyframes strobeLive {
+      0%, 100% { opacity: 1; filter: drop-shadow(0 0 6px #f97316); }
+      50% { opacity: 0.3; filter: none; }
+    }
+    @keyframes badgePopLive {
+      0% { transform: scale(0.9) translateY(0); }
+      100% { transform: scale(1.1) translateY(-4px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Zirky <span class="accent">Transition Controller</span></h1>
+      <p class="subtitle">Smooth Kinematics &bull; SVG-Accurate Color Palette &bull; Instant Seamless Switching</p>
+    </header>
+
+    <!-- === HERO INTERACTIVE ARENA === -->
+    <div class="stage-card">
+      <div class="avatar-viewport" id="avatar-viewport">
+        <!-- HUD Header -->
+        <div class="viewport-hud">
+          <div class="status-badge" id="hud-status-badge">
+            <div class="status-dot" id="hud-status-dot"></div>
+            <span id="hud-status-text">ONLINE :: IDLE</span>
+          </div>
+          <div class="active-speed-badge" id="hud-speed-badge">INSTANT RESPONSIVE</div>
+        </div>
+
+        <!-- Master Unified Zirky Character Rig Container -->
+        <div id="zirky-rig-container" class="state-idle">
+          <svg id="zirky-live-rig" class="state-idle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320">
+            <defs>
+              <!-- 1. Ambient Glow: Cyan (Idle/Sleep/Tinkering) -->
+              <radialGradient id="live-glow-cyan" cx="50%" cy="45%" r="55%">
+                <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.28" />
+                <stop offset="60%" stop-color="#0f766e" stop-opacity="0.05" />
+                <stop offset="100%" stop-color="#05080e" stop-opacity="0" />
+              </radialGradient>
+
+              <!-- 2. Ambient Glow: Amber/Orange Emergency (Alert) -->
+              <radialGradient id="live-glow-amber" cx="50%" cy="45%" r="55%">
+                <stop offset="0%" stop-color="#f97316" stop-opacity="0.4" />
+                <stop offset="60%" stop-color="#ef4444" stop-opacity="0.12" />
+                <stop offset="100%" stop-color="#05080e" stop-opacity="0" />
+              </radialGradient>
+
+              <!-- 3. Ambient Glow: Radiant Yellow Gold (Celebrating) -->
+              <radialGradient id="live-glow-gold" cx="50%" cy="45%" r="55%">
+                <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.45" />
+                <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.18" />
+                <stop offset="100%" stop-color="#05080e" stop-opacity="0" />
+              </radialGradient>
+
+              <!-- Chassis Gradients -->
+              <linearGradient id="live-chassis-body" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1e293b" />
+                <stop offset="45%" stop-color="#0f172a" />
+                <stop offset="100%" stop-color="#090d16" />
+              </linearGradient>
+              <linearGradient id="live-chassis-head" x1="20%" y1="0%" x2="80%" y2="100%">
+                <stop offset="0%" stop-color="#334155" />
+                <stop offset="35%" stop-color="#1e293b" />
+                <stop offset="100%" stop-color="#0b111e" />
+              </linearGradient>
+
+              <!-- Ears Gradients -->
+              <linearGradient id="live-ear-l" x1="100%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#475569" /><stop offset="50%" stop-color="#334155" /><stop offset="100%" stop-color="#1e293b" />
+              </linearGradient>
+              <linearGradient id="live-ear-r" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#475569" /><stop offset="50%" stop-color="#334155" /><stop offset="100%" stop-color="#1e293b" />
+              </linearGradient>
+
+              <!-- Thruster Pill Gradient -->
+              <linearGradient id="live-thruster-pill" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#475569" /><stop offset="40%" stop-color="#334155" /><stop offset="100%" stop-color="#0f172a" />
+              </linearGradient>
+
+              <!-- Visor Screen Base -->
+              <linearGradient id="live-screen-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#020617" /><stop offset="100%" stop-color="#07131e" />
+              </linearGradient>
+
+              <!-- Filters -->
+              <filter id="live-neon-cyan" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <filter id="live-beacon-strobe" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <filter id="live-soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+              </filter>
+
+              <!-- Clip Paths -->
+              <clipPath id="live-screen-clip">
+                <rect x="108" y="86" width="104" height="74" rx="14" />
+              </clipPath>
+            </defs>
+
+            <!-- Dynamic Ambient Backdrop Auras (Zero-lag CSS visibility) -->
+            <circle id="live-aura-cyan" cx="160" cy="155" r="140" fill="url(#live-glow-cyan)" />
+            <circle id="live-aura-gold" cx="160" cy="155" r="140" fill="url(#live-glow-gold)" />
+            <circle id="live-aura-amber" cx="160" cy="155" r="140" fill="url(#live-glow-amber)" />
+
+            <!-- Static Ground Shadow -->
+            <ellipse cx="160" cy="288" rx="46" ry="6" fill="#020617" opacity="0.5" />
+
+            <!-- Accessory Overlays -->
+            <!-- 1. Sleeping Zircon Z Runes -->
+            <g id="layer-acc-sleeping">
+              <g class="live-zzz-1" transform-origin="210 95" filter="url(#live-neon-cyan)">
+                <g transform="translate(210, 95) scale(0.24) translate(-32, -33)">
+                  <path d="M 10.7,12.1 v 11 h 4.6 l 3.5,-4.4 h 17.7 v 5.3 L 10.7,40.2 v 11.6 h 42.5 V 38.9 H 48.6 L 45.1,43.4 H 27.4 v -3.1 l 25.8,-16.2 V 12.1 H 13.5 Z" fill="#2dd4bf" stroke="#5eead4" stroke-width="1.2" />
+                </g>
+              </g>
+              <g class="live-zzz-2" transform-origin="226 78" filter="url(#live-neon-cyan)">
+                <g transform="translate(226, 78) scale(0.32) translate(-32, -33)">
+                  <path d="M 10.7,12.1 v 11 h 4.6 l 3.5,-4.4 h 17.7 v 5.3 L 10.7,40.2 v 11.6 h 42.5 V 38.9 H 48.6 L 45.1,43.4 H 27.4 v -3.1 l 25.8,-16.2 V 12.1 H 13.5 Z" fill="#5eead4" stroke="#99f6e4" stroke-width="1.2" />
+                </g>
+              </g>
+              <g class="live-zzz-3" transform-origin="244 58" filter="url(#live-neon-cyan)">
+                <g transform="translate(244, 58) scale(0.40) translate(-32, -33)">
+                  <path d="M 10.7,12.1 v 11 h 4.6 l 3.5,-4.4 h 17.7 v 5.3 L 10.7,40.2 v 11.6 h 42.5 V 38.9 H 48.6 L 45.1,43.4 H 27.4 v -3.1 l 25.8,-16.2 V 12.1 H 13.5 Z" fill="#99f6e4" stroke="#ffffff" stroke-width="1.2" />
+                </g>
+              </g>
+            </g>
+
+            <!-- 2. Alert Badge -->
+            <g id="layer-acc-alert" class="alert-badge-bounce" transform-origin="236 58">
+              <circle cx="236" cy="58" r="13" fill="#ef4444" stroke="#ffffff" stroke-width="1.8" filter="url(#live-beacon-strobe)" />
+              <text x="236" y="64" font-family="'JetBrains Mono', monospace" font-size="16" font-weight="900" fill="#ffffff" text-anchor="middle">!</text>
+            </g>
+
+            <!-- 3. Celebrating Bursting Stars (Gold & Cyan) -->
+            <g id="layer-acc-celebrating">
+              <g class="live-sparkle-1" transform-origin="60 65" filter="url(#live-neon-cyan)">
+                <polygon points="60,54 63,62 71,65 63,68 60,76 57,68 49,65 57,62" fill="#5eead4" />
+                <circle cx="60" cy="65" r="2" fill="#ffffff" />
+              </g>
+              <g class="live-sparkle-2" transform-origin="255 60" filter="url(#live-neon-cyan)">
+                <polygon points="255,48 258,57 267,60 258,63 255,72 252,63 243,60 252,57" fill="#fbbf24" />
+                <circle cx="255" cy="60" r="2.2" fill="#ffffff" />
+              </g>
+              <g class="live-sparkle-3" transform-origin="270 145" filter="url(#live-neon-cyan)">
+                <polygon points="270,138 275,145 270,152 265,145" fill="#2dd4bf" />
+              </g>
+              <g class="live-sparkle-2" transform-origin="50 145" filter="url(#live-neon-cyan)">
+                <polygon points="50,138 55,145 50,152 45,145" fill="#fbbf24" />
+              </g>
+            </g>
+
+            <!-- Main Floating Character Rig -->
+            <g id="live-rig-bob" class="live-float-bob">
+
+              <!-- LAYER 1: Rocket Flame / Ember -->
+              <g id="live-flame">
+                <!-- Default Cyan Flame -->
+                <g id="flame-cyan" class="live-jet-flicker" transform-origin="160 244">
+                  <polygon points="148,242 160,277 172,242" fill="#2dd4bf" filter="url(#live-neon-cyan)" opacity="0.9" />
+                  <polygon points="152,242 160,267 168,242" fill="#5eead4" />
+                  <polygon points="155,242 160,258 165,242" fill="#ffffff" />
+                  <circle cx="155" cy="279" r="1.6" fill="#5eead4" opacity="0.8" />
+                  <circle cx="165" cy="281" r="1.4" fill="#2dd4bf" opacity="0.9" />
+                </g>
+                <!-- Sleeping Low-Power Ember -->
+                <g id="flame-ember" class="ember-glow" transform-origin="160 248">
+                  <ellipse cx="160" cy="248" rx="10" ry="3.5" fill="#2dd4bf" filter="url(#live-neon-cyan)" />
+                  <ellipse cx="160" cy="248" rx="5" ry="1.8" fill="#ffffff" />
+                </g>
+                <!-- Alert Emergency Amber Hyper-Burn -->
+                <g id="flame-alert" transform-origin="160 244">
+                  <polygon points="146,242 160,285 174,242" fill="#f97316" filter="url(#live-beacon-strobe)" opacity="0.9" />
+                  <polygon points="150,242 160,273 170,242" fill="#fbbf24" />
+                  <polygon points="154,242 160,262 166,242" fill="#ffffff" />
+                  <circle cx="152" cy="287" r="2" fill="#ef4444" opacity="0.8" />
+                  <circle cx="168" cy="290" r="1.6" fill="#f97316" opacity="0.9" />
+                </g>
+              </g>
+
+              <!-- LAYER 2: Rocket Thruster Cone (Tucked Behind Torso, in Front of Flame) -->
+              <g id="live-thruster">
+                <rect class="themed-outline" x="141" y="232" width="38" height="15" rx="5" fill="url(#live-thruster-pill)" stroke-width="1.5" />
+              </g>
+
+              <!-- LAYER 3: Torso Chassis -->
+              <g id="live-torso">
+                <rect class="themed-outline" x="122" y="179" width="76" height="59" rx="14" fill="url(#live-chassis-body)" stroke-width="2" />
+                
+                <!-- Chest Reactor Housing Plate (Adapts to Amber in Alert) -->
+                <rect id="live-reactor-plate" class="themed-reactor-plate" x="142" y="191" width="36" height="34" rx="8" stroke-width="1.8" filter="var(--zirky-glow-filter)" />
+                
+                <!-- Official Zircon Z Emblem (Orange in Alert, Gold/Cyan in Celeb, Cyan in Idle) -->
+                <g id="live-chest-rune" class="live-rune-pulse" transform="translate(160, 208) scale(0.44) translate(-32, -32)" filter="var(--zirky-glow-filter)">
+                  <path class="themed-accent-fill themed-bright-stroke" d="M 10.7,12.1 v 11 h 4.6 l 3.5,-4.4 h 17.7 v 5.3 L 10.7,40.2 v 11.6 h 42.5 V 38.9 H 48.6 L 45.1,43.4 H 27.4 v -3.1 l 25.8,-16.2 V 12.1 H 13.5 Z" stroke-width="1.2" stroke-linejoin="round" />
+                </g>
+
+                <!-- Chassis Accent Circuits (Cyan in Normal, Orange in Alert) -->
+                <line class="themed-accent-stroke" x1="129" y1="195" x2="136" y2="195" stroke-width="1.5" opacity="0.75" stroke-linecap="round" />
+                <line class="themed-accent-stroke" x1="129" y1="201" x2="134" y2="201" stroke-width="1.5" opacity="0.5" stroke-linecap="round" />
+                <line class="themed-accent-stroke" x1="184" y1="195" x2="191" y2="195" stroke-width="1.5" opacity="0.75" stroke-linecap="round" />
+                <line class="themed-accent-stroke" x1="186" y1="201" x2="191" y2="201" stroke-width="1.5" opacity="0.5" stroke-linecap="round" />
+              </g>
+
+              <!-- LAYER 4: Floating Head Rig (D-Ears + Dynamic Visor) -->
+              <g id="live-head" transform-origin="160 122" filter="url(#live-soft-shadow)">
+                
+                <!-- Left D-Shaped Ear -->
+                <g id="live-ear-left">
+                  <path class="themed-outline" d="M 94 105 L 87 105 Q 80 105 80 112 L 80 130 Q 80 137 87 137 L 94 137 Z" fill="url(#live-ear-l)" stroke-width="1.5" stroke-linejoin="round" />
+                  <path d="M 94 109 L 88 109 Q 83 109 83 114 L 83 128 Q 83 133 88 133 L 94 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.8" />
+                  <circle class="alert-ear-light alert-beacon-strobe" cx="86" cy="121" r="2.5" fill="#f97316" />
+                </g>
+
+                <!-- Right D-Shaped Ear -->
+                <g id="live-ear-right">
+                  <path class="themed-outline" d="M 226 105 L 233 105 Q 240 105 240 112 L 240 130 Q 240 137 233 137 L 226 137 Z" fill="url(#live-ear-r)" stroke-width="1.5" stroke-linejoin="round" />
+                  <path d="M 226 109 L 232 109 Q 237 109 237 114 L 237 128 Q 237 133 232 133 L 226 133 Z" fill="#1e293b" stroke="rgba(255, 255, 255, 0.08)" stroke-width="0.8" />
+                  <circle class="alert-ear-light alert-beacon-strobe" cx="234" cy="121" r="2.5" fill="#f97316" />
+                </g>
+
+                <!-- Main Head Chassis -->
+                <rect class="themed-outline" x="94" y="68" width="132" height="106" rx="20" fill="url(#live-chassis-head)" stroke-width="2.2" />
+
+                <!-- Visor Screen Base -->
+                <rect x="108" y="86" width="104" height="74" rx="14" fill="url(#live-screen-bg)" stroke="#1e293b" stroke-width="1.5" />
+
+                <!-- VISOR FACE STATE 1: Idle (Open eyes + natural blink) -->
+                <g id="face-idle" class="live-eye-pulse" transform-origin="160 122">
+                  <g filter="url(#live-neon-cyan)">
+                    <rect x="124" y="108" width="22" height="26" rx="7" fill="#2dd4bf" />
+                    <rect x="127" y="111" width="8" height="9" rx="3" fill="#ffffff" />
+                    <circle cx="140" cy="128" r="2.2" fill="#ffffff" opacity="0.9" />
+                  </g>
+                  <rect x="121" y="138" width="12" height="3.5" rx="1.7" fill="#0f766e" opacity="0.7" />
+
+                  <g filter="url(#live-neon-cyan)">
+                    <rect x="174" y="108" width="22" height="26" rx="7" fill="#2dd4bf" />
+                    <rect x="177" y="111" width="8" height="9" rx="3" fill="#ffffff" />
+                    <circle cx="190" cy="128" r="2.2" fill="#ffffff" opacity="0.9" />
+                  </g>
+                  <rect x="187" y="138" width="12" height="3.5" rx="1.7" fill="#0f766e" opacity="0.7" />
+                  <path d="M 154 135 Q 160 141 166 135" fill="none" stroke="#5eead4" stroke-width="2.5" stroke-linecap="round" filter="url(#live-neon-cyan)" />
+                </g>
+
+                <!-- VISOR FACE STATE 2: Sleeping (Curved crescent arcs ◠ ◠) -->
+                <g id="face-sleeping">
+                  <g filter="url(#live-neon-cyan)">
+                    <path d="M 124 122 Q 135 112 146 122" fill="none" stroke="#2dd4bf" stroke-width="3.5" stroke-linecap="round" />
+                    <path d="M 174 122 Q 185 112 196 122" fill="none" stroke="#2dd4bf" stroke-width="3.5" stroke-linecap="round" />
+                  </g>
+                  <rect x="121" y="136" width="12" height="3.5" rx="1.7" fill="#0f766e" opacity="0.6" />
+                  <rect x="187" y="136" width="12" height="3.5" rx="1.7" fill="#0f766e" opacity="0.6" />
+                  <path d="M 155 135 Q 160 139 165 135" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" opacity="0.75" />
+                </g>
+
+                <!-- VISOR FACE STATE 3: Tinkering (Scrolling terminal lines + glowing TINKERING) -->
+                <g id="face-tinkering">
+                  <g clip-path="url(#live-screen-clip)">
+                    <g class="live-term-scroll" fill="#0b3842" opacity="0.7">
+                      <rect x="114" y="52" width="34" height="2.5" rx="1.2" /><rect x="154" y="52" width="26" height="2.5" rx="1.2" />
+                      <rect x="114" y="62" width="52" height="2.5" rx="1.2" /><rect x="172" y="62" width="18" height="2.5" rx="1.2" />
+                      <rect x="114" y="72" width="28" height="2.5" rx="1.2" /><rect x="148" y="72" width="42" height="2.5" rx="1.2" />
+                      <rect x="114" y="82" width="60" height="2.5" rx="1.2" />
+                      <rect x="114" y="92" width="36" height="2.5" rx="1.2" /><rect x="156" y="92" width="24" height="2.5" rx="1.2" />
+                      <rect x="114" y="102" width="46" height="2.5" rx="1.2" /><rect x="166" y="102" width="22" height="2.5" rx="1.2" />
+                      <rect x="114" y="112" width="58" height="2.5" rx="1.2" />
+                      <rect x="114" y="122" width="30" height="2.5" rx="1.2" /><rect x="150" y="122" width="38" height="2.5" rx="1.2" />
+                      <rect x="114" y="132" width="48" height="2.5" rx="1.2" /><rect x="168" y="132" width="16" height="2.5" rx="1.2" />
+                      <rect x="114" y="142" width="36" height="2.5" rx="1.2" /><rect x="156" y="142" width="32" height="2.5" rx="1.2" />
+                      <rect x="114" y="152" width="54" height="2.5" rx="1.2" />
+                      <rect x="114" y="162" width="40" height="2.5" rx="1.2" /><rect x="160" y="162" width="26" height="2.5" rx="1.2" />
+                    </g>
+                  </g>
+                  <ellipse cx="160" cy="123" rx="44" ry="18" fill="#020810" opacity="0.65" clip-path="url(#live-screen-clip)" />
+                  <g class="live-term-title">
+                    <text x="160" y="127" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12.5" font-weight="900" fill="#5eead4" letter-spacing="1.2">TINKERING</text>
+                    <text x="160" y="127" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12.5" font-weight="900" fill="#ffffff" letter-spacing="1.2" opacity="0.75">TINKERING</text>
+                  </g>
+                </g>
+
+                <!-- VISOR FACE STATE 4: Celebrating (Joyous anime arch eyes ^ ^ + blush) -->
+                <g id="face-celebrating">
+                  <g filter="url(#live-neon-cyan)">
+                    <path d="M 122 120 Q 134 104 146 120" fill="none" stroke="#2dd4bf" stroke-width="4.5" stroke-linecap="round" />
+                    <path d="M 174 120 Q 186 104 198 120" fill="none" stroke="#2dd4bf" stroke-width="4.5" stroke-linecap="round" />
+                  </g>
+                  <rect x="119" y="132" width="14" height="4" rx="2" fill="#f43f5e" opacity="0.65" />
+                  <rect x="187" y="132" width="14" height="4" rx="2" fill="#f43f5e" opacity="0.65" />
+                  <path d="M 151 130 Q 160 144 169 130 Z" fill="#5eead4" stroke="#ffffff" stroke-width="1.5" filter="url(#live-neon-cyan)" />
+                </g>
+
+                <!-- VISOR FACE STATE 5: Alert (Wide shocked eyes + sweat drop + 'o' mouth) -->
+                <g id="face-alert">
+                  <g filter="url(#live-beacon-strobe)">
+                    <rect x="122" y="104" width="24" height="28" rx="10" fill="#f97316" />
+                    <rect x="125" y="107" width="8" height="9" rx="3" fill="#ffffff" />
+                    <circle cx="138" cy="124" r="2.5" fill="#ffffff" opacity="0.9" />
+                  </g>
+                  <path d="M 118 108 Q 115 113 118 116 Q 121 113 118 108 Z" fill="#38bdf8" opacity="0.8" />
+                  <g filter="url(#live-beacon-strobe)">
+                    <rect x="174" y="104" width="24" height="28" rx="10" fill="#f97316" />
+                    <rect x="177" y="107" width="8" height="9" rx="3" fill="#ffffff" />
+                    <circle cx="190" cy="124" r="2.5" fill="#ffffff" opacity="0.9" />
+                  </g>
+                  <ellipse cx="160" cy="138" rx="4.5" ry="6" fill="#f97316" stroke="#ffffff" stroke-width="1" filter="url(#live-beacon-strobe)" />
+                </g>
+
+                <!-- Visor Gloss Sheen Curve -->
+                <path d="M 112 90 L 198 90 Q 206 90 206 98 L 206 104 L 112 90 Z" fill="rgba(255, 255, 255, 0.08)" />
+              </g>
+
+              <!-- LAYER 5: Non-Snapping Dynamic Hands (Rendered IN FRONT of Head) -->
+              <!-- Left Hand Outer Group (Smooth Height Transition) -->
+              <g id="live-hand-left" class="hand-pos-l" transform-origin="88 198">
+                <!-- Inner Group (Micro-motion) -->
+                <g class="hand-motion-l" transform-origin="88 198" filter="url(#live-soft-shadow)">
+                  <rect class="themed-outline" x="74" y="184" width="28" height="28" rx="8" fill="url(#live-chassis-body)" stroke-width="2" />
+                  <rect class="themed-hand-socket" x="80" y="190" width="16" height="16" rx="4" fill="#041b24" />
+                  <circle class="themed-accent-fill" cx="88" cy="198" r="3.5" filter="url(#live-neon-cyan)" />
+                </g>
+              </g>
+
+              <!-- Right Hand Outer Group (Smooth Height Transition) -->
+              <g id="live-hand-right" class="hand-pos-r" transform-origin="232 198">
+                <!-- Inner Group (Micro-motion) -->
+                <g class="hand-motion-r" transform-origin="232 198" filter="url(#live-soft-shadow)">
+                  <rect class="themed-outline" x="218" y="184" width="28" height="28" rx="8" fill="url(#live-chassis-body)" stroke-width="2" />
+                  <rect class="themed-hand-socket" x="224" y="190" width="16" height="16" rx="4" fill="#041b24" />
+                  <circle class="themed-accent-fill" cx="232" cy="198" r="3.5" filter="url(#live-neon-cyan)" />
+                </g>
+              </g>
+
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Controls Panel -->
+      <div class="controls-panel">
+        <div>
+          <div class="section-label">1. Switch Animation State (Instant Response)</div>
+          <div class="button-group">
+            <button class="btn-state active" data-state="idle" onclick="requestTransition('idle')">🟢 Online (Idle)</button>
+            <button class="btn-state" data-state="sleeping" onclick="requestTransition('sleeping')">🌙 Sleep Mode</button>
+            <button class="btn-state" data-state="tinkering" onclick="requestTransition('tinkering')">🔧 Tinkering</button>
+            <button class="btn-state celeb-mode" data-state="celebrating" onclick="requestTransition('celebrating')">🎉 Celebrating</button>
+            <button class="btn-state alert-mode" data-state="alert" onclick="requestTransition('alert')">🚨 Alert / Crash</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">2. Playback Speed &amp; Scenarios</div>
+          <div class="options-row">
+            <div class="speed-selector">
+              <span>Playback Speed:</span>
+              <select id="sel-playback-speed" onchange="updatePlaybackSpeed()">
+                <option value="1">1.0x (Normal)</option>
+                <option value="0.5">0.5x (Slow Motion)</option>
+                <option value="0.25">0.25x (Micro Inspect)</option>
+              </select>
+            </div>
+
+            <button class="btn-tour" onclick="startAutoTour()">▶ Play Scenario Tour</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">3. Transition Lifecycle Telemetry</div>
+          <div class="terminal-box" id="term-log">
+            <div class="log-item">
+              <span class="time">[00:00:00]</span>
+              <span class="event-state">Zirky state machine initialized in IDLE mode.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- === STANDALONE ASSET REFERENCE GALLERY === -->
+    <div class="gallery-heading">
+      <span>Standalone SVG Assets (Direct Embedding)</span>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="badge idle">Online / Ambient</div>
+        <div class="title">zirky-idle.svg</div>
+        <div class="svg-container">
+          <object data="./zirky-idle.svg" type="image/svg+xml" width="100%" height="100%"></object>
+        </div>
+        <div class="desc">Smooth 3.2s hover bob, organic eye blinks, pulsing chest reactor with official Zircon Z icon.</div>
+      </div>
+
+      <div class="card">
+        <div class="badge sleeping">Sleep Mode / Standby</div>
+        <div class="title">zirky-sleeping.svg</div>
+        <div class="svg-container">
+          <object data="./zirky-sleeping.svg" type="image/svg+xml" width="100%" height="100%"></object>
+        </div>
+        <div class="desc">Low-power nozzle ember, curved happy crescent closed eyes, and floating glowing Zircon Z sleep runes.</div>
+      </div>
+
+      <div class="card">
+        <div class="badge tinkering">Auto-Heal / Diagnostics</div>
+        <div class="title">zirky-tinkering.svg</div>
+        <div class="svg-container">
+          <object data="./zirky-tinkering.svg" type="image/svg+xml" width="100%" height="100%"></object>
+        </div>
+        <div class="desc">Slower fluid hands, head sway, darker scrolling syntax lines, and glowing full-visor TINKERING screen.</div>
+      </div>
+
+      <div class="card">
+        <div class="badge celebrating">Success / Goal Reached</div>
+        <div class="title">zirky-celebrating.svg</div>
+        <div class="svg-container">
+          <object data="./zirky-celebrating.svg" type="image/svg+xml" width="100%" height="100%"></object>
+        </div>
+        <div class="desc">Calmer constant victory float, toned-down flame, bursting stars, cheerful blush, and raised cheering hands.</div>
+      </div>
+
+      <div class="card">
+        <div class="badge alert">Crash / High Alert</div>
+        <div class="title">zirky-alert.svg</div>
+        <div class="svg-container">
+          <object data="./zirky-alert.svg" type="image/svg+xml" width="100%" height="100%"></object>
+        </div>
+        <div class="desc">Emergency strobe beacon, startled wide eyes with sweat drop, raised defensive hands, and jittering head.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ZIRKY INSTANT RESPONSIVE TRANSITION ENGINE
+    const container = document.getElementById('zirky-rig-container');
+    const rig = document.getElementById('zirky-live-rig');
+    const rigBob = document.getElementById('live-rig-bob');
+    const hudBadge = document.getElementById('hud-status-badge');
+    const hudText = document.getElementById('hud-status-text');
+    const hudDot = document.getElementById('hud-status-dot');
+    const termLog = document.getElementById('term-log');
+    const aura = document.getElementById('live-backdrop-aura');
+
+    let currentState = 'idle';
+    let autoTourTimer = null;
+
+    function logEvent(typeClass, message) {
+      const timeStr = new Date().toTimeString().split(' ')[0];
+      const item = document.createElement('div');
+      item.className = 'log-item';
+      item.innerHTML = `<span class="time">[${timeStr}]</span> <span class="${typeClass}">${message}</span>`;
+      termLog.appendChild(item);
+      termLog.scrollTop = termLog.scrollHeight;
+    }
+
+    function requestTransition(targetState) {
+      if (targetState === currentState) return;
+
+      const fromState = currentState;
+      currentState = targetState;
+
+      // Update button visual selection immediately
+      document.querySelectorAll('.btn-state').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-state') === targetState);
+      });
+
+      // Immediate Seamless Class Switch across viewport, container, and rig
+      const targetClass = `state-${targetState}`;
+      const viewport = document.getElementById('avatar-viewport');
+      if (viewport) viewport.className = `avatar-viewport ${targetClass}`;
+      container.className = targetClass;
+      rig.setAttribute('class', targetClass);
+
+      // Instant transition telemetry log (zero delay, pure responsive switching)
+      if (targetState === 'alert') {
+        logEvent('event-alert', `🚨 Instant State Switch: [${fromState.toUpperCase()}] ➔ [ALERT] (Chassis, circuits, reactor & backdrop all emergency orange!)`);
+      } else if (targetState === 'celebrating') {
+        logEvent('event-trans', `🎉 Instant State Switch: [${fromState.toUpperCase()}] ➔ [CELEBRATING] (Radiant yellow backdrop glow & gold victory stars active!)`);
+      } else {
+        logEvent('event-state', `✨ Instant State Switch: [${fromState.toUpperCase()}] ➔ [${targetState.toUpperCase()}] (Smooth kinematic gliding)`);
+      }
+
+      // Update HUD
+      updateHUD(targetState);
+    }
+
+    function updateHUD(state) {
+      const map = {
+        idle: { text: 'ONLINE :: IDLE', color: '#2dd4bf' },
+        sleeping: { text: 'STANDBY :: SLEEP (0 MB)', color: '#94a3b8' },
+        tinkering: { text: 'DIAGNOSTIC :: AUTO-HEAL', color: '#5eead4' },
+        celebrating: { text: 'SUCCESS :: SERVER RESTORED', color: '#fbbf24' },
+        alert: { text: 'CRASH :: HIGH ALERT', color: '#f97316' }
+      };
+      const info = map[state] || map.idle;
+      hudText.textContent = info.text;
+      hudDot.style.background = info.color;
+      hudDot.style.boxShadow = `0 0 8px ${info.color}`;
+      hudBadge.style.borderColor = info.color;
+      hudBadge.style.color = info.color;
+    }
+
+    function updatePlaybackSpeed() {
+      const speed = parseFloat(document.getElementById('sel-playback-speed').value);
+      rig.style.animationDuration = `${3.2 / speed}s`;
+      rigBob.style.animationDuration = `${3.2 / speed}s`;
+      document.getElementById('hud-speed-badge').textContent = `SPEED: ${speed}x`;
+      logEvent('event-sync', `Playback speed set to ${speed}x`);
+    }
+
+    // Auto-Play Tour Story
+    function startAutoTour() {
+      if (autoTourTimer) clearTimeout(autoTourTimer);
+      logEvent('event-trans', '=== Starting Scenario Tour Demo ===');
+      
+      requestTransition('idle');
+      
+      autoTourTimer = setTimeout(() => {
+        logEvent('event-alert', '[Scenario 1]: Server encounters unexpected crash exception!');
+        requestTransition('alert');
+        
+        autoTourTimer = setTimeout(() => {
+          logEvent('event-trans', '[Scenario 2]: Zirky engages auto-repair harness...');
+          requestTransition('tinkering');
+          
+          autoTourTimer = setTimeout(() => {
+            logEvent('event-trans', '[Scenario 3]: Crash resolved! Server restored!');
+            requestTransition('celebrating');
+            
+            autoTourTimer = setTimeout(() => {
+              logEvent('event-sync', '[Scenario 4]: Inactive for 5 minutes, entering eco-sleep mode...');
+              requestTransition('sleeping');
+              
+              autoTourTimer = setTimeout(() => {
+                logEvent('event-state', '[Scenario 5]: Player connects ➔ Server wake up!');
+                requestTransition('idle');
+              }, 4000);
+            }, 4000);
+          }, 4000);
+        }, 4000);
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

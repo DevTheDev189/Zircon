@@ -80,11 +80,25 @@
 </head>
 <body>
 
+  <!-- Animated Procedural Background Elements -->
+  <div class="z-bg-dots"></div>
+  <div class="z-orb z-orb-1"></div>
+  <div class="z-orb z-orb-2"></div>
+  <div class="z-orb z-orb-3"></div>
+  <div class="z-orb z-orb-4"></div>
+  <div class="z-particle z-particle-1"></div>
+  <div class="z-particle z-particle-2"></div>
+  <div class="z-particle z-particle-3"></div>
+  <div class="z-particle z-particle-4"></div>
+  <div class="z-particle z-particle-5"></div>
+  <div class="z-particle z-particle-6"></div>
+
   <!-- ================= NAV ================= -->
   <header class="site-nav">
     <div class="container">
       <a class="brand" href="/" aria-label="Zircon home">
-        <img src="assets/img/zircon-title.svg" alt="Zircon" width="150" height="44">
+        <img class="brand-mark" src="assets/img/zircon-icon.svg" alt="Zircon Diamond Icon" width="32" height="32">
+        <img class="brand-text" src="assets/img/zircon-title.svg" alt="Zircon" width="130" height="30">
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
@@ -95,10 +109,20 @@
         <li><a href="/">Home</a></li>
         <li><a href="launcher.html">Launcher</a></li>
         <li><a href="server.html">Server Manager</a></li>
+        <li>
+          <a href="https://cloud.zirconmc.net" target="_blank" rel="noopener" class="nav-link-cloud">
+            Zircon Cloud <span class="nav-cloud-badge">Cloud</span>
+          </a>
+        </li>
         <li><a href="docs.html">Guides</a></li>
         <li><a href="faq.html" class="active">FAQ</a></li>
         <li><a href="downloads.html">Downloads</a></li>
-        <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+        <li>
+          <a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener" class="nav-github-link" aria-label="GitHub Repository">
+            <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+            <span>GitHub</span>
+          </a>
+        </li>
         <li><a class="nav-cta" href="downloads.html#players">Get Launcher</a></li>
       </ul>
     </div>
@@ -109,7 +133,7 @@
     <div class="container">
       <span class="eyebrow">Help &amp; Knowledge Base</span>
       <h1>Frequently Asked Questions</h1>
-      <p>Everything you need to know about Zircon Launcher, Server Manager, mod sync, and security.</p>
+      <p>Everything you need to know about Zircon Launcher, Server Manager, Zircon Cloud, mod sync, and security.</p>
     </div>
   </section>
 
@@ -122,6 +146,7 @@
         <button class="filter-pill active" data-category="all">All Questions</button>
         <button class="filter-pill" data-category="players">For Players</button>
         <button class="filter-pill" data-category="servers">For Server Hosts</button>
+        <button class="filter-pill" data-category="cloud">Zircon Cloud</button>
         <button class="filter-pill" data-category="security">Security &amp; Accounts</button>
         <button class="filter-pill" data-category="troubleshoot">Troubleshooting</button>
       </div>
@@ -187,6 +212,35 @@
           </div>
         </details>
 
+        <!-- Zircon Cloud -->
+        <details class="faq-item" data-category="cloud">
+          <summary class="faq-question">What is Zircon Cloud and how does it compare to self-hosting?</summary>
+          <div class="faq-answer">
+            <p><strong>Zircon Cloud</strong> (<a href="https://cloud.zirconmc.net" target="_blank" rel="noopener">cloud.zirconmc.net</a>) is the turnkey managed hosting platform for Zircon. It eliminates the need for home port forwarding, VPS configuration, Linux administration, and high electric bills. Your server runs on high-frequency enterprise cloud nodes with automated backups, DDoS mitigation, and live browser management.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="cloud">
+          <summary class="faq-question">How does Pause-to-Sleep retention work on Zircon Cloud?</summary>
+          <div class="faq-answer">
+            <p>When zero players are online, Zircon Cloud automatically places your Minecraft server into a suspended sleep state to conserve RAM and compute resources. The second a player clicks connect via the Zircon Launcher, a wake packet restores the JVM in seconds with 100% of your world entities, builds, and inventory intact.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="cloud">
+          <summary class="faq-question">Can players connect with standard Minecraft or do they need Zircon Launcher?</summary>
+          <div class="faq-answer">
+            <p>Players using the free <strong>Zircon Launcher</strong> enjoy automatic mod synchronization — all mods, loaders, and configurations download and verify automatically in seconds. Vanilla or standard Minecraft clients can connect if your server runs purely server-side mods, but Zircon Launcher is recommended for the full seamless modded experience.</p>
+          </div>
+        </details>
+
+        <details class="faq-item" data-category="cloud">
+          <summary class="faq-question">Is enterprise DDoS protection and automated backup included?</summary>
+          <div class="faq-answer">
+            <p>Yes. All Zircon Cloud servers are protected by always-on L3/L4/L7 edge DDoS mitigation that filters attacks without dropping legitimate game traffic. Automated snapshots are taken daily with 1-click restore capabilities.</p>
+          </div>
+        </details>
+
         <!-- Security -->
         <details class="faq-item" data-category="security">
           <summary class="faq-question">Is my Microsoft Minecraft account safe?</summary>
@@ -241,8 +295,11 @@
       <div class="cta-band">
         <h2>Still have questions?</h2>
         <p>Check out our step-by-step documentation guides or join the open-source community on GitHub.</p>
-        <a class="btn btn-white btn-lg" href="docs.html">Read Setup Guides</a>
-        <a class="btn btn-ghost btn-lg" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub Discussions &amp; Issues</a>
+        <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+          <a class="btn btn-primary btn-lg" href="docs.html">Read Setup Guides</a>
+          <a class="btn btn-cloud btn-lg" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Explore Zircon Cloud</a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub Discussions</a>
+        </div>
       </div>
     </div>
   </section>
@@ -252,7 +309,10 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="assets/img/zircon-title.svg" alt="Zircon">
+          <a href="/" style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 14px; text-decoration: none;">
+            <img src="assets/img/zircon-icon.svg" alt="Zircon" width="28" height="28" style="filter: drop-shadow(0 0 8px rgba(71, 210, 201, 0.5));">
+            <img src="assets/img/zircon-title.svg" alt="Zircon" height="24">
+          </a>
           <p>A free, open-source launcher and server manager for modded Minecraft. Exact mod sync verified on every launch against Modrinth &amp; CurseForge.</p>
           <a class="pill pill-accent" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">Source-Available (BSL 1.1)</a>
         </div>
@@ -262,23 +322,25 @@
             <li><a href="/">Home</a></li>
             <li><a href="launcher.html">Launcher</a></li>
             <li><a href="server.html">Server Manager</a></li>
+            <li><a href="https://cloud.zirconmc.net" target="_blank" rel="noopener" style="color: var(--accent-bright); font-weight: 700;">Zircon Cloud &rarr;</a></li>
             <li><a href="docs.html">Guides &amp; Docs</a></li>
-            <li><a href="faq.html">FAQ</a></li>
+            <li><a href="faq.html" class="active">FAQ</a></li>
             <li><a href="downloads.html">Downloads</a></li>
           </ul>
         </div>
         <div class="footer-col">
-          <h4>Project</h4>
+          <h4>Project &amp; Community</h4>
           <ul>
-            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
-            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases &amp; Changelogs</a></li>
+            <li><a href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Zircon Cloud Console</a></li>
             <li><a href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" target="_blank" rel="noopener">Business Source License 1.1</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-legal">
-        <span>© Zircon contributors · v0.4.18</span>
-        <span>Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</span>
+        <span>© Zircon contributors · v0.4.19 (active development)</span>
+        <span>Not an official Minecraft product. Not approved by or associated with Mojang Studios or Microsoft.</span>
       </div>
     </div>
   </footer>

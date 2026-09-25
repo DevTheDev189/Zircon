@@ -64,7 +64,7 @@ createApp({
             showStatsDropdown: false,
             chartTooltip: { visible: false, x: 0, y: 0, chartType: '', time: '', systemCpu: 0, processCpu: 0, usedMemory: '', maxMemory: '', tps: '', mspt: '', ping: '' },
             statsPollingActive: true,
-            serverCurrentVersion: '0.4.2',
+            serverCurrentVersion: '0.4.18',
             serverUpdateChecking: false,
             serverUpdateApplying: false,
             serverUpdateAvailable: false,

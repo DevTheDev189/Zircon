@@ -57,22 +57,47 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
+                if let Err(err) = app.deep_link().register_all() {
+                    tracing::warn!("Failed to register deep link schemes via register_all: {err}");
+                }
+                let _ = app.deep_link().register("zircon");
+                tracing::info!("Registered zircon:// deep-link protocol handler");
                 let handle = app.handle().clone();
                 app.deep_link().on_open_url(move |event| {
                     use tauri::Emitter;
                     for url in event.urls() {
                         tracing::info!("Deep link received: {}", url);
                         if url.scheme() == "zircon" {
-                            let raw_addr = if url.host_str() == Some("join") {
-                                url.path().trim_start_matches('/').to_string()
-                            } else if let Some(host) = url.host_str() {
-                                host.to_string()
+                            if url.host_str() == Some("server") && (url.path() == "/add" || url.path().starts_with("/add")) {
+                                let mut name = "Zircon Cloud Server".to_string();
+                                let mut address = "".to_string();
+                                for (k, v) in url.query_pairs() {
+                                    if k == "name" && !v.is_empty() {
+                                        name = v.into_owned();
+                                    } else if (k == "address" || k == "host") && !v.is_empty() {
+                                        address = v.into_owned();
+                                    }
+                                }
+                                if !address.is_empty() {
+                                    let payload = serde_json::json!({
+                                        "name": name,
+                                        "address": address
+                                    });
+                                    let _ = handle.emit("deep-link-add-server", payload);
+                                    let _ = handle.emit("deep-link-join", &address);
+                                }
                             } else {
-                                url.path().trim_start_matches('/').to_string()
-                            };
-                            let address = raw_addr.trim().to_string();
-                            if !address.is_empty() {
-                                let _ = handle.emit("deep-link-join", &address);
+                                let raw_addr = if url.host_str() == Some("join") {
+                                    url.path().trim_start_matches('/').to_string()
+                                } else if let Some(host) = url.host_str() {
+                                    host.to_string()
+                                } else {
+                                    url.path().trim_start_matches('/').to_string()
+                                };
+                                let address = raw_addr.trim().to_string();
+                                if !address.is_empty() {
+                                    let _ = handle.emit("deep-link-join", &address);
+                                }
                             }
                         }
                     }
@@ -174,6 +199,8 @@ pub fn run() {
             commands::remove_local_pack,
             commands::set_active_shaderpack,
             commands::set_active_resourcepacks,
+            commands::set_server_pack_decisions,
+            commands::get_server_pack_decisions,
             commands::toggle_resourcepack,
             commands::import_offline_mod_file,
             commands::import_offline_mod_bytes,

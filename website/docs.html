@@ -30,11 +30,25 @@
 </head>
 <body>
 
+  <!-- Animated Procedural Background Elements -->
+  <div class="z-bg-dots"></div>
+  <div class="z-orb z-orb-1"></div>
+  <div class="z-orb z-orb-2"></div>
+  <div class="z-orb z-orb-3"></div>
+  <div class="z-orb z-orb-4"></div>
+  <div class="z-particle z-particle-1"></div>
+  <div class="z-particle z-particle-2"></div>
+  <div class="z-particle z-particle-3"></div>
+  <div class="z-particle z-particle-4"></div>
+  <div class="z-particle z-particle-5"></div>
+  <div class="z-particle z-particle-6"></div>
+
   <!-- ================= NAV ================= -->
   <header class="site-nav">
     <div class="container">
       <a class="brand" href="/" aria-label="Zircon home">
-        <img src="assets/img/zircon-title.svg" alt="Zircon" width="150" height="44">
+        <img class="brand-mark" src="assets/img/zircon-icon.svg" alt="Zircon Diamond Icon" width="32" height="32">
+        <img class="brand-text" src="assets/img/zircon-title.svg" alt="Zircon" width="130" height="30">
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
@@ -45,10 +59,20 @@
         <li><a href="/">Home</a></li>
         <li><a href="launcher.html">Launcher</a></li>
         <li><a href="server.html">Server Manager</a></li>
+        <li>
+          <a href="https://cloud.zirconmc.net" target="_blank" rel="noopener" class="nav-link-cloud">
+            Zircon Cloud <span class="nav-cloud-badge">Cloud</span>
+          </a>
+        </li>
         <li><a href="docs.html" class="active">Guides</a></li>
         <li><a href="faq.html">FAQ</a></li>
         <li><a href="downloads.html">Downloads</a></li>
-        <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
+        <li>
+          <a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener" class="nav-github-link" aria-label="GitHub Repository">
+            <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+            <span>GitHub</span>
+          </a>
+        </li>
         <li><a class="nav-cta" href="downloads.html#players">Get Launcher</a></li>
       </ul>
     </div>
@@ -66,6 +90,7 @@
         <button class="docs-pill filter-pill active" data-guide="all">All Guides</button>
         <button class="docs-pill filter-pill" data-guide="players">Player Quickstart</button>
         <button class="docs-pill filter-pill" data-guide="servers">Server Host Setup</button>
+        <button class="docs-pill filter-pill" data-guide="cloud">Zircon Cloud Setup</button>
       </div>
     </div>
   </section>
@@ -93,6 +118,14 @@
             <li><a href="#server-instance">3. Create Instance</a></li>
             <li><a href="#server-mods">4. Add Mods (Modrinth/CF)</a></li>
             <li><a href="#server-ports">5. Port Forwarding (25565)</a></li>
+          </ul>
+
+          <h4 style="margin-top: 20px;">Zircon Cloud Setup</h4>
+          <ul>
+            <li><a href="#cloud-deploy">1. Deploy Server Instance</a></li>
+            <li><a href="#cloud-mods">2. Select Modpacks</a></li>
+            <li><a href="#cloud-retention">3. Pause-to-Sleep Engine</a></li>
+            <li><a href="#cloud-connect">4. Connect via Launcher</a></li>
           </ul>
         </nav>
 
@@ -240,6 +273,44 @@
 
           </section>
 
+          <!-- ================= CLOUD SECTION ================= -->
+          <section id="cloud-guide" class="docs-guide-section" data-guide="cloud">
+            <h2 style="margin-top: 0; color: var(--accent);">Zircon Cloud Setup Guide</h2>
+
+            <div id="cloud-deploy" class="docs-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h4>Deploy Server on Zircon Cloud</h4>
+                <p>Sign in at <a href="https://cloud.zirconmc.net" target="_blank" rel="noopener"><strong>cloud.zirconmc.net</strong></a> with your Discord or Microsoft account. Click <em>New Instance</em>, choose your desired server region for lowest ping, and select your RAM tier.</p>
+              </div>
+            </div>
+
+            <div id="cloud-mods" class="docs-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h4>Select Modpack &amp; Minecraft Version</h4>
+                <p>Choose your Minecraft version and loader (Fabric, NeoForge, Forge, or Quilt). Install individual mods or full modpacks directly from CurseForge &amp; Modrinth in one click with automatic dependency resolution.</p>
+              </div>
+            </div>
+
+            <div id="cloud-retention" class="docs-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h4>Pause-to-Sleep World Retention</h4>
+                <p>Zircon Cloud automatically enables smart Pause-to-Sleep retention. When no players are online, your server instance enters a low-resource suspended state. The moment a player connects via Zircon Launcher, the node resumes in seconds with zero data loss.</p>
+              </div>
+            </div>
+
+            <div id="cloud-connect" class="docs-step">
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <h4>Share Address with Friends &amp; Connect</h4>
+                <p>Copy your dedicated cloud address (e.g. <code>mycommunity.zirconmc.net</code>). Your players paste it into the Zircon Launcher and click <strong>PLAY</strong> — the exact modpack and configurations install automatically.</p>
+              </div>
+            </div>
+
+          </section>
+
         </div>
       </div>
     </div>
@@ -250,9 +321,12 @@
     <div class="container">
       <div class="cta-band">
         <h2>Ready to get started?</h2>
-        <p>Download the launcher for your computer or set up your own server manager in minutes.</p>
-        <a class="btn btn-white btn-lg" href="downloads.html">Go to Downloads</a>
-        <a class="btn btn-ghost btn-lg" href="faq.html">View Frequently Asked Questions</a>
+        <p>Download the free player launcher, run a self-hosted server, or deploy in seconds on Zircon Cloud.</p>
+        <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+          <a class="btn btn-primary btn-lg" href="downloads.html">Go to Downloads</a>
+          <a class="btn btn-cloud btn-lg" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Launch on Zircon Cloud</a>
+          <a class="btn btn-ghost btn-lg" href="faq.html">View FAQ</a>
+        </div>
       </div>
     </div>
   </section>
@@ -262,7 +336,10 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="assets/img/zircon-title.svg" alt="Zircon">
+          <a href="/" style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 14px; text-decoration: none;">
+            <img src="assets/img/zircon-icon.svg" alt="Zircon" width="28" height="28" style="filter: drop-shadow(0 0 8px rgba(71, 210, 201, 0.5));">
+            <img src="assets/img/zircon-title.svg" alt="Zircon" height="24">
+          </a>
           <p>A free, open-source launcher and server manager for modded Minecraft. Exact mod sync verified on every launch against Modrinth &amp; CurseForge.</p>
           <a class="pill pill-accent" href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">Source-Available (BSL 1.1)</a>
         </div>
@@ -272,23 +349,25 @@
             <li><a href="/">Home</a></li>
             <li><a href="launcher.html">Launcher</a></li>
             <li><a href="server.html">Server Manager</a></li>
+            <li><a href="https://cloud.zirconmc.net" target="_blank" rel="noopener" style="color: var(--accent-bright); font-weight: 700;">Zircon Cloud &rarr;</a></li>
             <li><a href="docs.html" class="active">Guides &amp; Docs</a></li>
             <li><a href="faq.html">FAQ</a></li>
             <li><a href="downloads.html">Downloads</a></li>
           </ul>
         </div>
         <div class="footer-col">
-          <h4>Project</h4>
+          <h4>Project &amp; Community</h4>
           <ul>
-            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub</a></li>
-            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases &amp; Changelogs</a></li>
+            <li><a href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Zircon Cloud Console</a></li>
             <li><a href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" target="_blank" rel="noopener">Business Source License 1.1</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-legal">
-        <span>© Zircon contributors · v0.4.18</span>
-        <span>Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</span>
+        <span>© Zircon contributors · v0.4.19 (active development)</span>
+        <span>Not an official Minecraft product. Not approved by or associated with Mojang Studios or Microsoft.</span>
       </div>
     </div>
   </footer>

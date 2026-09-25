@@ -1341,7 +1341,9 @@ async fn run_online_flow(
                 Err(_) => false,
             };
             if is_safe {
-                if !selection.active_resourcepacks.contains(&pack.filename) {
+                if !selection.rejected_resourcepacks.contains(&pack.filename)
+                    && !selection.active_resourcepacks.contains(&pack.filename)
+                {
                     selection.active_resourcepacks.push(pack.filename.clone());
                 }
             } else {
@@ -1359,6 +1361,14 @@ async fn run_online_flow(
         .collect();
     selection.active_resourcepacks = present;
     selection.save(&game_dir);
+
+    // --- version sanity check ---
+    if !zircon_core::api::versions::is_supported_mc_version(&bom.minecraft_version) {
+        return Err(LauncherError::InvalidInput(format!(
+            "Minecraft {} is not supported. The minimum supported version is 1.7 (e.g. 1.7.10). Older versions like 1.6 are not supported.",
+            bom.minecraft_version
+        )));
+    }
 
     // --- classpath / Java ---
     let listener = UiProgressListener { app: app.clone() };
@@ -2484,6 +2494,13 @@ async fn run_offline_flow(
         ));
     }
 
+    if !zircon_core::api::versions::is_supported_mc_version(&instance.minecraft_version) {
+        return Err(LauncherError::InvalidInput(format!(
+            "Minecraft {} is not supported. The minimum supported version is 1.7 (e.g. 1.7.10). Older versions like 1.6 are not supported.",
+            instance.minecraft_version
+        )));
+    }
+
     let listener = UiProgressListener { app: app.clone() };
     let required_java =
         JavaRuntimeSelector::get_required_java_major_version(&instance.minecraft_version);
@@ -3511,6 +3528,49 @@ pub fn set_active_resourcepacks(
     selection.active_resourcepacks = filenames;
     selection.save(&dir);
     Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerPackDecisions {
+    pub accepted: Vec<String>,
+    pub rejected: Vec<String>,
+}
+
+/// Sets player decisions (accept/reject) for server resource packs.
+#[tauri::command]
+pub fn set_server_pack_decisions(
+    game_dir: String,
+    accepted: Vec<String>,
+    rejected: Vec<String>,
+) -> Result<(), String> {
+    let dir = PathBuf::from(&game_dir);
+    let mut selection = PackSelection::load(&dir);
+    for name in &rejected {
+        selection.rejected_resourcepacks.insert(name.clone());
+        selection.active_resourcepacks.retain(|p| p != name);
+    }
+    for name in &accepted {
+        selection.rejected_resourcepacks.remove(name);
+        if !selection.active_resourcepacks.contains(name) {
+            selection.active_resourcepacks.push(name.clone());
+        }
+    }
+    selection.save(&dir);
+    Ok(())
+}
+
+/// Gets player decisions (accepted/rejected) for server resource packs.
+#[tauri::command]
+pub fn get_server_pack_decisions(
+    game_dir: String,
+) -> Result<ServerPackDecisions, String> {
+    let dir = PathBuf::from(&game_dir);
+    let selection = PackSelection::load(&dir);
+    Ok(ServerPackDecisions {
+        accepted: selection.active_resourcepacks,
+        rejected: selection.rejected_resourcepacks.into_iter().collect(),
+    })
 }
 
 /// Imports a local pack archive into the instance (`shader` -> `shaderpacks`, `resource` -> `resourcepacks`).

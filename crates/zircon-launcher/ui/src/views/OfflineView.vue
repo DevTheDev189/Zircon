@@ -270,10 +270,10 @@
               <button
                 type="button"
                 class="z-segmented-pill"
-                :class="{ 'active': activeTab === 'textures' }"
-                @click="activeTab = 'textures'"
+                :class="{ 'active': activeTab === 'resources' || activeTab === 'textures' }"
+                @click="activeTab = 'resources'"
               >
-                Texture Packs ({{ detailedPacks.resourcepacks.length }})
+                Resource Packs ({{ detailedPacks.resourcepacks.length }})
               </button>
               <button
                 type="button"
@@ -393,17 +393,49 @@
                 <button type="button" class="text-[10px] px-2.5 py-1 text-red-400 hover:text-red-300 font-semibold" @click="bulkDeleteSelected">Delete</button>
               </div>
 
-              <!-- Mods list -->
-              <div
-                v-if="mods.length"
-                class="max-h-[220px] overflow-y-auto mb-3 flex flex-col gap-1.5 pr-1"
+              <!-- Category Filter Pills -->
+              <div v-if="mods.length > 0" class="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1 text-xs">
+                <button
+                  v-for="cat in modCategoriesWithCounts"
+                  :key="cat.id"
+                  type="button"
+                  class="px-2.5 py-1 rounded-lg font-semibold transition shrink-0 flex items-center gap-1.5 cursor-pointer"
+                  :class="activeModCategory === cat.id ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm' : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'"
+                  @click="activeModCategory = cat.id"
+                >
+                  <span>{{ cat.label }}</span>
+                  <span class="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-black/40" :class="activeModCategory === cat.id ? 'text-cyan-200' : 'text-slate-500'">
+                    {{ cat.count }}
+                  </span>
+                </button>
+              </div>
+
+              <!-- Mods list with smooth animation reordering and drag handle -->
+              <TransitionGroup
+                v-if="displayedMods.length"
+                name="stack-flip"
+                tag="div"
+                class="max-h-[260px] overflow-y-auto mb-3 flex flex-col gap-1.5 pr-1"
               >
                 <div
-                  v-for="mod in mods"
+                  v-for="(mod, index) in displayedMods"
                   :key="mod.filename"
-                  class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs transition hover:border-slate-700"
-                  :class="{ 'opacity-50': !mod.enabled }"
+                  draggable="true"
+                  @dragstart="onModDragStart(index, $event)"
+                  @dragover.prevent="onModDragOver(index, $event)"
+                  @drop.prevent="onModDropReorder(index, $event)"
+                  @dragend="onModDragEnd"
+                  class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs transition hover:border-slate-700 cursor-grab active:cursor-grabbing"
+                  :class="[
+                    !mod.enabled ? 'opacity-50' : '',
+                    modDropTargetIndex === index ? 'border-t-2 border-t-cyan-400 bg-cyan-950/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]' : ''
+                  ]"
                 >
+                  <!-- Drag Handle -->
+                  <div class="text-slate-500 hover:text-cyan-400 cursor-grab px-0.5 select-none font-mono text-xs" title="Drag to reorder mod priority">
+                    ⠿
+                  </div>
+
                   <input
                     type="checkbox"
                     class="zircon-check shrink-0 item-select-check"
@@ -430,6 +462,12 @@
                         v-if="mod.version"
                         class="bg-slate-950 text-slate-400 border border-slate-800 text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0"
                       >{{ mod.version }}</span>
+                      <span
+                        v-if="getModCategory(mod)?.id !== 'general'"
+                        class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800/80 text-cyan-300 border border-slate-700/60 shrink-0"
+                      >
+                        {{ getModCategory(mod)?.label }}
+                      </span>
                     </div>
                     <div v-if="mod.author" class="text-[10px] text-slate-500">by {{ mod.author }}</div>
                   </div>
@@ -463,6 +501,9 @@
                     <span>Delete</span>
                   </button>
                 </div>
+              </TransitionGroup>
+              <div v-else-if="mods.length > 0" class="py-6 text-center text-slate-500 text-xs">
+                No mods found in this category.
               </div>
 
               <!-- Custom upload / drop zone -->
@@ -792,75 +833,126 @@
             </div>
           </template>
 
-          <!-- ================= TAB: TEXTURE PACKS ================= -->
-          <template v-else-if="activeTab === 'textures'">
+          <!-- ================= TAB: RESOURCE PACKS ================= -->
+          <template v-else-if="activeTab === 'resources' || activeTab === 'textures'">
             <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
               <div class="flex items-center justify-between mb-2">
                 <div>
-                  <div class="z-section text-white font-bold text-sm">Active Texture Packs ({{ activeResourcepacksList.length }})</div>
-                  <div class="text-[11px] text-slate-400">Packs higher in the stack override packs below them.</div>
+                  <div class="z-section text-white font-bold text-sm">Active Resource Packs ({{ activeResourcepacksList.length }})</div>
+                  <div class="text-[11px] text-slate-400">Packs higher in the stack override packs below them. Drag to reorder priority.</div>
                 </div>
                 <span class="text-[10px] text-cyan-400 font-mono bg-cyan-950/40 border border-cyan-800/60 px-2 py-0.5 rounded-full">
                   Priority Stack
                 </span>
               </div>
 
-              <!-- Active packs stack -->
-              <div v-if="activeResourcepacksList.length" class="max-h-[260px] overflow-y-auto mb-4 flex flex-col gap-1.5 pr-1">
-                <div
-                  v-for="(p, index) in activeResourcepacksList"
-                  :key="p.filename"
-                  class="flex items-center gap-2.5 text-xs p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 shadow-sm transition hover:border-cyan-500/60"
-                >
-                  <!-- Priority badge -->
-                  <div class="px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0" :title="index === 0 ? 'Highest Visual Priority' : `Priority Level ${index + 1}`">
-                    #{{ index + 1 }} {{ index === 0 ? 'Top' : '' }}
+              <!-- Server Resource Packs Offered Banner (if any) -->
+              <div
+                v-if="serverAdvertisedPacks.length > 0"
+                class="mb-3 p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-[0_0_15px_rgba(6,182,212,0.06)]"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-sm font-bold shrink-0">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
                   </div>
-
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-white font-semibold truncate">{{ p.title || p.filename }}</span>
-                      <span v-if="p.serverEnforced" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
-                        🔒 Server Enforced
-                      </span>
-                    </div>
-                    <div v-if="p.description" class="text-[10px] text-slate-400 truncate">{{ p.description }}</div>
-                  </div>
-
-                  <span class="bg-slate-950 text-slate-400 border border-slate-800 text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0">
-                    {{ p.version || (p.packFormat ? 'v' + p.packFormat : 'Pack') }}
-                  </span>
-                  <span class="text-slate-500 font-mono text-[11px] shrink-0">{{ fmtBytes(p.sizeBytes) }}</span>
-
-                  <!-- Reorder buttons -->
-                  <div class="flex items-center gap-1 shrink-0 ml-1">
-                    <button
-                      class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
-                      :disabled="index === 0"
-                      title="Move Up (Higher Priority)"
-                      @click="moveResourcepack(index, -1)"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
-                      :disabled="index === activeResourcepacksList.length - 1"
-                      title="Move Down (Lower Priority)"
-                      @click="moveResourcepack(index, 1)"
-                    >
-                      ▼
-                    </button>
-                    <button
-                      class="text-slate-400 hover:text-amber-300 text-xs px-2 py-0.5 hover:bg-amber-500/10 rounded transition font-medium ml-1"
-                      title="Deactivate Pack"
-                      @click="disableResourcepack(p.filename)"
-                    >
-                      ✕
-                    </button>
+                  <div>
+                    <div class="text-xs font-bold text-cyan-200">Server Resource Packs ({{ serverAdvertisedPacks.length }})</div>
+                    <div class="text-[10px] text-slate-400">This instance offers server-recommended resource packs.</div>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  class="z-btn-primary text-xs px-3.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 shrink-0"
+                  @click="openServerPacksModal"
+                >
+                  <span>Review &amp; Accept / Decline</span>
+                </button>
               </div>
-              <div v-else class="text-xs text-slate-500 mb-4 italic py-2">No texture packs currently active. Add one from the available list below.</div>
+
+              <!-- Active packs stack -->
+              <div v-if="activeResourcepacksList.length">
+                <TransitionGroup
+                  name="stack-flip"
+                  tag="div"
+                  class="max-h-[260px] overflow-y-auto mb-4 flex flex-col gap-1.5 pr-1"
+                >
+                  <div
+                    v-for="(p, index) in activeResourcepacksList"
+                    :key="p.filename"
+                    draggable="true"
+                    @dragstart="onRpDragStart(index, $event)"
+                    @dragover.prevent="onRpDragOver(index, $event)"
+                    @drop.prevent="onRpDrop(index, $event)"
+                    @dragend="onRpDragEnd"
+                    class="flex items-center gap-2.5 text-xs p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 shadow-sm transition hover:border-cyan-500/60 cursor-grab active:cursor-grabbing"
+                    :class="{ 'border-t-2 border-t-cyan-400 bg-cyan-950/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]': rpDropTargetIndex === index }"
+                  >
+                    <!-- Drag handle -->
+                    <div class="text-slate-500 hover:text-cyan-400 cursor-grab px-0.5 select-none font-mono text-xs" title="Drag to reorder priority">
+                      ⠿
+                    </div>
+
+                    <!-- Priority badge -->
+                    <div class="px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0" :title="index === 0 ? 'Highest Visual Priority' : `Priority Level ${index + 1}`">
+                      #{{ index + 1 }} {{ index === 0 ? 'Top' : '' }}
+                    </div>
+
+                    <div class="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
+                      <img v-if="p.iconDataUrl" :src="p.iconDataUrl" class="w-full h-full object-cover" />
+                      <svg v-else class="w-4 h-4 text-cyan-400/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <line x1="3" y1="9" x2="21" y2="9" />
+                        <line x1="9" y1="21" x2="9" y2="9" />
+                      </svg>
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-white font-semibold truncate">{{ p.title || p.filename }}</span>
+                        <span v-if="p.serverEnforced" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                          🔒 Server Enforced
+                        </span>
+                      </div>
+                      <div v-if="p.description" class="text-[10px] text-slate-400 truncate">{{ p.description }}</div>
+                    </div>
+
+                    <span class="bg-slate-950 text-slate-400 border border-slate-800 text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0">
+                      {{ p.version || (p.packFormat ? 'v' + p.packFormat : 'Pack') }}
+                    </span>
+                    <span class="text-slate-500 font-mono text-[11px] shrink-0">{{ fmtBytes(p.sizeBytes) }}</span>
+
+                    <!-- Reorder buttons -->
+                    <div class="flex items-center gap-1 shrink-0 ml-1">
+                      <button
+                        class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
+                        :disabled="index === 0"
+                        title="Move Up (Higher Priority)"
+                        @click.stop="moveResourcepack(index, -1)"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
+                        :disabled="index === activeResourcepacksList.length - 1"
+                        title="Move Down (Lower Priority)"
+                        @click.stop="moveResourcepack(index, 1)"
+                      >
+                        ▼
+                      </button>
+                      <button
+                        class="text-slate-400 hover:text-amber-300 text-xs px-2 py-0.5 hover:bg-amber-500/10 rounded transition font-medium ml-1"
+                        title="Deactivate Pack"
+                        @click.stop="disableResourcepack(p.filename)"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </TransitionGroup>
+              </div>
+              <div v-else class="text-xs text-slate-500 mb-4 italic py-2">No resource packs currently active. Add one from the available list below.</div>
 
               <!-- Available / Inactive Packs -->
               <div class="z-section mb-2 text-white font-bold text-sm">Available Packs ({{ inactiveResourcepacksList.length }})</div>
@@ -883,7 +975,7 @@
                   <div class="flex items-center gap-2 shrink-0 ml-1">
                     <button
                       class="z-btn text-xs px-2.5 py-1 rounded-lg font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition flex items-center gap-1"
-                      title="Add to active texture packs stack"
+                      title="Add to active resource packs stack"
                       @click="enableResourcepack(p.filename)"
                     >
                       <span>+ Enable</span>
@@ -901,35 +993,35 @@
                   </div>
                 </div>
               </div>
-              <div v-else class="text-xs text-slate-500 mb-3 italic py-1">All installed texture packs are currently active.</div>
+              <div v-else class="text-xs text-slate-500 mb-3 italic py-1">All installed resource packs are currently active.</div>
 
-              <!-- Custom upload / drop zone for texture packs -->
+              <!-- Custom upload / drop zone for resource packs -->
               <div
                 class="zircon-drop-zone p-4 text-center text-xs text-slate-400 cursor-pointer rounded-xl border border-dashed border-slate-800 hover:border-cyan-500/50 transition"
                 @dragover.prevent
-                @drop.prevent="onTextureDrop"
+                @drop.prevent="onResourceDrop"
               >
-                Drop <code class="text-cyan-300 font-mono">.zip</code> texture pack files here (or <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseTextures">browse files</button>)
+                Drop <code class="text-cyan-300 font-mono">.zip</code> resource pack files here (or <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseResources">browse files</button>)
               </div>
             </div>
 
-            <!-- Texture Packs Discovery: Modrinth & CurseForge -->
+            <!-- Resource Packs Discovery: Modrinth & CurseForge -->
             <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
               <div class="flex items-center justify-between gap-2 mb-3">
-                <div class="z-section text-white font-bold text-sm">Search &amp; Install Texture Packs</div>
+                <div class="z-section text-white font-bold text-sm">Search &amp; Install Resource Packs</div>
                 <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-0.5">
                   <button
                     class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all"
-                    :class="textureProvider === 'modrinth' ? 'bg-[#1bd96a]/20 text-[#46d66d] border border-[#1bd96a]/40 shadow-sm' : 'text-slate-400 hover:text-white'"
-                    @click="setTextureProvider('modrinth')"
+                    :class="resourceProvider === 'modrinth' ? 'bg-[#1bd96a]/20 text-[#46d66d] border border-[#1bd96a]/40 shadow-sm' : 'text-slate-400 hover:text-white'"
+                    @click="setResourceProvider('modrinth')"
                   >
                     <img src="../assets/modrinth.svg" class="w-3.5 h-3.5" />
                     Modrinth
                   </button>
                   <button
                     class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all"
-                    :class="textureProvider === 'curseforge' ? 'bg-[#f16436]/20 text-[#f16436] border border-[#f16436]/40 shadow-sm' : 'text-slate-400 hover:text-white'"
-                    @click="setTextureProvider('curseforge')"
+                    :class="resourceProvider === 'curseforge' ? 'bg-[#f16436]/20 text-[#f16436] border border-[#f16436]/40 shadow-sm' : 'text-slate-400 hover:text-white'"
+                    @click="setResourceProvider('curseforge')"
                   >
                     <img src="../assets/curseforge.svg" class="w-3.5 h-3.5" />
                     CurseForge
@@ -939,29 +1031,29 @@
 
               <div class="flex gap-2">
                 <input
-                  v-model="textureSearchQuery"
+                  v-model="resourceSearchQuery"
                   class="z-input flex-1 text-xs"
-                  placeholder="Search texture packs (e.g. Faithful, Bare Bones, Fresh Animations)..."
-                  @keydown.enter="searchTextures"
+                  placeholder="Search resource packs (e.g. Faithful, Bare Bones, Fresh Animations)..."
+                  @keydown.enter="searchResources"
                 />
-                <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="textureSearchBusy" @click="searchTextures">Search</button>
+                <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="resourceSearchBusy" @click="searchResources">Search</button>
               </div>
 
               <div class="flex items-center justify-between mt-2 text-xs text-slate-400">
                 <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input type="checkbox" v-model="textureSearchAllVersions" class="zircon-check" @change="searchTextures" />
+                  <input type="checkbox" v-model="resourceSearchAllVersions" class="zircon-check" @change="searchResources" />
                   <span>Show all Minecraft versions</span>
                 </label>
-                <span v-if="textureSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
+                <span v-if="resourceSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
                   <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
                   Searching packs…
                 </span> <!-- end busy spinner -->
               </div>
 
-              <!-- Texture results -->
+              <!-- Resource results -->
               <div class="mt-3 flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
                 <div
-                  v-for="hit in textureResults"
+                  v-for="hit in resourceResults"
                   :key="hit.projectId || hit.id"
                   class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 transition hover:border-slate-700"
                 >
@@ -976,7 +1068,7 @@
                       <div class="flex items-center justify-between gap-2">
                         <div class="text-xs font-bold text-white truncate">{{ hit.title || hit.name }}</div>
                         <button
-                          v-if="hit.origin === 'curseforge' || textureProvider === 'curseforge'"
+                          v-if="hit.origin === 'curseforge' || resourceProvider === 'curseforge'"
                           class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#F16436]/20 text-orange-200 border border-[#F16436]/40 hover:bg-[#F16436]/30 shadow-sm"
                           @click="openCurseforgeModal(hit, 'resourcepack')"
                         >
@@ -1014,10 +1106,10 @@
                           target="_blank"
                           rel="noopener noreferrer"
                           class="font-medium hover:underline inline-flex items-center gap-0.5"
-                          :class="(hit.origin === 'curseforge' || textureProvider === 'curseforge') ? 'text-[#F16436]' : 'text-[#46d66d]'"
+                          :class="(hit.origin === 'curseforge' || resourceProvider === 'curseforge') ? 'text-[#F16436]' : 'text-[#46d66d]'"
                           @click.prevent="openExternalLink(hit.projectUrl || hit.websiteUrl)"
                         >
-                          {{ (hit.origin === 'curseforge' || textureProvider === 'curseforge') ? 'View on CurseForge ↗' : 'View on Modrinth ↗' }}
+                          {{ (hit.origin === 'curseforge' || resourceProvider === 'curseforge') ? 'View on CurseForge ↗' : 'View on Modrinth ↗' }}
                         </a>
                       </div>
                     </div>
@@ -1038,8 +1130,8 @@
                     </select>
                   </div>
                 </div>
-                <div v-if="!textureSearchBusy && textureSearchDone && textureResults.length === 0" class="text-xs text-slate-500 py-2">
-                  No texture packs found.
+                <div v-if="!resourceSearchBusy && resourceSearchDone && resourceResults.length === 0" class="text-xs text-slate-500 py-2">
+                  No resource packs found.
                 </div>
               </div>
             </div>
@@ -1845,6 +1937,15 @@
       @close="showAuditModal = false"
       @repaired="onModsRepaired"
     />
+
+    <!-- SERVER RESOURCE PACKS OFFERED MODAL -->
+    <ServerResourcePacksModal
+      :is-open="showServerPacksModal"
+      :server-packs="serverAdvertisedPacks"
+      :initial-decisions="serverPackDecisions"
+      @accepted="onServerPacksAccepted"
+      @close="showServerPacksModal = false"
+    />
   </div>
 </template>
 
@@ -1852,6 +1953,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import DependencyPromptModal from '../components/DependencyPromptModal.vue';
+import ServerResourcePacksModal from '../components/ServerResourcePacksModal.vue';
 import JoinByCodeModal from '../components/JoinByCodeModal.vue';
 import ShareSetupModal from '../components/ShareSetupModal.vue';
 import ImportSetupModal from '../components/ImportSetupModal.vue';
@@ -1998,10 +2100,166 @@ const modResults = ref([]);
 const modSearchBusy = ref(false);
 const modSearchDone = ref(false);
 
+// Mod Categorization
+const MOD_CATEGORIES = [
+  { id: 'all', label: 'All' },
+  { id: 'performance', label: 'Performance', keywords: ['sodium', 'iris', 'lithium', 'ferritecore', 'indium', 'entityculling', 'immediatelyfast', 'krypton', 'modernfix', 'nbt-crafting', 'lazydfu', 'smoothboot', 'dynamic-fps', 'c2me', 'starlight', 'phosphor', 'embeddium', 'rubidium', 'radium', 'canary'] },
+  { id: 'visuals', label: 'Visuals & UI', keywords: ['fabric-api', 'cloth-config', 'architectury', 'appleskin', 'modmenu', 'citresewn', 'continuity', 'lambdynamiclights', 'chat', 'hud', 'zoom', 'skin', 'armor', 'tooltip', 'rei', 'jei', 'emi', 'wthit', 'jade', 'blur', 'betterf3', 'presencefootsteps', 'soundphysics', 'waveycapes'] },
+  { id: 'gameplay', label: 'Content & World', keywords: ['create', 'applied', 'botania', 'biomes', 'twilight', 'aether', 'adorn', 'farmersdelight', 'supplementaries', 'comforts', 'artifacts', 'dungeon', 'boss', 'mob', 'weapon', 'magic', 'tetra', 'tconstruct', 'mekanism', 'immersive', 'thermal'] },
+  { id: 'utility', label: 'Utility & Tools', keywords: ['worldedit', 'xaero', 'journeymap', 'voxel', 'litematica', 'minihud', 'tweakeroo', 'carpet', 'voice', 'simple-voice', 'replaymod', 'axiom', 'spark'] },
+  { id: 'libraries', label: 'Libraries', keywords: ['api', 'lib', 'library', 'core', 'kotlin', 'cloth', 'cardinal', 'geckolib', 'owo', 'architectury', 'puzzleslib', 'yungsapi', 'balm'] },
+];
+
+const activeModCategory = ref('all');
+
+function getModCategory(mod) {
+  if (!mod) return { id: 'general', label: 'General' };
+  const name = (mod.filename || '').toLowerCase();
+  for (const cat of MOD_CATEGORIES) {
+    if (cat.id === 'all') continue;
+    if (cat.keywords?.some((k) => name.includes(k))) {
+      return cat;
+    }
+  }
+  return { id: 'general', label: 'General' };
+}
+
+const modCategoriesWithCounts = computed(() => {
+  const allMods = mods.value || [];
+  return MOD_CATEGORIES.map((cat) => {
+    if (cat.id === 'all') {
+      return { ...cat, count: allMods.length };
+    }
+    const count = allMods.filter((m) => getModCategory(m).id === cat.id).length;
+    return { ...cat, count };
+  });
+});
+
+const displayedMods = computed(() => {
+  const allMods = mods.value || [];
+  if (activeModCategory.value === 'all') return allMods;
+  return allMods.filter((m) => getModCategory(m).id === activeModCategory.value);
+});
+
+// Drag & Drop for Mods
+const modDraggedIndex = ref(null);
+const modDropTargetIndex = ref(null);
+
+function onModDragStart(index, event) {
+  modDraggedIndex.value = index;
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+  }
+}
+
+function onModDragOver(index, event) {
+  if (modDraggedIndex.value === null || modDraggedIndex.value === index) return;
+  modDropTargetIndex.value = index;
+  if (event?.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move';
+  }
+}
+
+function onModDropReorder(index) {
+  const from = modDraggedIndex.value;
+  const to = index;
+  modDraggedIndex.value = null;
+  modDropTargetIndex.value = null;
+  if (from === null || from === undefined || from === to) return;
+
+  const list = [...mods.value];
+  const [moved] = list.splice(from, 1);
+  list.splice(to, 0, moved);
+  mods.value = list;
+}
+
+function onModDragEnd() {
+  modDraggedIndex.value = null;
+  modDropTargetIndex.value = null;
+}
+
 // Packs state
 const packs = ref({ shaderpacks: [], resourcepacks: [], activeResourcepacks: [] });
 const detailedPacks = ref({ shaderpacks: [], resourcepacks: [], shadersEnabled: false });
 const activeShaderpack = ref('');
+
+// Drag & Drop for Resource Packs
+const rpDraggedIndex = ref(null);
+const rpDropTargetIndex = ref(null);
+
+function onRpDragStart(index, event) {
+  rpDraggedIndex.value = index;
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+  }
+}
+
+function onRpDragOver(index, event) {
+  if (rpDraggedIndex.value === null || rpDraggedIndex.value === index) return;
+  rpDropTargetIndex.value = index;
+  if (event?.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move';
+  }
+}
+
+async function onRpDrop(index) {
+  const from = rpDraggedIndex.value;
+  const to = index;
+  rpDraggedIndex.value = null;
+  rpDropTargetIndex.value = null;
+  if (from === null || from === undefined || from === to) return;
+
+  if (!selectedDir.value) return;
+  const current = [...(packs.value.activeResourcepacks || [])];
+  const [moved] = current.splice(from, 1);
+  current.splice(to, 0, moved);
+  packs.value.activeResourcepacks = current;
+  await api.setActiveResourcepacks(selectedDir.value, current);
+}
+
+function onRpDragEnd() {
+  rpDraggedIndex.value = null;
+  rpDropTargetIndex.value = null;
+}
+
+// Server Resource Packs modal & state
+const showServerPacksModal = ref(false);
+const serverPackDecisions = ref({});
+
+const serverAdvertisedPacks = computed(() => {
+  return (detailedPacks.value.resourcepacks || []).filter((p) => !p.isLocal);
+});
+
+async function openServerPacksModal() {
+  if (selectedDir.value) {
+    try {
+      const decisions = await api.getServerPackDecisions(selectedDir.value);
+      serverPackDecisions.value = decisions || {};
+    } catch (e) {
+      console.warn('Could not load server pack decisions:', e);
+    }
+  }
+  showServerPacksModal.value = true;
+}
+
+async function onServerPacksAccepted({ accepted, rejected }) {
+  if (!selectedDir.value) return;
+  try {
+    await api.setServerPackDecisions(selectedDir.value, accepted, rejected);
+    await loadPacks();
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', {
+        detail: `Updated resource pack preferences: ${accepted.length} accepted, ${rejected.length} declined.`,
+      })
+    );
+  } catch (err) {
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', { detail: `Error saving resource pack decisions: ${err}` })
+    );
+  }
+}
 
 const activeResourcepacksList = computed(() => {
   const activeNames = packs.value.activeResourcepacks || [];
@@ -2024,13 +2282,13 @@ const shaderResults = ref([]);
 const shaderSearchBusy = ref(false);
 const shaderSearchDone = ref(false);
 
-// Textures search state
-const textureProvider = ref('modrinth');
-const textureSearchQuery = ref('');
-const textureSearchAllVersions = ref(false);
-const textureResults = ref([]);
-const textureSearchBusy = ref(false);
-const textureSearchDone = ref(false);
+// Resource packs search state
+const resourceProvider = ref('modrinth');
+const resourceSearchQuery = ref('');
+const resourceSearchAllVersions = ref(false);
+const resourceResults = ref([]);
+const resourceSearchBusy = ref(false);
+const resourceSearchDone = ref(false);
 
 // Generic installing tracker
 const installingId = ref('');
@@ -2527,7 +2785,7 @@ async function onShaderDrop(event) {
   await loadPacks();
 }
 
-async function browseTextures() {
+async function browseResources() {
   if (!selectedDir.value) return;
   const picked = await pickFiles({ multiple: true, filters: [PACK_FILTER] });
   if (!picked || !picked.length) return;
@@ -2536,8 +2794,9 @@ async function browseTextures() {
   }
   await loadPacks();
 }
+const browseTextures = browseResources;
 
-async function onTextureDrop(event) {
+async function onResourceDrop(event) {
   if (!selectedDir.value) return;
   const files = event.dataTransfer?.files;
   if (!files || !files.length) return;
@@ -2549,9 +2808,10 @@ async function onTextureDrop(event) {
   }
   await loadPacks();
 }
+const onTextureDrop = onResourceDrop;
 
 // ---------------------------------------------------------------------------
-// Shaders & Texture Packs Discovery
+// Shaders & Resource Packs Discovery
 // ---------------------------------------------------------------------------
 
 function setShaderProvider(provider) {
@@ -2607,49 +2867,51 @@ async function loadShaderVersions(hit) {
   }
 }
 
-function setTextureProvider(provider) {
-  textureProvider.value = provider;
-  if (textureSearchQuery.value.trim()) searchTextures();
+function setResourceProvider(provider) {
+  resourceProvider.value = provider;
+  if (resourceSearchQuery.value.trim()) searchResources();
 }
+const setTextureProvider = setResourceProvider;
 
-async function searchTextures() {
-  const query = textureSearchQuery.value.trim();
+async function searchResources() {
+  const query = resourceSearchQuery.value.trim();
   if (!query || !selected.value) return;
-  textureSearchBusy.value = true;
-  textureSearchDone.value = false;
+  resourceSearchBusy.value = true;
+  resourceSearchDone.value = false;
   try {
     const hits = await api.searchMods(
       selected.value.id,
       query,
-      textureProvider.value,
+      resourceProvider.value,
       'resourcepack',
-      textureSearchAllVersions.value
+      resourceSearchAllVersions.value
     );
-    textureResults.value = hits.map((hit) => ({
+    resourceResults.value = hits.map((hit) => ({
       ...hit,
       versionOptions: [],
       selectedVersionId: '',
       versionsLoading: true,
       versionsFailed: false,
     }));
-    textureSearchDone.value = true;
-    for (const hit of textureResults.value) {
-      loadTextureVersions(hit);
+    resourceSearchDone.value = true;
+    for (const hit of resourceResults.value) {
+      loadResourceVersions(hit);
     }
   } catch (e) {
-    window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Texture search error: ${e}` }));
+    window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Resource pack search error: ${e}` }));
   } finally {
-    textureSearchBusy.value = false;
+    resourceSearchBusy.value = false;
   }
 }
+const searchTextures = searchResources;
 
-async function loadTextureVersions(hit) {
+async function loadResourceVersions(hit) {
   try {
     const versions = await api.listModVersions(
       selected.value.id,
       hit.projectId || hit.id,
-      hit.origin || textureProvider.value,
-      textureSearchAllVersions.value
+      hit.origin || resourceProvider.value,
+      resourceSearchAllVersions.value
     );
     hit.versionOptions = versions;
     hit.selectedVersionId = versions[0]?.id || '';

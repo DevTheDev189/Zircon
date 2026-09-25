@@ -82,6 +82,16 @@ crates/zircon-server/src/web/controllers/migration_controller.rs
 *PHASE_*
 IMPORTANT.md
 MCP_IMPLEMENTATION_PLAN.md
+HYPERGROWTH_AND_SCALING_PLAYBOOK.md
+ZIRCON_ANDROID_ARCHITECTURE.md
+MOD_METADATA_EXPORT_AND_SHARING_RFC.md
+QOL_LAUNCHER_ENHANCEMENTS_PLAN.md
+ai/
+docker/
 scratch/
 .agents/
+import_desktop_export.bat
+skills-lock.json
+
+
 

@@ -1,7 +1,7 @@
 <template>
   <div class="relative h-full flex flex-col bg-bg text-text">
-    <!-- Microsoft login overlay (z-above everything) only visible if auth check is complete and no session exists -->
-    <LoginOverlay :visible="!authChecking && !session" @logged-in="onLoggedIn" />
+    <!-- Microsoft login overlay (z-above everything) visible at pre-login step for testing -->
+    <LoginOverlay :visible="!authChecking && !session" :cached-account="cachedAccount" @logged-in="onLoggedIn" />
     <!-- Active Minecraft launch lifecycle modal -->
     <LaunchOverlay
       :visible="launchModalActive"
@@ -177,6 +177,7 @@
               :session="session"
               :game-status="gameStatus"
               :deep-link-address="deepLinkAddress"
+              :deep-link-server="deepLinkServer"
               @launching="onLaunching"
               @stopped="onStopped"
               @error="onLaunchError"
@@ -245,7 +246,7 @@ import ServersView from './views/ServersView.vue';
 import OfflineView from './views/OfflineView.vue';
 import SkinsView from './views/SkinsView.vue';
 import SettingsView from './views/SettingsView.vue';
-import { api, createDefaultSteveDataUrl, onDeepLinkJoin, onGameCrashed, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
+import { api, createDefaultSteveDataUrl, onDeepLinkAddServer, onDeepLinkJoin, onGameCrashed, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { applyTheme } from './lib/theme';
@@ -301,6 +302,7 @@ const navItems = [
 
 const view = ref('servers');
 const session = ref(null);
+const cachedAccount = ref(null);
 const authChecking = ref(true);
 const avatarUrl = ref('');
 const statusText = ref('');
@@ -315,19 +317,21 @@ const shaderRemember = ref(false);
 const keyPrompt = ref(null);
 const launchingServer = ref(null);
 const deepLinkAddress = ref('');
+const deepLinkServer = ref(null);
 const crashReportData = ref(null);
 const showCrashReportModal = ref(false);
 
 let unlisten = [];
 
 onMounted(async () => {
-  // Auth restore (silent refresh when expired) before showing login overlay or opening window.
+  // Pre-login testing mode: check for cached session but hold at pre-login screen on launch
   try {
-    session.value = await api.getCachedSession();
+    cachedAccount.value = await api.getCachedSession();
   } catch (err) {
-    console.warn('Failed to restore cached session:', err);
-    session.value = null;
+    console.warn('Failed to inspect cached session:', err);
+    cachedAccount.value = null;
   } finally {
+    session.value = null;
     authChecking.value = false;
   }
 
@@ -407,6 +411,13 @@ onMounted(async () => {
     onDeepLinkJoin((addr) => {
       view.value = 'servers';
       deepLinkAddress.value = addr;
+    }),
+    onDeepLinkAddServer((payload) => {
+      view.value = 'servers';
+      deepLinkServer.value = payload;
+      if (payload && payload.address) {
+        deepLinkAddress.value = payload.address;
+      }
     })
   );
 

@@ -173,7 +173,18 @@ impl OfflineInstanceManager {
                 )) /* z0 */
             })? /* z0 */
         }; // end-def 0
-// spacer 0
+        let resolved_mc_version = if mc_version.trim().is_empty() {
+            "1.20.4".to_string()
+        } else {
+            mc_version.trim().to_string()
+        };
+
+        if !zircon_core::api::versions::is_supported_mc_version(&resolved_mc_version) {
+            return Err(LauncherError::InvalidInput(format!(
+                "Minecraft '{resolved_mc_version}' is not supported. The minimum supported version is 1.7 (e.g. 1.7.10). Older versions like 1.6 are not supported."
+            )));
+        }
+
         let instance = OfflineInstance {
             id: uuid::Uuid::new_v4().to_string(),
             name: if name.trim().is_empty() {
@@ -181,11 +192,7 @@ impl OfflineInstanceManager {
             } else {
                 name.trim().to_string()
             },
-            minecraft_version: if mc_version.trim().is_empty() {
-                "1.20.4".to_string()
-            } else {
-                mc_version.trim().to_string()
-            },
+            minecraft_version: resolved_mc_version,
             mod_loader: ModLoaderInfo::new(
                 loader_enum.id(), // z0
                 loader_version.trim(),
@@ -855,6 +862,26 @@ mod tests {
         std::fs::write(&special_jar, b"fake special jar").unwrap();
         instance.custom_client_jar = Some("special.jar".to_string());
         assert_eq!(manager.resolve_custom_client_jar(&instance), Some(special_jar));
+    }
+
+    #[test]
+    fn test_create_instance_rejects_older_than_1_7() {
+        let root = TempDir::new("offline-ver-check-test");
+        let manager = OfflineInstanceManager::new(root.path().join("offline_instances"));
+
+        // 1.6.4 and older should be rejected
+        let err1 = manager.create("Ancient", "1.6.4", "forge", "");
+        assert!(err1.is_err());
+        let err2 = manager.create("Ancient 1.5", "1.5.2", "vanilla", "");
+        assert!(err2.is_err());
+
+        // 1.7.10 is the minimum supported version and should succeed
+        let ok_1_7 = manager.create("Retro 1.7", "1.7.10", "forge", "10.13.4.1614");
+        assert!(ok_1_7.is_ok());
+
+        // Modern versions succeed
+        let ok_modern = manager.create("Modern", "1.20.4", "fabric", "0.15.11");
+        assert!(ok_modern.is_ok());
     }
 }
 
