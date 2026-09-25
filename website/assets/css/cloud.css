@@ -1,0 +1,274 @@
+/* ============================================================
+   Zircon — Zircon Cloud Platform, Comparison Table & Zirky AI
+   ============================================================ */
+
+/* ---------------- Zircon Cloud Section Showcase Box ---------------- */
+
+.cloud-showcase-box {
+  background: linear-gradient(135deg, rgba(8, 145, 178, 0.18) 0%, rgba(18, 28, 42, 0.76) 30%, rgba(10, 16, 25, 0.86) 100%) !important;
+  backdrop-filter: blur(36px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(190%) !important;
+  border: 1px solid rgba(71, 210, 201, 0.35) !important;
+  border-radius: 22px;
+  padding: 44px 38px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 28px 70px rgba(0, 0, 0, 0.8), 0 0 45px rgba(71, 210, 201, 0.18) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.cloud-showcase-box::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(71, 210, 201, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+  filter: blur(60px);
+}
+
+.cloud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  background: rgba(71, 210, 201, 0.14);
+  border: 1px solid rgba(71, 210, 201, 0.4);
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  box-shadow: 0 0 16px rgba(71, 210, 201, 0.25);
+}
+
+.cloud-badge svg {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  max-width: 14px !important;
+  flex-shrink: 0 !important;
+  display: inline-block !important;
+}
+
+.cloud-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 30px 0 26px;
+}
+
+.cloud-feature-item {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(18, 28, 42, 0.68) 40%, rgba(10, 16, 25, 0.8) 100%) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 1px solid rgba(71, 210, 201, 0.24) !important;
+  border-radius: 14px;
+  padding: 24px 22px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 32px rgba(0, 0, 0, 0.4) !important;
+  transition: all 0.25s ease;
+}
+
+.cloud-feature-item:hover {
+  border-color: rgba(71, 210, 201, 0.55) !important;
+  transform: translateY(-3px);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(71, 210, 201, 0.05) 40%, rgba(16, 25, 38, 0.75) 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 16px 45px rgba(0, 0, 0, 0.55), 0 0 25px rgba(71, 210, 201, 0.22) !important;
+}
+
+.cloud-feature-item h4 {
+  color: var(--white);
+  font-size: 17.5px;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cloud-feature-item h4 svg {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  max-width: 22px !important;
+  flex-shrink: 0 !important;
+  display: inline-block !important;
+  color: var(--accent);
+}
+
+.cloud-feature-item p {
+  color: var(--muted);
+  font-size: 15.2px;
+  line-height: 1.68;
+  margin: 0;
+}
+
+/* ---------------- Cloud vs Traditional Host Comparison Table ---------------- */
+
+.compare-table-wrapper {
+  background: rgba(10, 16, 25, 0.84);
+  border: 1px solid rgba(71, 210, 201, 0.3);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  overflow: hidden;
+  backdrop-filter: blur(34px);
+  -webkit-backdrop-filter: blur(34px);
+  margin-top: 24px;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.compare-table th {
+  padding: 18px 24px;
+  font-size: 14.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--edge);
+}
+
+.compare-table th.col-feature {
+  color: var(--muted);
+  width: 32%;
+}
+
+.compare-table th.col-traditional {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  width: 34%;
+}
+
+.compare-table th.col-cloud {
+  color: var(--accent-bright);
+  background: rgba(71, 210, 201, 0.08);
+  border-left: 1px solid rgba(71, 210, 201, 0.25);
+  border-right: 1px solid rgba(71, 210, 201, 0.25);
+  width: 34%;
+  position: relative;
+}
+
+.compare-table td {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--edge-soft);
+  font-size: 15.5px;
+  line-height: 1.55;
+  vertical-align: middle;
+}
+
+.compare-table tr:last-child td {
+  border-bottom: none;
+}
+
+.compare-table td.col-feature-cell {
+  font-weight: 600;
+  color: var(--white);
+}
+
+.compare-table td.col-traditional-cell {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.compare-table td.col-cloud-cell {
+  color: #ffffff;
+  background: rgba(71, 210, 201, 0.06);
+  border-left: 1px solid rgba(71, 210, 201, 0.2);
+  border-right: 1px solid rgba(71, 210, 201, 0.2);
+  font-weight: 500;
+}
+
+.compare-table td.col-cloud-cell strong {
+  color: var(--accent);
+}
+
+.badge-cross {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f87171;
+  font-weight: 500;
+}
+
+.badge-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------------- Zirky AI Spotlight ---------------- */
+
+.zirky-spotlight {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(18, 28, 42, 0.76) 30%, rgba(10, 16, 25, 0.86) 100%) !important;
+  border: 1px solid rgba(71, 210, 201, 0.35) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 28px 70px rgba(0, 0, 0, 0.8), 0 0 45px rgba(71, 210, 201, 0.18) !important;
+  border-radius: 22px;
+  padding: 34px 38px;
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 28px;
+  align-items: center;
+  margin-top: 32px;
+  backdrop-filter: blur(36px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(190%) !important;
+}
+
+@media (max-width: 768px) {
+  .zirky-spotlight {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding: 26px 20px;
+    gap: 18px;
+  }
+}
+
+.zirky-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.zirky-avatar {
+  width: 90px !important;
+  height: 90px !important;
+  max-width: 90px !important;
+  max-height: 90px !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 0 16px rgba(71, 210, 201, 0.5));
+  animation: zirky-float 4s ease-in-out infinite alternate;
+}
+
+.zirky-spotlight svg {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  max-width: 16px !important;
+  flex-shrink: 0 !important;
+  display: inline-block !important;
+}
+
+@keyframes zirky-float {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-8px); }
+}
+
+.zirky-tag {
+  background: rgba(71, 210, 201, 0.15);
+  border: 1px solid rgba(71, 210, 201, 0.35);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  margin-top: 10px;
+}

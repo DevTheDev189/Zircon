@@ -1,0 +1,122 @@
+/* ============================================================
+   Zircon — Ambient Procedural Background, Orbs & Particles
+   ============================================================ */
+
+/* Procedural Glowing Dot Matrix with continuous slow drift */
+.z-bg-dots {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(rgba(71, 210, 201, 0.45) 1.5px, transparent 1.5px),
+    radial-gradient(rgba(90, 223, 213, 0.22) 1px, transparent 1px);
+  background-size: 38px 38px, 76px 76px;
+  background-position: 0 0, 19px 19px;
+  animation: z-dots-drift 50s linear infinite;
+  opacity: 0.92;
+}
+
+/* Floating Blurred Brand Orbs */
+.z-orb {
+  position: fixed;
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, opacity;
+}
+
+.z-orb-1 {
+  width: 580px;
+  height: 580px;
+  top: -10%;
+  left: -8%;
+  background: radial-gradient(circle, rgba(71, 210, 201, 0.28) 0%, rgba(32, 178, 170, 0.12) 55%, transparent 75%);
+  filter: blur(85px);
+  animation: z-float-orb-1 18s ease-in-out infinite alternate;
+}
+
+.z-orb-2 {
+  width: 640px;
+  height: 640px;
+  top: 35%;
+  right: -12%;
+  background: radial-gradient(circle, rgba(8, 145, 178, 0.32) 0%, rgba(14, 116, 144, 0.14) 60%, transparent 80%);
+  filter: blur(95px);
+  animation: z-float-orb-2 24s ease-in-out infinite alternate;
+}
+
+.z-orb-3 {
+  width: 500px;
+  height: 500px;
+  bottom: 10%;
+  left: 12%;
+  background: radial-gradient(circle, rgba(90, 223, 213, 0.22) 0%, rgba(71, 210, 201, 0.08) 55%, transparent 75%);
+  filter: blur(80px);
+  animation: z-float-orb-3 20s ease-in-out infinite alternate;
+}
+
+.z-orb-4 {
+  width: 520px;
+  height: 520px;
+  top: 70%;
+  right: 15%;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.2) 0%, rgba(2, 38, 35, 0.3) 65%, transparent 80%);
+  filter: blur(90px);
+  animation: z-float-orb-4 26s ease-in-out infinite alternate;
+}
+
+/* Floating Sparkle Particles */
+.z-particle {
+  position: fixed;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: #5adfd5;
+  box-shadow: 0 0 14px 3px rgba(71, 210, 201, 0.7);
+  pointer-events: none;
+  z-index: 1;
+  animation: z-particle-drift 8s ease-in-out infinite alternate;
+}
+
+.z-particle-1 { top: 18%; left: 22%; animation-duration: 9s; animation-delay: 0s; }
+.z-particle-2 { top: 65%; left: 16%; animation-duration: 11s; animation-delay: 1.5s; width: 6px; height: 6px; }
+.z-particle-3 { top: 25%; right: 20%; animation-duration: 10s; animation-delay: 3s; }
+.z-particle-4 { top: 75%; right: 24%; animation-duration: 12s; animation-delay: 2s; width: 4px; height: 4px; }
+.z-particle-5 { top: 45%; left: 8%; animation-duration: 14s; animation-delay: 4s; }
+.z-particle-6 { top: 55%; right: 8%; animation-duration: 13s; animation-delay: 0.5s; }
+
+@keyframes z-dots-drift {
+  0% { background-position: 0 0, 19px 19px; }
+  100% { background-position: 76px 76px, 95px 95px; }
+}
+
+@keyframes z-float-orb-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(90px, 70px) scale(1.12); }
+  100% { transform: translate(40px, 140px) scale(0.95); }
+}
+
+@keyframes z-float-orb-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-100px, -80px) scale(1.14); }
+  100% { transform: translate(-50px, -150px) scale(0.92); }
+}
+
+@keyframes z-float-orb-3 {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  50% { transform: translate(-70px, 90px) scale(1.18); opacity: 0.9; }
+  100% { transform: translate(60px, -50px) scale(0.88); opacity: 0.6; }
+}
+
+@keyframes z-float-orb-4 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(80px, -90px) scale(1.1); }
+  100% { transform: translate(-60px, 70px) scale(0.96); }
+}
+
+@keyframes z-particle-drift {
+  0% { transform: translateY(0) scale(0.85); opacity: 0.35; }
+  50% { transform: translateY(-22px) scale(1.25); opacity: 0.95; }
+  100% { transform: translateY(-45px) scale(0.85); opacity: 0.35; }
+}
