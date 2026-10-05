@@ -222,7 +222,9 @@ impl ModManagementService {
                 let _ = fs::remove_file(&target);
                 return Err(e);
             }
-        } else if self.has_curse_forge_key() {
+        } else if normalized_origin == ORIGIN_MODRINTH {
+            self.enrich_metadata(&mut entry).await;
+        } else if self.has_curse_forge_key() && normalized_origin == ORIGIN_DIRECT {
             self.enrich_curseforge_metadata(&mut entry).await;
         }
 
@@ -363,6 +365,17 @@ impl ModManagementService {
             .add_mod(std::io::Cursor::new(bytes.to_vec()), filename, Some(origin)) /* z0 */
             .await?; // z0
         entry.download_url = Some(url.to_string()); // z0
+        if entry.id.is_none() && origin.eq_ignore_ascii_case(ORIGIN_MODRINTH) {
+            if let Some(idx) = url.find("cdn.modrinth.com/data/") {
+                let rest = &url[idx + "cdn.modrinth.com/data/".len()..];
+                if let Some(slash) = rest.find('/') {
+                    let pid = &rest[..slash];
+                    if !pid.is_empty() && pid.chars().all(|c| c.is_ascii_alphanumeric()) {
+                        entry.id = Some(pid.to_string());
+                    }
+                }
+            }
+        }
         self.persist_entry(&entry)?; // z0
         Ok(entry)
     }
@@ -1051,15 +1064,22 @@ impl ModManagementService {
 
         // Fast path: check if any entry needs Modrinth or CurseForge repair
         let needs_repair = mods.iter().any(|m| {
-            (m.origin.as_deref() == Some(ORIGIN_MODRINTH)
-                && !m.id.as_deref().is_some_and(|id| {
-                    !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric())
-                })
-                && m.icon_url.is_none()
-                && m.sha1.is_some())
-            || (m.origin.as_deref() == Some(ORIGIN_CURSEFORGE)
-                && m.icon_url.is_none()
-                && m.murmur3 > 0)
+            let is_corrupted_modrinth = (m.download_url.as_deref().unwrap_or("").contains("modrinth.com")
+                || m.download_url.as_deref().unwrap_or("").contains("cdn.modrinth.com"))
+                && (m.origin.as_deref() == Some(ORIGIN_CURSEFORGE)
+                    || m.project_url.as_deref().unwrap_or("").contains("curseforge.com"));
+
+            is_corrupted_modrinth
+                || (m.origin.as_deref() == Some(ORIGIN_MODRINTH)
+                    && (!m.id.as_deref().is_some_and(|id| {
+                        !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric())
+                    })
+                    || m.icon_url.is_none()
+                    || m.project_url.as_ref().map_or(true, |u| !u.contains("modrinth.com")))
+                    && m.sha1.is_some())
+                || (m.origin.as_deref() == Some(ORIGIN_CURSEFORGE)
+                    && m.icon_url.is_none()
+                    && m.murmur3 > 0)
         });
         let mut result = if !needs_repair {
             mods
@@ -1071,7 +1091,36 @@ impl ModManagementService {
                 .map(|(idx, mut entry)| {
                     let this = self.clone();
                     async move {
-                        let changed = if entry.origin.as_deref() == Some(ORIGIN_CURSEFORGE) {
+                        let is_corrupted_modrinth = (entry.download_url.as_deref().unwrap_or("").contains("modrinth.com")
+                            || entry.download_url.as_deref().unwrap_or("").contains("cdn.modrinth.com"))
+                            && (entry.origin.as_deref() == Some(ORIGIN_CURSEFORGE)
+                                || entry.project_url.as_deref().unwrap_or("").contains("curseforge.com"));
+
+                        let changed = if is_corrupted_modrinth {
+                            entry.origin = Some(ORIGIN_MODRINTH.to_string());
+                            entry.project_url = None;
+                            entry.icon_url = None;
+                            // If entry.id is not set or came from CurseForge, try extracting from URL
+                            if entry.id.as_ref().map_or(true, |id| id.chars().all(|c| c.is_ascii_digit())) {
+                                if let Some(url) = &entry.download_url {
+                                    if let Some(idx) = url.find("cdn.modrinth.com/data/") {
+                                        let rest = &url[idx + "cdn.modrinth.com/data/".len()..];
+                                        if let Some(slash) = rest.find('/') {
+                                            let pid = &rest[..slash];
+                                            if !pid.is_empty() && pid.chars().all(|c| c.is_ascii_alphanumeric()) {
+                                                entry.id = Some(pid.to_string());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if entry.id.is_some() {
+                                this.enrich_metadata(&mut entry).await;
+                                true
+                            } else {
+                                this.repair_modrinth_metadata(&mut entry).await
+                            }
+                        } else if entry.origin.as_deref() == Some(ORIGIN_CURSEFORGE) {
                             this.enrich_curseforge_metadata(&mut entry).await
                         } else {
                             this.repair_modrinth_metadata(&mut entry).await
@@ -1299,6 +1348,21 @@ impl ModManagementService {
         if !self.has_curse_forge_key() {
             return false;
         }
+        // Strict origin check: if the mod originates from Modrinth or has a Modrinth CDN URL, NEVER enrich with CurseForge!
+        if entry.origin.as_deref() == Some(ORIGIN_MODRINTH) {
+            return false;
+        }
+        if let Some(url) = &entry.download_url {
+            if url.contains("cdn.modrinth.com") || url.contains("modrinth.com") {
+                return false;
+            }
+        }
+        // If entry has a non-numeric ID (like Modrinth base62 IDs), it cannot be a CurseForge mod
+        if let Some(id) = &entry.id {
+            if !id.is_empty() && id.chars().any(|c| !c.is_ascii_digit()) {
+                return false;
+            }
+        }
         let murmur3 = entry.murmur3;
         if murmur3 == 0 {
             return false;
@@ -1333,6 +1397,11 @@ impl ModManagementService {
         }
 
         if file_match.mod_id > 0 {
+            if let Some(orig) = &entry.origin {
+                if !orig.eq_ignore_ascii_case(ORIGIN_CURSEFORGE) && !orig.eq_ignore_ascii_case(ORIGIN_DIRECT) {
+                    return false;
+                }
+            }
             entry.id = Some(file_match.mod_id.to_string());
             if let Ok(mod_info) = self.curse_forge.get_mod(file_match.mod_id).await {
                 if !mod_info.name.is_empty() {
@@ -1422,6 +1491,10 @@ impl ModManagementService {
         }
         if !project.icon_url.is_empty() {
             entry.icon_url = Some(project.icon_url);
+        }
+        if !project.slug.is_empty() {
+            entry.slug = Some(project.slug.clone());
+            entry.project_url = Some(format!("https://modrinth.com/mod/{}", project.slug));
         }
         true
     }

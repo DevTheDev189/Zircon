@@ -37,7 +37,7 @@
             :class="
               activeCuratedId === curated.id
                 ? 'border-accent bg-accent/10 shadow-[0_0_14px_var(--color-accent-glow)] ring-1 ring-accent/30'
-                : 'border-edge bg-well/70 hover:border-slate-700 hover:bg-well'
+                : 'border-edge bg-well/70 hover:border-accent/40 hover:shadow-[0_0_14px_var(--color-accent-glow)] hover:bg-well'
             "
             @click="selectCuratedTheme(curated)"
           >
@@ -126,7 +126,7 @@
                   :class="
                     settings.theme === preset.id
                       ? 'border-accent bg-accent/15 shadow-[0_0_12px_var(--color-accent-glow)]'
-                      : 'border-edge bg-well/60 hover:border-slate-700 hover:bg-well'
+                      : 'border-edge bg-well/60 hover:border-accent/40 hover:shadow-[0_0_12px_var(--color-accent-glow)] hover:bg-well'
                   "
                   @click="selectTheme(preset.id)"
                 >
@@ -161,7 +161,7 @@
                   :class="
                     settings.theme === 'custom'
                       ? 'border-accent bg-accent/15 shadow-[0_0_12px_var(--color-accent-glow)]'
-                      : 'border-edge bg-well/60 hover:border-slate-700 hover:bg-well'
+                      : 'border-edge bg-well/60 hover:border-accent/40 hover:shadow-[0_0_12px_var(--color-accent-glow)] hover:bg-well'
                   "
                   @click="selectCustomTheme"
                 >
@@ -224,7 +224,7 @@
                   :class="
                     settings.bgTheme === bgPreset.id
                       ? 'border-accent bg-accent/10 shadow-[0_0_12px_var(--color-accent-glow)]'
-                      : 'border-edge bg-well/60 hover:border-slate-700 hover:bg-well'
+                      : 'border-edge bg-well/60 hover:border-accent/40 hover:shadow-[0_0_12px_var(--color-accent-glow)] hover:bg-well'
                   "
                   @click="selectBgTheme(bgPreset.id)"
                 >
@@ -261,7 +261,7 @@
                   :class="
                     settings.bgTheme === 'custom'
                       ? 'border-accent bg-accent/10 shadow-[0_0_12px_var(--color-accent-glow)]'
-                      : 'border-edge bg-well/60 hover:border-slate-700 hover:bg-well'
+                      : 'border-edge bg-well/60 hover:border-accent/40 hover:shadow-[0_0_12px_var(--color-accent-glow)] hover:bg-well'
                   "
                   @click="selectCustomBgTheme"
                 >
@@ -545,14 +545,14 @@
             type="button"
             class="w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer group"
             :class="settings.gpuPreference === 'dedicated'
-              ? 'border-cyan-500/80 bg-cyan-500/10 shadow-[0_0_12px_rgba(71,210,201,0.15)] ring-1 ring-cyan-500/30'
-              : 'border-slate-800/80 bg-well/70 hover:border-slate-700 hover:bg-well'"
+              ? 'border-accent bg-accent/10 shadow-[0_0_12px_var(--color-accent-glow)] ring-1 ring-accent/30'
+              : 'border-slate-800/80 bg-well/70 hover:border-accent/40 hover:shadow-[0_0_10px_var(--color-accent-glow)] hover:bg-well'"
             @click="settings.gpuPreference = 'dedicated'"
           >
             <div class="mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
-              :class="settings.gpuPreference === 'dedicated' ? 'border-cyan-400 bg-cyan-400/20' : 'border-slate-600'"
+              :class="settings.gpuPreference === 'dedicated' ? 'border-accent bg-accent/20' : 'border-slate-600'"
             >
-              <div v-if="settings.gpuPreference === 'dedicated'" class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#47d2c9]"></div>
+              <div v-if="settings.gpuPreference === 'dedicated'" class="w-2 h-2 rounded-full bg-accent shadow-[0_0_6px_var(--color-accent-glow)]"></div>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
@@ -566,7 +566,7 @@
               <div class="text-[11px] text-slate-400 mt-0.5">
                 {{ dedicatedGpu ? dedicatedGpu.name + (dedicatedGpu.vramMb ? ` (${dedicatedGpu.vramMb} MB VRAM)` : '') : 'Primary high-performance graphics card' }}
               </div>
-              <div class="text-[10px] text-cyan-400/80 mt-1">
+              <div class="text-[10px] text-accent-bright/80 mt-1">
                 Required for Vivecraft VR, Iris/Oculus shaders, and heavy modpacks.
               </div>
             </div>
@@ -577,14 +577,14 @@
             type="button"
             class="w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer group"
             :class="settings.gpuPreference === 'integrated'
-              ? 'border-cyan-500/80 bg-cyan-500/10 shadow-[0_0_12px_rgba(71,210,201,0.15)] ring-1 ring-cyan-500/30'
-              : 'border-slate-800/80 bg-well/70 hover:border-slate-700 hover:bg-well'"
+              ? 'border-accent bg-accent/10 shadow-[0_0_12px_var(--color-accent-glow)] ring-1 ring-accent/30'
+              : 'border-slate-800/80 bg-well/70 hover:border-accent/40 hover:shadow-[0_0_10px_var(--color-accent-glow)] hover:bg-well'"
             @click="settings.gpuPreference = 'integrated'"
           >
             <div class="mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
-              :class="settings.gpuPreference === 'integrated' ? 'border-cyan-400 bg-cyan-400/20' : 'border-slate-600'"
+              :class="settings.gpuPreference === 'integrated' ? 'border-accent bg-accent/20' : 'border-slate-600'"
             >
-              <div v-if="settings.gpuPreference === 'integrated'" class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#47d2c9]"></div>
+              <div v-if="settings.gpuPreference === 'integrated'" class="w-2 h-2 rounded-full bg-accent shadow-[0_0_6px_var(--color-accent-glow)]"></div>
             </div>
             <div class="flex-1 min-w-0">
               <span class="text-xs font-bold transition-colors" :class="settings.gpuPreference === 'integrated' ? 'text-white' : 'text-slate-300 group-hover:text-white'">
@@ -601,14 +601,14 @@
             type="button"
             class="w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer group"
             :class="settings.gpuPreference === 'system'
-              ? 'border-cyan-500/80 bg-cyan-500/10 shadow-[0_0_12px_rgba(71,210,201,0.15)] ring-1 ring-cyan-500/30'
-              : 'border-slate-800/80 bg-well/70 hover:border-slate-700 hover:bg-well'"
+              ? 'border-accent bg-accent/10 shadow-[0_0_12px_var(--color-accent-glow)] ring-1 ring-accent/30'
+              : 'border-slate-800/80 bg-well/70 hover:border-accent/40 hover:shadow-[0_0_10px_var(--color-accent-glow)] hover:bg-well'"
             @click="settings.gpuPreference = 'system'"
           >
             <div class="mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
-              :class="settings.gpuPreference === 'system' ? 'border-cyan-400 bg-cyan-400/20' : 'border-slate-600'"
+              :class="settings.gpuPreference === 'system' ? 'border-accent bg-accent/20' : 'border-slate-600'"
             >
-              <div v-if="settings.gpuPreference === 'system'" class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#47d2c9]"></div>
+              <div v-if="settings.gpuPreference === 'system'" class="w-2 h-2 rounded-full bg-accent shadow-[0_0_6px_var(--color-accent-glow)]"></div>
             </div>
             <div class="flex-1 min-w-0">
               <span class="text-xs font-bold transition-colors" :class="settings.gpuPreference === 'system' ? 'text-white' : 'text-slate-300 group-hover:text-white'">

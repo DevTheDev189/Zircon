@@ -519,6 +519,8 @@ export function applyTheme(options = {}) {
   root.style.setProperty('--color-accent-ink-rgb', accentObj.inkRgb);
   root.style.setProperty('--color-accent-glow', accentObj.glow);
   root.style.setProperty('--color-accent-glow-strong', accentObj.glowStrong);
+  root.style.setProperty('--color-accent-border', `rgba(${accentObj.rgb.replace(/ /g, ', ')}, 0.45)`);
+  root.style.setProperty('--color-accent-focus', `rgba(${accentObj.rgb.replace(/ /g, ', ')}, 0.25)`);
 
   // Set Background & Surface CSS variables
   root.style.setProperty('--color-bg', bgObj.bg);

@@ -7,24 +7,24 @@
           <span class="z-section text-white font-bold text-base">Your Servers</span>
           <span
             v-if="servers.length > 0"
-            class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono shadow-[0_0_8px_rgba(71,210,201,0.15)]"
+            class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-accent/15 text-accent-bright border border-accent/30 font-mono shadow-[0_0_8px_var(--color-accent-glow)]"
           >
             {{ servers.length }}
           </span>
         </div>
         <div class="flex items-center gap-2">
           <button
-            class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 transition-all shadow-sm"
+            class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold bg-accent/15 text-accent-bright border border-accent/30 hover:bg-accent/25 transition-all shadow-sm"
             @click="showJoinCodeModal = true"
             title="Connect directly using a 6-character Join Code from a friend"
           >
-            <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="w-3.5 h-3.5 text-accent-bright" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
             <span>Join via Code</span>
           </button>
           <button
-            class="z-btn-ghost text-xs flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-cyan-300 border border-slate-700/80 hover:border-cyan-400/50 hover:bg-[#142230] transition-all shadow-sm"
+            class="z-btn-ghost text-xs flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-accent-bright border border-slate-700/80 hover:border-accent/50 hover:bg-accent/10 transition-all shadow-sm"
             @click="openAddDialog"
           >
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -42,8 +42,8 @@
           v-if="servers.length === 0"
           class="flex flex-col items-center justify-center p-8 bg-[#0a0f14]/60 border border-dashed border-slate-800 rounded-2xl text-center my-4"
         >
-          <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-accent mb-3 shadow-[0_0_15px_rgba(71,210,201,0.15)]">
-            <svg class="w-6 h-6 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <div class="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent mb-3 shadow-[0_0_15px_var(--color-accent-glow)]">
+            <svg class="w-6 h-6 text-accent-bright" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
               <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
               <line x1="6" y1="6" x2="6.01" y2="6" />
@@ -62,7 +62,7 @@
         <div
           v-for="server in servers"
           :key="server.address"
-          class="group z-card mb-3 transition-all duration-200 hover:border-accent/40 hover:shadow-[0_0_20px_rgba(71,210,201,0.12)] overflow-hidden p-0 relative"
+          class="group z-card mb-3 transition-all duration-200 hover:border-accent/40 hover:shadow-[0_0_20px_var(--color-accent-glow)] overflow-hidden p-0 relative"
         >
           <!-- 16:9 Hero Wallpaper Mode: Full Card Backdrop with Vibrant Light Gradient & Soft Blur -->
           <div
@@ -96,7 +96,7 @@
           <!-- Server Row Details -->
           <div class="relative z-10 flex items-center gap-4 p-4">
             <div
-              class="relative w-11 h-11 rounded-xl bg-slate-900 border border-slate-700/80 overflow-hidden flex items-center justify-center text-lg shrink-0 select-none shadow-[0_0_12px_rgba(71,210,201,0.2)]"
+              class="relative w-11 h-11 rounded-xl bg-slate-900 border border-slate-700/80 overflow-hidden flex items-center justify-center text-lg shrink-0 select-none shadow-[0_0_12px_var(--color-accent-glow)]"
             >
               <img
                 v-if="serverIcon(server)"
@@ -238,17 +238,17 @@
         </div>
 
         <!-- Zircon Cloud In-App Banner -->
-        <div class="my-3 p-3.5 rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-[#07131f]/90 via-[#0a1c2d]/85 to-[#07131f]/90 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md flex items-center justify-between gap-3">
+        <div class="my-3 p-3.5 rounded-2xl border border-accent/30 bg-gradient-to-r from-well/90 via-card/85 to-well/90 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
-            <div class="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(71,210,201,0.2)]">
-              <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="w-9 h-9 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center shrink-0 shadow-[0_0_12px_var(--color-accent-glow)]">
+              <svg class="w-4 h-4 text-accent-bright" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
               </svg>
             </div>
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <span class="text-white text-xs font-bold tracking-tight">Host Your Own 24/7 Minecraft Server</span>
-                <span class="text-[9px] font-mono font-bold uppercase bg-cyan-400/20 text-cyan-300 px-1.5 py-0.2 rounded border border-cyan-400/30">Zircon Cloud</span>
+                <span class="text-[9px] font-mono font-bold uppercase bg-accent/20 text-accent-bright px-1.5 py-0.2 rounded border border-accent/30">Zircon Cloud</span>
               </div>
               <p class="text-slate-400 text-[10.5px] truncate mt-0.5">
                 Zero port-forwarding, instant player mod sync, and automated NVMe snapshots.
@@ -257,7 +257,7 @@
           </div>
           <button
             @click="openDeployCloud"
-            class="shrink-0 text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#47d2c9] to-[#0891b2] text-slate-950 hover:brightness-110 shadow-[0_0_12px_rgba(71,210,201,0.25)] transition-all cursor-pointer flex items-center gap-1.5"
+            class="shrink-0 text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-r from-accent to-accent-deep text-accent-ink hover:brightness-110 shadow-[0_0_12px_var(--color-accent-glow)] transition-all cursor-pointer flex items-center gap-1.5"
           >
             <span>Deploy</span>
             <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -270,7 +270,7 @@
       <div class="z-section mt-4 mb-2.5 flex items-center justify-between text-white font-bold">
         <div class="flex items-center gap-2">
           <span>Featured &amp; Recommended</span>
-          <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Official</span>
+          <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-accent/15 text-accent-bright border border-accent/30">Official</span>
         </div>
         <span class="text-[10px] text-slate-500 font-mono font-medium">Public Server</span>
       </div>
@@ -366,7 +366,7 @@
         <div class="relative z-10 flex items-center gap-4">
           <!-- Server Icon -->
           <div
-            class="relative w-14 h-14 rounded-2xl bg-slate-900 border border-slate-700/80 group-hover:border-cyan-400/60 overflow-hidden flex items-center justify-center shrink-0 select-none shadow-[0_0_16px_rgba(71,210,201,0.25)] transition-all"
+            class="relative w-14 h-14 rounded-2xl bg-slate-900 border border-slate-700/80 group-hover:border-accent/60 overflow-hidden flex items-center justify-center shrink-0 select-none shadow-[0_0_16px_var(--color-accent-glow)] transition-all"
           >
             <img
               v-if="serverIcon(rec)"
@@ -390,7 +390,7 @@
 
           <!-- Server Details -->
           <div class="flex-1 min-w-0 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            <div class="text-base font-extrabold text-white truncate group-hover:text-cyan-200 transition-colors drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+            <div class="text-base font-extrabold text-white truncate group-hover:text-accent-bright transition-colors drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
               {{ rec.name }}
             </div>
             <div class="text-xs text-slate-300 truncate mt-0.5 leading-relaxed drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
@@ -402,7 +402,7 @@
           <div class="shrink-0">
             <button
               v-if="isLaunching(rec.address)"
-              class="z-btn-accent flex items-center gap-2 py-2 px-5 font-bold tracking-wide rounded-xl shadow-[0_0_20px_rgba(71,210,201,0.3)]"
+              class="z-btn-accent flex items-center gap-2 py-2 px-5 font-bold tracking-wide rounded-xl shadow-[0_0_20px_var(--color-accent-glow)]"
               disabled
             >
               <span class="inline-block w-4 h-4 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
@@ -424,7 +424,7 @@
             </button>
             <button
               v-else
-              class="z-btn-accent font-extrabold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-[0_0_20px_rgba(71,210,201,0.35)] hover:shadow-[0_0_30px_rgba(71,210,201,0.55)] hover:scale-[1.03] active:scale-[0.98] transition-all"
+              class="z-btn-accent font-extrabold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-[0_0_20px_var(--color-accent-glow)] hover:shadow-[0_0_30px_var(--color-accent-glow-strong)] hover:scale-[1.03] active:scale-[0.98] transition-all"
               @click="playRecommended(rec)"
             >
               <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -438,15 +438,15 @@
         <!-- Recommended server bottom customization bar -->
         <div class="relative z-10 flex items-center justify-between px-2 pt-2 border-t border-white/[0.04]">
           <div class="text-[10px] text-slate-500 font-mono tracking-tight flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400/50"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-accent/50"></span>
             Instance Customization
           </div>
           <button
-            class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md hover:bg-slate-800/80 text-slate-400 hover:text-cyan-300 transition-colors text-xs font-bold group/btn"
+            class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md hover:bg-slate-800/80 text-slate-400 hover:text-accent-bright transition-colors text-xs font-bold group/btn"
             title="Configure mods, shaders & resource packs"
             @click.stop="openConfigModal(rec)"
           >
-            <span class="tracking-widest text-slate-400 group-hover/btn:text-cyan-300">•••</span>
+            <span class="tracking-widest text-slate-400 group-hover/btn:text-accent-bright">•••</span>
             <span class="text-[10px] font-semibold tracking-wide">Configure</span>
           </button>
         </div>
@@ -547,7 +547,7 @@
           class="mb-4 bg-slate-950/90 border border-slate-800 rounded-xl p-4 transition-all"
         >
           <div v-if="isProbing && !probeResult" class="flex items-center gap-3 py-2">
-            <div class="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-accent shrink-0 animate-pulse shadow-[0_0_10px_rgba(71,210,201,0.2)]">
+            <div class="w-9 h-9 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent shrink-0 animate-pulse shadow-[0_0_10px_var(--color-accent-glow)]">
               <span class="inline-block w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
             </div>
             <div class="flex-1 min-w-0">
@@ -572,7 +572,7 @@
             <!-- Header row: Avatar + Name + Edit -->
             <div class="flex items-center gap-3">
               <div
-                class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 overflow-hidden flex items-center justify-center text-base shrink-0 select-none shadow-[0_0_12px_rgba(71,210,201,0.2)]"
+                class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 overflow-hidden flex items-center justify-center text-base shrink-0 select-none shadow-[0_0_12px_var(--color-accent-glow)]"
               >
                 <img
                   v-if="probeResult.iconUrl"
@@ -626,7 +626,7 @@
               <!-- Zircon Mod-Synced Badge -->
               <span
                 v-if="probeResult.isZircon"
-                class="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 flex items-center gap-1 shadow-[0_0_8px_rgba(71,210,201,0.15)]"
+                class="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-accent/15 text-accent-bright border border-accent/30 flex items-center gap-1 shadow-[0_0_8px_var(--color-accent-glow)]"
               >
                 <svg class="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />

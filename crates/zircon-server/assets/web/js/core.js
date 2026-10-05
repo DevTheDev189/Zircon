@@ -256,6 +256,7 @@ window.Zircon.core = {
                 if (this.activeTab === 'stats') await this.loadStats();
                 if (this.activeTab === 'players') await this.loadPlayers();
                 if (this.activeTab === 'backups') await this.loadBackups();
+                if (this.activeTab === 'shaders') await this.loadShaders();
             } catch (e) {
                 // Connection or server temporary network error
             }

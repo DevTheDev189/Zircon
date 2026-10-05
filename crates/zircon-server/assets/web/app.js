@@ -439,6 +439,8 @@ createApp({
             }
             if (tab === 'players') this.loadPlayers();
             if (tab === 'backups') this.loadBackups();
+            if (tab === 'shaders') this.loadShaders();
+            if (tab === 'mods') this.loadMods();
             if (tab === 'settings') {
                 this.loadMinecraftVersions();
                 this.loadServerProperties();

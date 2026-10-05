@@ -34,6 +34,13 @@ window.Zircon.instances = {
         this.loadSettingsLoaderVersions();
         this.loadMinecraftVersions();
         this.loadMods();
+        this.shaderpacks = [];
+        this.resourcepacks = [];
+        this.serverResourcePack = null;
+        this.serverResourcePacks = [];
+        this.selectedShaders = {};
+        this.selectedResourcePacks = {};
+        this.loadShaders();
         this.loadServerProperties();
         this.playersLoaded = false; // first load of the new instance shows the spinner
         this.loadPlayers();

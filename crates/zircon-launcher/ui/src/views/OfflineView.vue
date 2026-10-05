@@ -37,8 +37,8 @@
           class="flex items-center gap-3.5 border rounded-xl p-3.5 mb-2.5 cursor-pointer transition-all duration-200"
           :class="
             selected?.id === instance.id
-              ? 'border-cyan-400 ring-1 ring-cyan-400/60 shadow-[0_0_16px_rgba(71,210,201,0.25)] bg-[#111c29]'
-              : 'border-slate-800/80 bg-[#070b10]/60 hover:border-slate-700 hover:bg-[#121d2b]'
+              ? 'border-accent ring-1 ring-accent/60 shadow-[0_0_16px_var(--color-accent-glow)] bg-[#111c29]'
+              : 'border-slate-800/80 bg-[#070b10]/60 hover:border-accent/40 hover:shadow-[0_0_10px_var(--color-accent-glow)] hover:bg-[#121d2b]'
           "
           @click="selectInstance(instance)"
         >
