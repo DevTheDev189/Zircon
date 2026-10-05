@@ -13,6 +13,7 @@ pub mod export;
 pub mod metadata;
 pub mod model;
 pub mod security;
+pub mod world;
 
 /// Current BOM JSON schema version. Bump when breaking field changes are made.
 pub const CURRENT_SCHEMA_VERSION: i32 = 1;

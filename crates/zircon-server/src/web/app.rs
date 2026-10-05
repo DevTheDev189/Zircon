@@ -68,6 +68,8 @@ pub struct AppState {
     pub join_intent_limiter: Arc<FixedWindowLimiter>,
     /// Append-only audit log for sensitive administrative actions.
     pub audit: Arc<crate::audit::AuditLogger>,
+    /// Warm headless preview session manager for interactive viewport streaming.
+    pub preview_sessions: Arc<crate::services::preview_session::WarmSessionManager>,
 }
 
 /// The client IP for rate limiting and other per-source decisions.
@@ -491,6 +493,16 @@ pub fn router(state: AppState) -> Router {
         .route("/api/instances/:id/mods/snapshots", get(instance_controller::list_instance_snapshots).post(instance_controller::create_instance_snapshot))
         .route("/api/instances/:id/mods/snapshots/:filename", delete(instance_controller::delete_instance_snapshot))
         .route("/api/instances/:id/mods/snapshots/:filename/restore", post(instance_controller::restore_instance_snapshot))
+        .route("/api/instances/:id/terrain-mods", get(instance_controller::list_instance_terrain_mods))
+        .route("/api/instances/:id/preview-seed", post(instance_controller::preview_instance_seed))
+        .route("/api/instances/:id/pregenerate", post(instance_controller::pregenerate_instance_world))
+        .route("/api/instances/:id/world-map/tile", get(instance_controller::get_world_map_tile))
+        .route("/api/instances/:id/world-map/boot-and-explore", post(instance_controller::boot_and_explore_instance))
+        .route("/api/instances/:id/world-map/generate-area", post(instance_controller::generate_world_map_area))
+        .route("/api/instances/:id/world-map/session/ensure", post(instance_controller::ensure_world_map_session))
+        .route("/api/instances/:id/world-map/session/stream-viewport", post(instance_controller::stream_world_map_viewport))
+        .route("/api/instances/:id/world-map/session/stop", post(instance_controller::stop_world_map_session))
+        .route("/api/instances/:id/world-map/reset-world-seed", post(instance_controller::reset_world_seed))
         .route(
             "/api/instances/:id/modpacks/install",
             post(instance_controller::install_modpack),
@@ -675,13 +687,38 @@ pub fn router(state: AppState) -> Router {
             get(branding_controller::download_banner_by_port),
         );
 
-    Router::new()
+    #[cfg(feature = "cloud")]
+    let internal_api = Router::new()
+        .nest("/api/internal", crate::cloud::create_internal_router());
+    #[cfg(not(feature = "cloud"))]
+    let internal_api: Router<AppState> = Router::new();
+
+    let is_cloud = state.config.get_config().cloud.is_enabled();
+
+    let mut router = Router::new()
         .merge(public_api)
         .merge(protected_api)
         .merge(console_router)
         .merge(client_routes)
-        .route("/", get(spa_index))
-        .fallback(spa_fallback)
+        .merge(internal_api);
+
+    if !is_cloud {
+        router = router
+            .route("/", get(spa_index))
+            .fallback(spa_fallback);
+    } else {
+        router = router.fallback(|| async {
+            (
+                axum::http::StatusCode::NOT_FOUND,
+                axum::Json(serde_json::json!({
+                    "error": "Not Found",
+                    "daemon": "Zircon Cloud Node Daemon (Headless)"
+                })),
+            )
+        });
+    }
+
+    router
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::max(512 * 1024 * 1024))
         .with_state(state)
@@ -735,7 +772,7 @@ fn spa_response(path: &str) -> Response {
 const SPA_CSP: &str = "default-src 'self'; \
     script-src 'self'; \
     style-src 'self' 'unsafe-inline'; \
-    img-src 'self' data: https:; \
+    img-src 'self' data: blob: https:; \
     font-src 'self' data:; \
     connect-src 'self' ws: wss:; \
     frame-ancestors 'none'; \
@@ -821,6 +858,10 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
         "/js/players.js" => (
             "application/javascript; charset=utf-8",
             include_str!("../../assets/web/js/players.js"),
+        ),
+        "/js/preview.js" => (
+            "application/javascript; charset=utf-8",
+            include_str!("../../assets/web/js/preview.js"),
         ),
         "/js/render.js" => (
             "application/javascript; charset=utf-8",

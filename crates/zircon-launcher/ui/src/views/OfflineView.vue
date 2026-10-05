@@ -1457,6 +1457,15 @@
               placeholder="e.g. 0.16.10"
             />
           </template>
+
+          <div class="mb-5">
+            <label class="z-label mb-1.5 text-xs text-slate-300">World Seed (Optional)</label>
+            <input
+              v-model="newForm.seed"
+              class="z-input text-xs font-mono"
+              placeholder="Leave blank for random"
+            />
+          </div>
           <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80 mt-auto">
             <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="showNewDialog = false">Cancel</button>
             <button class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25" :disabled="!newForm.name.trim() || creating" @click="createInstance">
@@ -2316,7 +2325,7 @@ const loaderTypes = ref([]);
 const loaderVersions = ref([]);
 const recommendedLoaderVersion = ref('');
 const loadingLoaderVersions = ref(false);
-const newForm = ref({ name: '', mcVersion: '1.20.4', loaderType: 'fabric', loaderVersion: '' });
+const newForm = ref({ name: '', mcVersion: '1.20.4', loaderType: 'fabric', loaderVersion: '', seed: '' });
 
 const selectedModCount = computed(() => {
   const activeSelections = selectedMods.value;

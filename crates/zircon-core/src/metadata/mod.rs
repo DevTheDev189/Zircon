@@ -12,9 +12,11 @@ pub use self::nbt::{
     check_version_compatibility,
     data_version_to_mc_version,
     mc_version_to_data_version,
+    parse_nbt_compound,
     read_level_dat,
     LevelDatInfo,
-    NbtError, // NBT error types
+    NbtError,
+    NbtTag,
 }; // End NBT exports
 //
 // Re-export resource pack and shader pack metadata models.

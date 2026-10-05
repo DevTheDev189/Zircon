@@ -371,7 +371,12 @@ fn build_online_command(
     // -p module path, --add-modules/--add-opens/--add-exports, -D system
     // properties such as -DlibraryDirectory and -DignoreList.
     command.extend(data.jvm_args.iter().cloned());
-    append_jvm_memory_args(&mut command, java_args);
+    let java_major = crate::launch::java::get_java_home_major_version(&data.java_home)
+        .or_else(|| {
+            Some(crate::launch::java::JavaRuntimeSelector::get_required_java_major_version(&data.version_name))
+        });
+    let is_vr = crate::launch::java::is_vr_instance(game_dir, Some(&data.version_name));
+    append_jvm_memory_args(&mut command, java_args, java_major, is_vr);
     command.push(format!(
         "-Djava.library.path={}",
         data.natives_dir.display()
@@ -469,7 +474,12 @@ fn build_offline_command(
         command.push("-XstartOnFirstThread".to_string());
     }
     command.extend(data.jvm_args.iter().cloned());
-    append_jvm_memory_args(&mut command, java_args);
+    let java_major = crate::launch::java::get_java_home_major_version(&data.java_home)
+        .or_else(|| {
+            Some(crate::launch::java::JavaRuntimeSelector::get_required_java_major_version(&data.version_name))
+        });
+    let is_vr = crate::launch::java::is_vr_instance(game_dir, Some(&data.version_name));
+    append_jvm_memory_args(&mut command, java_args, java_major, is_vr);
     command.push(format!(
         "-Djava.library.path={}",
         data.natives_dir.display()
@@ -526,23 +536,41 @@ fn build_offline_command(
 }
 
 
-/// Appends JVM memory and GC flags, defaulting to `-Xms4G -Xmx4G -XX:+UseG1GC` when blank.
-/// Ensures -Xms matches -Xmx when not specified, and adds -XX:+UseG1GC by default if no GC is specified.
-fn append_jvm_memory_args(command: &mut Vec<String>, java_args: Option<&str>) {
+/// Appends JVM memory and GC flags, defaulting to safe optimal memory (-Xms matching -Xmx)
+/// and dynamically selecting between Generational ZGC (Java 21+, >=4GB or VR) and G1GC (legacy/low-RAM).
+fn append_jvm_memory_args(
+    command: &mut Vec<String>,
+    java_args: Option<&str>,
+    java_major: Option<i32>,
+    is_vr: bool,
+) {
     let args = match java_args {
         Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-        _ => "-Xms4G -Xmx4G -XX:+UseG1GC".to_string(),
+        _ => "-Xms4G -Xmx4G".to_string(),
     };
     let mut tokens: Vec<String> = args.split_whitespace().map(str::to_string).collect();
-    if !tokens.iter().any(|t| t.starts_with("-XX:+Use") || t.starts_with("-XX:-Use")) {
-        tokens.push("-XX:+UseG1GC".to_string());
-    }
     if !tokens.iter().any(|t| t.to_ascii_lowercase().starts_with("-xms")) {
         if let Some(xmx) = tokens.iter().find(|t| t.to_ascii_lowercase().starts_with("-xmx")).cloned() {
             tokens.push(format!("-Xms{}", &xmx[4..]));
         } else {
             tokens.push("-Xms4G".to_string());
         }
+    }
+    if !tokens.iter().any(|t| t.to_ascii_lowercase().starts_with("-xmx")) {
+        tokens.push("-Xmx4G".to_string());
+    }
+    if !tokens.iter().any(|t| t.starts_with("-XX:+Use") || t.starts_with("-XX:-Use")) {
+        let memory_gb = tokens
+            .iter()
+            .find(|t| t.to_ascii_lowercase().starts_with("-xmx"))
+            .and_then(|t| {
+                let num_str = t[4..].trim_end_matches(|c: char| !c.is_ascii_digit());
+                num_str.parse::<u32>().ok()
+            })
+            .unwrap_or(4);
+
+        let gc_flags = crate::launch::java::select_optimal_gc(java_major, memory_gb, is_vr);
+        tokens.extend(gc_flags);
     }
     command.extend(tokens);
 }
@@ -692,6 +720,11 @@ fn spawn_game(
     game_dir: &Path,
     output: Option<Arc<dyn Fn(String) + Send + Sync>>,
 ) -> Result<Child, LauncherError> {
+    if let Some(exe_str) = command.first() {
+        let exe_path = Path::new(exe_str);
+        let settings = crate::settings::load_settings();
+        let _ = crate::launch::gpu::apply_gpu_preference(exe_path, settings.gpu_preference);
+    }
     let mut cmd = Command::new(&command[0]);
     configure_platform_flags(&mut cmd);
     // Untrusted mod code runs inside this JVM: scrub the environment so host

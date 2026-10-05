@@ -231,13 +231,40 @@ createApp({
                 loading: false
             },
             copiedIp: false,
-            userRole: 'Owner'
+            userRole: 'Owner',
+            showSeedModal: false,
+            showSeedWarningModal: false,
+            previewLoading: false,
+            pregenLoading: false,
+            previewStage: '',
+            previewProgress: 0,
+            previewSeedInput: '',
+            previewRadiusChunks: 24,
+            previewCenterX: 0,
+            previewCenterZ: 0,
+            previewZoom: 1.0,
+            previewShowGrid: true,
+            previewDragging: false,
+            previewTerrainMods: [],
+            selectedTerrainMods: [],
+            previewResult: null,
+            previewError: null,
+            previewLogs: [],
+            previewHoverX: 0,
+            previewHoverZ: 0,
+            previewModSearch: '',
+            previewCopiedSeed: false,
+            warmWorkerReady: false,
+            warmWorkerBooting: false,
+            mapStudioActive: false,
+            mapTool: 'pan',
+            brushSize: 1
         };
     },
     methods: Object.assign({},
         Zircon.core, Zircon.auth, Zircon.instances, Zircon.settings,
         Zircon.mods, Zircon.packs, Zircon.players, Zircon.backups,
-        Zircon.files, Zircon.branding, Zircon.console),
+        Zircon.files, Zircon.branding, Zircon.console, Zircon.preview),
     created() {
         // Restore a persisted session (js/auth.js) before the login overlay /
         // dashboard decision is made.
@@ -380,6 +407,16 @@ createApp({
         },
         runningInstancesCount() {
             return (this.instances || []).filter(i => i.running).length;
+        },
+        filteredTerrainMods() {
+            const query = (this.previewModSearch || '').trim().toLowerCase();
+            const list = this.previewTerrainMods || [];
+            if (!query) return list;
+            return list.filter(m => 
+                (m.name && m.name.toLowerCase().includes(query)) ||
+                (m.slug && m.slug.toLowerCase().includes(query)) ||
+                (m.file_name && m.file_name.toLowerCase().includes(query))
+            );
         }
     },
     watch: {
@@ -409,7 +446,38 @@ createApp({
                 this.loadStats();
                 this.checkServerUpdate();
             }
-            if (tab === 'shaders') this.loadShaders();
+            if (tab !== 'world') {
+                if (typeof this.stopWarmMapSession === 'function') {
+                    this.stopWarmMapSession();
+                }
+            }
+            if (tab === 'world') {
+                this.loadServerProperties();
+                this.loadPlayers();
+                this.fetchTerrainMods();
+                if (this.serverProps?.['level-seed']) {
+                    this.previewSeedInput = this.serverProps['level-seed'];
+                }
+                const isLive = !!(this.selectedInstance && (this.selectedInstance.booted || this.selectedInstance.running));
+                if (isLive) {
+                    this.mapStudioActive = true;
+                    this.warmWorkerReady = true;
+                    this.warmWorkerBooting = false;
+                    this.previewBooting = false;
+                } else if (this.selectedInstance && this.selectedInstance.booting) {
+                    this.warmWorkerBooting = true;
+                }
+                this.$nextTick(() => {
+                    this.initWorldMapEngine();
+                });
+            }
+        },
+        selectedInstance(newInst, oldInst) {
+            if (newInst && (!oldInst || newInst.id !== oldInst.id)) {
+                if (typeof this.resetWorldMapForInstance === 'function') {
+                    this.resetWorldMapForInstance(newInst);
+                }
+            }
         }
     }
 }).mount('#app');

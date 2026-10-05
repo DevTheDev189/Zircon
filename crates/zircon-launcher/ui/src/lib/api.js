@@ -335,6 +335,7 @@ export const api = {
   // Settings & App Info
   getSettings: () => invoke('get_settings'),
   getSystemRamInfo: () => invoke('get_system_ram_info'),
+  getGpuInfo: () => invoke('get_gpu_info'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
   showMainWindow: () => invoke('show_main_window'),
   getLauncherVersion: () => invoke('get_launcher_version'),

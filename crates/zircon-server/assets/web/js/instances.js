@@ -48,6 +48,9 @@ window.Zircon.instances = {
         if (this.activeTab === 'console') {
             this.connectConsole();
         }
+        if (typeof this.resetWorldMapForInstance === 'function') {
+            this.resetWorldMapForInstance(inst);
+        }
         // The Stats view hides the top bar, so picking a server there must
         // also navigate back into the instance pages (mods is the landing tab).
         if (this.activeTab === 'stats') this.activeTab = 'mods';

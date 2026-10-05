@@ -521,6 +521,107 @@
         </div>
       </div>
 
+      <!-- Graphics Processor & GPU Preference -->
+      <div class="mb-5 pt-4 border-t border-slate-800/80">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="z-label font-semibold text-slate-200">Graphics Processor (GPU)</span>
+            <span class="text-[9px] bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+              Hardware
+            </span>
+          </div>
+          <span v-if="activeGpuLabel" class="text-[10px] text-slate-400 font-mono truncate max-w-[200px]" :title="activeGpuLabel">
+            {{ activeGpuLabel }}
+          </span>
+        </div>
+        <p class="z-label text-slate-400 text-xs mb-3">
+          Specifies which graphics adapter Windows assigns to Minecraft and Java. Forcing the dedicated GPU resolves Vivecraft VR driver crashes and shader lag on multi-GPU systems.
+        </p>
+
+        <!-- Preference Options -->
+        <div class="space-y-2">
+          <!-- Dedicated GPU Option -->
+          <button
+            type="button"
+            class="w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer group"
+            :class="settings.gpuPreference === 'dedicated'
+              ? 'border-cyan-500/80 bg-cyan-500/10 shadow-[0_0_12px_rgba(71,210,201,0.15)] ring-1 ring-cyan-500/30'
+              : 'border-slate-800/80 bg-well/70 hover:border-slate-700 hover:bg-well'"
+            @click="settings.gpuPreference = 'dedicated'"
+          >
+            <div class="mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
+              :class="settings.gpuPreference === 'dedicated' ? 'border-cyan-400 bg-cyan-400/20' : 'border-slate-600'"
+            >
+              <div v-if="settings.gpuPreference === 'dedicated'" class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#47d2c9]"></div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold transition-colors" :class="settings.gpuPreference === 'dedicated' ? 'text-white' : 'text-slate-300 group-hover:text-white'">
+                  Dedicated GPU (High Performance)
+                </span>
+                <span class="text-[9px] font-bold text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.2 rounded">
+                  Recommended
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-400 mt-0.5">
+                {{ dedicatedGpu ? dedicatedGpu.name + (dedicatedGpu.vramMb ? ` (${dedicatedGpu.vramMb} MB VRAM)` : '') : 'Primary high-performance graphics card' }}
+              </div>
+              <div class="text-[10px] text-cyan-400/80 mt-1">
+                Required for Vivecraft VR, Iris/Oculus shaders, and heavy modpacks.
+              </div>
+            </div>
+          </button>
+
+          <!-- Integrated GPU Option -->
+          <button
+            type="button"
+            class="w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer group"
+            :class="settings.gpuPreference === 'integrated'
+              ? 'border-cyan-500/80 bg-cyan-500/10 shadow-[0_0_12px_rgba(71,210,201,0.15)] ring-1 ring-cyan-500/30'
+              : 'border-slate-800/80 bg-well/70 hover:border-slate-700 hover:bg-well'"
+            @click="settings.gpuPreference = 'integrated'"
+          >
+            <div class="mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
+              :class="settings.gpuPreference === 'integrated' ? 'border-cyan-400 bg-cyan-400/20' : 'border-slate-600'"
+            >
+              <div v-if="settings.gpuPreference === 'integrated'" class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#47d2c9]"></div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <span class="text-xs font-bold transition-colors" :class="settings.gpuPreference === 'integrated' ? 'text-white' : 'text-slate-300 group-hover:text-white'">
+                Integrated GPU (Power Saving)
+              </span>
+              <div class="text-[11px] text-slate-400 mt-0.5">
+                {{ integratedGpu ? integratedGpu.name : 'Internal processor graphics for conserving battery on laptops' }}
+              </div>
+            </div>
+          </button>
+
+          <!-- System Default Option -->
+          <button
+            type="button"
+            class="w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer group"
+            :class="settings.gpuPreference === 'system'
+              ? 'border-cyan-500/80 bg-cyan-500/10 shadow-[0_0_12px_rgba(71,210,201,0.15)] ring-1 ring-cyan-500/30'
+              : 'border-slate-800/80 bg-well/70 hover:border-slate-700 hover:bg-well'"
+            @click="settings.gpuPreference = 'system'"
+          >
+            <div class="mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
+              :class="settings.gpuPreference === 'system' ? 'border-cyan-400 bg-cyan-400/20' : 'border-slate-600'"
+            >
+              <div v-if="settings.gpuPreference === 'system'" class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#47d2c9]"></div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <span class="text-xs font-bold transition-colors" :class="settings.gpuPreference === 'system' ? 'text-white' : 'text-slate-300 group-hover:text-white'">
+                System Default
+              </span>
+              <div class="text-[11px] text-slate-400 mt-0.5">
+                Let Windows automatically decide based on power profile and driver policy.
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <!-- Discord Rich Presence toggle -->
       <div class="mb-5 pt-4 border-t border-slate-800/80">
         <label class="flex items-start gap-3 cursor-pointer select-none group">
@@ -819,6 +920,7 @@ import { THEME_PRESETS, BG_THEME_PRESETS, BUTTON_STYLES, GLASS_EFFECTS, CURATED_
 const settings = ref({
   memoryGb: 4,
   discordRpc: true,
+  gpuPreference: 'dedicated',
   customJvmArgs: '',
   javaPathOverride: '',
   windowWidth: 0,
@@ -843,6 +945,19 @@ const sliderMax = computed(() => Math.min(32, Math.max(8, systemRamInfo.value.to
 const isHighRam = computed(() => {
   const total = systemRamInfo.value.totalRamGb || 16;
   return settings.value.memoryGb > (total * 0.8);
+});
+
+const gpuInfo = ref({ supported: false, adapters: [], preferred: 'dedicated', activeGpuName: null });
+const dedicatedGpu = computed(() => gpuInfo.value.adapters?.find(a => a.isDedicated));
+const integratedGpu = computed(() => gpuInfo.value.adapters?.find(a => !a.isDedicated));
+const activeGpuLabel = computed(() => {
+  if (settings.value.gpuPreference === 'dedicated') {
+    return dedicatedGpu.value ? dedicatedGpu.value.name : 'Dedicated GPU';
+  }
+  if (settings.value.gpuPreference === 'integrated') {
+    return integratedGpu.value ? integratedGpu.value.name : 'Integrated GPU';
+  }
+  return 'System Default';
 });
 
 const showAdvancedTheme = ref(false);
@@ -1013,6 +1128,17 @@ onMounted(async () => {
     if (ram) systemRamInfo.value = ram;
   } catch (e) {
     console.warn('Could not load system RAM info:', e);
+  }
+  try {
+    const gpu = await api.getGpuInfo();
+    if (gpu) {
+      gpuInfo.value = gpu;
+      if (!settings.value.gpuPreference) {
+        settings.value.gpuPreference = gpu.preferred || 'dedicated';
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load GPU info:', e);
   }
   refreshLogs();
   refreshMcLog();

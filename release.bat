@@ -34,8 +34,8 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/4] Committing version bump...
-git add crates/zircon-launcher/tauri.conf.json crates/zircon-launcher/ui/package.json crates/zircon-launcher/Cargo.toml crates/zircon-server/Cargo.toml crates/zircon-core/Cargo.toml website/ scripts/sync-version.ps1
+echo [2/4] Committing version bump and workspace changes...
+git add .gitignore Cargo.toml Cargo.lock crates/ website/ scripts/sync-version.ps1 release.bat
 git commit -m "Release v%VERSION%"
 
 echo.
@@ -65,5 +65,5 @@ echo Live progress:
 echo   https://github.com/DevTheDev189/Zircon/actions
 echo ===========================================================================
 echo.
-pause
+if "%~1"=="" pause
 endlocal

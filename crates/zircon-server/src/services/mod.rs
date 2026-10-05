@@ -12,3 +12,5 @@ pub mod r2_uploader;
 pub mod resolver;
 pub mod scheduler;
 pub mod versions;
+pub mod preview;
+pub mod preview_session;

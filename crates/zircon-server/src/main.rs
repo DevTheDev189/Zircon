@@ -184,6 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         login_limiter: login_limiter.clone(),
         join_intent_limiter: join_intent_limiter.clone(),
         audit,
+        preview_sessions: Arc::new(zircon_server::services::preview_session::WarmSessionManager::new()),
     };
 
     // Axum admin API (binds 127.0.0.1:<webPort>; reachable through the
@@ -278,10 +279,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
+    // Zircon Cloud node heartbeat telemetry emitter
+    #[cfg(feature = "cloud")]
+    let heartbeat_handle = {
+        let cloud_config = config.get_config().cloud.clone();
+        if cloud_config.is_enabled() {
+            tracing::info!(
+                "Zircon Cloud mode active. Starting node heartbeat to {} for node '{}' (every {}s)",
+                cloud_config.effective_central_api_url(),
+                cloud_config.effective_node_id(),
+                cloud_config.heartbeat_interval_secs
+            );
+            let heartbeat = Arc::new(zircon_server::cloud::HeartbeatService::new(
+                config.clone(),
+                instances.clone(),
+                cloud_config.effective_central_api_url(),
+                cloud_config.effective_internal_secret(),
+                cloud_config.effective_node_id(),
+                cloud_config.heartbeat_interval_secs,
+            ));
+            Some(heartbeat.start())
+        } else {
+            None
+        }
+    };
+    #[cfg(not(feature = "cloud"))]
+    let heartbeat_handle: Option<tokio::task::JoinHandle<()>> = None;
+
     // Shutdown on Ctrl-C / terminate.
     shutdown_signal().await;
 
     tracing::info!("Shutting down...");
+    if let Some(h) = heartbeat_handle {
+        h.abort();
+    }
     scheduler_handle.abort();
     idle_shutdown_handle.abort();
     housekeeping.abort();

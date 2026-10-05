@@ -16,6 +16,8 @@ use crate::paths::settings_file;
 /// Default RAM allocation in GB.
 pub const DEFAULT_MEMORY_GB: u32 = 4;
 
+pub use crate::launch::gpu::GpuPreference;
+
 /// Persisted launcher settings.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
@@ -24,6 +26,8 @@ pub struct LauncherSettings {
     pub memory_gb: u32,
     /// Whether Discord Rich Presence is enabled.
     pub discord_rpc: bool,
+    /// Preferred graphics processor on hybrid GPU systems (dedicated, integrated, system).
+    pub gpu_preference: GpuPreference,
     /// Custom JVM arguments (e.g. GC flags like Shenandoah, ZGC, Aikar's flags).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_jvm_args: Option<String>,
@@ -63,6 +67,7 @@ impl Default for LauncherSettings {
         Self {
             memory_gb: DEFAULT_MEMORY_GB,
             discord_rpc: true,
+            gpu_preference: GpuPreference::Dedicated,
             custom_jvm_args: None,
             java_path_override: None,
             window_width: 0,
@@ -235,6 +240,7 @@ mod tests {
         let original = LauncherSettings {
             memory_gb: 6,
             discord_rpc: true,
+            gpu_preference: GpuPreference::Dedicated,
             custom_jvm_args: Some("-XX:+UseZGC -XX:+ZGenerational".to_string()),
             java_path_override: Some("C:\\Java\\bin\\java.exe".to_string()),
             window_width: 1920,

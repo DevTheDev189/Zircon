@@ -473,10 +473,10 @@ impl PackManagementService {
         if let Some(official_sha1) = file_match.sha1() {
             if let Some(local_sha1) = &entry.sha1 {
                 if !local_sha1.trim().eq_ignore_ascii_case(official_sha1.trim()) {
-                    tracing::warn!(
-                        "CurseForge pack file {} ({}) SHA-1 differs from official metadata (official: {}, local: {}). Murmur3 fingerprint ({}) verified.",
-                        entry.filename, file_match.id, official_sha1, local_sha1, murmur3
-                    );
+                    return Err(PackError::Invalid(format!(
+                        "CurseForge upload security verification failed: SHA-1 mismatch (expected {}, got {})",
+                        official_sha1, local_sha1
+                    )));
                 }
             }
             entry.sha1 = Some(official_sha1.to_string());
@@ -559,7 +559,17 @@ impl PackManagementService {
         tokio::io::copy(&mut content, &mut out).await?;
         drop(out);
 
-        // Zero-trust security audit: enforce file extension whitelist and zip safety
+        let normalized_origin = if origin.unwrap_or("").eq_ignore_ascii_case(ORIGIN_CURSEFORGE) {
+            ORIGIN_CURSEFORGE.to_string()
+        } else if origin.unwrap_or("").eq_ignore_ascii_case(ORIGIN_MODRINTH) {
+            ORIGIN_MODRINTH.to_string()
+        } else {
+            ORIGIN_DIRECT.to_string()
+        };
+
+        // Zero-trust security audit: enforce file extension whitelist and zip safety.
+        // For pre-scanned platforms (Modrinth and CurseForge), validate zip-slip and archive bombs
+        // while allowing their validated assets; custom uploads enforce strict extension whitelisting.
         let guard = zircon_core::archive::limits::ArchiveGuard::default();
         let pack_file = match std::fs::File::open(&target) {
             Ok(f) => f,
@@ -568,7 +578,12 @@ impl PackManagementService {
                 return Err(PackError::Io(e));
             }
         };
-        if let Err(e) = zircon_core::security::pack_validator::validate_pack_archive(pack_file, &guard) {
+        let validation_res = if normalized_origin == ORIGIN_CURSEFORGE || normalized_origin == ORIGIN_MODRINTH {
+            zircon_core::security::pack_validator::validate_pack_archive_safety(pack_file, &guard)
+        } else {
+            zircon_core::security::pack_validator::validate_pack_archive(pack_file, &guard)
+        };
+        if let Err(e) = validation_res {
             let _ = fs::remove_file(&target);
             return Err(PackError::Invalid(format!("Security validation failed: {e}")));
         }
@@ -592,14 +607,6 @@ impl PackManagementService {
         let murmur3_value = match murmur3::curse_forge_fingerprint_of_file(&target) {
             Ok(v) => v,
             Err(_) => 0,
-        };
-
-        let normalized_origin = if origin.unwrap_or("").eq_ignore_ascii_case(ORIGIN_CURSEFORGE) {
-            ORIGIN_CURSEFORGE.to_string()
-        } else if origin.unwrap_or("").eq_ignore_ascii_case(ORIGIN_MODRINTH) {
-            ORIGIN_MODRINTH.to_string()
-        } else {
-            ORIGIN_DIRECT.to_string()
         };
 
         let id = match normalized_origin.as_str() {
@@ -666,13 +673,28 @@ impl PackManagementService {
         }
 
         self.bom_service.with_bom(|bom| {
-            if shader {
-                bom.shaderpacks.retain(|p| p.filename != safe_name);
-                bom.shaderpacks.push(entry.clone());
+            let list = if shader {
+                &mut bom.shaderpacks
             } else {
-                bom.resourcepacks.retain(|p| p.filename != safe_name);
-                bom.resourcepacks.push(entry.clone());
-            }
+                &mut bom.resourcepacks
+            };
+            list.retain(|p| {
+                if p.filename == safe_name {
+                    return false;
+                }
+                if let (Some(orig_a), Some(orig_b), Some(id_a), Some(id_b)) = (
+                    p.origin.as_deref(),
+                    entry.origin.as_deref(),
+                    p.id.as_deref(),
+                    entry.id.as_deref(),
+                ) {
+                    if orig_a.eq_ignore_ascii_case(orig_b) && id_a == id_b {
+                        return false;
+                    }
+                }
+                true
+            });
+            list.push(entry.clone());
         });
         self.bom_service.save()?;
         tracing::info!(
@@ -788,6 +810,17 @@ impl PackManagementService {
             .map_err(|e| PackError::Api(e.to_string()))?
             .to_vec();
 
+        // Safety verification: verify SHA-1 hash against Modrinth metadata
+        if let Some(expected_sha1) = file.sha1() {
+            let actual_sha1 = hash::sha1_bytes(&bytes);
+            if !actual_sha1.eq_ignore_ascii_case(expected_sha1.trim()) {
+                return Err(PackError::Invalid(format!(
+                    "Modrinth pack hash mismatch for {}: expected SHA1 {expected_sha1}, got {actual_sha1}",
+                    file.filename
+                )));
+            }
+        }
+
         let mut entry = self
             .add(
                 std::io::Cursor::new(bytes),
@@ -819,7 +852,22 @@ impl PackManagementService {
             } else {
                 &mut bom.resourcepacks
             };
-            list.retain(|p| p.filename != entry.filename);
+            list.retain(|p| {
+                if p.filename == entry.filename {
+                    return false;
+                }
+                if let (Some(orig_a), Some(orig_b), Some(id_a), Some(id_b)) = (
+                    p.origin.as_deref(),
+                    entry.origin.as_deref(),
+                    p.id.as_deref(),
+                    entry.id.as_deref(),
+                ) {
+                    if orig_a.eq_ignore_ascii_case(orig_b) && id_a == id_b {
+                        return false;
+                    }
+                }
+                true
+            });
             list.push(entry.clone());
         });
         self.bom_service.save()?;

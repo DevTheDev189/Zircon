@@ -73,7 +73,13 @@ impl BillOfMaterials {
     pub fn add_mod(&mut self, entry: ModEntry) {
         self.mods.retain(|m| {
             m.filename != entry.filename
-                && !(entry.id.is_some() && entry.id == m.id && entry.origin == m.origin)
+                && !(entry.id.is_some()
+                    && entry.id == m.id
+                    && match (&entry.origin, &m.origin) {
+                        (Some(o1), Some(o2)) => o1.eq_ignore_ascii_case(o2),
+                        (None, None) => true,
+                        _ => false,
+                    })
         });
         self.mods.push(entry);
     }
@@ -121,10 +127,19 @@ impl BillOfMaterials {
         self.mods.iter().find(|m| m.id.as_deref() == Some(id))
     }
 
+    /// Finds a mod by origin/source and ID, verifying mod source first
+    /// to prevent cross-origin ID collisions between Modrinth and CurseForge.
+    pub fn get_mod_by_origin_and_id(&self, origin: &str, id: &str) -> Option<&ModEntry> {
+        self.mods.iter().find(|m| {
+            m.origin.as_deref().map_or(false, |o| o.eq_ignore_ascii_case(origin))
+                && m.id.as_deref() == Some(id)
+        })
+    }
+
     pub fn get_mods_by_origin(&self, origin: &str) -> Vec<&ModEntry> {
         self.mods
             .iter()
-            .filter(|m| m.origin.as_deref() == Some(origin))
+            .filter(|m| m.origin.as_deref().map_or(false, |o| o.eq_ignore_ascii_case(origin)))
             .collect()
     }
 
@@ -149,6 +164,16 @@ impl BillOfMaterials {
     }
 
     pub fn add_shaderpack(&mut self, entry: PackEntry) {
+        self.shaderpacks.retain(|p| {
+            p.filename != entry.filename
+                && !(entry.id.is_some()
+                    && entry.id == p.id
+                    && match (&entry.origin, &p.origin) {
+                        (Some(o1), Some(o2)) => o1.eq_ignore_ascii_case(o2),
+                        (None, None) => true,
+                        _ => false,
+                    })
+        });
         self.shaderpacks.push(entry);
     }
 
@@ -162,7 +187,24 @@ impl BillOfMaterials {
         self.shaderpacks.iter().find(|p| p.filename == filename)
     }
 
+    pub fn get_shaderpack_by_origin_and_id(&self, origin: &str, id: &str) -> Option<&PackEntry> {
+        self.shaderpacks.iter().find(|p| {
+            p.origin.as_deref().map_or(false, |o| o.eq_ignore_ascii_case(origin))
+                && p.id.as_deref() == Some(id)
+        })
+    }
+
     pub fn add_resourcepack(&mut self, entry: PackEntry) {
+        self.resourcepacks.retain(|p| {
+            p.filename != entry.filename
+                && !(entry.id.is_some()
+                    && entry.id == p.id
+                    && match (&entry.origin, &p.origin) {
+                        (Some(o1), Some(o2)) => o1.eq_ignore_ascii_case(o2),
+                        (None, None) => true,
+                        _ => false,
+                    })
+        });
         self.resourcepacks.push(entry);
     }
 
@@ -174,6 +216,13 @@ impl BillOfMaterials {
 
     pub fn get_resourcepack_by_filename(&self, filename: &str) -> Option<&PackEntry> {
         self.resourcepacks.iter().find(|p| p.filename == filename)
+    }
+
+    pub fn get_resourcepack_by_origin_and_id(&self, origin: &str, id: &str) -> Option<&PackEntry> {
+        self.resourcepacks.iter().find(|p| {
+            p.origin.as_deref().map_or(false, |o| o.eq_ignore_ascii_case(origin))
+                && p.id.as_deref() == Some(id)
+        })
     }
 
     /// Converts this BOM into a spec-compliant Modrinth modpack index manifest.
@@ -845,6 +894,45 @@ mod tests {
         assert_eq!(2, bom.mods.len());
         assert_eq!("sodium-0.6.0.jar", bom.mods[0].filename);
         assert_eq!("iris-1.7.0.jar", bom.mods[1].filename);
+    }
+
+    #[test]
+    fn test_duplicate_id_across_origins_does_not_collide() {
+        let mut bom = BillOfMaterials::new("1.21.4", None, None);
+        // Mod A from modrinth with id "12345"
+        let mod_a = ModEntry::new(
+            Some("12345".to_string()),
+            "mod-a.jar",
+            Some("sha1_a".to_string()),
+            0,
+            Some("modrinth".to_string()),
+            None,
+            100,
+        );
+        // Mod B from curseforge with duplicate id "12345"
+        let mod_b = ModEntry::new(
+            Some("12345".to_string()),
+            "mod-b.jar",
+            Some("sha1_b".to_string()),
+            0,
+            Some("curseforge".to_string()),
+            None,
+            200,
+        );
+
+        bom.add_mod(mod_a);
+        bom.add_mod(mod_b);
+        assert_eq!(2, bom.mods.len());
+
+        bom.deduplicate_mods();
+        assert_eq!(2, bom.mods.len(), "Deduplication must keep distinct origins with the same ID");
+
+        // get_mod_by_origin_and_id resolves the exact one by checking source first
+        let found_mr = bom.get_mod_by_origin_and_id("modrinth", "12345").unwrap();
+        assert_eq!("mod-a.jar", found_mr.filename);
+
+        let found_cf = bom.get_mod_by_origin_and_id("curseforge", "12345").unwrap();
+        assert_eq!("mod-b.jar", found_cf.filename);
     }
 }
 

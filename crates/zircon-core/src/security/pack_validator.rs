@@ -22,6 +22,7 @@ pub const WHITELISTED_EXTENSIONS: &[&str] = &[
     // Configs, Models, Data, Markdown & Language files
     "json", "mcmeta", "txt", "properties", "lang", "nbt", "snbt", "bbmodel", "jem", "jpm", "obj",
     "mtl", "schem", "schematic", "dat", "ini", "toml", "yaml", "yml", "csv", "md", "markdown",
+    "mcfunction",
     // Shaders & GLSL code (used by Iris/Oculus, OptiFine, and vanilla core shaders)
     "fsh", "vsh", "gsh", "csh", "glsl", "inc", "comp", "frag", "vert", "geom",
     // Fonts
@@ -93,6 +94,23 @@ pub fn validate_pack_archive<R: Read + Seek>(
     reader: R,
     guard: &ArchiveGuard,
 ) -> Result<PackValidationReport, PackSecurityError> {
+    validate_pack_archive_internal(reader, guard, true)
+}
+
+/// Validates archive structure and safety limits (path traversal, zip bombs) without
+/// enforcing the strict extension whitelist (used for pre-scanned packs from Modrinth or CurseForge).
+pub fn validate_pack_archive_safety<R: Read + Seek>(
+    reader: R,
+    guard: &ArchiveGuard,
+) -> Result<PackValidationReport, PackSecurityError> {
+    validate_pack_archive_internal(reader, guard, false)
+}
+
+fn validate_pack_archive_internal<R: Read + Seek>(
+    reader: R,
+    guard: &ArchiveGuard,
+    enforce_whitelist: bool,
+) -> Result<PackValidationReport, PackSecurityError> {
     let mut zip = ZipArchive::new(reader)?;
 
     let num_entries = zip.len();
@@ -148,7 +166,7 @@ pub fn validate_pack_archive<R: Read + Seek>(
         total_compressed = total_compressed.saturating_add(comp_size);
         guard.check_entry_header(&name, size, comp_size)?;
 
-        // 4. Strict extension whitelist check for all files
+        // 4. Extension check for files
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
@@ -161,7 +179,7 @@ pub fn validate_pack_archive<R: Read + Seek>(
 
         match ext {
             Some(ext) => {
-                if !whitelist.contains(ext.as_str()) {
+                if enforce_whitelist && !whitelist.contains(ext.as_str()) {
                     return Err(PackSecurityError::DisallowedFile {
                         path: name.clone(),
                         reason: format!(
@@ -174,13 +192,13 @@ pub fn validate_pack_archive<R: Read + Seek>(
             None => {
                 // Check if file matches safe unextended text files (e.g. LICENSE, README)
                 if let Some(stem) = file_stem {
-                    if !safe_stems.contains(stem.as_str()) {
+                    if enforce_whitelist && !safe_stems.contains(stem.as_str()) {
                         return Err(PackSecurityError::DisallowedFile {
                             path: name.clone(),
                             reason: "Files without a whitelisted extension are forbidden".to_string(),
                         });
                     }
-                } else {
+                } else if enforce_whitelist {
                     return Err(PackSecurityError::DisallowedFile {
                         path: name.clone(),
                         reason: "Files without a whitelisted extension are forbidden".to_string(),
@@ -301,5 +319,35 @@ mod tests {
         let guard = ArchiveGuard::default();
         let err = validate_pack_archive(Cursor::new(zip_bytes), &guard).unwrap_err();
         assert!(matches!(err, PackSecurityError::DisallowedFile { .. }));
+    }
+
+    #[test]
+    fn mcfunction_is_whitelisted() {
+        let zip_bytes = create_test_zip(&[
+            ("pack.mcmeta", b"{}"),
+            ("data/custom/functions/tick.mcfunction", b"say hello"),
+        ]);
+        let guard = ArchiveGuard::default();
+        let report = validate_pack_archive(Cursor::new(zip_bytes), &guard).unwrap();
+        assert!(report.extensions_found.contains(&"mcfunction".to_string()));
+    }
+
+    #[test]
+    fn safety_mode_allows_arbitrary_extensions_but_rejects_zip_slip() {
+        let zip_bytes = create_test_zip(&[
+            ("pack.mcmeta", b"{}"),
+            ("custom/meta.bin", b"binary"),
+        ]);
+        let guard = ArchiveGuard::default();
+        // Strict whitelist rejects .bin
+        assert!(validate_pack_archive(Cursor::new(&zip_bytes), &guard).is_err());
+        // Safety mode permits .bin for pre-scanned packs
+        assert!(validate_pack_archive_safety(Cursor::new(&zip_bytes), &guard).is_ok());
+
+        // But safety mode still catches zip-slip
+        let evil_zip = create_test_zip(&[
+            ("../../../evil.bin", b"binary"),
+        ]);
+        assert!(validate_pack_archive_safety(Cursor::new(evil_zip), &guard).is_err());
     }
 }

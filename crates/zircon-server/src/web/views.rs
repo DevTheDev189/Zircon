@@ -155,6 +155,7 @@ pub fn modrinth_hit_to_map(
         &hit.project_id
     };
     serde_json::json!({
+        "id": hit.project_id,
         "projectId": hit.project_id,
         "slug": hit.slug,
         "title": hit.title,
@@ -164,6 +165,7 @@ pub fn modrinth_hit_to_map(
         "iconUrl": hit.icon_url,
         "versions": hit.versions,
         "projectUrl": format!("https://modrinth.com/project/{slug_or_id}"),
+        "origin": "modrinth",
     })
 }
 

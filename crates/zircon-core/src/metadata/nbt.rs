@@ -518,6 +518,12 @@ pub fn check_version_compatibility(
 // Internal NBT Parser implementation
 // --------------------------------------------------------------------------
 
+/// Parses an uncompressed NBT root compound directly from a byte slice.
+pub fn parse_nbt_compound(bytes: &[u8]) -> Result<HashMap<String, NbtTag>, NbtError> {
+    let mut cursor = Cursor::new(bytes);
+    parse_root_compound(&mut cursor)
+}
+
 fn parse_root_compound(cursor: &mut Cursor<&[u8]>) -> Result<HashMap<String, NbtTag>, NbtError> {
     let tag_type = read_u8(cursor)?;
     if tag_type != 10 {

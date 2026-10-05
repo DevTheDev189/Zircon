@@ -159,7 +159,6 @@ pub fn run() {
             commands::coop_sync_mods,
             commands::launch_offline_instance,
 
-
             // Offline mod management
             commands::list_offline_mods,
             commands::add_offline_mod,
@@ -228,6 +227,7 @@ pub fn run() {
             commands::get_launcher_metadata,
             commands::get_settings,
             commands::get_system_ram_info,
+            commands::get_gpu_info,
             commands::save_settings,
             commands::show_main_window,
             commands::get_launcher_version,

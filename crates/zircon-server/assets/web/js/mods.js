@@ -331,10 +331,28 @@ window.Zircon.mods = {
         }
     },
     isModInstalled(rec) {
-        // Mods installed via generic search or upload are matched by id or title
+        if (!rec) return false;
+        // Verify mod source before checking ID to avoid cross-platform ID collisions (e.g. CurseForge vs Modrinth)
+        const recOrigin = (rec.origin || '').toLowerCase();
         const id = rec.projectId || rec.id;
-        return this.installedMods.some(m => (id && m.id === id)
-            || (m.title && rec.title && m.title.toLowerCase() === rec.title.toLowerCase()));
+
+        return this.installedMods.some(m => {
+            const mOrigin = (m.origin || '').toLowerCase();
+            if (recOrigin && mOrigin) {
+                if (recOrigin === mOrigin && id && String(m.id) === String(id)) {
+                    return true;
+                }
+            } else if (id && String(m.id) === String(id)) {
+                return true;
+            }
+
+            if (m.title && rec.title && m.title.trim().toLowerCase() === rec.title.trim().toLowerCase()) {
+                if (!recOrigin || !mOrigin || recOrigin === mOrigin) {
+                    return true;
+                }
+            }
+            return false;
+        });
     },
     async loadMods() {
         if (!this.selectedInstance) return;

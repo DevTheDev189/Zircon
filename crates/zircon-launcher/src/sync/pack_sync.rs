@@ -156,10 +156,22 @@ impl PackSyncEngine {
             }
             let target = dir.join(&pack.filename);
             let guard = zircon_core::archive::limits::ArchiveGuard::default();
+            let is_prescanned = pack
+                .origin
+                .as_deref()
+                .map(|o| o.eq_ignore_ascii_case("modrinth") || o.eq_ignore_ascii_case("curseforge"))
+                .unwrap_or(false);
+
             if HashVerifier::matches_pack(&target, pack) {
                 // Verify local cached file passes zero-trust security audit
                 let is_safe = match std::fs::File::open(&target) {
-                    Ok(f) => zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok(),
+                    Ok(f) => {
+                        if is_prescanned {
+                            zircon_core::security::pack_validator::validate_pack_archive_safety(f, &guard).is_ok()
+                        } else {
+                            zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok()
+                        }
+                    }
                     Err(_) => false,
                 };
                 if is_safe {
@@ -180,7 +192,13 @@ impl PackSyncEngine {
                     // BOM; a server serving something else is discarded.
                     if HashVerifier::matches_pack(&target, pack) {
                         let is_safe = match std::fs::File::open(&target) {
-                            Ok(f) => zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok(),
+                            Ok(f) => {
+                                if is_prescanned {
+                                    zircon_core::security::pack_validator::validate_pack_archive_safety(f, &guard).is_ok()
+                                } else {
+                                    zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok()
+                                }
+                            }
                             Err(_) => false,
                         };
                         if is_safe {

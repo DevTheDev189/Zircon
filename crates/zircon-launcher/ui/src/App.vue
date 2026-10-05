@@ -1,7 +1,7 @@
 <template>
   <div class="relative h-full flex flex-col bg-bg text-text">
-    <!-- Microsoft login overlay (z-above everything) visible at pre-login step for testing -->
-    <LoginOverlay :visible="!authChecking && !session" :cached-account="cachedAccount" @logged-in="onLoggedIn" />
+    <!-- Microsoft login overlay (visible only when signed out) -->
+    <LoginOverlay :visible="!authChecking && !session" @logged-in="onLoggedIn" />
     <!-- Active Minecraft launch lifecycle modal -->
     <LaunchOverlay
       :visible="launchModalActive"
@@ -302,7 +302,6 @@ const navItems = [
 
 const view = ref('servers');
 const session = ref(null);
-const cachedAccount = ref(null);
 const authChecking = ref(true);
 const avatarUrl = ref('');
 const statusText = ref('');
@@ -324,14 +323,16 @@ const showCrashReportModal = ref(false);
 let unlisten = [];
 
 onMounted(async () => {
-  // Pre-login testing mode: check for cached session but hold at pre-login screen on launch
+  // Automatically restore active session from keychain/cache on launch
   try {
-    cachedAccount.value = await api.getCachedSession();
+    const cached = await api.getCachedSession();
+    if (cached) {
+      session.value = cached;
+    }
   } catch (err) {
-    console.warn('Failed to inspect cached session:', err);
-    cachedAccount.value = null;
-  } finally {
+    console.warn('Failed to restore cached session:', err);
     session.value = null;
+  } finally {
     authChecking.value = false;
   }
 

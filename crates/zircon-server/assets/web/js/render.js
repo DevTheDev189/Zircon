@@ -1500,12 +1500,17 @@ return function render(_ctx, _cache) {
                             _createTextVNode(" " + _toDisplayString(isFallingAsleep(inst) ? 'falling asleep...' : (isShuttingDown(inst) ? 'shutting down...' : ((inst.booting || (inst.running && !inst.booted) || actionLoading[inst.id]) ? 'booting...' : (inst.running ? inst.playerCount + ' online' : (inst.wakeable ? 'sleeping' : 'offline'))))), 1 /* TEXT */)
                           ], 2 /* CLASS */)
                         ]),
-                        (inst.running && !isStopping(inst) && inst.playerCount === 0 && inst.idleRemainingSeconds != null && inst.idleRemainingSeconds > 0)
-                          ? (_openBlock(), _createElementBlock("span", _hoisted_15, [
-                              _cache[7] || (_cache[7] = _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" }, null, -1 /* CACHED */)),
-                              _createElementVNode("span", null, "Sleeps in " + _toDisplayString(formatIdleTime(inst.idleRemainingSeconds)), 1 /* TEXT */)
+                        (inst.running && !isStopping(inst) && inst.playerCount === 0 && (activeTab === 'world' && selectedInstance && selectedInstance.id === inst.id))
+                          ? (_openBlock(), _createElementBlock("span", { class: "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-500/40 text-[10px] font-mono text-cyan-300 font-semibold" }, [
+                              _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#38bdf8] animate-pulse" }),
+                              _createElementVNode("span", null, "Editing World")
                             ]))
-                          : _createCommentVNode("v-if", true),
+                          : (inst.running && !isStopping(inst) && inst.playerCount === 0 && inst.idleRemainingSeconds != null && inst.idleRemainingSeconds > 0)
+                            ? (_openBlock(), _createElementBlock("span", _hoisted_15, [
+                                _cache[7] || (_cache[7] = _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" }, null, -1 /* CACHED */)),
+                                _createElementVNode("span", null, "Sleeps in " + _toDisplayString(formatIdleTime(inst.idleRemainingSeconds)), 1 /* TEXT */)
+                              ]))
+                            : _createCommentVNode("v-if", true),
                         (inst.running && !isStopping(inst))
                           ? (_openBlock(), _createElementBlock("p", _hoisted_16, "Port " + _toDisplayString(inst.externalPort), 1 /* TEXT */))
                           : (!inst.running && inst.wakeable && !isStopping(inst))
@@ -1669,7 +1674,7 @@ return function render(_ctx, _cache) {
                   (activeTab !== 'stats')
                     ? (_openBlock(), _createElementBlock("header", _hoisted_30, [
                         _createElementVNode("nav", _hoisted_31, [
-                          (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(['mods', 'shaders', 'files', 'console', 'players', 'backups', 'settings'], (t) => {
+                          (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(['mods', 'shaders', 'files', 'console', 'players', 'backups', 'world', 'settings'], (t) => {
                             return (_openBlock(), _createElementBlock("button", {
                               key: t,
                               onClick: $event => (activeTab = t),
@@ -4173,7 +4178,9 @@ return function render(_ctx, _cache) {
                                           key: 0,
                                           class: "p-3.5 bg-amber-500/10 border border-amber-500/40 rounded-xl flex items-start gap-3 text-xs text-amber-200"
                                         }, [
-                                          _createElementVNode("span", { class: "text-lg flex-shrink-0" }, "⚠️"),
+                                          _createElementVNode("svg", { class: "w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                            _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" })
+                                          ]),
                                           _createElementVNode("div", null, [
                                             _createElementVNode("strong", { class: "block font-bold text-amber-300 mb-0.5" }, "Warning: Changing Mod Loader"),
                                             _createTextVNode("Switching mod loaders (e.g. Fabric to NeoForge/Forge/Vanilla) may cause incompatible mods to break or fail to load. Existing mods will be re-synced and any incompatible mods will be flagged or disabled. Ensure you create a backup before proceeding.")
@@ -4781,6 +4788,385 @@ return function render(_ctx, _cache) {
                                     : _createCommentVNode("v-if", true)
                                 ]))
                           ])
+                        ]))
+                      : _createCommentVNode("v-if", true),
+                    _createCommentVNode(" WORLD SEED RADAR VIEW "),
+                    (activeTab === 'world')
+                      ? (_openBlock(), _createElementBlock("div", {
+                          key: "world-tab",
+                          class: "world-tab-view p-4 lg:p-5 flex-1 overflow-y-auto space-y-4"
+                        }, [
+                          // Header
+                          _createElementVNode("div", { class: "flex items-center justify-between border-b border-slate-800 pb-3" }, [
+                            _createElementVNode("div", null, [
+                              _createElementVNode("h3", { class: "font-bold text-base text-white flex items-center gap-2" }, [
+                                _createElementVNode("span", { class: "w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#47d2c9]" }),
+                                _createTextVNode("World Terrain & Seed Map Studio")
+                              ]),
+                              _createElementVNode("p", { class: "text-xs text-slate-400 mt-0.5" }, "Inspect spawn terrain, pan & zoom across coordinates, paint new chunks, and explore biomes.")
+                            ]),
+                            _createElementVNode("div", { class: "flex items-center gap-2" }, [
+                              (warmWorkerBooting || previewBooting || (selectedInstance && (selectedInstance.booting || (selectedInstance.running && !selectedInstance.booted))))
+                                ? (_openBlock(), _createElementBlock("div", { key: "hdr-boot", class: "flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-semibold text-amber-300" }, [
+                                    _createElementVNode("div", { class: "w-2.5 h-2.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" }),
+                                    _createTextVNode("Booting Server...")
+                                  ]))
+                                : ((selectedInstance && (selectedInstance.booted || selectedInstance.running)) || warmWorkerReady || mapStudioActive)
+                                  ? (_openBlock(), _createElementBlock("div", { key: "hdr-live", class: "flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-300" }, [
+                                      _createElementVNode("span", { class: "w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse" }),
+                                    ]))
+                                  : _createCommentVNode("v-if", true)
+                            ])
+                          ]),
+
+                          // Full-Width World Studio Container
+                          _createElementVNode("div", { class: "world-studio-container flex flex-col space-y-3 w-full" }, [
+                            // Consolidated World Studio Control Deck (Row 1: Tools & Navigation; Row 2: Seed & Actions)
+                            (_openBlock(), _createElementBlock("div", { key: "world-studio-topbar", class: "world-studio-topbar" }, [
+                              // Row 1: Tool Selection, Brush Sizes, Recenter, Grid & Live Telemetry
+                              _createElementVNode("div", { class: "topbar-row" }, [
+                                // Left: Tools & Brush Sizes
+                                _createElementVNode("div", { class: "topbar-group" }, [
+                                  // Pan & Paint Tools Capsule
+                                  _createElementVNode("div", { class: "flex items-center bg-slate-950/80 border border-slate-800 rounded-lg p-0.5" }, [
+                                    _createElementVNode("button", {
+                                      onClick: _withModifiers($event => (setMapTool('pan'), mapTool = 'pan'), ["stop"]),
+                                      class: _normalizeClass(["px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border", (mapTool || 'pan') === 'pan' ? "bg-cyan-500/25 text-cyan-300 border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.25)]" : "bg-transparent text-slate-400 hover:text-slate-200 border-transparent hover:bg-white/5"]),
+                                      title: "Pan Tool (Drag to move camera)"
+                                    }, [
+                                      _createElementVNode("svg", { class: "w-3.5 h-3.5 fill-none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                        _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" })
+                                      ]),
+                                      _createElementVNode("span", null, "Pan Camera")
+                                    ], 2 /* CLASS */),
+                                    _createElementVNode("button", {
+                                      onClick: _withModifiers($event => (setMapTool('brush'), mapTool = 'brush'), ["stop"]),
+                                      class: _normalizeClass(["px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border", mapTool === 'brush' ? "bg-cyan-500/25 text-cyan-300 border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.25)]" : "bg-transparent text-slate-400 hover:text-slate-200 border-transparent hover:bg-white/5"]),
+                                      title: "Paint Chunks Tool (Click and drag to generate chunks)"
+                                    }, [
+                                      _createElementVNode("svg", { class: "w-3.5 h-3.5 fill-none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                        _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M7 21a4 4 0 01-4-4 4.001 4.001 0 016.994-2.684l8.293-8.293a2 2 0 112.828 2.828l-8.293 8.293A4.001 4.001 0 017 21zm0 0l-2 2m5-5l2 2" })
+                                      ]),
+                                      _createElementVNode("span", null, "Paint Chunks")
+                                    ], 2 /* CLASS */)
+                                  ]),
+                                  _createElementVNode("div", { class: "topbar-divider" }),
+                                  // Brush Size Buttons Capsule
+                                  _createElementVNode("div", { class: "flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-lg p-0.5" }, [
+                                    _createElementVNode("span", { class: "text-[10px] font-mono text-slate-500 font-bold px-1.5 uppercase select-none" }, "Brush:"),
+                                    _createElementVNode("button", {
+                                      onClick: _withModifiers($event => (setBrushSize(1), brushSize = 1), ["stop"]),
+                                      class: _normalizeClass(["px-2.5 py-1 rounded text-[11px] font-mono font-bold transition cursor-pointer border", (brushSize || 1) === 1 ? "bg-cyan-500/25 text-cyan-300 border-cyan-400/50 shadow-[0_0_8px_rgba(6,182,212,0.25)]" : "bg-transparent text-slate-400 hover:text-slate-200 border-transparent hover:bg-white/5"]),
+                                      title: "1 Chunk (16x16 blocks)"
+                                    }, "1x1", 2 /* CLASS */),
+                                    _createElementVNode("button", {
+                                      onClick: _withModifiers($event => (setBrushSize(3), brushSize = 3), ["stop"]),
+                                      class: _normalizeClass(["px-2.5 py-1 rounded text-[11px] font-mono font-bold transition cursor-pointer border", (brushSize || 1) === 3 ? "bg-cyan-500/25 text-cyan-300 border-cyan-400/50 shadow-[0_0_8px_rgba(6,182,212,0.25)]" : "bg-transparent text-slate-400 hover:text-slate-200 border-transparent hover:bg-white/5"]),
+                                      title: "3x3 Chunks (48x48 blocks)"
+                                    }, "3x3", 2 /* CLASS */),
+                                    _createElementVNode("button", {
+                                      onClick: _withModifiers($event => (setBrushSize(5), brushSize = 5), ["stop"]),
+                                      class: _normalizeClass(["px-2.5 py-1 rounded text-[11px] font-mono font-bold transition cursor-pointer border", (brushSize || 1) === 5 ? "bg-cyan-500/25 text-cyan-300 border-cyan-400/50 shadow-[0_0_8px_rgba(6,182,212,0.25)]" : "bg-transparent text-slate-400 hover:text-slate-200 border-transparent hover:bg-white/5"]),
+                                      title: "5x5 Chunks (80x80 blocks)"
+                                    }, "5x5", 2 /* CLASS */),
+                                    _createElementVNode("button", {
+                                      onClick: _withModifiers($event => (setBrushSize(32), brushSize = 32), ["stop"]),
+                                      class: _normalizeClass(["px-2.5 py-1 rounded text-[11px] font-mono font-bold transition cursor-pointer border", (brushSize || 1) === 32 ? "bg-cyan-500/25 text-cyan-300 border-cyan-400/50 shadow-[0_0_8px_rgba(6,182,212,0.25)]" : "bg-transparent text-slate-400 hover:text-slate-200 border-transparent hover:bg-white/5"]),
+                                      title: "Full Region Stamp (512x512 blocks)"
+                                    }, "Region", 2 /* CLASS */)
+                                  ]),
+                                  _createElementVNode("div", { class: "topbar-divider" }),
+                                  // Recenter & Grid
+                                  _createElementVNode("button", {
+                                    onClick: _withModifiers($event => (recenterMap()), ["stop"]),
+                                    class: "px-2.5 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-cyan-300 hover:border-slate-700 transition flex items-center gap-1.5 cursor-pointer",
+                                    title: "Recenter to Spawn Origin (0, 0)"
+                                  }, [
+                                    _createElementVNode("svg", { class: "w-3.5 h-3.5 text-cyan-400", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                      _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M3 12h3m12 0h3M12 3v3m0 12v3" }),
+                                      _createElementVNode("circle", { cx: "12", cy: "12", r: "3", stroke: "currentColor", "stroke-width": "1.5" })
+                                    ]),
+                                    _createElementVNode("span", { class: "text-[11px]" }, "Origin")
+                                  ]),
+                                  _createElementVNode("button", {
+                                    onClick: _withModifiers($event => (toggleGrid(), previewShowGrid = !previewShowGrid), ["stop"]),
+                                    class: _normalizeClass(["px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition cursor-pointer", previewShowGrid ? "bg-cyan-500/25 text-cyan-300 border-cyan-400/50 shadow-[0_0_8px_rgba(6,182,212,0.25)]" : "bg-slate-950/80 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"]),
+                                    title: "Toggle Region & Chunk Grid (#)"
+                                  }, "#", 2 /* CLASS */)
+                                ]),
+                                // Right: Live Telemetry & Server Live Status
+                                _createElementVNode("div", { class: "topbar-group flex items-center gap-2 text-[11px] font-mono text-slate-300 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-lg" }, [
+                                  _createElementVNode("span", { class: "text-cyan-300 font-bold" }, _toDisplayString((previewZoom || 1).toFixed(1)) + "x", 1 /* TEXT */),
+                                  _createElementVNode("span", { class: "text-slate-600" }, "|"),
+                                  _createElementVNode("span", { class: "text-slate-400" }, "Cursor: [" + _toDisplayString(previewHoverX || 0) + ", " + _toDisplayString(previewHoverZ || 0) + "]", 1 /* TEXT */),
+                                  (warmWorkerBooting || previewBooting || (selectedInstance && (selectedInstance.booting || (selectedInstance.running && !selectedInstance.booted))))
+                                    ? (_openBlock(), _createElementBlock("span", { key: "worker-boot-badge", class: "flex items-center gap-1.5 ml-1 text-amber-400 font-semibold" }, [
+                                        _createElementVNode("div", { class: "w-2.5 h-2.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" }),
+                                        _createTextVNode("Booting...")
+                                      ]))
+                                    : ((selectedInstance && (selectedInstance.booted || selectedInstance.running)) || warmWorkerReady || mapStudioActive)
+                                      ? (_openBlock(), _createElementBlock("span", { key: "worker-live-badge", class: "flex items-center gap-1.5 ml-1 text-emerald-400 font-semibold" }, [
+                                          _createElementVNode("span", { class: "w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse" }),
+                                          _createTextVNode("Live")
+                                        ]))
+                                      : _createCommentVNode("v-if", true)
+                                ])
+                              ]),
+
+                              // Row 2: Dedicated World Seed Input Deck & Wipe World Action
+                              _createElementVNode("div", { class: "topbar-row pt-1 border-t border-slate-800/80" }, [
+                                // Seed Configuration Group
+                                _createElementVNode("div", { class: "flex items-center gap-2.5 flex-1 min-w-0" }, [
+                                  _createElementVNode("span", { class: "text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 shrink-0" }, [
+                                    _createElementVNode("span", { class: "w-2 h-2 rounded-full bg-cyan-400" }),
+                                    _createTextVNode("World Seed")
+                                  ]),
+                                  // Wide Seed Input Capsule with Copy and Random Icons
+                                  _createElementVNode("div", { class: "flex items-center bg-slate-950/90 border border-slate-700/80 focus-within:border-cyan-400 rounded-lg px-3 py-1.5 gap-2 flex-1 max-w-xl shadow-inner transition" }, [
+                                    _createElementVNode("input", {
+                                      value: previewSeedInput,
+                                      onInput: $event => (previewSeedInput = $event.target.value),
+                                      placeholder: "Enter seed number or alphanumeric phrase (e.g. 42, zircon, epic-mountains)...",
+                                      class: "bg-transparent text-xs font-mono text-cyan-200 outline-none w-full placeholder-slate-600"
+                                    }, null, 8 /* PROPS */, ["value"]),
+                                    _createElementVNode("button", {
+                                      onClick: $event => (copyActiveSeed()),
+                                      title: "Copy seed to clipboard",
+                                      class: "p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-white/10 transition cursor-pointer shrink-0"
+                                    }, [
+                                      _createElementVNode("svg", { class: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                        _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" })
+                                      ])
+                                    ]),
+                                    _createElementVNode("button", {
+                                      onClick: $event => (randomizePreviewSeed()),
+                                      title: "Generate random seed",
+                                      class: "p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-white/10 transition cursor-pointer shrink-0"
+                                    }, [
+                                      _createElementVNode("svg", { class: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                        _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" })
+                                      ])
+                                    ])
+                                  ]),
+                                  _createElementVNode("button", {
+                                    onClick: $event => (applyPreviewSeed()),
+                                    disabled: !previewSeedInput || previewLoading,
+                                    class: "px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition disabled:opacity-40 cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.35)] shrink-0"
+                                  }, "Apply Seed", 8 /* PROPS */, ["disabled"])
+                                ]),
+                                // Wipe World & Try New Seed Action on the right side of Row 2
+                                _createElementVNode("div", { class: "flex items-center gap-2 shrink-0" }, [
+                                  _createElementVNode("button", {
+                                    onClick: $event => (promptWipeAndResetWorld()),
+                                    title: "Wipe all world data and regenerate with a fresh random seed",
+                                    class: "px-3.5 py-1.5 bg-red-950/60 hover:bg-red-900/60 border border-red-500/40 rounded-lg text-xs font-semibold text-red-300 hover:text-red-200 transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.15)]"
+                                  }, [
+                                    _createElementVNode("svg", { class: "w-3.5 h-3.5 text-red-400", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                      _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" })
+                                    ]),
+                                    _createTextVNode("Wipe World & Try New Seed")
+                                  ])
+                                ])
+                              ])
+                            ])),
+
+                            // Slippy Map Container
+                            _createElementVNode("div", { class: "slippy-map-container" }, [
+                              // HTML5 Canvas for double-buffered 60 FPS tile engine
+                              _createElementVNode("canvas", {
+                                  id: "worldMapCanvas",
+                                  class: "slippy-canvas"
+                                }),
+
+                              // Big Central Standby Overlay: Render Map CTA in Glass Card
+                              (!hasRenderedWorldMap() && !warmWorkerBooting && !previewBooting && !previewLoading && !(selectedInstance && selectedInstance.booting))
+                                ? (_openBlock(), _createElementBlock("div", { key: "map-standby-overlay", class: "absolute inset-0 bg-slate-950/70 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 select-none" }, [
+                                    _createElementVNode("div", { class: "bg-slate-900/90 border border-slate-700/80 rounded-2xl p-7 max-w-md w-full flex flex-col items-center text-center shadow-2xl backdrop-blur-md" }, [
+                                      _createElementVNode("div", { class: "w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-3 shadow-[0_0_20px_rgba(6,182,212,0.25)]" }, [
+                                        _createElementVNode("svg", { class: "w-7 h-7", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                          _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.75", d: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" })
+                                        ])
+                                      ]),
+                                      _createElementVNode("h3", { class: "text-lg font-extrabold text-white tracking-wide mb-1" }, "World Terrain & Seed Map"),
+                                      _createElementVNode("p", { class: "text-xs text-slate-300 mb-4 leading-relaxed" }, 
+                                        isServerOnline()
+                                          ? "Server engine is live. Click below to render terrain and inspect your seed with custom worldgen mods."
+                                          : (isServerSleeping()
+                                              ? "Server engine is currently sleeping (idle shutdown). Click below to wake the server and render terrain."
+                                              : "Boot the server engine to render terrain and explore your world in real-time.")
+                                      ),
+                                      (previewSeedInput)
+                                        ? (_openBlock(), _createElementBlock("div", { key: "seed-pill", class: "mb-4 px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-300 font-semibold" }, [
+                                            _createTextVNode("Seed: " + _toDisplayString(previewSeedInput))
+                                          ]))
+                                        : _createCommentVNode("v-if", true),
+                                      _createElementVNode("button", {
+                                        onClick: _withModifiers($event => (renderMapFromCenter()), ["stop"]),
+                                        class: "px-7 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-white font-extrabold text-sm shadow-[0_0_30px_rgba(6,182,212,0.5)] hover:shadow-[0_0_45px_rgba(6,182,212,0.7)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 cursor-pointer"
+                                      }, [
+                                        _createElementVNode("svg", { class: "w-4 h-4 fill-current", viewBox: "0 0 24 24" }, [
+                                          _createElementVNode("path", { d: "M13 10V3L4 14h7v7l9-11h-7z" })
+                                        ]),
+                                        _createTextVNode(
+                                          isServerOnline()
+                                            ? "Render Map"
+                                            : (isServerSleeping()
+                                                ? "Wake Server & Render Map"
+                                                : "Start Server & Render Map")
+                                        )
+                                      ])
+                                    ])
+                                  ]))
+                                : (warmWorkerBooting || previewBooting || (selectedInstance && (selectedInstance.booting || (selectedInstance.running && !selectedInstance.booted))))
+                                  ? (_openBlock(), _createElementBlock("div", { key: "map-booting-overlay", class: "absolute inset-0 bg-slate-950/70 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 select-none" }, [
+                                      _createElementVNode("div", { class: "bg-slate-900/90 border border-slate-700/80 rounded-2xl p-7 max-w-md w-full flex flex-col items-center text-center shadow-2xl backdrop-blur-md" }, [
+                                        // Standard circular spinning spinner matching the rest of the application
+                                        _createElementVNode("div", { class: "w-12 h-12 border-3 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_15px_rgba(6,182,212,0.4)]" }),
+                                        _createElementVNode("h3", { class: "text-base font-bold text-white tracking-wide mb-1" }, "Booting Server Engine..."),
+                                        _createElementVNode("p", { class: "text-xs text-slate-400 mb-3 leading-relaxed" }, "Initializing world generator, modded biomes, and terrain pipelines."),
+                                        _createElementVNode("span", { class: "px-2.5 py-1 rounded-md bg-amber-400/10 border border-amber-400/30 text-[11px] font-mono font-medium text-amber-300 flex items-center gap-1.5" }, [
+                                          _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" }),
+                                          _createTextVNode(previewStage || "Live Stream Warming Up...")
+                                        ])
+                                      ])
+                                    ]))
+                                  : _createCommentVNode("v-if", true),
+
+                              // Floating Controls (Bottom-Right): Modern Slippy Zoom
+                              _createElementVNode("div", { class: "slippy-hud-bottom-right" }, [
+                                _createElementVNode("button", {
+                                  onClick: _withModifiers($event => (zoomIn()), ["stop"]),
+                                  title: "Zoom In (+)",
+                                  class: "slippy-btn font-bold text-sm"
+                                }, "+"),
+                                _createElementVNode("button", {
+                                  onClick: _withModifiers($event => (zoomOut()), ["stop"]),
+                                  title: "Zoom Out (-)",
+                                  class: "slippy-btn font-bold text-sm"
+                                }, "-")
+                              ]),
+
+                              // Loading Overlay with Spinner
+                              (previewLoading)
+                                ? (_openBlock(), _createElementBlock("div", {
+                                    key: "slippy-loading",
+                                    class: "absolute inset-0 flex flex-col items-center justify-center bg-slate-950/75 rounded-2xl p-4 text-center z-20 backdrop-blur-sm"
+                                  }, [
+                                    _createElementVNode("div", { class: "w-12 h-12 border-3 border-cyan-400 border-t-transparent rounded-full animate-spin mb-3 shadow-[0_0_15px_#47d2c9]" }),
+                                    _createElementVNode("p", { class: "text-xs font-semibold text-cyan-300 tracking-wide" }, _toDisplayString(previewStage || "Streaming world terrain..."), 1 /* TEXT */)
+                                  ]))
+                                : _createCommentVNode("v-if", true)
+                            ]),
+
+                              // Seed & Topography Information Deck (Directly beneath the map)
+                              _createElementVNode("div", { class: "bg-[#0e1622] border border-slate-800 p-4 rounded-2xl space-y-3.5" }, [
+                                // Active World Player Data Warning Banner
+                                (hasExistingPlayers())
+                                  ? (_openBlock(), _createElementBlock("div", {
+                                      key: "player-warn",
+                                      class: "p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 flex items-start gap-2.5"
+                                    }, [
+                                      _createElementVNode("svg", { class: "w-4 h-4 text-amber-400 shrink-0 mt-0.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                        _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" })
+                                      ]),
+                                      _createElementVNode("div", null, [
+                                        _createElementVNode("div", { class: "font-semibold text-amber-300" }, "Active World Detected"),
+                                        _createElementVNode("div", { class: "text-[11px] text-amber-200/80 mt-0.5 leading-snug" }, "Player history is recorded. Changing this seed from the top bar will wipe existing terrain and structures.")
+                                      ])
+                                    ]))
+                                  : _createCommentVNode("v-if", true),
+
+                                // Telemetry, Topography Stats
+                                _createElementVNode("div", { class: "flex flex-wrap items-center justify-between gap-3 text-xs" }, [
+                                  _createElementVNode("div", { class: "flex flex-wrap items-center gap-3 text-slate-400 font-mono text-[11px]" }, [
+                                    _createElementVNode("span", { class: "flex items-center gap-1.5" }, [
+                                      _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-red-400" }),
+                                      _createTextVNode("Spawn: "),
+                                      _createElementVNode("strong", { class: "text-white" }, "(0, 0)")
+                                    ]),
+                                    _createElementVNode("span", { class: "text-slate-700" }, "|"),
+                                    _createElementVNode("span", { class: "flex items-center gap-1.5" }, [
+                                      _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-cyan-400" }),
+                                      _createTextVNode("Camera: "),
+                                      _createElementVNode("strong", { class: "text-cyan-300" }, "(" + _toDisplayString(previewCenterX || 0) + ", " + _toDisplayString(previewCenterZ || 0) + ")")
+                                    ]),
+                                    (previewResult)
+                                      ? (_openBlock(), _createElementBlock(_Fragment, { key: "res-metrics" }, [
+                                          _createElementVNode("span", { class: "text-slate-700" }, "|"),
+                                          _createElementVNode("span", null, [
+                                            _createTextVNode("Elevation: "),
+                                            _createElementVNode("strong", { class: "text-emerald-400" }, "Y=" + _toDisplayString(previewResult.min_elevation) + ".." + _toDisplayString(previewResult.max_elevation))
+                                          ]),
+                                          _createElementVNode("span", { class: "text-slate-700" }, "|"),
+                                          _createElementVNode("span", null, [
+                                            _createTextVNode("Biomes: "),
+                                            _createElementVNode("strong", { class: "text-purple-400" }, _toDisplayString(previewResult.biomes_found.length))
+                                          ])
+                                        ], 64 /* STABLE_FRAGMENT */))
+                                      : _createCommentVNode("v-if", true)
+                                  ])
+                                ]),
+
+                                // Discovered Biomes Pills
+                                (previewResult && previewResult.biomes_found && previewResult.biomes_found.length)
+                                  ? (_openBlock(), _createElementBlock("div", {
+                                      key: "biome-tags",
+                                      class: "flex flex-wrap gap-1.5 max-h-20 overflow-y-auto pt-2 border-t border-slate-800/80"
+                                    }, [
+                                      (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(previewResult.biomes_found, (b) => {
+                                        return (_openBlock(), _createElementBlock("span", {
+                                          key: b,
+                                          class: "text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-900/90 text-cyan-300 border border-slate-700/80"
+                                        }, _toDisplayString(b)))
+                                      }), 128 /* KEYED_FRAGMENT */))
+                                    ]))
+                                  : _createCommentVNode("v-if", true)
+                              ])
+                            ]),
+
+                          // RED DANGER SEED RESET CONFIRMATION MODAL
+                          (showSeedWarningModal)
+                            ? (_openBlock(), _createElementBlock("div", {
+                                key: "seed-warning-modal",
+                                class: "fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in"
+                              }, [
+                                _createElementVNode("div", { class: "bg-[#0f0e17] border-2 border-red-500/60 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-[0_0_50px_rgba(239,68,68,0.25)] relative" }, [
+                                  _createElementVNode("div", { class: "flex items-start gap-3.5" }, [
+                                    _createElementVNode("div", { class: "w-11 h-11 rounded-xl bg-red-500/15 border border-red-500/40 flex items-center justify-center flex-shrink-0 text-red-400 shadow-inner" }, [
+                                      _createElementVNode("svg", { class: "w-6 h-6", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                        _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" })
+                                      ])
+                                    ]),
+                                    _createElementVNode("div", { class: "flex-1" }, [
+                                      _createElementVNode("h4", { class: "font-bold text-base text-white flex items-center gap-2" }, [
+                                        _createElementVNode("span", { class: "text-red-400 font-black tracking-wide uppercase text-xs px-2 py-0.5 bg-red-500/20 border border-red-500/40 rounded" }, "Danger"),
+                                        _createTextVNode("Wipe World & Regenerate Seed?")
+                                      ]),
+                                      _createElementVNode("p", { class: "text-xs text-slate-300 mt-2 leading-relaxed" }, "Changing the seed on an existing world will completely wipe all world terrain, saved player inventories, built structures, and tile caches. This action cannot be undone."),
+                                      _createElementVNode("div", { class: "mt-3 p-2.5 rounded-lg bg-red-950/30 border border-red-500/30 text-xs font-mono flex items-center justify-between" }, [
+                                        _createElementVNode("span", { class: "text-slate-400" }, "Target Seed:"),
+                                        _createElementVNode("span", { class: "text-red-300 font-bold" }, _toDisplayString(previewSeedInput || "Random"))
+                                      ])
+                                    ])
+                                  ]),
+                                  _createElementVNode("div", { class: "flex items-center justify-end gap-3 pt-3 border-t border-slate-800" }, [
+                                    _createElementVNode("button", {
+                                      onClick: $event => (cancelApplySeed()),
+                                      class: "px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 border border-slate-700 transition cursor-pointer"
+                                    }, "Cancel"),
+                                    _createElementVNode("button", {
+                                      onClick: $event => (confirmApplySeed()),
+                                      class: "px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 transition shadow-lg shadow-red-600/30 cursor-pointer flex items-center gap-1.5"
+                                    }, [
+                                      _createElementVNode("svg", { class: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+                                        _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" })
+                                      ]),
+                                      _createTextVNode("Delete World & Regenerate")
+                                    ])
+                                  ])
+                                ])
+                              ]))
+                            : _createCommentVNode("v-if", true)
                         ]))
                       : _createCommentVNode("v-if", true)
                   ])

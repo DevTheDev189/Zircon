@@ -1336,8 +1336,19 @@ async fn run_online_flow(
     for pack in &bom.resourcepacks {
         let file_path = game_dir.join("resourcepacks").join(&pack.filename);
         if file_path.is_file() {
+            let is_prescanned = pack
+                .origin
+                .as_deref()
+                .map(|o| o.eq_ignore_ascii_case("modrinth") || o.eq_ignore_ascii_case("curseforge"))
+                .unwrap_or(false);
             let is_safe = match std::fs::File::open(&file_path) {
-                Ok(f) => zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok(),
+                Ok(f) => {
+                    if is_prescanned {
+                        zircon_core::security::pack_validator::validate_pack_archive_safety(f, &guard).is_ok()
+                    } else {
+                        zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok()
+                    }
+                }
                 Err(_) => false,
             };
             if is_safe {
@@ -1469,7 +1480,10 @@ async fn run_online_flow(
         &server_addr,
     );
 
-    let java_args = override_heap("", memory_gb, custom_jvm.as_deref());
+    let java_major = crate::launch::java::get_java_home_major_version(&launch_data.java_home)
+        .or(Some(required_java));
+    let is_vr = crate::launch::java::is_vr_instance(&game_dir, Some(&launch_data.version_name));
+    let java_args = override_heap_with_context("", memory_gb, custom_jvm.as_deref(), java_major, is_vr);
     let child = MinecraftRunner
         .launch_with_options(
             &launch_data,
@@ -2540,7 +2554,10 @@ async fn run_offline_flow(
     std::fs::create_dir_all(&game_dir)?;
 
     // The Settings RAM slider and custom JVM args override the instance's values.
-    let java_args = override_heap(&instance.java_args, memory_gb, custom_jvm.as_deref());
+    let java_major = crate::launch::java::get_java_home_major_version(&launch_data.java_home)
+        .or(Some(required_java));
+    let is_vr = crate::launch::java::is_vr_instance(&game_dir, Some(&launch_data.version_name));
+    let java_args = override_heap_with_context(&instance.java_args, memory_gb, custom_jvm.as_deref(), java_major, is_vr);
 
     let player_name = {
         let session = state.session.lock().await;
@@ -2624,6 +2641,21 @@ async fn run_offline_flow(
 /// keeping every other argument (extra JVM flags, GC options...), and appending any
 /// user-configured custom JVM arguments.
 fn override_heap(java_args: &str, memory_gb: u32, custom_jvm_args: Option<&str>) -> String {
+    override_heap_with_context(java_args, memory_gb, custom_jvm_args, None, false)
+}
+
+/// Replaces any `-Xmx`/`-Xms` tokens in a Java args string with the Settings
+/// slider value, matching `-Xms` to `-Xmx` to prevent dynamic allocation CPU stalls,
+/// keeping every other argument (extra JVM flags, GC options...), and appending any
+/// user-configured custom JVM arguments. If no GC is configured, automatically selects
+/// the optimal GC (Generational ZGC for Java 21+ with >=4GB or VR, else G1GC).
+fn override_heap_with_context(
+    java_args: &str,
+    memory_gb: u32,
+    custom_jvm_args: Option<&str>,
+    java_major: Option<i32>,
+    is_vr: bool,
+) -> String {
     let mut initial = java_args.to_string();
     if let Some(extra) = custom_jvm_args {
         if !extra.trim().is_empty() {
@@ -2652,7 +2684,8 @@ fn override_heap(java_args: &str, memory_gb: u32, custom_jvm_args: Option<&str>)
         out.push(format!("-Xmx{memory_gb}G"));
     }
     if !out.iter().any(|t| t.starts_with("-XX:+Use") || t.starts_with("-XX:-Use")) {
-        out.push("-XX:+UseG1GC".to_string());
+        let gc_flags = crate::launch::java::select_optimal_gc(java_major, memory_gb, is_vr);
+        out.extend(gc_flags);
     }
     out.join(" ")
 }
@@ -5014,6 +5047,12 @@ pub fn get_system_ram_info() -> Result<crate::launch::system_ram::SystemRamInfo,
 }
 
 #[tauri::command]
+pub fn get_gpu_info(state: State<'_, LauncherState>) -> Result<crate::launch::gpu::GpuSystemInfo, String> {
+    let pref = state.settings.lock().unwrap().gpu_preference;
+    Ok(crate::launch::gpu::get_gpu_system_info(pref))
+}
+
+#[tauri::command]
 pub fn save_settings(
     state: State<'_, LauncherState>,
     settings: LauncherSettings,
@@ -5024,6 +5063,16 @@ pub fn save_settings(
     };
     *state.settings.lock().unwrap() = clamped.clone();
     settings::save_settings(&clamped);
+
+    if let Some(ref custom_java) = clamped.java_path_override {
+        if !custom_java.trim().is_empty() {
+            let _ = crate::launch::gpu::apply_gpu_preference(
+                std::path::Path::new(custom_java.trim()),
+                clamped.gpu_preference,
+            );
+        }
+    }
+
     if !clamped.discord_rpc {
         let discord_client = state.discord_client.clone();
         tauri::async_runtime::spawn(async move {
@@ -5527,6 +5576,10 @@ pub async fn apply_import_setup(
 }
 
 
+
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5564,6 +5617,24 @@ mod tests {
     fn override_heap_appends_custom_jvm_args() {
         let args = override_heap("-Xmx4G", 8, Some("-XX:+UseZGC -XX:+ZGenerational"));
         assert_eq!("-Xmx8G -XX:+UseZGC -XX:+ZGenerational -Xms8G", args);
+    }
+
+    #[test]
+    fn override_heap_auto_selects_zgc_for_java_21() {
+        let args = override_heap_with_context("", 6, None, Some(21), false);
+        assert_eq!("-Xms6G -Xmx6G -XX:+UseZGC -XX:+ZGenerational", args);
+    }
+
+    #[test]
+    fn override_heap_falls_back_to_g1gc_for_low_ram() {
+        let args = override_heap_with_context("", 2, None, Some(21), false);
+        assert_eq!("-Xms2G -Xmx2G -XX:+UseG1GC", args);
+    }
+
+    #[test]
+    fn override_heap_enforces_zgc_for_vr_even_at_low_ram() {
+        let args = override_heap_with_context("", 2, None, Some(21), true);
+        assert_eq!("-Xms2G -Xmx2G -XX:+UseZGC -XX:+ZGenerational", args);
     }
 
 

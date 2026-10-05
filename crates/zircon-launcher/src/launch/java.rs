@@ -743,6 +743,109 @@ fn safe_parse(value: &str) -> i32 {
     value.parse().unwrap_or(0)
 }
 
+/// Inspects a Java installation home directory and determines its major version
+/// (e.g. 8, 17, 21, 25) without launching a subprocess. Reads the standard JDK `release`
+/// metadata file if present, falling back to folder naming conventions.
+pub fn get_java_home_major_version(java_home: &Path) -> Option<i32> {
+    // 1. Check <java_home>/release (standard for Temurin, OpenJDK, Oracle, Zulu, etc.)
+    let release_path = java_home.join("release");
+    if let Ok(content) = std::fs::read_to_string(&release_path) {
+        if let Some(major) = parse_major_from_release_file(&content) {
+            return Some(major);
+        }
+    }
+
+    // 2. Check parent folder's release file (for macOS <home>/Contents/Home or deep subdirs)
+    if let Some(parent) = java_home.parent() {
+        let parent_release = parent.join("release");
+        if let Ok(content) = std::fs::read_to_string(&parent_release) {
+            if let Some(major) = parse_major_from_release_file(&content) {
+                return Some(major);
+            }
+        }
+    }
+
+    // 3. Fallback: inspect directory name for explicit version tokens (e.g. "temurin-21", "jdk-21", "java-17")
+    let path_str = java_home.to_string_lossy().to_ascii_lowercase();
+    for candidate in [25, 24, 23, 22, 21, 17, 16, 11, 8] {
+        if path_str.contains(&format!("-{candidate}"))
+            || path_str.contains(&format!("_{candidate}"))
+            || path_str.contains(&format!("jdk{candidate}"))
+            || path_str.contains(&format!("jdk-{candidate}"))
+            || path_str.contains(&format!("temurin-{candidate}"))
+        {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+/// Parses the major version number from the `JAVA_VERSION="..."` line in a JDK `release` file.
+pub(crate) fn parse_major_from_release_file(content: &str) -> Option<i32> {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(val) = trimmed.strip_prefix("JAVA_VERSION=") {
+            let unquoted = val.trim_matches('"').trim_matches('\'');
+            let mut parts = unquoted.split('.');
+            let first = parts.next()?.parse::<i32>().ok()?;
+            if first == 1 {
+                // Legacy "1.8.0_xxx" -> Java 8
+                return parts.next()?.parse::<i32>().ok();
+            } else {
+                return Some(first);
+            }
+        }
+    }
+    None
+}
+
+/// Detects if an instance is configured for Virtual Reality (Vivecraft, OpenXR, MCXR).
+pub fn is_vr_instance(game_dir: &Path, version_name: Option<&str>) -> bool {
+    if let Some(v) = version_name {
+        let v_lower = v.to_ascii_lowercase();
+        if v_lower.contains("vivecraft") || v_lower.contains("openxr") || v_lower.contains("mcxr") {
+            return true;
+        }
+    }
+    let mods_dir = game_dir.join("mods");
+    if let Ok(entries) = std::fs::read_dir(mods_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            if name.contains("vivecraft") || name.contains("mcxr") || name.contains("openxr") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Determines the optimal garbage collector flags for Minecraft.
+///
+/// Automatically enables Generational ZGC (`-XX:+UseZGC -XX:+ZGenerational`) when:
+/// 1. Java version is 21 or newer.
+/// 2. Allocated memory is >= 4 GB AND the system has >= 4 logical CPU threads (ensures
+///    background concurrent collection threads don't starve Minecraft on 2-core machines).
+///    OR the instance is running Vivecraft / VR (sub-millisecond frame pacing is essential
+///    to prevent headset motion sickness).
+///
+/// Falls back to standard G1GC (`-XX:+UseG1GC`) on Java <= 17, low memory allocations (< 4GB),
+/// or constrained dual-core CPUs.
+pub fn select_optimal_gc(
+    java_major: Option<i32>,
+    memory_gb: u32,
+    is_vr: bool,
+) -> Vec<String> {
+    let cpu_threads = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let is_java_21_plus = java_major.map_or(false, |m| m >= 21);
+
+    if is_java_21_plus && ((memory_gb >= 4 && cpu_threads >= 4) || is_vr) {
+        vec!["-XX:+UseZGC".to_string(), "-XX:+ZGenerational".to_string()]
+    } else {
+        vec!["-XX:+UseG1GC".to_string()]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -995,5 +1098,40 @@ mod tests {
             assert_eq!(req_1_21_1.preferred_major, 21);
             assert_eq!(req_1_21_1.max_major, Some(21));
         }
+    }
+
+    #[test]
+    fn test_select_optimal_gc_rules() {
+        // Java 21+ with >= 4GB on multi-core gets Generational ZGC
+        let gc_21 = select_optimal_gc(Some(21), 6, false);
+        assert_eq!(gc_21, vec!["-XX:+UseZGC", "-XX:+ZGenerational"]);
+
+        // Java 17 gets G1GC even with high RAM
+        let gc_17 = select_optimal_gc(Some(17), 6, false);
+        assert_eq!(gc_17, vec!["-XX:+UseG1GC"]);
+
+        // Java 8 gets G1GC
+        let gc_8 = select_optimal_gc(Some(8), 4, false);
+        assert_eq!(gc_8, vec!["-XX:+UseG1GC"]);
+
+        // Java 21 with low RAM (2GB) falls back to G1GC to protect low-end PCs from allocation stalls
+        let gc_low_ram = select_optimal_gc(Some(21), 2, false);
+        assert_eq!(gc_low_ram, vec!["-XX:+UseG1GC"]);
+
+        // Java 21 in VR mode enforces ZGC even at lower RAM because VR frame pacing is critical
+        let gc_vr = select_optimal_gc(Some(21), 2, true);
+        assert_eq!(gc_vr, vec!["-XX:+UseZGC", "-XX:+ZGenerational"]);
+    }
+
+    #[test]
+    fn test_parse_major_from_release_file() {
+        let release_21 = "JAVA_VERSION=\"21.0.2\"\nOS_NAME=\"Windows\"\n";
+        assert_eq!(parse_major_from_release_file(release_21), Some(21));
+
+        let release_17 = "IMPLEMENTOR=\"Eclipse Adoptium\"\nJAVA_VERSION=\"17.0.9\"\n";
+        assert_eq!(parse_major_from_release_file(release_17), Some(17));
+
+        let release_8 = "JAVA_VERSION=\"1.8.0_392\"\n";
+        assert_eq!(parse_major_from_release_file(release_8), Some(8));
     }
 }

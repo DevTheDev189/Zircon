@@ -518,9 +518,13 @@ impl TcpMultiplexer {
 
     /// Whether the multiplexer proxies HTTP traffic to the web server. Disabled
     /// when a TLS reverse proxy fronts the HTTP side (see `config.http_proxy`),
-    /// so the admin panel is never reachable in plaintext on the MC ports.
+    /// or when running as a headless Zircon Cloud fleet node.
     fn http_proxy_enabled(&self) -> bool {
-        self.config.get_config().http_proxy
+        let cfg = self.config.get_config();
+        if cfg.cloud.is_enabled() {
+            return false;
+        }
+        cfg.http_proxy
     }
 
     /// Resolves the backend MC port for a connection.
@@ -992,6 +996,13 @@ mod tests {
 
         // Reverse-proxy deployments turn it off.
         config.with_config(|c| c.http_proxy = false);
+        assert!(!multiplexer.http_proxy_enabled());
+
+        // Cloud fleet mode also turns it off unconditionally.
+        config.with_config(|c| {
+            c.http_proxy = true;
+            c.cloud.enabled = true;
+        });
         assert!(!multiplexer.http_proxy_enabled());
 
         let _ = std::fs::remove_dir_all(&dir);

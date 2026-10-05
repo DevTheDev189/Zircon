@@ -1,6 +1,6 @@
 [package]
 name = "zircon-server"
-version = "0.4.19"
+version = "0.4.20"
 edition = "2021"
 description = "Zircon server manager daemon: process supervisor, TCP multiplexer, backup engine, Axum admin API"
 license = "BSL-1.1"
@@ -65,3 +65,7 @@ http-body-util = "0.1"
 serde_urlencoded = "0.7"
 tempfile = "3"
 totp-rs = { version = "5.5", features = ["gen_secret", "otpauth"] }
+
+[features]
+default = []
+cloud = []

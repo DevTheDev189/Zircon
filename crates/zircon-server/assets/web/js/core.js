@@ -268,6 +268,10 @@ window.Zircon.core = {
         this.idleTicker = setInterval(() => {
             if (!this.authenticated || !this.instances) return;
             for (const inst of this.instances) {
+                // If admin is actively on the World tab for this instance, hold off idle sleep countdown
+                if (this.activeTab === 'world' && this.selectedInstance && this.selectedInstance.id === inst.id) {
+                    continue;
+                }
                 if (
                     inst.running &&
                     !inst.stopping &&
@@ -286,11 +290,12 @@ window.Zircon.core = {
             inst.stopping ||
             this.actionLoading[inst.id] === 'manual' ||
             this.actionLoading[inst.id] === 'stopping' ||
-            (inst.running && inst.playerCount === 0 && typeof inst.idleRemainingSeconds === 'number' && inst.idleRemainingSeconds <= 0)
+            (inst.running && inst.playerCount === 0 && typeof inst.idleRemainingSeconds === 'number' && inst.idleRemainingSeconds <= 0 && !(this.activeTab === 'world' && this.selectedInstance && this.selectedInstance.id === inst.id))
         );
     },
     isFallingAsleep(inst) {
         if (!inst) return false;
+        if (this.activeTab === 'world' && this.selectedInstance && this.selectedInstance.id === inst.id) return false;
         if (inst.stoppingReason === 'idle') return true;
         if (inst.running && !inst.stopping && inst.playerCount === 0 && typeof inst.idleRemainingSeconds === 'number' && inst.idleRemainingSeconds <= 0) return true;
         return false;
