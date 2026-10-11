@@ -2,7 +2,7 @@
 //! and in-launcher screenshot gallery.
 
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
@@ -13,6 +13,18 @@ use zip::{ZipArchive, ZipWriter};
 
 use crate::error::LauncherError;
 use crate::paths::sanitize_filename_strict;
+
+/// Comprehensive artwork bundle for an instance:
+/// Checks for custom banners/icons, singleplayer world icons, player screenshots,
+/// and client title-screen panorama cubemap faces.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstanceArtwork {
+    pub banner_data_url: Option<String>,
+    pub icon_data_url: Option<String>,
+    pub panorama_data_urls: Vec<String>,
+    pub source: String,
+}
 
 /// Summary of a single-player world extracted from `level.dat` and filesystem.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -362,6 +374,160 @@ pub fn delete_screenshot(game_dir: &Path, filename: &str) -> Result<(), Launcher
     Ok(())
 }
 
+/// Discovers or extracts rich artwork for an instance:
+/// 1. Custom banner.png or icon.png
+/// 2. World save icon from the most played singleplayer world
+/// 3. Most recent player screenshot
+/// 4. Official client title panorama cubemap faces from version JAR
+pub fn get_instance_artwork(game_dir: &Path, client_jar_path: Option<&Path>) -> InstanceArtwork {
+    let mut banner_data_url = None;
+    let mut icon_data_url = None;
+    let mut panorama_data_urls = Vec::new();
+    let mut source = "procedural".to_string();
+
+    // 1. Direct banner.png or icon.png in instance folder
+    let custom_banner = game_dir.join("banner.png");
+    if custom_banner.is_file() {
+        if let Ok(bytes) = std::fs::read(&custom_banner) {
+            banner_data_url = Some(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(&bytes)
+            ));
+            source = "custom_banner".to_string();
+        }
+    }
+
+    let custom_icon = game_dir.join("icon.png");
+    if custom_icon.is_file() {
+        if let Ok(bytes) = std::fs::read(&custom_icon) {
+            icon_data_url = Some(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(&bytes)
+            ));
+            if source == "procedural" {
+                source = "custom_icon".to_string();
+            }
+        }
+    }
+
+    // 2. Check single-player worlds for an icon
+    let worlds = list_worlds(game_dir);
+    if let Some(w) = worlds.iter().find(|w| w.icon_data_url.is_some()) {
+        if icon_data_url.is_none() {
+            icon_data_url = w.icon_data_url.clone();
+        }
+        if banner_data_url.is_none() {
+            banner_data_url = w.icon_data_url.clone();
+            if source == "procedural" {
+                source = "world_icon".to_string();
+            }
+        }
+    }
+
+    // 3. Check screenshots for high-res banner
+    let screenshots = list_screenshots(game_dir);
+    if let Some(ss) = screenshots.first() {
+        if banner_data_url.is_none() {
+            banner_data_url = Some(ss.data_url.clone());
+            source = "screenshot".to_string();
+        }
+    }
+
+    // 4. Check client JAR for title screen panorama cubemap faces (panorama_0.png .. panorama_3.png)
+    if let Some(jar_path) = client_jar_path {
+        if let Ok(file) = File::open(jar_path) {
+            if let Ok(mut archive) = ZipArchive::new(BufReader::new(file)) {
+                for i in 0..4 {
+                    let entry_name = format!("assets/minecraft/textures/gui/title/background/panorama_{i}.png");
+                    if let Ok(mut entry) = archive.by_name(&entry_name) {
+                        let mut buf = Vec::new();
+                        if entry.read_to_end(&mut buf).is_ok() {
+                            let encoded = format!(
+                                "data:image/png;base64,{}",
+                                base64::engine::general_purpose::STANDARD.encode(&buf)
+                            );
+                            panorama_data_urls.push(encoded);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if banner_data_url.is_none() && !panorama_data_urls.is_empty() {
+        banner_data_url = panorama_data_urls.first().cloned();
+        source = "panorama".to_string();
+    }
+
+    InstanceArtwork {
+        banner_data_url,
+        icon_data_url,
+        panorama_data_urls,
+        source,
+    }
+}
+
+/// Renders a world seed / biome radar preview for a given instance or world folder.
+pub fn get_world_radar_preview(
+    game_dir: &Path,
+    world_folder: Option<&str>,
+    seed_override: Option<&str>,
+    center_x: i32,
+    center_z: i32,
+    radius_blocks: i32,
+    zoom: f32,
+) -> Result<zircon_core::world::WorldPreviewResult, LauncherError> {
+    let radius = radius_blocks.clamp(64, 2048);
+    let zoom_clamped = zoom.clamp(0.2, 8.0);
+    let image_size = 512;
+
+    let mut seed = seed_override.unwrap_or("").trim().to_string();
+    let mut surface_map = zircon_core::world::anvil::RegionSurfaceMap::new();
+
+    // If a world folder is provided, check for region files and level.dat seed
+    if let Some(folder) = world_folder {
+        let world_dir = game_dir.join("saves").join(folder);
+        if world_dir.is_dir() {
+            if seed.is_empty() {
+                let level_dat = world_dir.join("level.dat");
+                if level_dat.is_file() {
+                    if let Ok(info) = zircon_core::metadata::read_level_dat(&level_dat) {
+                        if let Some(s) = info.seed {
+                            seed = s.to_string();
+                        }
+                    }
+                }
+            }
+
+            let region_dir = world_dir.join("region");
+            if region_dir.is_dir() {
+                surface_map = zircon_core::world::anvil::scan_region_surface(
+                    &region_dir,
+                    center_x,
+                    center_z,
+                    radius,
+                );
+            }
+        }
+    }
+
+    if seed.is_empty() {
+        seed = "1337424269101".to_string();
+    }
+
+    let result = zircon_core::world::renderer::render_preview_map(
+        &surface_map,
+        &seed,
+        center_x,
+        center_z,
+        radius,
+        zoom_clamped,
+        image_size,
+    );
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -395,6 +561,19 @@ mod tests {
 
         delete_backup(&temp_dir, &backup_file).unwrap();
         assert!(list_backups(&temp_dir).is_empty());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn world_radar_preview_generation() {
+        let temp_dir = std::env::temp_dir().join(format!("world_radar_test_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let res = get_world_radar_preview(&temp_dir, None, Some("404847291"), 0, 0, 128, 1.0).unwrap();
+        assert!(res.image_data_url.starts_with("data:image/png;base64,"));
+        assert!(!res.biomes_found.is_empty());
+        assert!(res.radius_blocks >= 64);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

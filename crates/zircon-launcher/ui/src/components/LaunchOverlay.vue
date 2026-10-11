@@ -98,11 +98,11 @@
                     class="h-1.5 w-1.5 rounded-full"
                     :class="running ? 'bg-emerald-400' : 'bg-teal-400 animate-ping'"
                   />
-                  {{ running ? 'Online' : 'Booting' }}
+                  {{ running ? $t('overlay.online') : $t('overlay.booting') }}
                 </span>
               </div>
               <h2 id="launch-dialog-title" class="mt-1 text-lg font-extrabold tracking-tight text-white truncate">
-                {{ server?.name || (running ? 'Game Running' : 'Starting Minecraft') }}
+                {{ server?.name || (running ? $t('overlay.game_running') : $t('overlay.starting_minecraft')) }}
               </h2>
               <p v-if="server?.address" class="text-[11px] font-mono text-teal-400/85 truncate">
                 {{ server.address }}
@@ -119,19 +119,19 @@
               :class="show2048
                 ? 'border-teal-400/60 bg-teal-500/20 text-teal-200 shadow-[0_0_14px_rgba(71,210,201,0.35)]'
                 : 'border-white/10 bg-white/5 text-slate-300 hover:border-teal-500/40 hover:text-teal-200 hover:bg-teal-500/10'"
-              :title="show2048 ? 'Hide 2048 Minigame' : 'Play 2048 while Minecraft loads'"
+              :title="show2048 ? $t('overlay.minigame_hide_tooltip') : $t('overlay.minigame_play_tooltip')"
               @click="toggle2048"
             >
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="2" y="6" width="20" height="12" rx="4" />
                 <path d="M6 12h4m-2-2v4m7-2h.01m3-2h.01" stroke-linecap="round" />
               </svg>
-              <span>2048</span>
+              <span>{{ $t('overlay.minigame_2048') }}</span>
               <span
                 v-if="!show2048"
                 class="hidden sm:inline-block rounded-full bg-teal-400/20 px-1.5 py-0.2 text-[9px] font-black text-teal-300 border border-teal-400/30 uppercase"
               >
-                Play
+                {{ $t('overlay.minigame_play') }}
               </span>
             </button>
 
@@ -139,14 +139,14 @@
             <button
               type="button"
               class="relative inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-300 transition-all duration-200 hover:border-cyan-400/50 hover:text-cyan-200 hover:bg-cyan-500/10"
-              title="Customize skins or generate AI textures while downloading"
+              :title="$t('overlay.character_forge_tooltip')"
               @click="$emit('open-skins')"
             >
               <svg class="h-3.5 w-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
-              <span>Character Forge</span>
+              <span>{{ $t('overlay.character_forge') }}</span>
             </button>
 
             <!-- Dismiss Error Button -->
@@ -156,14 +156,14 @@
               class="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
               @click="$emit('close')"
             >
-              Dismiss
+              {{ $t('overlay.dismiss') }}
             </button>
 
             <!-- Stop/Cancel Launch Button -->
             <button
               type="button"
               class="group inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-300 transition-all hover:border-rose-500/60 hover:bg-rose-500/20 active:scale-95 shadow-sm"
-              title="Cancel launch and stop process"
+              :title="$t('overlay.stop_tooltip')"
               :disabled="stopping"
               @click="cancelLaunch"
             >
@@ -185,7 +185,7 @@
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
-              <span>{{ stopping ? 'Stopping...' : 'Stop' }}</span>
+              <span>{{ stopping ? $t('overlay.stopping') : $t('overlay.stop') }}</span>
             </button>
           </div>
         </div>
@@ -206,7 +206,7 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>Launch Failed</span>
+                <span>{{ $t('overlay.launch_failed') }}</span>
               </div>
               <p class="mt-2 text-xs leading-relaxed text-rose-200/90 break-words font-mono bg-rose-950/60 p-2.5 rounded-xl border border-rose-900/50">
                 {{ error }}
@@ -225,24 +225,24 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </span>
-                  <span>Shader Engine Recommended</span>
+                  <span>{{ $t('overlay.shader_engine_recommended') }}</span>
                 </div>
                 <span class="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] font-extrabold text-amber-300 uppercase">
-                  Iris / Oculus
+                  {{ $t('overlay.shader_iris_oculus') }}
                 </span>
               </div>
 
               <div class="my-3 rounded-xl bg-black/40 border border-amber-500/20 p-3">
                 <div class="flex items-center justify-between">
                   <span class="text-xs font-bold text-white">
-                    {{ shaderPrompt.shaderName || 'Iris Recommended Shaders' }}
+                    {{ shaderPrompt.shaderName || $t('overlay.iris_recommended_shaders') }}
                   </span>
                   <span v-if="shaderPrompt.shaderAuthor" class="text-[10px] text-amber-300/80 font-medium">
-                    by {{ shaderPrompt.shaderAuthor }}
+                    {{ $t('overlay.by_author', { author: shaderPrompt.shaderAuthor }) }}
                   </span>
                 </div>
                 <p class="mt-1.5 text-[11px] text-amber-100/80 leading-relaxed">
-                  This server provides high-performance shader enhancements for realistic lighting, water refractions, and atmospheric skyboxes.
+                  {{ $t('overlay.shader_description') }}
                 </p>
               </div>
 
@@ -253,7 +253,7 @@
                   v-model="rememberShaders"
                   class="rounded border-amber-500/40 bg-amber-950/50 text-amber-400 focus:ring-0 focus:ring-offset-0 cursor-pointer h-4 w-4"
                 />
-                <span class="font-medium text-[11px]">Remember my preference for this server</span>
+                <span class="font-medium text-[11px]">{{ $t('overlay.remember_preference') }}</span>
               </label>
 
               <!-- Actions: Skip or Enable (Clean SVG icons, no emojis) -->
@@ -263,7 +263,7 @@
                   class="rounded-xl border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
                   @click="submitShaderChoice(false)"
                 >
-                  Play Without Shaders
+                  {{ $t('overlay.play_without_shaders') }}
                 </button>
                 <button
                   type="button"
@@ -273,7 +273,7 @@
                   <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  <span>Enable Shaders</span>
+                  <span>{{ $t('overlay.enable_shaders') }}</span>
                 </button>
               </div>
             </div>
@@ -326,10 +326,10 @@
                       class="mt-2 text-[11px] font-bold leading-tight"
                       :class="idx === currentStageIndex ? 'text-teal-300' : (idx < currentStageIndex ? 'text-slate-200' : 'text-slate-400')"
                     >
-                      {{ st.name }}
+                      {{ $t('overlay.stage_' + st.key) }}
                     </span>
                     <span class="text-[9px] text-slate-500 font-mono mt-0.5">
-                      {{ st.subtitle }}
+                      {{ $t('overlay.stage_' + st.key + '_sub') }}
                     </span>
                   </div>
                 </div>
@@ -344,7 +344,7 @@
                         <svg class="h-3.5 w-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span>{{ tips[activeTipIndex].headline }}</span>
+                        <span>{{ $t(tips[activeTipIndex].headlineKey) }}</span>
                       </div>
                       <!-- Pips -->
                       <div class="flex items-center gap-1">
@@ -357,7 +357,7 @@
                       </div>
                     </div>
                     <p class="mt-1.5 text-[11px] leading-relaxed text-[#b4c4cb]">
-                      {{ tips[activeTipIndex].message }}
+                      {{ $t(tips[activeTipIndex].messageKey) }}
                     </p>
                   </div>
                 </Transition>
@@ -368,13 +368,13 @@
                 <div class="flex items-center justify-between text-xs font-semibold">
                   <span class="truncate text-slate-200 pr-2 flex items-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-teal-400" :class="{ 'animate-ping': !running }" />
-                    <span class="truncate">{{ status || (running ? 'Minecraft is active' : 'Preparing launch environment...') }}</span>
+                    <span class="truncate">{{ status || (running ? $t('overlay.minecraft_active') : $t('overlay.preparing_launch')) }}</span>
                   </span>
                   <span v-if="progress !== null" class="shrink-0 font-mono font-black text-teal-300 text-sm">
                     {{ Math.round(progress * 100) }}%
                   </span>
                   <span v-else class="shrink-0 text-teal-400/80 animate-pulse font-mono text-[11px] font-bold">
-                    {{ running ? 'ACTIVE' : 'SYNCING' }}
+                    {{ running ? $t('overlay.active_badge') : $t('overlay.syncing_badge') }}
                   </span>
                 </div>
 
@@ -402,8 +402,8 @@
                   </svg>
                 </div>
                 <div>
-                  <div class="text-xs font-bold text-white">Play 2048 While Waiting</div>
-                  <div class="text-[10px] text-slate-400">Pass the time with tiles while Minecraft launches</div>
+                  <div class="text-xs font-bold text-white">{{ $t('overlay.teaser_2048_title') }}</div>
+                  <div class="text-[10px] text-slate-400">{{ $t('overlay.teaser_2048_subtitle') }}</div>
                 </div>
               </div>
               <button
@@ -411,7 +411,7 @@
                 class="shrink-0 z-btn-accent text-[11px] font-black px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 active:scale-95 transition-all"
                 @click="toggle2048"
               >
-                <span>Play Now</span>
+                <span>{{ $t('overlay.play_now') }}</span>
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
@@ -431,8 +431,8 @@
                   </svg>
                 </div>
                 <div>
-                  <div class="text-xs font-bold text-white">Character Forge Quick Access</div>
-                  <div class="text-[10px] text-slate-400">Generate or switch 3D skins while Minecraft loads</div>
+                  <div class="text-xs font-bold text-white">{{ $t('overlay.teaser_forge_title') }}</div>
+                  <div class="text-[10px] text-slate-400">{{ $t('overlay.teaser_forge_subtitle') }}</div>
                 </div>
               </div>
               <button
@@ -440,7 +440,7 @@
                 class="shrink-0 z-btn-ghost text-[11px] font-bold px-3 py-1.5 rounded-xl border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/20 shadow-md flex items-center gap-1.5 active:scale-95 transition-all"
                 @click="$emit('open-skins')"
               >
-                <span>Open Forge</span>
+                <span>{{ $t('overlay.open_forge') }}</span>
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
@@ -545,20 +545,20 @@ const stages = [
 
 const tips = [
   {
-    headline: 'High-Speed Mod Verification',
-    message: 'Zircon verifies mod SHA-1 hashes directly against Modrinth & CurseForge so you never crash from server desyncs.',
+    headlineKey: 'overlay.tip_1_headline',
+    messageKey: 'overlay.tip_1_message',
   },
   {
-    headline: 'Isolated Server Environments',
-    message: 'Each server has its own dedicated directory. Configs, shaders, and mods never conflict with your other worlds.',
+    headlineKey: 'overlay.tip_2_headline',
+    messageKey: 'overlay.tip_2_message',
   },
   {
-    headline: 'Instant Idle Wakeup',
-    message: 'Sleeping servers automatically spin up the moment you click Play. Zircon waits until the world finishes loading.',
+    headlineKey: 'overlay.tip_3_headline',
+    messageKey: 'overlay.tip_3_message',
   },
   {
-    headline: 'Iris Shader Cache',
-    message: 'Compiled shaders are cached locally on NVMe/SSD, significantly reducing first-time stutter and chunk loading delays.',
+    headlineKey: 'overlay.tip_4_headline',
+    messageKey: 'overlay.tip_4_message',
   },
 ];
 

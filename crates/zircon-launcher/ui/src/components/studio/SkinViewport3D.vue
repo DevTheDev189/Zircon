@@ -32,13 +32,13 @@
                 ? 'bg-cyan-500/25 text-cyan-300 font-bold shadow-sm'
                 : 'text-slate-400 hover:text-white'
             "
-            title="Paint Mode: Left-click to paint, Right-click to rotate"
+            :title="$t('skin_studio.paint_mode_tooltip')"
             @click="studio.state.viewMode3D = 'paint'"
           >
             <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
             </svg>
-            Paint
+            {{ $t('skin_studio.paint') }}
           </button>
           <button
             type="button"
@@ -48,13 +48,13 @@
                 ? 'bg-cyan-500/25 text-cyan-300 font-bold shadow-sm'
                 : 'text-slate-400 hover:text-white'
             "
-            title="Orbit Mode: Left-click rotates camera"
+            :title="$t('skin_studio.orbit_mode_tooltip')"
             @click="studio.state.viewMode3D = 'orbit'"
           >
             <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
             </svg>
-            Orbit
+            {{ $t('skin_studio.orbit') }}
           </button>
         </div>
 
@@ -65,15 +65,15 @@
           <select
             v-model="selectedAngle"
             class="text-[10px] font-semibold py-0.5 px-1.5 bg-[#121c27] border border-slate-700/80 hover:border-slate-600 text-slate-300 rounded-md focus:outline-none focus:border-cyan-400 cursor-pointer"
-            title="Camera View Angle"
+            :title="$t('skin_studio.angle_title')"
             @change="onAngleChange"
           >
-            <option value="iso">Isometric</option>
-            <option value="front">Front</option>
-            <option value="back">Back</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-            <option value="top">Top</option>
+            <option value="iso">{{ $t('skin_studio.angle_iso') }}</option>
+            <option value="front">{{ $t('skin_studio.angle_front') }}</option>
+            <option value="back">{{ $t('skin_studio.angle_back') }}</option>
+            <option value="left">{{ $t('skin_studio.angle_left') }}</option>
+            <option value="right">{{ $t('skin_studio.angle_right') }}</option>
+            <option value="top">{{ $t('skin_studio.angle_top') }}</option>
           </select>
 
           <div class="h-3 w-px bg-slate-800 mx-0.5" />
@@ -87,14 +87,14 @@
                 ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_8px_rgba(56,189,248,0.3)]'
                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
             "
-            title="Toggle Body Parts & Layers HUD"
+            :title="$t('skin_studio.parts_tooltip')"
             @click="showPartsHud = !showPartsHud"
           >
             <svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
-            Parts
+            {{ $t('skin_studio.parts') }}
           </button>
         </div>
       </div>
@@ -124,7 +124,7 @@
           class="absolute top-3 right-3 z-20 w-52 bg-[#09101a]/95 backdrop-blur-md border border-cyan-500/40 rounded-xl p-2.5 shadow-2xl"
         >
           <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-800">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-cyan-300">Parts HUD</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-cyan-300">{{ $t('skin_studio.parts_hud') }}</span>
             <button
               class="text-slate-400 hover:text-white p-0.5 rounded transition-colors"
               title="Close HUD"

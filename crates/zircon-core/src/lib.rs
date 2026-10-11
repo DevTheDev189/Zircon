@@ -12,6 +12,7 @@ pub mod crypto;
 pub mod export;
 pub mod metadata;
 pub mod model;
+pub mod protocol;
 pub mod security;
 pub mod world;
 

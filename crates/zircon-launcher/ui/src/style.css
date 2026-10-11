@@ -2,7 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('./assets/fonts/OpenDyslexic-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('./assets/fonts/OpenDyslexic-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lexend';
+  src: url('./assets/fonts/Lexend-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
+  --font-family-base: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --ui-scale: 1;
+
   --color-accent: #47d2c9;
   --color-accent-rgb: 71 210 201;
   --color-accent-bright: #5adfd5;
@@ -38,6 +65,51 @@
   --border-opacity: 0.55;
 }
 
+/* Accessibility Modes */
+html.font-dyslexic {
+  --font-family-base: 'OpenDyslexic', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+  line-height: 1.65 !important;
+  letter-spacing: 0.02em !important;
+}
+
+html.font-lexend {
+  --font-family-base: 'Lexend', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+  letter-spacing: 0.01em !important;
+}
+
+/* UI Scale Zooms */
+html[data-ui-scale="1.15"] #app {
+  zoom: 1.15;
+}
+html[data-ui-scale="1.25"] #app {
+  zoom: 1.25;
+}
+html[data-ui-scale="1.4"] #app {
+  zoom: 1.4;
+}
+
+/* Reduced Motion Mode */
+html.reduce-motion,
+html.reduce-motion * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* High Contrast Mode */
+html.high-contrast {
+  --color-card: #04070b !important;
+  --color-well: #000000 !important;
+  --card-opacity: 1 !important;
+  --card-blur: 0px !important;
+  --border-opacity: 1 !important;
+  --color-border: #38bdf8 !important;
+}
+html.high-contrast .z-card {
+  border: 2px solid #38bdf8 !important;
+  box-shadow: none !important;
+}
+
 @layer base {
   html,
   body,
@@ -52,7 +124,7 @@
   body {
     background-color: var(--color-bg);
     color: #c9d1d9;
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-family: var(--font-family-base, "Segoe UI", system-ui, -apple-system, sans-serif);
     user-select: none;
     -webkit-font-smoothing: antialiased;
   }
@@ -384,6 +456,83 @@
 @keyframes zircon-shimmer {
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
+}
+
+@keyframes zircon-ambient-pulse {
+  0% {
+    transform: translate3d(-50%, 0, 0) scale(1);
+    opacity: 0.15;
+  }
+  25% {
+    transform: translate3d(calc(-50% + 18px), 10px, 0) scale(1.05);
+    opacity: 0.20;
+  }
+  50% {
+    transform: translate3d(-50%, 20px, 0) scale(1.08);
+    opacity: 0.24;
+  }
+  75% {
+    transform: translate3d(calc(-50% - 18px), 10px, 0) scale(1.04);
+    opacity: 0.18;
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0) scale(1);
+    opacity: 0.15;
+  }
+}
+
+@keyframes zircon-ambient-corner {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.12;
+  }
+  25% {
+    transform: translate3d(16px, -12px, 0) scale(1.04);
+    opacity: 0.16;
+  }
+  50% {
+    transform: translate3d(24px, 14px, 0) scale(1.07);
+    opacity: 0.21;
+  }
+  75% {
+    transform: translate3d(6px, 22px, 0) scale(1.03);
+    opacity: 0.15;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.12;
+  }
+}
+
+.z-ambient-glow-top {
+  position: absolute;
+  top: -12rem;
+  left: 50%;
+  transform: translate3d(-50%, 0, 0);
+  width: 52rem;
+  height: 24rem;
+  border-radius: 9999px;
+  background-color: var(--color-accent);
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  animation: zircon-ambient-pulse 11s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.z-ambient-glow-corner {
+  position: absolute;
+  top: -16rem;
+  left: -16rem;
+  width: 44rem;
+  height: 44rem;
+  border-radius: 9999px;
+  background-color: var(--color-accent-bright, var(--color-accent));
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+  animation: zircon-ambient-corner 15s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 /* ==========================================================================

@@ -240,6 +240,13 @@ impl ServerImportService {
             }
         }
 
+        // If an overrides folder exists from an .mrpack archive, merge it into the root
+        let overrides_dir = unpacked_dir.join("overrides");
+        if overrides_dir.is_dir() {
+            let _ = move_directory_contents(&overrides_dir, unpacked_dir);
+            let _ = fs::remove_dir_all(&overrides_dir);
+        }
+
         let suggested_name = mrpack_name
             .or(server_name_prop)
             .or(motd)

@@ -22,10 +22,10 @@
           <div class="flex items-center gap-1.5">
             <span class="text-xs font-black tracking-wider text-teal-300 uppercase font-mono">2048</span>
             <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-200 font-bold tracking-tight border border-teal-500/30">
-              MINIGAME
+              {{ $t('game_2048.minigame') }}
             </span>
           </div>
-          <p class="text-[10px] text-slate-400 font-medium leading-none mt-0.5">Join tiles to reach 2048!</p>
+          <p class="text-[10px] text-slate-400 font-medium leading-none mt-0.5">{{ $t('game_2048.tagline') }}</p>
         </div>
       </div>
 
@@ -33,11 +33,11 @@
         <!-- Score & Best Boxes -->
         <div class="flex gap-1.5">
           <div class="px-2.5 py-1 rounded-xl bg-[#0b1420] border border-teal-500/20 text-center min-w-[52px] shadow-sm">
-            <span class="block text-[8px] uppercase tracking-wider text-slate-400 font-bold">Score</span>
+            <span class="block text-[8px] uppercase tracking-wider text-slate-400 font-bold">{{ $t('game_2048.score') }}</span>
             <span class="block text-xs font-black text-teal-200 font-mono leading-none mt-0.5">{{ score }}</span>
           </div>
           <div class="px-2.5 py-1 rounded-xl bg-[#0b1420] border border-emerald-500/20 text-center min-w-[52px] shadow-sm">
-            <span class="block text-[8px] uppercase tracking-wider text-emerald-400/80 font-bold">Best</span>
+            <span class="block text-[8px] uppercase tracking-wider text-emerald-400/80 font-bold">{{ $t('game_2048.best') }}</span>
             <span class="block text-xs font-black text-emerald-300 font-mono leading-none mt-0.5">{{ bestScore }}</span>
           </div>
         </div>
@@ -46,7 +46,7 @@
         <button
           type="button"
           class="p-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-teal-500/20 hover:border-teal-400/50 text-slate-300 hover:text-teal-200 transition-all text-xs"
-          title="Restart Game"
+          :title="$t('game_2048.restart_tooltip')"
           @click="resetGame"
         >
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -58,7 +58,7 @@
         <button
           type="button"
           class="p-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-rose-500/20 hover:border-rose-400/60 text-slate-400 hover:text-rose-300 transition-all text-xs"
-          title="Minimize Minigame"
+          :title="$t('game_2048.minimize_tooltip')"
           @click="$emit('close')"
         >
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -113,14 +113,14 @@
         v-if="gameOver"
         class="absolute inset-0 z-20 bg-[#05090f]/90 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-4 text-center animate-fade-in border border-rose-500/30"
       >
-        <span class="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-1">Game Over</span>
-        <p class="text-sm font-extrabold text-white mb-3">No more moves!</p>
+        <span class="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-1">{{ $t('game_2048.game_over') }}</span>
+        <p class="text-sm font-extrabold text-white mb-3">{{ $t('game_2048.no_more_moves') }}</p>
         <button
           type="button"
           class="z-btn-accent text-xs font-bold px-4 py-1.5 rounded-xl shadow-lg hover:shadow-teal-400/30 transition-all active:scale-95"
           @click="resetGame"
         >
-          Try Again
+          {{ $t('game_2048.try_again') }}
         </button>
       </div>
 
@@ -129,22 +129,22 @@
         v-else-if="gameWon && !dismissedWin"
         class="absolute inset-0 z-20 bg-[#06151f]/92 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-4 text-center animate-fade-in border border-teal-400/40 shadow-[0_0_25px_rgba(71,210,201,0.35)]"
       >
-        <span class="text-[10px] font-black uppercase tracking-widest text-teal-300 mb-1 drop-shadow-[0_0_8px_#47d2c9]">Victory!</span>
-        <p class="text-sm font-extrabold text-white mb-3">You reached 2048!</p>
+        <span class="text-[10px] font-black uppercase tracking-widest text-teal-300 mb-1 drop-shadow-[0_0_8px_#47d2c9]">{{ $t('game_2048.victory') }}</span>
+        <p class="text-sm font-extrabold text-white mb-3">{{ $t('game_2048.reached_2048') }}</p>
         <div class="flex gap-2">
           <button
             type="button"
             class="z-btn-ghost text-[11px] font-bold px-3 py-1.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white"
             @click="dismissedWin = true"
           >
-            Keep Going
+            {{ $t('game_2048.keep_going') }}
           </button>
           <button
             type="button"
             class="z-btn-accent text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-md"
             @click="resetGame"
           >
-            New Game
+            {{ $t('game_2048.new_game') }}
           </button>
         </div>
       </div>
@@ -157,10 +157,10 @@
         <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">↓</kbd>
         <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">←</kbd>
         <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">→</kbd>
-        <span class="ml-1 text-slate-500">or WASD</span>
+        <span class="ml-1 text-slate-500">{{ $t('game_2048.or_wasd') }}</span>
       </span>
       <span class="text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" @click="$emit('close')">
-        ✕ Hide
+        ✕ {{ $t('game_2048.hide') }}
       </span>
     </div>
   </div>

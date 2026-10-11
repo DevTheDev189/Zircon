@@ -2,7 +2,7 @@
   <div class="bg-[#0b121c] border border-slate-800/90 rounded-xl p-3 flex flex-col gap-3.5 select-none">
     <!-- Tools Grid -->
     <div>
-      <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Tools</div>
+      <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">{{ $t('skin_studio.tools_title') }}</div>
       <div class="grid grid-cols-4 gap-1.5">
         <!-- Pencil -->
         <button
@@ -13,7 +13,7 @@
               ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
               : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
           "
-          title="Pencil (B) - Shift+Click for straight lines"
+          :title="$t('skin_studio.tool_pencil')"
           @click="selectTool('pencil')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -31,7 +31,7 @@
               ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
               : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
           "
-          title="Eraser (E) - Clears pixels to transparent"
+          :title="$t('skin_studio.tool_eraser')"
           @click="selectTool('eraser')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -51,7 +51,7 @@
               ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
               : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
           "
-          title="Eyedropper (I) - Sample color from 2D or 3D"
+          :title="$t('skin_studio.tool_picker')"
           @click="selectTool('picker')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -72,7 +72,7 @@
               ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
               : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
           "
-          title="Paint Bucket (G) - Region-bounded flood fill"
+          :title="$t('skin_studio.tool_bucket')"
           @click="selectTool('bucket')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -92,7 +92,7 @@
               ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
               : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
           "
-          title="Noise Shading Brush (N) - Natural texture variations"
+          :title="$t('skin_studio.tool_noise')"
           @click="selectTool('noise')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -110,7 +110,7 @@
               ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
               : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
           "
-          title="Lighten / Dodge - Brightens pixels by 8%"
+          :title="$t('skin_studio.tool_lighten')"
           @click="selectTool('lighten')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -136,7 +136,7 @@
               ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(56,189,248,0.25)]'
               : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
           "
-          title="Darken / Burn - Darkens pixels by 8%"
+          :title="$t('skin_studio.tool_darken')"
           @click="selectTool('darken')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -190,7 +190,7 @@
 
       <!-- Opacity Slider -->
       <div class="flex items-center gap-2 pt-0.5">
-        <span class="text-[10px] font-semibold text-slate-400 w-10">Alpha:</span>
+        <span class="text-[10px] font-semibold text-slate-400 w-10">{{ $t('skin_studio.alpha_label') }}</span>
         <input
           v-model.number="studio.state.activeAlpha"
           type="range"
@@ -208,10 +208,10 @@
     <!-- Palette Presets -->
     <div class="flex flex-col gap-2">
       <div class="flex items-center justify-between">
-        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Palettes</span>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $t('skin_studio.palettes_title') }}</span>
         <div class="flex items-center gap-1">
           <button
-            v-for="(label, key) in paletteTabs"
+            v-for="(labelKey, key) in paletteTabKeys"
             :key="key"
             type="button"
             class="text-[9px] font-semibold px-1.5 py-0.5 rounded transition-colors"
@@ -222,7 +222,7 @@
             "
             @click="studio.state.selectedPalette = key"
           >
-            {{ label }}
+            {{ $t(labelKey) }}
           </button>
         </div>
       </div>
@@ -243,7 +243,7 @@
 
     <!-- Recent Colors Row -->
     <div v-if="studio.state.recentColors.length > 0" class="flex flex-col gap-1.5">
-      <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recent Colors</div>
+      <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $t('skin_studio.recent_colors') }}</div>
       <div class="flex items-center gap-1 flex-wrap p-1 bg-[#070b10] rounded-lg border border-slate-800/80">
         <button
           v-for="color in studio.state.recentColors"
@@ -259,7 +259,7 @@
 
     <!-- Custom Saved Colors -->
     <div v-if="studio.state.customPalette.length > 0" class="flex flex-col gap-1.5">
-      <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Custom Colors</div>
+      <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $t('skin_studio.custom_colors') }}</div>
       <div class="flex items-center gap-1 flex-wrap p-1 bg-[#070b10] rounded-lg border border-slate-800/80">
         <button
           v-for="(color, idx) in studio.state.customPalette"
@@ -292,12 +292,12 @@ watch(
   }
 );
 
-const paletteTabs = {
-  skin: 'Skin',
-  hair: 'Hair',
-  clothes: 'Cloth',
-  armor: 'Armor',
-  dyes: 'Dyes',
+const paletteTabKeys = {
+  skin: 'skin_studio.palette_skin',
+  hair: 'skin_studio.palette_hair',
+  clothes: 'skin_studio.palette_cloth',
+  armor: 'skin_studio.palette_armor',
+  dyes: 'skin_studio.palette_dyes',
 };
 
 const activePaletteColors = computed(() => {

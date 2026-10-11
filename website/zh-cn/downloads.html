@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+  <link rel="canonical" href="https://zirconmc.net/zh-cn/downloads.html">
+  <link rel="alternate" hreflang="x-default" href="https://zirconmc.net/downloads.html">
+  <link rel="alternate" hreflang="en" href="https://zirconmc.net/downloads.html">
+  <link rel="alternate" hreflang="es" href="https://zirconmc.net/es/downloads.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://zirconmc.net/pt-br/downloads.html">
+  <link rel="alternate" hreflang="pt-PT" href="https://zirconmc.net/pt-pt/downloads.html">
+  <link rel="alternate" hreflang="de" href="https://zirconmc.net/de/downloads.html">
+  <link rel="alternate" hreflang="fr" href="https://zirconmc.net/fr/downloads.html">
+  <link rel="alternate" hreflang="it" href="https://zirconmc.net/it/downloads.html">
+  <link rel="alternate" hreflang="ru" href="https://zirconmc.net/ru/downloads.html">
+  <link rel="alternate" hreflang="pl" href="https://zirconmc.net/pl/downloads.html">
+  <link rel="alternate" hreflang="nl" href="https://zirconmc.net/nl/downloads.html">
+  <link rel="alternate" hreflang="tr" href="https://zirconmc.net/tr/downloads.html">
+  <link rel="alternate" hreflang="sv" href="https://zirconmc.net/sv/downloads.html">
+  <link rel="alternate" hreflang="uk" href="https://zirconmc.net/uk/downloads.html">
+  <link rel="alternate" hreflang="cs" href="https://zirconmc.net/cs/downloads.html">
+  <link rel="alternate" hreflang="fi" href="https://zirconmc.net/fi/downloads.html">
+  <link rel="alternate" hreflang="da" href="https://zirconmc.net/da/downloads.html">
+  <link rel="alternate" hreflang="no" href="https://zirconmc.net/no/downloads.html">
+  <link rel="alternate" hreflang="hu" href="https://zirconmc.net/hu/downloads.html">
+  <link rel="alternate" hreflang="ro" href="https://zirconmc.net/ro/downloads.html">
+  <link rel="alternate" hreflang="el" href="https://zirconmc.net/el/downloads.html">
+  <link rel="alternate" hreflang="bg" href="https://zirconmc.net/bg/downloads.html">
+  <link rel="alternate" hreflang="sk" href="https://zirconmc.net/sk/downloads.html">
+  <link rel="alternate" hreflang="hr" href="https://zirconmc.net/hr/downloads.html">
+  <link rel="alternate" hreflang="sr" href="https://zirconmc.net/sr/downloads.html">
+  <link rel="alternate" hreflang="sl" href="https://zirconmc.net/sl/downloads.html">
+  <link rel="alternate" hreflang="lt" href="https://zirconmc.net/lt/downloads.html">
+  <link rel="alternate" hreflang="lv" href="https://zirconmc.net/lv/downloads.html">
+  <link rel="alternate" hreflang="et" href="https://zirconmc.net/et/downloads.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://zirconmc.net/zh-cn/downloads.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://zirconmc.net/zh-tw/downloads.html">
+  <link rel="alternate" hreflang="ja" href="https://zirconmc.net/ja/downloads.html">
+  <link rel="alternate" hreflang="ko" href="https://zirconmc.net/ko/downloads.html">
+  <link rel="alternate" hreflang="id" href="https://zirconmc.net/id/downloads.html">
+  <link rel="alternate" hreflang="vi" href="https://zirconmc.net/vi/downloads.html">
+  <link rel="alternate" hreflang="th" href="https://zirconmc.net/th/downloads.html">
+  <link rel="alternate" hreflang="ms" href="https://zirconmc.net/ms/downloads.html">
+  <link rel="alternate" hreflang="fil" href="https://zirconmc.net/fil/downloads.html">
+  <link rel="alternate" hreflang="hi" href="https://zirconmc.net/hi/downloads.html">
+  <link rel="alternate" hreflang="ar" href="https://zirconmc.net/ar/downloads.html">
+  <link rel="alternate" hreflang="he" href="https://zirconmc.net/he/downloads.html">
+  <link rel="alternate" hreflang="fa" href="https://zirconmc.net/fa/downloads.html">
+
+<!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+<script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Downloads — Zircon Launcher &amp; Server Manager for Modded Minecraft</title>
+<meta content="Download the Zircon launcher for players and the Zircon server manager for server owners. Free, open-source modded Minecraft companion with automatic mod syncing. Windows 10/11 available now." name="description"/>
+<meta content="download zircon launcher, zircon server manager download, modded minecraft launcher download, minecraft auto mod sync, zircon msi, zircon setup exe" name="keywords"/>
+<meta content="Zircon Contributors" name="author"/>
+<meta content="index, follow" name="robots"/>
+<meta content="#0d1117" name="theme-color"/>
+<!-- Canonical URL -->
+<link href="https://zirconmc.net/downloads.html" rel="canonical"/>
+<!-- Open Graph / Social Sharing -->
+<meta content="Zircon" property="og:site_name"/>
+<meta content="https://zirconmc.net/downloads.html" property="og:url"/>
+<meta content="Downloads — Zircon Launcher &amp; Server Manager" property="og:title"/>
+<meta content="Download the Zircon launcher for players and server manager for server owners. Exact mod sync, Modrinth &amp; CurseForge verified, and official Microsoft sign-in." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://zirconmc.net/assets/img/locales/zh-CN/main_launcher.png" property="og:image"/>
+<meta content="Download Zircon Launcher" property="og:image:alt"/>
+<meta content="en_US" property="og:locale"/>
+<!-- Twitter Cards -->
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Downloads — Zircon Launcher &amp; Server Manager" name="twitter:title"/>
+<meta content="Download the Zircon launcher for players and server manager for server owners. Modrinth &amp; CurseForge mod sync, free and open source." name="twitter:description"/>
+<meta content="https://zirconmc.net/assets/img/locales/zh-CN/main_launcher.png" name="twitter:image"/>
+<meta content="Download Zircon Launcher" name="twitter:image:alt"/>
+<!-- Favicons & Manifest -->
+<link href="../assets/img/favicon.png" rel="icon" type="image/png"/>
+<link href="../assets/img/favicon.png" rel="apple-touch-icon"/>
+<link href="../site.webmanifest" rel="manifest"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+<!-- Structured Data / JSON-LD -->
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://zirconmc.net/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Downloads",
+            "item": "https://zirconmc.net/downloads.html"
+          }
+        ]
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Zircon Launcher",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Windows 10, Windows 11, macOS, Linux",
+        "downloadUrl": "https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_x64-setup.exe",
+        "softwareVersion": "v0.5.0",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Zircon Server Manager",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows, Linux",
+        "downloadUrl": "https://downloads.zirconmc.net/updates/server/v0.5.0/zircon-server-windows-x86_64.zip",
+        "softwareVersion": "v0.5.0",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+<!-- Animated Procedural Background Elements -->
+<div class="z-bg-dots"></div>
+<div class="z-orb z-orb-1"></div>
+<div class="z-orb z-orb-2"></div>
+<div class="z-orb z-orb-3"></div>
+<div class="z-orb z-orb-4"></div>
+<div class="z-particle z-particle-1"></div>
+<div class="z-particle z-particle-2"></div>
+<div class="z-particle z-particle-3"></div>
+<div class="z-particle z-particle-4"></div>
+<div class="z-particle z-particle-5"></div>
+<div class="z-particle z-particle-6"></div>
+<!-- ================= NAV ================= -->
+<header class="site-nav">
+<div class="container">
+<a aria-label="Zircon home" class="brand" href="./">
+<img alt="Zircon" class="brand-text" height="28" src="../assets/img/zircon-title.svg" width="130"/>
+</a>
+<button aria-expanded="false" aria-label="Toggle navigation" class="nav-toggle">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"></path>
+</svg>
+</button>
+<ul class="nav-links">
+<li data-i18n="downloads.home"><a data-i18n="downloads.home_1" href="/">首页</a></li>
+<li data-i18n="downloads.launcher"><a data-i18n="downloads.launcher_1" href="launcher.html">启动器</a></li>
+<li data-i18n="downloads.server_manager"><a data-i18n="downloads.server_manager_1" href="server.html">服务器管理器</a></li>
+<li data-i18n="downloads.cloud"><a data-i18n="downloads.cloud_1" href="cloud.html">云服务</a></li>
+<li data-i18n="downloads.guides"><a data-i18n="downloads.guides_1" href="docs.html">指南</a></li>
+<li data-i18n="downloads.faq"><a data-i18n="downloads.faq_1" href="faq.html">常见问题</a></li>
+<li data-i18n="downloads.downloads"><a class="active" data-i18n="downloads.downloads_1" href="downloads.html">下载</a></li>
+<li data-i18n="downloads.github"><a aria-label="GitHub Repository" class="nav-github-link" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg viewbox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+<span data-i18n="downloads.github_1">GitHub</span>
+</a></li>
+<li data-i18n="downloads.get_launcher"><a class="nav-cta" data-i18n="downloads.get_launcher_1" href="#players">获取启动器</a></li>
+</ul>
+</div>
+</header>
+<!-- ================= PAGE HERO ================= -->
+<section class="page-hero">
+<div class="container">
+<span class="eyebrow" data-i18n="downloads.downloads_2">下载</span>
+<h1 data-i18n="downloads.one_ecosystem_everyones_ready">一个生态系统，人人皆就绪。</h1>
+<p data-i18n="downloads.players_get_the_launcher">玩家获取启动器，服主获取自托管服务器管理器。</p>
+</div>
+</section>
+<!-- ================= TABS ================= -->
+<div class="container">
+<div aria-label="Choose your download" class="tabs" data-i18n="downloads.im_a_playeri_run" role="tablist"><button aria-selected="true" class="tab-btn active" data-i18n="downloads.im_a_player" data-tab="players" role="tab">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        我是玩家
+      </button>
+<button aria-selected="false" class="tab-btn" data-i18n="downloads.i_run_a_server" data-tab="server-owners" role="tab">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><path d="M6 6h.01M6 18h.01"></path></svg>
+        我运行服务器（自托管）
+      </button>
+<button aria-selected="false" class="tab-btn" data-i18n="downloads.cloud_coming_soon" data-tab="cloud" role="tab">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
+        云服务（即将推出）
+      </button></div>
+</div>
+<!-- ================= PLAYER PANEL ================= -->
+<section class="section" style="padding-top: 0;">
+<div class="container">
+<div class="tab-panel active" data-panel="players" role="tabpanel">
+<div class="grid grid-2" style="align-items: start;">
+<div class="dl-card">
+<div class="dl-head">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg></span>
+<div>
+<h3 data-i18n="downloads.zircon_launcher">Zircon 启动器</h3>
+<div class="version">v0.5.0 · Windows · macOS · Linux</div>
+</div>
+</div>
+<div class="dl-meta" data-i18n="downloads.free_open_sourcemultiplatform_release"><span class="pill pill-accent" data-i18n="downloads.free_open_source">免费 &amp; 开源</span>
+<span class="pill" data-i18n="downloads.multiplatform_release">多平台发布</span></div>
+<p data-i18n="downloads.the_companion_launcher_for" style="color: var(--muted); font-size: 14.5px; margin: 0;">Zircon 服务器的伴侣启动器。使用 Microsoft 账户登录，添加
+              您的服务器，然后点击 PLAY — 模组将自动精确同步，并通过
+              Modrinth & CurseForge 验证。</p>
+<!-- OS Platform Selector -->
+<div class="os-selector-wrap">
+<div class="os-detected-label" data-i18n="downloads.detected_platformwindows"><span class="pulse-dot"></span>
+<span data-i18n="downloads.detected_platformwindows_1">检测到的平台：<strong data-i18n="downloads.windows" id="detected-os-label" style="color: var(--accent-bright);">Windows</strong></span></div>
+<div aria-label="Select Operating System" class="os-buttons" data-i18n="downloads.windowsmacoslinux" role="tablist"><button aria-selected="true" class="os-pill active" data-i18n="downloads.windows_1" data-os="windows" role="tab" type="button">
+<svg viewbox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"></path></svg>
+                  Windows
+                </button>
+<button aria-selected="false" class="os-pill" data-i18n="downloads.macos" data-os="macos" role="tab" type="button">
+<svg viewbox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.93c.62-.76 1.04-1.82.93-2.88-.9.04-2 .6-2.65 1.36-.58.68-1.08 1.76-.94 2.8.99.08 2.02-.52 2.66-1.28"></path></svg>
+                  macOS
+                </button>
+<button aria-selected="false" class="os-pill" data-i18n="downloads.linux" data-os="linux" role="tab" type="button">
+<svg fill="currentColor" viewbox="80 60 325 350"><path d="M139.157,383.053c16.613,1.984,35.279,12.746,50.9,14.646c15.705,1.983,20.565-10.695,20.565-10.695 s17.673-3.951,36.253-4.406c18.598-0.521,36.203,3.868,36.203,3.868s3.414,7.819,9.787,11.233 c6.373,3.48,20.094,3.951,28.888-5.314c8.811-9.332,32.319-21.087,45.519-28.435c13.284-7.365,10.846-18.597,2.506-22.011 c-8.34-3.413-15.167-8.794-14.646-19.119c0.454-10.24-7.365-17.067-7.365-17.067s6.844-22.532,0.471-41.197 c-6.373-18.58-27.392-48.461-43.551-70.926c-16.159-22.532-2.439-48.545-17.151-81.789c-14.714-33.294-52.867-31.326-73.432-17.135 c-20.565,14.192-14.26,49.386-13.268,66.084c0.992,16.613,0.454,28.501-1.446,32.773c-1.9,4.338-15.167,20.094-23.978,33.294 c-8.794,13.267-15.168,40.659-21.608,51.959c-6.306,11.233-1.9,21.473-1.9,21.473s-4.405,1.513-7.886,8.879 c-3.414,7.281-10.241,10.761-22.533,13.133c-12.208,2.505-12.208,10.375-9.265,19.186c2.959,8.794,0,13.721-3.414,24.954 C105.393,377.672,122.477,381.085,139.157,383.053z M311.849,331.816c8.727,3.817,21.271-1.497,25.088-5.314 c3.801-3.8,6.491-9.45,6.491-9.45s3.817,1.9,3.43,7.936c-0.404,6.121,2.623,14.848,8.34,17.875 c5.717,3.01,14.444,7.213,9.921,11.417c-4.608,4.204-30.099,14.461-37.716,22.465c-7.55,7.953-17.471,14.461-23.508,12.544 c-6.103-1.9-11.434-10.24-8.81-22.448c2.707-12.157,4.994-25.492,4.607-33.109c-0.403-7.617-1.9-17.874,0-19.388 c1.9-1.497,4.927-0.774,4.927-0.774S303.104,328.017,311.849,331.816z M255.216,126.033c8.407,0,15.184,8.34,15.184,18.597 c0,7.281-3.414,13.587-8.408,16.614c-1.261-0.521-2.573-1.11-4.019-1.716c3.027-1.496,5.128-5.313,5.128-9.719 c0-5.767-3.547-10.509-8.004-10.509c-4.338,0-7.954,4.741-7.954,10.509c0,2.103,0.522,4.204,1.379,5.852 c-2.623-1.06-4.994-1.967-6.894-2.69c-0.992-2.506-1.581-5.331-1.581-8.34C240.048,134.374,246.807,126.033,255.216,126.033z M234.398,158.083c4.137,0.723,15.503,5.65,19.708,7.163c4.204,1.446,8.861,4.136,8.407,6.827c-0.521,2.774-2.69,2.774-8.407,6.255 c-5.65,3.414-17.992,11.031-21.944,11.552c-3.935,0.521-6.171-1.699-10.376-4.406c-4.204-2.758-12.089-9.198-10.106-12.611 c0,0,6.171-4.725,8.862-7.146C223.233,163.211,230.194,157.309,234.398,158.083z M216.271,128.993 c6.625,0,12.023,7.886,12.023,17.605c0,1.766-0.202,3.413-0.521,5.061c-1.648,0.521-3.295,1.379-4.877,2.758 c-0.773,0.656-1.497,1.244-2.152,1.9c1.042-1.967,1.446-4.792,0.975-7.752c-0.908-5.246-4.456-9.13-7.937-8.609 c-3.498,0.589-5.583,5.398-4.742,10.712c0.925,5.381,4.405,9.264,7.953,8.676c0.202-0.067,0.387-0.134,0.589-0.202 c-1.698,1.648-3.279,3.094-4.927,4.271c-4.792-2.237-8.34-8.929-8.34-16.815C204.316,136.812,209.629,128.993,216.271,128.993z M179.362,256.216c6.827-10.761,11.232-34.286,18.059-42.105c6.895-7.802,12.208-24.432,9.787-31.78 c0,0,14.713,17.605,24.954,14.713c10.257-2.96,33.311-20.094,36.724-17.151c3.414,2.959,32.773,67.529,35.732,88.094 c2.96,20.548-1.967,36.254-1.967,36.254s-11.232-2.96-12.679,3.867c-1.446,6.894-1.446,31.865-1.446,31.865 s-15.184,21.019-38.692,24.499c-23.508,3.414-35.279,0.925-35.279,0.925l-13.2-15.117c0,0,10.258-1.513,8.811-11.821 c-1.446-10.24-31.344-24.433-36.725-37.179C168.062,288.534,172.451,266.994,179.362,256.216z M121.232,333.33 c1.177-5.044,16.411-5.044,22.263-8.592c5.852-3.548,7.028-13.738,11.754-16.428c4.657-2.758,13.267,7.029,16.815,12.543 c3.481,5.381,16.816,28.906,22.264,34.757c5.515,5.902,10.577,13.721,8.996,20.75c-1.496,7.028-9.786,12.157-9.786,12.157 c-7.415,2.287-28.098-6.642-37.497-10.577c-9.399-3.951-33.311-5.129-36.388-8.609c-3.161-3.548,1.513-11.367,2.757-18.783 C123.519,343.049,120.039,338.391,121.232,333.33z"></path></svg>
+                  Linux
+                </button></div>
+</div>
+<!-- Windows Downloads -->
+<div class="os-content active" data-os-panel="windows">
+<div class="dl-actions" data-i18n="downloads.download_for_windows_exemsi"><a class="btn btn-primary btn-lg" data-i18n="downloads.download_for_windows_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe" rel="noopener" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+                  下载 Windows (.exe)
+                </a>
+<a class="btn btn-ghost" data-i18n="downloads.msi_installer" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64_en-US.msi" rel="noopener" target="_blank">.msi 安装包</a></div>
+<p class="dl-note" data-i18n="downloads.compatible_with_64bitwindows_10">兼容 64 位 <strong data-i18n="downloads.windows_10_and_11">Windows 10 和 11</strong>。包含 NSIS 安装程序和 WiX MSI 包。</p>
+</div>
+<!-- macOS Downloads -->
+<div class="os-content" data-os-panel="macos">
+<div class="dl-actions" data-i18n="downloads.download_for_macos_dmgapp"><a class="btn btn-primary btn-lg" data-i18n="downloads.download_for_macos_dmg" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_aarch64.dmg" rel="noopener" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+                  下载 macOS (.dmg)
+                </a>
+<a class="btn btn-ghost" data-i18n="downloads.app_bundle_targz" href="https://downloads.zirconmc.net/updates/launcher/Zircon-macOS-app.tar.gz" rel="noopener" target="_blank">.app 捆绑包 (.tar.gz)</a></div>
+<p class="dl-note" data-i18n="downloads.native_apple_disk_image">原生 Apple 磁盘映像 (.dmg)。支持 <strong data-i18n="downloads.apple_silicon_m1m2m3m4">Apple Silicon (M1/M2/M3/M4)</strong> 以及运行 macOS 11.0+ 的 Intel Mac。</p>
+</div>
+<!-- Linux Downloads -->
+<div class="os-content" data-os-panel="linux">
+<div class="dl-actions" data-i18n="downloads.download_appimage_universaldeb_debianubunturpm"><a class="btn btn-primary btn-lg" data-i18n="downloads.download_appimage_universal" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_amd64.AppImage" rel="noopener" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+                  下载 .AppImage (通用版)
+                </a>
+<a class="btn btn-ghost" data-i18n="downloads.deb_debianubuntu" href="https://downloads.zirconmc.net/updates/launcher/zircon_0.4.21_amd64.deb" rel="noopener" target="_blank">.deb (Debian/Ubuntu)</a>
+<a class="btn btn-ghost" data-i18n="downloads.rpm_fedorarhel" href="https://downloads.zirconmc.net/updates/launcher/zircon-0.4.21-1.x86_64.rpm" rel="noopener" target="_blank">.rpm (Fedora/RHEL)</a></div>
+<p class="dl-note" data-i18n="downloads.portableappimageworks_across_arch_fedora">便携式 <strong data-i18n="downloads.appimage">.AppImage</strong> 适用于 Arch、Fedora、openSUSE、Ubuntu、Debian 和 Manjaro。同时提供原生 <strong data-i18n="downloads.deb">.deb</strong> 和 <strong data-i18n="downloads.rpm">.rpm</strong> 软件包。</p>
+</div>
+<!-- First-time Installation & Security Guide -->
+<details class="install-help-box">
+<summary data-i18n="downloads.firsttime_opening_on_macos"><svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<span data-i18n="downloads.firsttime_opening_on_macos_1">首次在 macOS、Windows 或 Linux 上打开？阅读设置提示 →</span></summary>
+<div class="install-help-content">
+<div data-i18n="downloads.macos_gatekeeperif_macos_displays"><strong data-i18n="downloads.macos_gatekeeper">macOS Gatekeeper：</strong>如果 macOS 显示应用未验证或已损坏的通知，请打开 Mac 的 <strong data-i18n="downloads.terminal">终端</strong>并运行：
+                  <br/><code style="margin-top: 4px; display: inline-block;">xattr -cr /Applications/Zircon.app</code></div>
+<div data-i18n="downloads.windows_smartscreenif_the_blue"><strong data-i18n="downloads.windows_smartscreen">Windows SmartScreen：</strong>如果出现蓝色的“Windows 保护了你的电脑”屏幕，请点击 <strong data-i18n="downloads.more_info">更多信息</strong> 并选择 <strong data-i18n="downloads.run_anyway">仍要运行</strong>。</div>
+<div data-i18n="downloads.linux_appimagemake_the_downloaded"><strong data-i18n="downloads.linux_appimage">Linux .AppImage：</strong>使下载的 AppImage 可执行：
+                  <br/><code style="margin-top: 4px; display: inline-block;">chmod +x Zircon*.AppImage</code></div>
+</div>
+</details>
+</div>
+<div>
+<h3 data-i18n="downloads.system_requirements" style="color: var(--white); margin: 0 0 6px;">系统要求</h3>
+<p data-i18n="downloads.supported_on_all_major" style="color: var(--muted); font-size: 14px; margin: 0 0 10px;">支持所有主流桌面操作系统：</p>
+<ul class="spec-list">
+<li data-i18n="downloads.windows_1011_macos_11"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
+<span data-i18n="downloads.windows_1011_macos_11_1"><b data-i18n="downloads.windows_1011_macos_11_2">Windows 10/11、macOS 11+ 或 Linux</b>（64 位 x86_64 或 Apple Silicon）</span></li>
+<li data-i18n="downloads.amicrosoft_account_with_minecraft"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="11" rx="2" width="18" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+<span data-i18n="downloads.amicrosoft_account_with_minecraft_1">拥有 <b data-i18n="downloads.microsoft_account_with_minecraft">包含 Minecraft: Java Edition 的 Microsoft 账户</b> — 登录采用官方 Microsoft 流程</span></li>
+<li data-i18n="downloads.4_gb_ram_recommendedfor"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M4 17l6-6-6-6"></path><path d="M12 19h8"></path></svg>
+<span data-i18n="downloads.4_gb_ram_recommendedfor_1"><b data-i18n="downloads.4_gb_ram_recommended">推荐 4 GB+ RAM</b> 用于模组整合包 — 启动器内置 RAM 滑块</span></li>
+</ul>
+<div class="callout" data-i18n="downloads.what_it_does_for"><strong data-i18n="downloads.what_it_does_for_1">它能为您做什么：</strong>一键加入 · 精确模组同步 ·
+              Modrinth & CurseForge 验证下载 · 服务器隔离 · 带 3D
+              预览的皮肤自定义器 · 离线单人游戏实例 · 着色器 & 资源包
+              支持。</div>
+<div class="callout warn" data-i18n="downloads.not_affiliated_with_mojang"><strong data-i18n="downloads.not_affiliated_with_mojang_1">与 Mojang 或 Microsoft 无关联。</strong>您必须拥有
+              Minecraft Java Edition。在线游玩没有离线/未认证模式。</div>
+</div>
+</div>
+</div>
+<!-- ================= SERVER OWNER PANEL ================= -->
+<div class="tab-panel" data-panel="server-owners" role="tabpanel">
+<div class="grid grid-2" style="align-items: start;">
+<div class="dl-card">
+<div class="dl-head">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><path d="M6 6h.01M6 18h.01"></path></svg></span>
+<div>
+<h3 data-i18n="downloads.zircon_server_manager">Zircon 服务器管理器</h3>
+<div class="version">v0.5.0 · Windows &amp; Linux</div>
+</div>
+</div>
+<div class="dl-meta" data-i18n="downloads.selfhostedlinux_windows_ready"><span class="pill pill-accent" data-i18n="downloads.selfhosted">自托管</span>
+<span class="pill" data-i18n="downloads.linux_windows_ready">Linux &amp; Windows 就绪</span></div>
+<p data-i18n="downloads.the_serverside_daemon_behind" style="color: var(--muted); font-size: 14.5px; margin: 0;">每个 Zircon 服务器背后的服务端守护进程：为您的玩家提供精确模组同步，
+              Modrinth & CurseForge 集成，单一公共 TCP 端口复用器，实时控制台，自动备份，以及
+              内置 Web 管理仪表盘。</p>
+<div class="dl-actions" data-i18n="downloads.download_for_linux_targzwindows"><a class="btn btn-primary btn-lg" data-i18n="downloads.download_for_linux_targz" href="https://downloads.zirconmc.net/updates/server/v0.4.21/zircon-server-linux-x86_64.tar.gz" rel="noopener" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+                下载 Linux (.tar.gz)
+              </a>
+<a class="btn btn-ghost" data-i18n="downloads.windows_zip" href="https://downloads.zirconmc.net/updates/server/v0.4.21/zircon-server-windows-x86_64.zip" rel="noopener" target="_blank">Windows (.zip)</a>
+<a class="btn btn-ghost" data-i18n="downloads.source" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">源代码</a></div>
+<p class="dl-note" data-i18n="downloads.production_ready_forubuntu_debian">生产环境就绪，适用于 <strong data-i18n="downloads.ubuntu_debian_fedora_rhel">Ubuntu、Debian、Fedora、RHEL、Arch Linux</strong> 和 Windows Server。可作为 systemd 服务或后台进程独立运行。</p>
+</div>
+<div>
+<h3 data-i18n="downloads.setup_guide" style="color: var(--white); margin: 0 0 6px;">设置指南</h3>
+<ol class="spec-list" style="list-style: none;">
+<li data-i18n="downloads.install_download_the_manager"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+<span data-i18n="downloads.install_download_the_manager_1"><b data-i18n="downloads.install">安装</b> — 下载管理器并运行它。首次启动时会生成安全的管理员密码并打印到控制台。</span></li>
+<li data-i18n="downloads.open_the_dashboardathttplocalhost25564and_sign"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path></svg>
+<span data-i18n="downloads.open_the_dashboardathttplocalhost25564and_sign_1">在 <b data-i18n="downloads.httplocalhost25564">http://localhost:25564</b> <b data-i18n="downloads.open_the_dashboard">打开仪表盘</b>并使用该密码登录。</span></li>
+<li data-i18n="downloads.create_an_instance_add"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+<span data-i18n="downloads.create_an_instance_add_1"><b data-i18n="downloads.create_an_instance_add_2">创建实例 &amp; 添加模组</b> — 管理器会为您下载服务器 JAR。
+                接受 EULA，选择您的 Minecraft &amp; 加载器版本，并直接从 Modrinth 和 CurseForge 搜索 &amp; 安装模组。</span></li>
+<li data-i18n="downloads.start_the_server_one"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M9 12l2 2 4-4"></path></svg>
+<span data-i18n="downloads.start_the_server_one_1"><b data-i18n="downloads.start_the_server">启动服务器</b> — 一个公共端口 (25565) 同时服务于
+                Minecraft 和 HTTP。分享地址，玩家即可加入模组化服务器。</span></li>
+</ol>
+<div class="callout" data-i18n="downloads.ports_firewallexpose25565minecraft_web_multiplexed"><strong data-i18n="downloads.ports_firewall">端口 &amp; 防火墙：</strong>暴露 <b>25565</b>（Minecraft + Web
+              复用），并将管理仪表盘 <b>25564</b> 保留在 localhost 或
+              置于您自己的反向代理之后。</div>
+</div>
+</div>
+<h3 data-i18n="downloads.build_from_source" style="color: var(--white); margin: 40px 0 6px;">从源代码构建</h3>
+<p data-i18n="downloads.the_whole_project_is" style="color: var(--muted); font-size: 14px; margin: 0 0 14px;">整个项目是一个 Rust 工作区。更喜欢自己运行吗？
+          GitHub 上的 README 提供了构建和运行说明。</p>
+<a class="btn btn-ghost" data-i18n="downloads.view_source_build_guide" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          查看源代码 & 构建指南</a>
+</div>
+<!-- ================= CLOUD PANEL ================= -->
+<div class="tab-panel" data-panel="cloud" role="tabpanel">
+<div class="cloud-showcase-box" style="margin-bottom: 24px;">
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+<div>
+<span class="cloud-badge" data-i18n="downloads.future_roadmap_coming_soon"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
+                未来路线图 · 即将推出</span>
+<h2 data-i18n="downloads.zerohardware_managed_hostingin_development" style="font-size: clamp(24px, 3.4vw, 34px); color: var(--white); margin: 0 0 10px; font-weight: 800;">零硬件托管 <span class="hl" data-i18n="downloads.in_development">开发中</span></h2>
+<p data-i18n="downloads.prefer_not_to_configure" style="color: var(--muted); font-size: 15.5px; max-width: 640px; margin: 0; line-height: 1.65;">不想配置端口转发、防火墙 NAT 规则或维护物理家用服务器？Zircon Cloud 将在未来的版本中提供交钥匙式托管服务，具备自动休眠保留功能和 AI 诊断功能。对于 v1，请查看免费的自托管服务器管理器！</p>
+</div>
+<div data-i18n="downloads.preview_roadmap"><a class="btn btn-secondary btn-xl" data-i18n="downloads.preview_roadmap_1" href="cloud.html">
+                预览路线图 →
+              </a></div>
+</div>
+<div class="cloud-features-grid">
+<div class="cloud-feature-item">
+<h4 data-i18n="downloads.pausetosleep_engine"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" x2="12" y1="2" y2="12"></line></svg>
+                暂停即休眠引擎</h4>
+<p data-i18n="downloads.suspends_cleanly_when_empty">当无人时干净地挂起以减少主机开销。当玩家点击连接时自动恢复。</p>
+</div>
+<div class="cloud-feature-item">
+<h4 data-i18n="downloads.realtime_websocket_console"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M4 17l6-6-6-6"></path><path d="M12 19h8"></path></svg>
+                实时 WebSocket 控制台</h4>
+<p data-i18n="downloads.access_your_live_terminal">从任何 Web 浏览器访问您的实时终端、CPU/RAM 遥测数据、玩家踢出/封禁以及文件管理。</p>
+</div>
+<div class="cloud-feature-item">
+<h4 data-i18n="downloads.automatic_mod_sync"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                自动模组同步</h4>
+<p data-i18n="downloads.all_players_using_zircon">所有使用 Zircon 启动器的玩家都会自动接收来自您服务器清单的验证模组、加载器和配置文件。</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= CTA ================= -->
+<section class="section" style="padding-top: 0;">
+<div class="container">
+<div class="cta-band">
+<h2 data-i18n="downloads.not_sure_which_one">不确定您需要哪一个？</h2>
+<p data-i18n="downloads.players_install_thelauncher_server">玩家安装 <strong data-i18n="downloads.launcher_2">启动器</strong>。服主运行自托管的 <strong data-i18n="downloads.server_manager_2">服务器管理器</strong>。</p>
+<div data-i18n="downloads.im_a_playerselfhost_servergithub" style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;"><a class="btn btn-primary btn-lg" data-i18n="downloads.im_a_player_1" href="#players">我是玩家</a>
+<a class="btn btn-secondary btn-lg" data-i18n="downloads.selfhost_server" href="#server-owners">自托管服务器</a>
+<a class="btn btn-ghost btn-lg" data-i18n="downloads.github_2" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">GitHub</a></div>
+</div>
+</div>
+</section>
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+<div class="container">
+<div class="footer-grid">
+<div class="footer-brand">
+<a class="brand" href="./" style="display: inline-block; margin-bottom: 14px; text-decoration: none;">
+<img alt="Zircon" class="brand-text" height="26" src="../assets/img/zircon-title.svg"/>
+</a>
+<p data-i18n="downloads.a_free_opensource_launcher">一款免费、开源的模组化 Minecraft 启动器和服务器管理器。
+          玩家点击 PLAY 即可获得服务器运行的确切模组 — 每次启动均通过
+          Modrinth & CurseForge 验证。</p>
+<a class="pill pill-accent" data-i18n="downloads.open_source_bsl_11" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank"><svg aria-hidden="true" fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.14c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"></path></svg>
+            开源 (BSL 1.1)</a>
+</div>
+<div class="footer-col">
+<h4 data-i18n="downloads.pages">页面</h4>
+<ul>
+<li data-i18n="downloads.home_2"><a data-i18n="downloads.home_3" href="/">首页</a></li>
+<li data-i18n="downloads.launcher_3"><a data-i18n="downloads.launcher_4" href="launcher.html">启动器</a></li>
+<li data-i18n="downloads.server_manager_3"><a data-i18n="downloads.server_manager_4" href="server.html">服务器管理器</a></li>
+<li data-i18n="downloads.guides_docs"><a data-i18n="downloads.guides_docs_1" href="docs.html">指南 &amp; 文档</a></li>
+<li data-i18n="downloads.faq_2"><a data-i18n="downloads.faq_3" href="faq.html">常见问题</a></li>
+<li data-i18n="downloads.downloads_3"><a data-i18n="downloads.downloads_4" href="downloads.html">下载</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<h4 data-i18n="downloads.project_community">项目 & 社区</h4>
+<ul>
+<li data-i18n="downloads.github_repository"><a data-i18n="downloads.github_repository_1" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">GitHub 仓库</a></li>
+<li data-i18n="downloads.releases_changelogs"><a data-i18n="downloads.releases_changelogs_1" href="https://github.com/DevTheDev189/Zircon/releases" rel="noopener" target="_blank">发布 &amp; 更新日志</a></li>
+<li data-i18n="downloads.cloud_coming_soon_1"><a data-i18n="downloads.cloud_coming_soon_2" href="cloud.html" style="color: var(--muted);">云服务（即将推出）</a></li>
+<li data-i18n="downloads.business_source_license_11"><a data-i18n="downloads.business_source_license_11_1" href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" rel="noopener" target="_blank">商业源码许可证 1.1</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-legal" data-i18n="downloads.zircon_contributors_v0421_active"><span data-i18n="downloads.zircon_contributors_v0421_active_1">© Zircon 贡献者 · v0.4.21（积极开发中）</span>
+<span data-i18n="downloads.not_an_official_minecraft">非官方 Minecraft 产品。未经 Mojang Studios 或 Microsoft 批准或关联。</span></div>
+</div>
+</footer>
+<script src="../assets/js/main.js?v=2"></script>
+</body>
+</html>

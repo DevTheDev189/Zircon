@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+
+<html lang="hu">
+<head>
+  <link rel="canonical" href="https://zirconmc.net/hu/">
+  <link rel="alternate" hreflang="x-default" href="https://zirconmc.net/">
+  <link rel="alternate" hreflang="en" href="https://zirconmc.net/">
+  <link rel="alternate" hreflang="es" href="https://zirconmc.net/es/">
+  <link rel="alternate" hreflang="pt-BR" href="https://zirconmc.net/pt-br/">
+  <link rel="alternate" hreflang="pt-PT" href="https://zirconmc.net/pt-pt/">
+  <link rel="alternate" hreflang="de" href="https://zirconmc.net/de/">
+  <link rel="alternate" hreflang="fr" href="https://zirconmc.net/fr/">
+  <link rel="alternate" hreflang="it" href="https://zirconmc.net/it/">
+  <link rel="alternate" hreflang="ru" href="https://zirconmc.net/ru/">
+  <link rel="alternate" hreflang="pl" href="https://zirconmc.net/pl/">
+  <link rel="alternate" hreflang="nl" href="https://zirconmc.net/nl/">
+  <link rel="alternate" hreflang="tr" href="https://zirconmc.net/tr/">
+  <link rel="alternate" hreflang="sv" href="https://zirconmc.net/sv/">
+  <link rel="alternate" hreflang="uk" href="https://zirconmc.net/uk/">
+  <link rel="alternate" hreflang="cs" href="https://zirconmc.net/cs/">
+  <link rel="alternate" hreflang="fi" href="https://zirconmc.net/fi/">
+  <link rel="alternate" hreflang="da" href="https://zirconmc.net/da/">
+  <link rel="alternate" hreflang="no" href="https://zirconmc.net/no/">
+  <link rel="alternate" hreflang="hu" href="https://zirconmc.net/hu/">
+  <link rel="alternate" hreflang="ro" href="https://zirconmc.net/ro/">
+  <link rel="alternate" hreflang="el" href="https://zirconmc.net/el/">
+  <link rel="alternate" hreflang="bg" href="https://zirconmc.net/bg/">
+  <link rel="alternate" hreflang="sk" href="https://zirconmc.net/sk/">
+  <link rel="alternate" hreflang="hr" href="https://zirconmc.net/hr/">
+  <link rel="alternate" hreflang="sr" href="https://zirconmc.net/sr/">
+  <link rel="alternate" hreflang="sl" href="https://zirconmc.net/sl/">
+  <link rel="alternate" hreflang="lt" href="https://zirconmc.net/lt/">
+  <link rel="alternate" hreflang="lv" href="https://zirconmc.net/lv/">
+  <link rel="alternate" hreflang="et" href="https://zirconmc.net/et/">
+  <link rel="alternate" hreflang="zh-CN" href="https://zirconmc.net/zh-cn/">
+  <link rel="alternate" hreflang="zh-TW" href="https://zirconmc.net/zh-tw/">
+  <link rel="alternate" hreflang="ja" href="https://zirconmc.net/ja/">
+  <link rel="alternate" hreflang="ko" href="https://zirconmc.net/ko/">
+  <link rel="alternate" hreflang="id" href="https://zirconmc.net/id/">
+  <link rel="alternate" hreflang="vi" href="https://zirconmc.net/vi/">
+  <link rel="alternate" hreflang="th" href="https://zirconmc.net/th/">
+  <link rel="alternate" hreflang="ms" href="https://zirconmc.net/ms/">
+  <link rel="alternate" hreflang="fil" href="https://zirconmc.net/fil/">
+  <link rel="alternate" hreflang="hi" href="https://zirconmc.net/hi/">
+  <link rel="alternate" hreflang="ar" href="https://zirconmc.net/ar/">
+  <link rel="alternate" hreflang="he" href="https://zirconmc.net/he/">
+  <link rel="alternate" hreflang="fa" href="https://zirconmc.net/fa/">
+
+<!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+<script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zircon — Modded Minecraft with friends, without the headache</title>
+<meta content="Zircon is a free, open-source launcher for modded Minecraft. Pick a server, hit PLAY, and the exact mods that server runs install themselves — verified against Modrinth &amp; CurseForge on every launch. Windows 10/11 now; macOS &amp; Linux planned." name="description"/>
+<meta content="modded minecraft launcher, minecraft mod sync, modrinth launcher, curseforge launcher, minecraft server manager, fabric launcher, forge launcher, neoforge, automatic mod installer" name="keywords"/>
+<meta content="Zircon Contributors" name="author"/>
+<meta content="index, follow" name="robots"/>
+<meta content="#0d1117" name="theme-color"/>
+<!-- Canonical URL -->
+<link href="https://zirconmc.net/" rel="canonical"/>
+<!-- Open Graph / Social Sharing -->
+<meta content="Zircon" property="og:site_name"/>
+<meta content="https://zirconmc.net/" property="og:url"/>
+<meta content="Zircon — Modded Minecraft with friends, without the headache" property="og:title"/>
+<meta content="Free open-source launcher &amp; server manager for modded Minecraft. Pick a server, hit PLAY, and mods sync automatically with Modrinth &amp; CurseForge verification." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://zirconmc.net/assets/img/locales/hu/main_launcher.png" property="og:image"/>
+<meta content="Zircon Modded Minecraft Launcher Interface" property="og:image:alt"/>
+<meta content="en_US" property="og:locale"/>
+<!-- Twitter Cards -->
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Zircon — Modded Minecraft with friends, without the headache" name="twitter:title"/>
+<meta content="Free open-source launcher &amp; server manager for modded Minecraft. Exact mod sync verified on every launch via Modrinth &amp; CurseForge." name="twitter:description"/>
+<meta content="https://zirconmc.net/assets/img/locales/hu/main_launcher.png" name="twitter:image"/>
+<meta content="Zircon Launcher Preview" name="twitter:image:alt"/>
+<!-- Favicons & Manifest -->
+<link href="../assets/img/favicon.png" rel="icon" type="image/png"/>
+<link href="../assets/img/favicon.png" rel="apple-touch-icon"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+<!-- Structured Data / JSON-LD -->
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://zirconmc.net/#website",
+        "url": "https://zirconmc.net/",
+        "name": "Zircon",
+        "description": "Free and open-source launcher & server manager for modded Minecraft.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Zircon",
+          "url": "https://github.com/DevTheDev189/Zircon"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://zirconmc.net/#launcher",
+        "name": "Zircon Launcher",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Windows 10, Windows 11",
+        "description": "A free, open-source companion launcher for modded Minecraft servers with automatic Modrinth & CurseForge verification.",
+        "url": "https://zirconmc.net/",
+        "downloadUrl": "https://zirconmc.net/downloads.html#players",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://zirconmc.net/#server-manager",
+        "name": "Zircon Server Manager",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "description": "Self-hosted Minecraft server manager featuring automatic player mod syncing, Modrinth & CurseForge integration, web dashboard, and single-port multiplexing.",
+        "url": "https://zirconmc.net/downloads.html#server-owners",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://zirconmc.net/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How does Zircon automatically sync Minecraft mods?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "When you hit PLAY, the Zircon Launcher connects to the server, fetches its exact mod manifest, verifies each mod hash against Modrinth and CurseForge, and automatically downloads any missing mods directly to your isolated instance folder."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use Modrinth and CurseForge to find and download mods?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes! Zircon natively integrates with both Modrinth and CurseForge with zero API key configuration needed. Server owners and players can search, browse, and download mods directly from both platforms."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Zircon free and open source?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, Zircon is free and source-available under the Business Source License 1.1 (BSL 1.1). It is 100% free for players, homelabbers, and gaming communities, while commercial managed cloud hosting is reserved."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is my Microsoft Minecraft account safe with Zircon?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Zircon uses Microsoft OAuth 2.0 authentication in your browser. Your password and credentials are submitted directly to Microsoft and never touch or get stored by Zircon."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which mod loaders does Zircon support?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Zircon supports Fabric, Quilt, Forge, and NeoForge mod loaders across supported Minecraft versions."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+<!-- Animated Procedural Background Elements -->
+<div class="z-bg-dots"></div>
+<div class="z-orb z-orb-1"></div>
+<div class="z-orb z-orb-2"></div>
+<div class="z-orb z-orb-3"></div>
+<div class="z-orb z-orb-4"></div>
+<div class="z-particle z-particle-1"></div>
+<div class="z-particle z-particle-2"></div>
+<div class="z-particle z-particle-3"></div>
+<div class="z-particle z-particle-4"></div>
+<div class="z-particle z-particle-5"></div>
+<div class="z-particle z-particle-6"></div>
+<!-- ================= NAV ================= -->
+<header class="site-nav">
+<div class="container">
+<a aria-label="Zircon home" class="brand" href="./">
+<img alt="Zircon" class="brand-text" height="28" src="../assets/img/zircon-title.svg" width="130"/>
+</a>
+<button aria-expanded="false" aria-label="Toggle navigation" class="nav-toggle">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"></path>
+</svg>
+</button>
+<ul class="nav-links">
+<li data-i18n="index.home"><a class="active" data-i18n="index.home_1" href="/">Kezdőlap</a></li>
+<li data-i18n="index.launcher"><a data-i18n="index.launcher_1" href="launcher.html">Indító</a></li>
+<li data-i18n="index.server_manager"><a data-i18n="index.server_manager_1" href="server.html">Szerverkezelő</a></li>
+<li data-i18n="index.guides"><a data-i18n="index.guides_1" href="docs.html">Útmutatók</a></li>
+<li data-i18n="index.faq"><a data-i18n="index.faq_1" href="faq.html">GYIK</a></li>
+<li data-i18n="index.downloads"><a data-i18n="index.downloads_1" href="downloads.html">Letöltések</a></li>
+<li data-i18n="index.github"><a aria-label="GitHub Repository" class="nav-github-link" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg viewbox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+<span data-i18n="index.github_1">GitHub</span>
+</a></li>
+<li data-i18n="index.get_launcher"><a class="nav-cta" data-i18n="index.get_launcher_1" href="downloads.html#players">Indító letöltése</a></li>
+</ul>
+</div>
+</header>
+<!-- ================= HERO ================= -->
+<section class="hero">
+<div class="container">
+<span class="eyebrow" data-i18n="index.the_fastest_way_to">A leggyorsabb módja a modolt Minecraft játékának barátaiddal</span>
+<img alt="Zircon" class="hero-title" src="../assets/img/zircon-title.svg"/>
+<h1 data-i18n="index.modded_minecraft_with_friendswithout">Modolt Minecraft barátaiddal,<br/><span class="hl" data-i18n="index.without_the_headache">fejfájás nélkül.</span></h1>
+<p class="lede" data-i18n="index.zircon_eliminates_modpack_mismatches">A Zircon végleg megszünteti a modcsomag eltéréseket. Válassz egy szervert,
+        nyomj <strong data-i18n="index.play">JÁTSZANI</strong>, és minden mod másodpercek alatt települ és kriptográfikusan ellenőrződik.
+        Ráadásul: 1-kattintásos importálás CurseForge & Prism-ből, 4 játékos kanapészófa co-op, és LAN automatikus felfedezés.</p>
+<div class="hero-actions-stacked" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 12px;">
+<div data-i18n="index.download_for_windows_exestar" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><a class="btn btn-primary btn-xl" data-i18n="index.download_for_windows_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe" id="hero-primary-download">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+<span class="download-label" data-i18n="index.download_for_windows_exe_1">Letöltés Windowsra (.exe)</span>
+</a>
+<a class="btn btn-secondary btn-xl" data-i18n="index.star_on_github" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg fill="currentColor" height="20" viewbox="0 0 24 24" width="20"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+            Csillagozd meg GitHubon
+          </a></div>
+<div class="hero-sublinks-row" data-i18n="index.also_onmacos_dmglinux_appimagehosting" style="color: var(--muted); font-size: 0.9rem; margin-top: 4px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><span data-i18n="index.also_onmacos_dmglinux_appimage">Elérhető még <a data-i18n="index.macos_dmg" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">macOS-re (.dmg)</a> &amp; <a data-i18n="index.linux_appimage" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">Linuxra (.AppImage)</a></span>
+<span>·</span>
+<span data-i18n="index.hosting_a_serverjump_to">Szervert üzemeltetsz? <a data-i18n="index.jump_to_server_engine" href="#server-hosts" style="color: var(--primary); font-weight: 600;">Ugrás a Szervermotorhoz ↓</a></span></div>
+</div>
+<div class="hero-foot" data-i18n="index.100_free_open_sourcezero"><span data-i18n="index.100_free_open_source"><i class="dot"></i> 100% Ingyenes &amp; Nyílt forráskódú</span>
+<span data-i18n="index.zero_telemetry"><i class="dot"></i> Nulla telemetria</span>
+<span data-i18n="index.modrinth_curseforge_integrated"><i class="dot"></i> Modrinth &amp; CurseForge integrálva</span>
+<span data-i18n="index.subsecond_verification"><i class="dot"></i> Másodperc alatti ellenőrzés</span></div>
+<!-- ================= INTERACTIVE SHOWCASE FRAME (70% Launcher Focus) ================= -->
+<div class="hero-shot showcase-container">
+<div class="showcase-tabs" data-i18n="index.launcheruniversal_migration4player_coop3d_skin" role="tablist"><button class="showcase-tab active" data-i18n="index.launcher_2" data-title="Zircon Indító — Egy kattintásos csatlakozás & Mod szinkronizáció" data-view="launcher">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Indító
+          </button>
+<button class="showcase-tab" data-i18n="index.universal_migration" data-title="Univerzális migráció — 1-kattintásos importálás bármely indítóból" data-view="migration">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+            Univerzális migráció
+          </button>
+<button class="showcase-tab" data-i18n="index.4player_coop" data-title="4 játékos felosztott képernyős kanapészófa co-op gamepaddel" data-view="coop">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle><path d="M12 9v6"></path></svg>
+            4 játékos Co-op
+          </button>
+<button class="showcase-tab" data-i18n="index.3d_skin_studio" data-title="Zircon 3D Bőr Stúdió &amp; Mojang szinkronizáció" data-view="skin">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            3D Bőr Stúdió
+          </button>
+<button class="showcase-tab" data-i18n="index.server_engine_preview" data-title="Zircon Szerverkezelő — Egyszerű port 25565 motor" data-view="server">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+            Szervermotor (Előnézet)
+          </button></div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots">
+<span class="dot dot-red"></span>
+<span class="dot dot-yellow"></span>
+<span class="dot dot-green"></span>
+</div>
+<div class="frame-title" data-i18n="index.zircon_launcher_oneclick_join"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="11" rx="2" ry="2" width="18" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+<span data-i18n="index.zircon_launcher_oneclick_join_1" id="frameTitleText">Zircon Indító — Egy kattintásos csatlakozás & Mod szinkronizáció</span></div>
+<div class="frame-controls">
+<button aria-label="Zoom image" class="frame-zoom-btn" title="Click to view full screen">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg>
+</button>
+</div>
+</div>
+<!-- View 1: Launcher -->
+<div class="showcase-view active" data-view="launcher">
+<img alt="Zircon Launcher Main Screen" fetchpriority="high" height="600" loading="eager" src="../assets/img/locales/hu/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="1000"/>
+</div>
+<!-- View 2: Universal Migration -->
+<div class="showcase-view" data-view="migration">
+<img alt="Universal Migration Importer" height="600" loading="lazy" src="../assets/img/locales/hu/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="1000"/>
+</div>
+<!-- View 3: Couch Co-op -->
+<div class="showcase-view" data-view="coop">
+<img alt="4-Player Split-Screen Couch Co-op" height="600" loading="lazy" src="../assets/img/locales/hu/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="1000"/>
+</div>
+<!-- View 4: 3D Skin Studio -->
+<div class="showcase-view" data-view="skin">
+<img alt="Zircon 3D Skin Studio with Live Preview" height="600" loading="lazy" src="../assets/img/locales/hu/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="1000"/>
+</div>
+<!-- View 5: Server Dashboard -->
+<div class="showcase-view" data-view="server">
+<img alt="Zircon Server Performance Stats" height="600" loading="lazy" src="../assets/img/performance_server.png" width="1000"/>
+</div>
+</div>
+<p class="shot-caption" data-i18n="index.click_any_tab_above">Kattints bármelyik fülre fent, vagy az képre a teljes képernyős részletekért.</p>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 1: THE HOOK — AUTOMATIC MOD SYNC ================= -->
+<section class="section" id="mod-sync">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.never_send_a_google">Soha többé ne küldj Google Drive linket.</h2>
+<p data-i18n="index.end_the_2hour_discord">Fejezd be a 2 órás Discord vitát a játékest előtt. Csak nyomd meg a JÁTSZANI-t és spawnolj.</p>
+</div>
+<!-- Problem vs Solution Contrast Arena -->
+<div class="contrast-arena">
+<div class="contrast-box contrast-old">
+<span class="contrast-badge" data-i18n="index.the_900_pm_discord">A 21:00-as Discord rémálom</span>
+<h3 data-i18n="index.the_old_way_modpack" style="color: var(--white); margin: 0; font-size: 22px;">A régi módszer: Modcsomag káosz</h3>
+<ul class="contrast-list">
+<li class="contrast-item" data-i18n="index.which_fabric_build_are"><span class="contrast-icon">✕</span>
+<span data-i18n="index.which_fabric_build_are_1"><strong data-i18n="index.which_fabric_build_are_2">"Melyik Fabric build-ed van?"</strong> — 45 perc Discord hibaelhárítás, miközben a szerver üresen áll.</span></li>
+<li class="contrast-item" data-i18n="index.sketchy_zip_links_downloading"><span class="contrast-icon">✕</span>
+<span data-i18n="index.sketchy_zip_links_downloading_1"><strong data-i18n="index.sketchy_zip_links">Gyanús zip linkek</strong> — 80 laza .jar fájl letöltése véletlenszerű Google Drive linkekről.</span></li>
+<li class="contrast-item" data-i18n="index.crash_on_launch_missing"><span class="contrast-icon">✕</span>
+<span data-i18n="index.crash_on_launch_missing_1"><strong data-i18n="index.crash_on_launch">Összeomlás induláskor</strong> — "Hiányzó függőség: cloth-config-v12" és titokzatos hibanaplók.</span></li>
+<li class="contrast-item" data-i18n="index.game_night_canceled_one"><span class="contrast-icon">✕</span>
+<span data-i18n="index.game_night_canceled_one_1"><strong data-i18n="index.game_night_canceled">Játékest törölve</strong> — Egy barát feladja, és mindenki kilép valami mást játszani.</span></li>
+</ul>
+</div>
+<div class="contrast-box contrast-zircon">
+<span class="contrast-badge" data-i18n="index.instant_game_night">Azonnali játékest</span>
+<h3 data-i18n="index.the_zircon_way_1click" style="color: var(--white); margin: 0; font-size: 22px;">A Zircon módja: 1-kattintás & Játék</h3>
+<ul class="contrast-list">
+<li class="contrast-item" data-i18n="index.zero_file_hunting_your"><span class="contrast-icon">✓</span>
+<span data-i18n="index.zero_file_hunting_your_1"><strong data-i18n="index.zero_file_hunting">Nulla fájlkeresés</strong> — A barátod ad egy szervercímet vagy helyi LAN meghívót.</span></li>
+<li class="contrast-item" data-i18n="index.one_click_hit_play"><span class="contrast-icon">✓</span>
+<span data-i18n="index.one_click_hit_play_1"><strong data-i18n="index.one_click">Egy kattintás</strong> — Nyomd meg a JÁTSZANI-t. A Zircon ellenőrzi a szerver modlistáját és minden egyes fájlt validál.</span></li>
+<li class="contrast-item" data-i18n="index.automatic_fastdownload_missing_mods"><span class="contrast-icon">✓</span>
+<span data-i18n="index.automatic_fastdownload_missing_mods_1"><strong data-i18n="index.automatic_fastdownload">Automatikus gyors letöltés</strong> — Hiányzó modok, konfigurációk és textúrák másodpercek alatt jönnek le Modrinth &amp; CurseForge-ról.</span></li>
+<li class="contrast-item" data-i18n="index.ingame_in_seconds_you"><span class="contrast-icon">✓</span>
+<span data-i18n="index.ingame_in_seconds_you_1"><strong data-i18n="index.ingame_in_seconds">Másodpercek alatt a játékban</strong> — Azonnal együtt spawnoltok. Nulla mod mappa húzgálás.</span></li>
+</ul>
+</div>
+</div>
+<!-- 3-Step Sync Flow -->
+<div class="steps">
+<div class="step">
+<h3 data-i18n="index.1_cryptographic_manifest">1. Kriptográfikus Manifest</h3>
+<p data-i18n="index.the_server_broadcasts_its">A szerver sugározza a pontos Alkatrészjegyzékét (BOM) a 25565-ös porton keresztül — mod ID-k, verzió hash-ek, betöltő és konfigurációk.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.2_instant_hash_audit">2. Azonnali Hash Audit</h3>
+<p data-i18n="index.the_launcher_scans_your">Az indító millimásodpercek alatt átvizsgálja a helyi példányodat, kihagyva a már meglévő fájlokat, és csak a hiányzókat jelöli meg.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.3_parallel_verified_fetch">3. Párhuzamos Validált Letöltés</h3>
+<p data-i18n="index.missing_files_download_in">A hiányzó fájlok párhuzamosan töltődnek le közvetlenül a Modrinth és CurseForge CDN-ekről. Nulla sérült JAR, nulla verzióeltérés.</p>
+</div>
+</div>
+<div style="margin-top: 36px; text-align: center;">
+<div class="app-frame" style="max-width: 900px; margin: 0 auto;">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.cryptographic_mod_synchronization_verification"><span data-i18n="index.cryptographic_mod_synchronization_verification_1">Kriptográfikus Mod Szinkronizációs & Ellenőrzési Motor</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Cryptographic Mod Sync Verification Interface" height="540" loading="lazy" src="../assets/img/sync_verification.png" width="900"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 2: THE OBJECTION KILLER — UNIVERSAL MIGRATION ================= -->
+<section class="section" id="migration">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.switching_from_curseforge_or">Váltasz CurseForge-ról vagy Prism-ről? Hozd át mindent egy kattintással.</h2>
+<p data-i18n="index.dont_abandon_your_worlds">Ne hagyd cserben a világaidat, billentyűkombinációidat vagy modcsomag példányaidat. A Zircon automatikusan észleli a telepített indítókat és veszteségmentesen átportolja őket 2 másodperc alatt.</p>
+</div>
+<!-- 4-Launcher Migration Badges Grid -->
+<div class="grid grid-4" style="margin-bottom: 36px;">
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="CurseForge Logo" height="48" src="../assets/img/curseforge.svg" width="48"/>
+</div>
+<h4 data-i18n="index.curseforge" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">CurseForge</h4>
+<p data-i18n="index.autodetects_modpacks_overrides_custom" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">Automatikusan észleli a modcsomagokat, felülírásokat, egyedi konfigurációkat & világmentéseket.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="Prism Launcher Logo" height="48" src="../assets/img/prism.svg" width="48"/>
+</div>
+<h4 data-i18n="index.prism_launcher" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">Prism Launcher</h4>
+<p data-i18n="index.imports_instance_trees_jvm" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">Importálja a példányfákat, JVM argumentumokat és világmentéseket.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="Modrinth App Logo" height="48" src="../assets/img/modrinth.svg" width="48"/>
+</div>
+<h4 data-i18n="index.modrinth_app" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">Modrinth App</h4>
+<p data-i18n="index.preserves_mr_packs_index" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">Megőrzi az MR csomagokat, indexfájlokat és egyedi erőforráscsomagokat.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="ATLauncher Logo" height="48" src="../assets/img/atlauncher.svg" width="48"/>
+</div>
+<h4 data-i18n="index.atlauncher" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">ATLauncher</h4>
+<p data-i18n="index.transfers_instances_custom_backups" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">Átviteli a példányokat, egyedi biztonsági mentéseket & textúra mappákat.</p>
+</div>
+</div>
+<!-- Feature Split Spotlight -->
+<div class="feature-split">
+<div class="feature-split-text">
+<h2 data-i18n="index.zero_data_loss_zero">Nulla adatvesztés. Nulla manuális fájlhúzogatás.</h2>
+<p data-i18n="index.when_you_launch_zircon">Amikor elindítod a Zircont, a natív Rust detektorunk megtalálja a rendszereden lévő profilokat. Válaszd ki, melyik példányokat szeretnéd importálni, és a Zircon mindent tiszta, izolált homokozókba migrál.</p>
+<ul class="spec-list">
+<li data-i18n="index.100_offline_local_detectionscans"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.100_offline_local_detectionscans_1"><b data-i18n="index.100_offline_local_detection">100% Offline Helyi Észlelés:</b> Átvizsgálja a szabványos lemezmappákat, nulla külső feltöltéssel.</span></li>
+<li data-i18n="index.complete_instance_preservationkeeps_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.complete_instance_preservationkeeps_your_1"><b data-i18n="index.complete_instance_preservation">Teljes Példány Megőrzés:</b> Pontosan úgy tartja meg a billentyűkombinációidat, options.txt-t, erőforráscsomagjaidat és világaidat.</span></li>
+<li data-i18n="index.immediate_fastlaunchautomatically_configures_matching"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.immediate_fastlaunchautomatically_configures_matching_1"><b data-i18n="index.immediate_fastlaunch">Azonnali Gyors Indítás:</b> Automatikus konfigurálja a megfelelő Java verziókat és optimális memóriabeállításokat.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.universal_launcher_importer"><span data-i18n="index.universal_launcher_importer_1">Univerzális Indító Importáló</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Universal Migration Importer Window" height="500" loading="lazy" src="../assets/img/locales/hu/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 3: DELIGHT FEATURES SLIDESHOW ================= -->
+<section class="section" id="features">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.your_new_minecraft_command">Az új Minecraft parancsnoki központod</h2>
+<p data-i18n="index.everything_youve_always_wished">Minden, amit mindig is szeretnél más indítóktól — beépítve az asztali alkalmazásodba.</p>
+</div>
+<div class="delight-slideshow">
+<!-- Slideshow Navigation Tabs -->
+<div class="delight-nav" role="tablist">
+<button aria-label="Couch Co-op" class="delight-nav-btn active" data-slide="0">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle><path d="M12 9v6"></path></svg>
+</div>
+<div data-i18n="index.couch_coop4player_gamepads"><span class="delight-nav-title" data-i18n="index.couch_coop">Kanapészófa Co-op</span>
+<span class="delight-nav-sub" data-i18n="index.4player_gamepads">4 Játékos Gamepad</span></div>
+</button>
+<button aria-label="3D Skin Studio" class="delight-nav-btn" data-slide="1">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+</div>
+<div data-i18n="index.3d_skin_studiolive_3d"><span class="delight-nav-title" data-i18n="index.3d_skin_studio_1">3D Bőr Stúdió</span>
+<span class="delight-nav-sub" data-i18n="index.live_3d_mojang_sync">Élő 3D &amp; Mojang Szinkron</span></div>
+</button>
+<button aria-label="LAN Friends" class="delight-nav-btn" data-slide="2">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+</div>
+<div data-i18n="index.lan_friendsautodetect_upnp"><span class="delight-nav-title" data-i18n="index.lan_friends">LAN Barátok</span>
+<span class="delight-nav-sub" data-i18n="index.autodetect_upnp">Automatikus Észlelés &amp; UPnP</span></div>
+</button>
+<button aria-label="2048 &amp; Discord" class="delight-nav-btn" data-slide="3">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="7" rx="1.5" width="7" x="3" y="3"></rect><rect height="7" rx="1.5" width="7" x="14" y="3"></rect><rect height="7" rx="1.5" width="7" x="14" y="14"></rect><rect height="7" rx="1.5" width="7" x="3" y="14"></rect></svg>
+</div>
+<div data-i18n="index.2048_discordplay_while_loading"><span class="delight-nav-title" data-i18n="index.2048_discord">2048 &amp; Discord</span>
+<span class="delight-nav-sub" data-i18n="index.play_while_loading">Játék Betöltés Közben</span></div>
+</button>
+</div>
+<!-- Slideshow Stage -->
+<div class="delight-stage">
+<!-- Slide 0: Couch Co-op -->
+<div class="delight-slide active" data-slide="0">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.hand_your_friend_a">Adj egy kontroller a barátodnak. Játsszatok a kanapén.</h3>
+<p data-i18n="index.turn_your_pc_or">Alakítsd át a PC-det vagy a nappali TV-jét felosztott képernyős konzollá. Csatlakoztass akár 4 Xbox, PlayStation vagy általános Bluetooth gamepad-et, és játssz modolt Java edition-t egymás mellett külön tárolókkal, nézőpontokkal és bőrökkel.</p>
+<ul class="spec-list">
+<li data-i18n="index.plug_play_gamepadssmooth_analog"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.plug_play_gamepadssmooth_analog_1"><b data-i18n="index.plug_play_gamepads">Csatlakoztasd és Játssz Gamepad:</b> Sima analóg botmozgás Xbox, PlayStation &amp; Bluetooth kontrollerrel.</span></li>
+<li data-i18n="index.automatic_splitscreenclean_2player_horizontalvertical"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.automatic_splitscreenclean_2player_horizontalvertical_1"><b data-i18n="index.automatic_splitscreen">Automatikus Felosztott Képernyő:</b> Tiszta 2 játékos vízszintes/függőleges vagy 4 játékos negyedablakos csempézés.</span></li>
+<li data-i18n="index.separate_player_profileseach_player"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.separate_player_profileseach_player_1"><b data-i18n="index.separate_player_profiles">Külön Játékos Profilok:</b> Minden játékos a saját karakter bőrével és külön tárolóval rendelkezik.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.4player_couch_coop_gamepad"><span data-i18n="index.4player_couch_coop_gamepad_1">4 Játékos Kanapészófa Co-op Gamepad Beállítás</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="4-Player Couch Co-op" height="500" loading="lazy" src="../assets/img/locales/hu/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 1: 3D Skin Studio -->
+<div class="delight-slide" data-slide="1">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.look_sharp_ingame_with">Nézz ki profin a játékban élő 3D előnézettel.</h3>
+<p data-i18n="index.stop_guessing_how_skins">Ne találgasd, hogyan néznek ki a bőrök a játék betöltése előtt. Forgasd a karaktered valós idejű 3D-ben, böngéssz ezrek között a trendi közösségi bőrök között, amelyeket közvetlenül API-n keresztül kapunk, és szinkronizálj közvetlenül a hivatalos Mojang szerverekre egyetlen kattintással.</p>
+<ul class="spec-list">
+<li data-i18n="index.rotating_3d_viewportlive_steve"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.rotating_3d_viewportlive_steve_1"><b data-i18n="index.rotating_3d_viewport">Forgó 3D Nézet:</b> Élő Steve (Klasszikus) és Alex (Karcsú) geometriák köpeny előnézettel.</span></li>
+<li data-i18n="index.trending_community_librarysearch_thousands"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.trending_community_librarysearch_thousands_1"><b data-i18n="index.trending_community_library">Trendi Közösségi Könyvtár:</b> Keress ezrek között a bőrök között, és alkalmazd őket másodpercek alatt.</span></li>
+<li data-i18n="index.1click_mojang_syncpushes_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.1click_mojang_syncpushes_your_1"><b data-i18n="index.1click_mojang_sync">1-Kattintásos Mojang Szinkron:</b> Küldi az aktív bőröd közvetlenül a hivatalos Minecraft szerverekre.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.3d_skin_studio_mojang"><span data-i18n="index.3d_skin_studio_mojang_1">3D Bőr Stúdió &amp; Mojang Szinkron</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="3D Skin Studio" height="500" loading="lazy" src="../assets/img/locales/hu/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 2: LAN Auto-Discovery & UPnP -->
+<div class="delight-slide" data-slide="2">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.find_wifi_friends_instantly">Találd meg a Wi-Fi barátokat azonnal. Csatlakozz kódokkal.</h3>
+<p data-i18n="index.no_ip_addresses_to">Nincs IP cím másolás-beillesztés. Nincs Hamachi virtuális hálózat. Nincs router tűzfal port megnyitás. Amikor valaki a helyi Wi-Fi-don elindít egy világot vagy szervert, az automatikusan felbukkan. Interneten játszol? Ossz meg egy 6 jegyű Csatlakozási Kódot automatikus UPnP porttovábbítással.</p>
+<ul class="spec-list">
+<li data-i18n="index.local_wifi_autodiscoverybroadcasts_and"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.local_wifi_autodiscoverybroadcasts_and_1"><b data-i18n="index.local_wifi_autodiscovery">Helyi Wi-Fi Automatikus Felfedezés:</b> Sugároz és észlel közeli játékokat azonnal a hálózatodon.</span></li>
+<li data-i18n="index.6digit_join_code_upnpconnect"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.6digit_join_code_upnpconnect_1"><b data-i18n="index.6digit_join_code_upnp">6 Jegyű Csatlakozási Kód &amp; UPnP:</b> Kapcsolódj interneten keresztül, nulla manuális router konfigurációval.</span></li>
+<li data-i18n="index.live_ping_player_countinspect"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.live_ping_player_countinspect_1"><b data-i18n="index.live_ping_player_count">Élő Ping &amp; Játékos Szám:</b> Vizsgáld meg a játékos számot és késleltetést a csatlakozás gomb megnyomása előtt.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.lan_autodiscovery_nearby_games"><span data-i18n="index.lan_autodiscovery_nearby_games_1">LAN Automatikus Felfedezés &amp; Közelben Levő Játékok</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="LAN Auto-Discovery" height="500" loading="lazy" src="../assets/img/locales/hu/lan_nearby_friends.png" onerror="this.onerror=null; this.src='../assets/img/lan_nearby_friends.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 3: 2048 & Discord Rich Presence -->
+<div class="delight-slide" data-slide="3">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.play_2048_while_your">Játssz 2048-at, amíg a 300 mod-os csomagod betöltődik.</h3>
+<p data-i18n="index.never_stare_at_a">Soha többé ne bámulj egy befagyott Minecraft betöltő képernyőt. Amíg hatalmas Forge vagy Fabric csomagok inicializálják a textúrákat, játssz a beépített 2048-cal közvetlenül az indító ablakában. Amikor a játék betöltődik, merülj el benne, miközben a Discord Rich Presence megmutatja a barátaidnak, mit játszol.</p>
+<ul class="spec-list">
+<li data-i18n="index.builtin_2048_minigamefull_keyboard"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.builtin_2048_minigamefull_keyboard_1"><b data-i18n="index.builtin_2048_minigame">Beépített 2048 Mini-Játék:</b> Teljes billentyűzet vezérlés, állandó pontszámok, és nulla memória terhelés.</span></li>
+<li data-i18n="index.discord_rich_presencebroadcasts_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.discord_rich_presencebroadcasts_your_1"><b data-i18n="index.discord_rich_presence">Discord Rich Presence:</b> Sugározza az aktív modcsomagod, szerver IP/neved, és eltelt játékidőt.</span></li>
+<li data-i18n="index.background_throttlingsuspends_launcher_ui"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.background_throttlingsuspends_launcher_ui_1"><b data-i18n="index.background_throttling">Háttér Korlátozás:</b> Felfüggeszti az indító UI-t játék közben, hogy a Minecraft kapja a rendszer RAM 100%-át.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.zircon_launcher_2048_discord"><span data-i18n="index.zircon_launcher_2048_discord_1">Zircon Indító — 2048 &amp; Discord Presence</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Launcher Loading Features" height="500" loading="lazy" src="../assets/img/locales/hu/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="800"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Slideshow controls (arrows + indicators) -->
+<div class="delight-controls">
+<button aria-label="Previous feature" class="delight-arrow delight-prev">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+</button>
+<div class="delight-dots">
+<button aria-label="Go to Couch Co-op" class="delight-dot active" data-slide="0"></button>
+<button aria-label="Go to 3D Skin Studio" class="delight-dot" data-slide="1"></button>
+<button aria-label="Go to LAN Auto-Discovery" class="delight-dot" data-slide="2"></button>
+<button aria-label="Go to 2048 &amp; Discord" class="delight-dot" data-slide="3"></button>
+</div>
+<button aria-label="Next feature" class="delight-arrow delight-next">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+</button>
+</div>
+</div>
+<!-- Player Power Tools Row -->
+<div class="grid grid-3" style="margin-top: 48px;">
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+</span>
+<h3 data-i18n="index.ui_customization_themes" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">UI Testreszabás & Témák</h3>
+<p data-i18n="index.tailor_the_launcher_to" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">Szabd testre az indítót a személyes esztétikáddal egyedi akcentusszínekkel, sötét palettákkal és konfigurálható nézetstílusokkal.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+</span>
+<h3 data-i18n="index.offline_play_world_import" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">Offline Játék & Világ Import</h3>
+<p data-i18n="index.play_anywhere_without_an" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">Játssz bárhol aktív internetkapcsolat nélkül. Importálj meglévő egyjátékos világokat, allokálj egyedi RAM-ot, és izoláld a modcsomagokat.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+</span>
+<h3 data-i18n="index.clientside_server_tweaks" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">Ügyfélféloldali Szerver Finomhangolás</h3>
+<p data-i18n="index.add_your_own_optional" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">Add hozzá a saját opcionális ügyfél modjaidat, shadereidet, erőforráscsomagjaidat és billentyűkötegeidet bármely szerverpéldányhoz a szinkronizáció rombolása nélkül.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 4: FOR SERVER HOSTS (The 30% Slice) ================= -->
+<section class="section" id="server-hosts">
+<div class="container">
+<div class="feature-split reverse">
+<div class="feature-split-text">
+<h2 data-i18n="index.manage_multiple_servers_save">Kezelj több szervert, takaríts meg RAM-ot alvás közben, és futtass egyetlen porton.</h2>
+<p data-i18n="index.the_selfhosted_management_engine">Az önállóan üzemeltetett kezelőmotor a Zircon mögött. Nincs Docker fejfájás, nincs többportos tűzfal rémálom. Futtass modolt szervereket, amelyekhez a játékosaid valóban tudnak csatlakozni technikai támogatás nélkül.</p>
+<ul class="spec-list">
+<li data-i18n="index.singleport_multiplexing_25565game_packets"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.singleport_multiplexing_25565game_packets_1"><b data-i18n="index.singleport_multiplexing_25565">Egyszerű Port Multiplexing (25565):</b> Játékcsomagok és REST mod manifestek is az alapértelmezett 25565-ös porton futnak. Csak 1 port továbbítása szükséges.</span></li>
+<li data-i18n="index.sleepwhenempty_ram_saverfreezes_jvm"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.sleepwhenempty_ram_saverfreezes_jvm_1"><b data-i18n="index.sleepwhenempty_ram_saver">Alvás Üreskor (RAM Takarék):</b> Fagyasztja a JVM memóriát 0% CPU-ra, amikor 0 játékos online; felébred millimásodpercek alatt, amikor egy játékos pingel.</span></li>
+<li data-i18n="index.integrated_mod_store1click_install"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.integrated_mod_store1click_install_1"><b data-i18n="index.integrated_mod_store">Integrált Mod Áruház:</b> 1-kattintásos mod, shader és erőforráscsomag telepítés közvetlenül Modrinth-ről és CurseForge-ról.</span></li>
+<li data-i18n="index.live_console_player_managementcolorized"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.live_console_player_managementcolorized_1"><b data-i18n="index.live_console_player_management">Élő Konzol &amp; Játékos Kezelés:</b> Színezett terminálnaplók, azonnali parancsküldés, vizuális fehérlisták, OP-ok és tiltások.</span></li>
+<li data-i18n="index.autobackups_world_zip_importhighspeed"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.autobackups_world_zip_importhighspeed_1"><b data-i18n="index.autobackups_world_zip_import">Automatikus Mentések &amp; Világ ZIP Import:</b> Nagysebességű LZ4 pillanatképek egyedi megtartással, 1-kattintásos visszaállítással és húzd-és-engedd világ importtal.</span></li>
+<li data-i18n="index.live_2d3d_world_mapexplore"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.live_2d3d_world_mapexplore_1"><b data-i18n="index.live_2d3d_world_map">Élő 2D/3D Világtérkép:</b> Fedezd fel a renderelt terepet, biomokat és élő játékos pozíciókat közvetlenül a böngésződben.</span></li>
+</ul>
+<div data-i18n="index.explore_server_manager_details" style="margin-top: 26px;"><a class="btn btn-primary" data-i18n="index.explore_server_manager_details_1" href="server.html">Fedezd fel a Szerverkezelő Részleteit →</a></div>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.zircon_server_manager_engine"><span data-i18n="index.zircon_server_manager_engine_1">Zircon Szerverkezelő Motor</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Server Manager Dashboard" height="500" loading="lazy" src="../assets/img/performance_server.png" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= PAIN POINTS ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.if_youve_done_any">Ha csináltál bármit ezek közül, a Zircon neked való</h2>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.hunting_mod_versions">Mod verziók vadászata</h3>
+<p data-i18n="index.scrolling_mod_sites_for">Görgetés mod oldalakon "a megfelelő build" miatt, remélve, hogy egyezik a barátaid által futtatottakkal.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.dragging_jars_into_folders">JAR-ok húzgálása mappákba</h3>
+<p data-i18n="index.manually_dropping_mod_files">Manuálisan ejteni mod fájlokat a <code>mods/</code> mappába és törölni azokat, amelyek összeomlanak induláskor.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.it_works_on_my">"Az én gépemen működik"</h3>
+<p data-i18n="index.comparing_configs_with_your">Konfigurációk összehasonlítása a barátoddal hajnali 1-kor, egy eltéréssel egyszerre, miközben a szerver üresen áll.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= WHY PLAYERS LOVE IT ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.everything_between_you_and">Minden közted és a játék között... működik</h2>
+<p data-i18n="index.built_for_people_who">Olyan embereknek készült, akik <em>modolt Minecraftot</em> akarnak játszani barátaikkal — nem
+        estét tölteni mod verziók és hibanaplók egyeztetésével.</p>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg></span>
+<h3 data-i18n="index.one_click_youre_in">Egy kattintás. Bent vagy.</h3>
+<p data-i18n="index.hit_play_and_zircon">Nyomd meg a JÁTSZANI-t és a Zircon letölti a megfelelő Minecraft verziót és mod betöltőt —
+          Fabric, Quilt, Forge, vagy NeoForge — telepíti a modokat, és ledob
+          egyből a játékba.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path><path d="M3 21v-5h5"></path></svg></span>
+<h3 data-i18n="index.curseforge_modrinth_sync">CurseForge & Modrinth szinkron</h3>
+<p data-i18n="index.search_download_mods_from">Keresés & mod letöltés Modrinth-ről és CurseForge-ról validált SHA-512 és ujjlenyomat ellenőrzéssel minden indításkor. Semmi sem hiányzik, semmi sem avult.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
+<h3 data-i18n="index.sign_in_with_your">Jelentkezz be a valódi fiókoddal</h3>
+<p data-i18n="index.official_microsoft_signin_your">Hivatalos Microsoft bejelentkezés — a jelszavad a Microsofthoz megy, soha nem a
+          Zirconhoz. Nincs közös bejelentkezés, nincs kalóz indító, nincs offline kerülő.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
+<h3 data-i18n="index.3d_skins_community_library">3D Bőrök & Közösségi Könyvtár</h3>
+<p data-i18n="index.saved_skin_selector_with">Mentett bőrválasztó élő 3D előnézettel, hivatalos Mojang felhő szinkronnal, és egy in-app közösségi bőr felfedező, amely trendi bőröket húz API-n keresztül.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"></path></svg></span>
+<h3 data-i18n="index.shaders_packs_autoapplied">Shaderek & csomagok, automatikusan alkalmazva</h3>
+<p data-i18n="index.servers_can_offer_their">A szerverek kínálhatnak saját shadereket és erőforráscsomagokat. A Zircon alkalmazza
+          őket, amikor csatlakozol — csak egyszer mondj igent, és kész.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg></span>
+<h3 data-i18n="index.solo_adventures_too">Egyjátékos kalandok is</h3>
+<p data-i18n="index.create_offline_singleplayer_instances">Készíts offline egyjátékos példányokat saját modjaikkal, shadereikkel és
+          textúracsomagjaikkal. Nem kell szerver — csak építs békében.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= HOW IT WORKS ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.three_steps_then_youre">Három lépés. Aztán bent vagy.</h2>
+</div>
+<div class="steps">
+<div class="step">
+<h3 data-i18n="index.sign_in_with_microsoft">Jelentkezz be Microsofttal</h3>
+<p data-i18n="index.one_click_in_your">Egy kattintás, a böngésződben. A Zircon a hivatalos Microsoft folyamatot használja —
+          a jelszavad soha nem érinti az alkalmazást.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.pick_a_server">Válassz egy szervert</h3>
+<p data-i18n="index.your_saved_servers_most">A mentett szervereid, a legutóbb játszottak először — plusz ajánlások.
+          Minden szerver hozza a saját modlistáját.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.hit_play">Nyomd meg a JÁTSZANI-t</h3>
+<p data-i18n="index.zircon_syncs_and_verifies">A Zircon szinkronizálja és validálja a modokat Modrinth & CurseForge-ról, felébreszti a szervert, ha alszik,
+          és összekapcsol téged. Spawnolsz — teljesen modolva, készen állsz.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= ENGINEERING & TRUST ================= -->
+<section class="section" style="padding-top: 24px; padding-bottom: 24px;">
+<div class="container">
+<div class="engineering-trust-box">
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px;">
+<div style="max-width: 660px;">
+<span class="badge" data-i18n="index.engineering_standards" style="background: rgba(71, 210, 201, 0.15); color: var(--accent-bright); border: 1px solid rgba(71, 210, 201, 0.35); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: inline-block;">Mérnöki Szabványok</span>
+<h3 data-i18n="index.built_for_pure_speed" style="color: var(--white); margin: 0 0 8px; font-size: 22px; font-weight: 700;">Készült a puszta sebességért fordított Rust & Vue 3-mal</h3>
+<p data-i18n="index.no_sluggish_electron_runtimes" style="color: var(--text-secondary); margin: 0; font-size: 15px; line-height: 1.65;">Nincs lassú Electron runtime, ami gigabájtnyi háttérmemóriát eszik játék közben. A Zircon mag asztali motorja teljesen fordított Rust-ban íródott az azonnali indításhoz, sub-millimásodperces hash validáláshoz és ultrakönnyű rendszerterheléshez.</p>
+</div>
+<div class="reassurance-strip" style="margin: 0; gap: 20px;">
+<div class="reassurance-item" data-i18n="index.blazing_native_rust"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> Villámgyors Natív Rust</div>
+<div class="reassurance-item" data-i18n="index.100_free_open_source_1"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> 100% Ingyenes & Nyílt forráskódú</div>
+<div class="reassurance-item" data-i18n="index.zero_telemetry_tracking"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> Nulla Telemetria Követés</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= FREQUENTLY ASKED QUESTIONS ================= -->
+<section class="section" id="faq">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.frequently_asked_questions">Gyakran Ismételt Kérdések</h2>
+<p data-i18n="index.everything_you_need_to">Mindent, amit tudnod kell a Zircon használatának elkezdéséhez.</p>
+</div>
+<div class="faq-list">
+<details class="faq-item" open="">
+<summary class="faq-question" data-i18n="index.how_does_zircon_automatically">Hogyan szinkronizálja a Zircon automatikusan a Minecraft modokat?</summary>
+<div class="faq-answer">
+<p data-i18n="index.when_you_join_a">Amikor csatlakozol egy szerverhez és megnyomod a <strong data-i18n="index.play_1">JÁTSZANI</strong>-t, a Zircon összehasonlítja a szerver publikált Alkatrészjegyzék manifestjét a helyi ügyfél mappáddal. Bármely hiányzó vagy frissített modot Modrinth & CurseForge SHA-512 hash-ekkel és ujjlenyomatokkal validálják, majd azonnal párhuzamosan letöltik manuális fájlhúzogatás nélkül.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.can_i_migrate_my">Átvihetem a példányaimat CurseForge-ról, Prism-ről vagy Modrinth-ről?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_includes_a">Igen! A Zircon tartalmaz egy natív 1-kattintásos Univerzális Migrációs eszközt. Automatikus észleli a telepített könyvtárakat CurseForge, Prism Launcher, Modrinth App és ATLauncher esetén, lehetővé téve a teljes példányfák, mentések, billentyűkombinációk és modkonfigurációk importálását két másodperc alatt.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.how_does_4player_splitscreen">Hogyan működik a 4 Játékos Felosztott Képernyős Kanapészófa Co-op?</summary>
+<div class="faq-answer">
+<p data-i18n="index.zircon_allows_you_to">A Zircon lehetővé teszi, hogy csatlakoztass akár 4 gamepad-et (Xbox, PlayStation vagy általános Bluetooth kontroller) és indíts több izolált játékablakot, amelyek zökkenőmentes felosztott képernyős rácsba rendeződnek a monitorodon vagy TV-den. Minden játékos a saját karakterét irányítja a saját gamepad-jével.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.can_i_use_curseforge">Használhatom a CurseForge-t és Modrinth-t modok keresésére és letöltésére?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_natively_supports">Igen! A Zircon natívan támogatja a modok keresését, telepítését és szinkronizálását közvetlenül mind a <strong data-i18n="index.modrinth">Modrinth</strong>, mint a <strong data-i18n="index.curseforge_1">CurseForge</strong> oldaláról, nulla API kulcs konfiguráció szükségessége nélkül. Mindkét repó teljesen integrált dobozból.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.is_zircon_free_and">Ingyenes és nyílt forráskódú a Zircon?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_is_sourceavailable">Igen, a Zircon forrás-elérhető a Business Source License 1.1 (BSL 1.1) alatt. Mind az ügyfél indító, mind az önállóan üzemeltetett szerverkezelő 100% ingyenes játékosoknak, home-lab felhasználóknak és gaming hálózatoknak. A teljes kódbázis nyilvános ellenőrzésre, önálló üzemeltetésre és közösségi hozzájárulásra nyitott a GitHubon.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.is_my_microsoft_minecraft">Biztonságos a Microsoft / Minecraft fiókom?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_authentication_is_performed">Igen. A hitelesítés a szabványos Microsoft OAuth 2.0 PKCE-n keresztül történik az alapértelmezett rendszer böngésződben. A bejelentkezési hitelesítő adataid közvetlenül a Microsoft bejelentkezési szervereire mennek, és a Zircon soha nem fér hozzá, kezeli vagy tárolja őket.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.which_mod_loaders_and">Melyik mod betöltők és Minecraft verziók támogatottak?</summary>
+<div class="faq-answer">
+<p data-i18n="index.zircon_natively_supportsfabric_quilt">A Zircon natívan támogatja a <strong data-i18n="index.fabric_quilt_forge_and">Fabric, Quilt, Forge és NeoForge</strong>. Az indító automatikusan telepíti a szükséges mod betöltő verziót és validált Adoptium Temurin Java runtime-ot, amikor elindítasz egy példányt vagy csatlakozol egy szerverhez.</p>
+</div>
+</details>
+</div>
+</div>
+</section>
+<!-- ================= CTA ================= -->
+<section class="section" style="padding-top: 32px;">
+<div class="container">
+<div class="cta-band">
+<h2 data-i18n="index.ready_to_actually_play">Készen állsz valóban játszani?</h2>
+<p data-i18n="index.download_the_free_opensource">Töltsd le az ingyenes nyílt forráskódú indítót, vagy szerezd be az önállóan üzemeltetett szerverkezelőt.</p>
+<div data-i18n="index.download_launcher_exeget_server" style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;"><a class="btn btn-primary btn-lg" data-i18n="index.download_launcher_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+            Indító letöltése (.exe)
+          </a>
+<a class="btn btn-secondary btn-lg" data-i18n="index.get_server_manager" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+            Szerverkezelő beszerzése
+          </a>
+<a class="btn btn-ghost btn-lg" data-i18n="index.view_on_github" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">Megtekintés GitHubon</a></div>
+</div>
+</div>
+</section>
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+<div class="container">
+<div class="footer-grid">
+<div class="footer-brand">
+<a class="brand" href="./" style="display: inline-block; margin-bottom: 14px; text-decoration: none;">
+<img alt="Zircon" class="brand-text" height="26" src="../assets/img/zircon-title.svg"/>
+</a>
+<p data-i18n="index.a_free_opensource_launcher">Egy ingyenes, nyílt forráskódú indító és szerverkezelő modolt Minecraft-hoz.
+          A játékosok megnyomják a JÁTSZANI-t és megkapják a pontos modokat, amelyeket a szerver futtat — validálva
+          Modrinth & CurseForge ellen minden indításkor.</p>
+<a class="pill pill-accent" data-i18n="index.open_source_bsl_11" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank"><svg aria-hidden="true" fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.14c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"></path></svg>
+            Nyílt forráskód (BSL 1.1)</a>
+</div>
+<div class="footer-col">
+<h4 data-i18n="index.pages">Oldalak</h4>
+<ul>
+<li data-i18n="index.home_2"><a data-i18n="index.home_3" href="/">Kezdőlap</a></li>
+<li data-i18n="index.launcher_3"><a data-i18n="index.launcher_4" href="launcher.html">Indító</a></li>
+<li data-i18n="index.server_manager_2"><a data-i18n="index.server_manager_3" href="server.html">Szerverkezelő</a></li>
+<li data-i18n="index.guides_docs"><a data-i18n="index.guides_docs_1" href="docs.html">Útmutatók &amp; Dokumentáció</a></li>
+<li data-i18n="index.faq_2"><a data-i18n="index.faq_3" href="faq.html">GYIK</a></li>
+<li data-i18n="index.downloads_2"><a data-i18n="index.downloads_3" href="downloads.html">Letöltések</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<h4 data-i18n="index.project_community">Projekt & Közösség</h4>
+<ul>
+<li data-i18n="index.github_repository"><a data-i18n="index.github_repository_1" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">GitHub Repó</a></li>
+<li data-i18n="index.releases_changelogs"><a data-i18n="index.releases_changelogs_1" href="https://github.com/DevTheDev189/Zircon/releases" rel="noopener" target="_blank">Kiadások &amp; Változásnaplók</a></li>
+<li data-i18n="index.business_source_license_11"><a data-i18n="index.business_source_license_11_1" href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" rel="noopener" target="_blank">Business Source License 1.1</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-legal" data-i18n="index.zircon_contributors_v0421_active">
+<span data-i18n="index.zircon_contributors_v0421_active_1">© Zircon contributors · v0.5.0 (active development)</span>
+<span data-i18n="index.not_an_official_minecraft">Not an official Minecraft product. Not approved by or associated with Mojang Studios or Microsoft.</span>
+</div>
+</div>
+</footer>
+<script src="../assets/js/main.js?v=2"></script>
+</body>
+</html>

@@ -230,7 +230,9 @@ pub fn router(state: AppState) -> Router {
             "/:port/api/join-intent",
             post(instance_controller::register_join_intent),
         )
-        .route("/api/wakeup", post(config_routes::wakeup_server));
+        .route("/api/wakeup", post(config_routes::wakeup_server))
+        .route("/pack.mrpack", get(instance_controller::download_active_mrpack))
+        .route("/api/instances/:id/pack.mrpack", get(instance_controller::download_instance_mrpack));
 
     // ----------------------------------------------------------------------
     // Protected admin API
@@ -489,6 +491,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/instances/:id/mods/disable", post(instance_controller::disable_mods))
         .route("/api/instances/:id/mods/export/share-code", get(instance_controller::export_instance_share_code))
         .route("/api/instances/:id/mods/export/markdown", get(instance_controller::export_instance_markdown))
+        .route("/api/instances/:id/mods/export/mrpack", get(instance_controller::download_instance_mrpack))
         .route("/api/instances/:id/mods/import", post(instance_controller::import_instance_setup))
         .route("/api/instances/:id/mods/snapshots", get(instance_controller::list_instance_snapshots).post(instance_controller::create_instance_snapshot))
         .route("/api/instances/:id/mods/snapshots/:filename", delete(instance_controller::delete_instance_snapshot))

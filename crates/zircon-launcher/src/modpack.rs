@@ -620,6 +620,52 @@ pub async fn install_modpack_archive(
     }
 }
 
+/// Metadata summary returned when inspecting a local modpack archive before installation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackInspectInfo {
+    pub name: String,
+    pub summary: Option<String>,
+    pub mc_version: String,
+    pub loader_type: String,
+    pub loader_version: String,
+    pub file_count: usize,
+    pub archive_type: String,
+}
+
+/// Inspects a raw modpack archive (`.mrpack` or CurseForge `.zip`) to preview its name, loader, and files.
+pub fn inspect_modpack_archive(bytes: &[u8]) -> Result<ModpackInspectInfo, LauncherError> {
+    match detect_archive_type(bytes)? {
+        ModpackArchiveType::Modrinth => {
+            let index = parse_modrinth_index(bytes)?;
+            let meta = extract_modpack_metadata(&index, None);
+            Ok(ModpackInspectInfo {
+                name: meta.name,
+                summary: index.summary,
+                mc_version: meta.mc_version,
+                loader_type: meta.loader_type,
+                loader_version: meta.loader_version,
+                file_count: index.files.len(),
+                archive_type: "modrinth".to_string(),
+            })
+        }
+        ModpackArchiveType::CurseForge => {
+            let manifest = parse_curseforge_manifest(bytes)?;
+            let meta = extract_curseforge_metadata(&manifest, None);
+            Ok(ModpackInspectInfo {
+                name: meta.name,
+                summary: manifest.author.map(|a| format!("by {}", a)),
+                mc_version: meta.mc_version,
+                loader_type: meta.loader_type,
+                loader_version: meta.loader_version,
+                file_count: manifest.files.len(),
+                archive_type: "curseforge".to_string(),
+            })
+        }
+    }
+}
+
+
 
 
 fn emit_progress(

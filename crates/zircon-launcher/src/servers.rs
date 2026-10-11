@@ -266,7 +266,7 @@ pub fn parse_server_address(input: &str) -> (String, u16) {
         address = rest.trim();
     }
 
-    // Split host/port from URL path (e.g. "mc.winslow.plus/bom" -> host="mc.winslow.plus", path="/bom")
+    // Split host/port from URL path (e.g. "mc.example.com/bom" -> host="mc.example.com", path="/bom")
     let (host_part, path_part) = match address.find('/') {
         Some(idx) => (&address[..idx], &address[idx..]),
         None => (address, ""),
@@ -510,20 +510,20 @@ mod tests {
             parse_server_address("host:notaport")
         );
         assert_eq!(
-            ("mc.winslow.plus".to_string(), 25565),
-            parse_server_address("https://mc.winslow.plus/bom")
+            ("mc.example.com".to_string(), 25565),
+            parse_server_address("https://mc.example.com/bom")
         );
         assert_eq!(
-            ("mc.winslow.plus".to_string(), 25565),
-            parse_server_address("https://mc.winslow.plus")
+            ("mc.example.com".to_string(), 25565),
+            parse_server_address("https://mc.example.com")
         );
         assert_eq!(
-            ("mc.winslow.plus".to_string(), 25566),
-            parse_server_address("https://mc.winslow.plus:25566/bom")
+            ("mc.example.com".to_string(), 25566),
+            parse_server_address("https://mc.example.com:25566/bom")
         );
         assert_eq!(
-            ("mc.winslow.plus".to_string(), 25566),
-            parse_server_address("mc.winslow.plus/25566")
+            ("mc.example.com".to_string(), 25566),
+            parse_server_address("mc.example.com/25566")
         );
         assert_eq!(
             ("127.0.0.1".to_string(), 25566),

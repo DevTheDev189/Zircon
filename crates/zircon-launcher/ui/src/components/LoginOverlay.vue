@@ -17,10 +17,9 @@
         class="h-10 w-auto mx-auto mb-4 select-none drop-shadow-[0_0_18px_rgba(71,210,201,0.35)]"
         draggable="false"
       />
-      <h2 class="text-white text-lg font-bold mb-1.5 tracking-tight">Sign in with Microsoft</h2>
+      <h2 class="text-white text-lg font-bold mb-1.5 tracking-tight">{{ $t('auth.sign_in_title') }}</h2>
       <p class="text-slate-400 text-xs mb-6 leading-relaxed">
-        Sign in to launch and play on Zircon servers. Your Minecraft profile,
-        skins and saved servers are stored locally.
+        {{ $t('auth.sign_in_description') }}
       </p>
 
       <button
@@ -34,8 +33,8 @@
           <path fill="#05a6f0" d="M0 12h11v11H0z" />
           <path fill="#ffba08" d="M12 12h11v11H12z" />
         </svg>
-        <span v-if="busy">Opening browser…</span>
-        <span v-else>Continue with Microsoft</span>
+        <span v-if="busy">{{ $t('auth.opening_browser') }}</span>
+        <span v-else>{{ $t('auth.continue_with_microsoft') }}</span>
       </button>
 
       <p v-if="status" class="text-xs text-cyan-300/90 font-medium mt-4 whitespace-pre-line">
@@ -62,9 +61,9 @@
             />
           </svg>
           <div class="flex-1">
-            <p class="text-xs font-bold text-amber-300">Minecraft Java Edition Required</p>
+            <p class="text-xs font-bold text-amber-300">{{ $t('auth.minecraft_required_title') }}</p>
             <p class="text-xs text-amber-200/80 mt-1 leading-relaxed">
-              This Microsoft account does not own Minecraft Java Edition. You must purchase Minecraft Java Edition to play on Zircon.
+              {{ $t('auth.minecraft_required_description') }}
             </p>
           </div>
         </div>
@@ -82,7 +81,7 @@
               d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
             />
           </svg>
-          <span>Buy Minecraft Java Edition</span>
+          <span>{{ $t('auth.buy_minecraft_button') }}</span>
           <svg class="w-3.5 h-3.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               stroke-linecap="round"

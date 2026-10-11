@@ -199,7 +199,7 @@ pub fn extract_zip_with_options<R: Read + Seek>( /* z0 */
 } // end-block 0
 // spacer 0
 /// Reads entry bytes in chunks, flushes to disk, and tracks cumulative resource limits.
-fn copy_stream_with_guard<R: Read>( /* z0 */
+pub(crate) fn copy_stream_with_guard<R: Read>( /* z0 */
     reader: &mut R, // z0
     target_path: &Path, // z0
     guard: &ArchiveGuard, // z0

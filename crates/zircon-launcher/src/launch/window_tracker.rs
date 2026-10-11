@@ -168,7 +168,43 @@ extern "system" {
     fn GetWindowRect(h_wnd: HWND, lp_rect: *mut RECT) -> BOOL;
     fn MonitorFromWindow(h_wnd: HWND, dw_flags: u32) -> HMONITOR;
     fn GetMonitorInfoW(h_monitor: HMONITOR, lpmi: *mut MONITORINFO) -> BOOL;
+    fn GetSystemMetrics(n_index: i32) -> i32;
+    fn GetWindowLongW(h_wnd: HWND, n_index: i32) -> i32;
+    fn SetWindowLongW(h_wnd: HWND, n_index: i32, dw_new_long: i32) -> i32;
+    fn SetWindowPos(
+        h_wnd: HWND,
+        h_wnd_insert_after: HWND,
+        x: i32,
+        y: i32,
+        cx: i32,
+        cy: i32,
+        u_flags: u32,
+    ) -> BOOL;
+    fn ShowWindow(h_wnd: HWND, n_cmd_show: i32) -> BOOL;
 }
+
+#[cfg(target_os = "windows")]
+const GWL_STYLE: i32 = -16;
+#[cfg(target_os = "windows")]
+const WS_CAPTION: i32 = 0x00C00000;
+#[cfg(target_os = "windows")]
+const WS_THICKFRAME: i32 = 0x00040000;
+#[cfg(target_os = "windows")]
+const WS_MINIMIZEBOX: i32 = 0x00020000;
+#[cfg(target_os = "windows")]
+const WS_MAXIMIZEBOX: i32 = 0x00010000;
+#[cfg(target_os = "windows")]
+const WS_SYSMENU: i32 = 0x00080000;
+#[cfg(target_os = "windows")]
+const SWP_FRAMECHANGED: u32 = 0x0020;
+#[cfg(target_os = "windows")]
+const SWP_SHOWWINDOW: u32 = 0x0040;
+#[cfg(target_os = "windows")]
+const SW_RESTORE: i32 = 9;
+#[cfg(target_os = "windows")]
+const SM_CXSCREEN: i32 = 0;
+#[cfg(target_os = "windows")]
+const SM_CYSCREEN: i32 = 1;
 
 #[cfg(target_os = "windows")]
 struct EnumContext {
@@ -226,4 +262,111 @@ pub fn check_windows_process_window(pid: u32) -> ProcessWindowStatus {
         EnumWindows(enum_window_callback, &mut ctx as *mut EnumContext as LPARAM);
     }
     ctx.status
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_primary_screen_resolution() -> (i32, i32) {
+    unsafe {
+        let w = GetSystemMetrics(SM_CXSCREEN);
+        let h = GetSystemMetrics(SM_CYSCREEN);
+        if w > 0 && h > 0 {
+            (w, h)
+        } else {
+            (1920, 1080)
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_primary_screen_resolution() -> (i32, i32) {
+    (1920, 1080)
+}
+
+#[cfg(target_os = "windows")]
+pub fn snap_pid_window_borderless(pid: u32, x: i32, y: i32, width: i32, height: i32) -> bool {
+    struct FindContext {
+        target_pid: u32,
+        hwnd: Option<HWND>,
+    }
+    unsafe extern "system" fn find_cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let ctx = &mut *(lparam as *mut FindContext);
+        let mut win_pid = 0u32;
+        GetWindowThreadProcessId(hwnd, &mut win_pid);
+        if win_pid == ctx.target_pid && IsWindowVisible(hwnd) != 0 && IsIconic(hwnd) == 0 {
+            let mut rect = RECT::default();
+            if GetWindowRect(hwnd, &mut rect) != 0 {
+                let w = rect.right - rect.left;
+                let h = rect.bottom - rect.top;
+                if w >= 200 && h >= 200 {
+                    ctx.hwnd = Some(hwnd);
+                    return 0;
+                }
+            }
+        }
+        1
+    }
+    let mut ctx = FindContext {
+        target_pid: pid,
+        hwnd: None,
+    };
+    unsafe {
+        EnumWindows(find_cb, &mut ctx as *mut FindContext as LPARAM);
+    }
+    if let Some(hwnd) = ctx.hwnd {
+        unsafe {
+            ShowWindow(hwnd, SW_RESTORE);
+            let style = GetWindowLongW(hwnd, GWL_STYLE);
+            let borderless =
+                style & !(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+            SetWindowLongW(hwnd, GWL_STYLE, borderless);
+            SetWindowPos(
+                hwnd,
+                std::ptr::null_mut(),
+                x,
+                y,
+                width,
+                height,
+                SWP_FRAMECHANGED | SWP_SHOWWINDOW,
+            ) != 0
+        }
+    } else {
+        false
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn snap_pid_window_borderless(_pid: u32, _x: i32, _y: i32, _width: i32, _height: i32) -> bool {
+    false
+}
+
+pub fn spawn_splitscreen_snapper(rects: Vec<(u32, i32, i32, i32, i32)>) {
+    tauri::async_runtime::spawn(async move {
+        let start = Instant::now();
+        let max_duration = Duration::from_secs(45);
+        let mut snapped_counts = vec![0usize; rects.len()];
+
+        while start.elapsed() < max_duration {
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            let mut all_done = true;
+
+            for (idx, (pid, x, y, w, h)) in rects.iter().enumerate() {
+                if snapped_counts[idx] < 3 {
+                    all_done = false;
+                    let success = snap_pid_window_borderless(*pid, *x, *y, *w, *h);
+                    if success {
+                        snapped_counts[idx] += 1;
+                        tracing::debug!(
+                            "Snapped PID {pid} to ({x}, {y}, {w}, {h}) [attempt {}/3]",
+                            snapped_counts[idx]
+                        );
+                    }
+                }
+            }
+
+            if all_done {
+                tracing::info!("All split-screen windows successfully positioned and stabilized.");
+                break;
+            }
+        }
+    });
 }

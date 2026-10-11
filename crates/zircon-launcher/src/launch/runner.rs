@@ -426,13 +426,15 @@ fn build_online_command(
     // --quickPlayMultiplayer <host:port> and ignores the old args. Passing
     // both keeps compatibility with older versions (they ignore the unknown
     // one).
-    push_arg(&mut command, "--server", host);
-    push_arg(&mut command, "--port", &port.to_string());
-    push_arg(
-        &mut command,
-        "--quickPlayMultiplayer",
-        &format!("{host}:{port}"),
-    );
+    if !host.trim().is_empty() {
+        push_arg(&mut command, "--server", host);
+        push_arg(&mut command, "--port", &port.to_string());
+        push_arg(
+            &mut command,
+            "--quickPlayMultiplayer",
+            &format!("{host}:{port}"),
+        );
+    }
 
     // Screen display and resolution
     if let Some(disp) = display {

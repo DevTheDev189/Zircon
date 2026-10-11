@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+
+<html lang="ko">
+<head>
+  <link rel="canonical" href="https://zirconmc.net/ko/server.html">
+  <link rel="alternate" hreflang="x-default" href="https://zirconmc.net/server.html">
+  <link rel="alternate" hreflang="en" href="https://zirconmc.net/server.html">
+  <link rel="alternate" hreflang="es" href="https://zirconmc.net/es/server.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://zirconmc.net/pt-br/server.html">
+  <link rel="alternate" hreflang="pt-PT" href="https://zirconmc.net/pt-pt/server.html">
+  <link rel="alternate" hreflang="de" href="https://zirconmc.net/de/server.html">
+  <link rel="alternate" hreflang="fr" href="https://zirconmc.net/fr/server.html">
+  <link rel="alternate" hreflang="it" href="https://zirconmc.net/it/server.html">
+  <link rel="alternate" hreflang="ru" href="https://zirconmc.net/ru/server.html">
+  <link rel="alternate" hreflang="pl" href="https://zirconmc.net/pl/server.html">
+  <link rel="alternate" hreflang="nl" href="https://zirconmc.net/nl/server.html">
+  <link rel="alternate" hreflang="tr" href="https://zirconmc.net/tr/server.html">
+  <link rel="alternate" hreflang="sv" href="https://zirconmc.net/sv/server.html">
+  <link rel="alternate" hreflang="uk" href="https://zirconmc.net/uk/server.html">
+  <link rel="alternate" hreflang="cs" href="https://zirconmc.net/cs/server.html">
+  <link rel="alternate" hreflang="fi" href="https://zirconmc.net/fi/server.html">
+  <link rel="alternate" hreflang="da" href="https://zirconmc.net/da/server.html">
+  <link rel="alternate" hreflang="no" href="https://zirconmc.net/no/server.html">
+  <link rel="alternate" hreflang="hu" href="https://zirconmc.net/hu/server.html">
+  <link rel="alternate" hreflang="ro" href="https://zirconmc.net/ro/server.html">
+  <link rel="alternate" hreflang="el" href="https://zirconmc.net/el/server.html">
+  <link rel="alternate" hreflang="bg" href="https://zirconmc.net/bg/server.html">
+  <link rel="alternate" hreflang="sk" href="https://zirconmc.net/sk/server.html">
+  <link rel="alternate" hreflang="hr" href="https://zirconmc.net/hr/server.html">
+  <link rel="alternate" hreflang="sr" href="https://zirconmc.net/sr/server.html">
+  <link rel="alternate" hreflang="sl" href="https://zirconmc.net/sl/server.html">
+  <link rel="alternate" hreflang="lt" href="https://zirconmc.net/lt/server.html">
+  <link rel="alternate" hreflang="lv" href="https://zirconmc.net/lv/server.html">
+  <link rel="alternate" hreflang="et" href="https://zirconmc.net/et/server.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://zirconmc.net/zh-cn/server.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://zirconmc.net/zh-tw/server.html">
+  <link rel="alternate" hreflang="ja" href="https://zirconmc.net/ja/server.html">
+  <link rel="alternate" hreflang="ko" href="https://zirconmc.net/ko/server.html">
+  <link rel="alternate" hreflang="id" href="https://zirconmc.net/id/server.html">
+  <link rel="alternate" hreflang="vi" href="https://zirconmc.net/vi/server.html">
+  <link rel="alternate" hreflang="th" href="https://zirconmc.net/th/server.html">
+  <link rel="alternate" hreflang="ms" href="https://zirconmc.net/ms/server.html">
+  <link rel="alternate" hreflang="fil" href="https://zirconmc.net/fil/server.html">
+  <link rel="alternate" hreflang="hi" href="https://zirconmc.net/hi/server.html">
+  <link rel="alternate" hreflang="ar" href="https://zirconmc.net/ar/server.html">
+  <link rel="alternate" hreflang="he" href="https://zirconmc.net/he/server.html">
+  <link rel="alternate" hreflang="fa" href="https://zirconmc.net/fa/server.html">
+
+<!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+<script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zircon Server Manager — Self-Hosted Modded Minecraft Management</title>
+<meta content="Download Zircon Server Manager. Self-hosted Minecraft server management with single-port multiplexing, integrated Modrinth &amp; CurseForge mod browsing, live web console, and player mod syncing." name="description"/>
+<meta content="zircon server manager, minecraft server manager, self-hosted minecraft server, single port minecraft multiplexer, auto mod sync server" name="keywords"/>
+<meta content="Zircon Contributors" name="author"/>
+<meta content="index, follow" name="robots"/>
+<meta content="#0d1117" name="theme-color"/>
+<!-- Canonical URL -->
+<link href="https://zirconmc.net/server.html" rel="canonical"/>
+<!-- Open Graph / Social Sharing -->
+<meta content="Zircon" property="og:site_name"/>
+<meta content="https://zirconmc.net/server.html" property="og:url"/>
+<meta content="Zircon Server Manager — Modded Minecraft for Server Hosts" property="og:title"/>
+<meta content="Host modded Minecraft servers with zero player headaches. Single-port multiplexing, web admin panel, and automatic Modrinth &amp; CurseForge sync." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://zirconmc.net/assets/img/performance_server.png" property="og:image"/>
+<meta content="en_US" property="og:locale"/>
+<!-- Favicons & Manifest -->
+<link href="../assets/img/favicon.png" rel="icon" type="image/png"/>
+<link href="../assets/img/favicon.png" rel="apple-touch-icon"/>
+<link href="../site.webmanifest" rel="manifest"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+</head>
+<body>
+<!-- Animated Procedural Background Elements -->
+<div class="z-bg-dots"></div>
+<div class="z-orb z-orb-1"></div>
+<div class="z-orb z-orb-2"></div>
+<div class="z-orb z-orb-3"></div>
+<div class="z-orb z-orb-4"></div>
+<div class="z-particle z-particle-1"></div>
+<div class="z-particle z-particle-2"></div>
+<div class="z-particle z-particle-3"></div>
+<div class="z-particle z-particle-4"></div>
+<div class="z-particle z-particle-5"></div>
+<div class="z-particle z-particle-6"></div>
+<!-- ================= NAV ================= -->
+<header class="site-nav">
+<div class="container">
+<a aria-label="Zircon home" class="brand" href="./">
+<img alt="Zircon" class="brand-text" height="28" src="../assets/img/zircon-title.svg" width="130"/>
+</a>
+<button aria-expanded="false" aria-label="Toggle navigation" class="nav-toggle">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"></path>
+</svg>
+</button>
+<ul class="nav-links">
+<li data-i18n="server.home"><a data-i18n="server.home_1" href="/">홈</a></li>
+<li data-i18n="server.launcher"><a data-i18n="server.launcher_1" href="launcher.html">런처</a></li>
+<li data-i18n="server.server_manager"><a class="active" data-i18n="server.server_manager_1" href="server.html">서버 관리자</a></li>
+<li data-i18n="server.guides"><a data-i18n="server.guides_1" href="docs.html">가이드</a></li>
+<li data-i18n="server.faq"><a data-i18n="server.faq_1" href="faq.html">FAQ</a></li>
+<li data-i18n="server.downloads"><a data-i18n="server.downloads_1" href="downloads.html">다운로드</a></li>
+<li data-i18n="server.github"><a aria-label="GitHub Repository" class="nav-github-link" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg viewbox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+<span data-i18n="server.github_1">GitHub</span>
+</a></li>
+<li data-i18n="server.get_server"><a class="nav-cta" data-i18n="server.get_server_1" href="downloads.html#server-owners">서버 가져오기</a></li>
+</ul>
+</div>
+</header>
+<!-- ================= HERO ================= -->
+<section class="page-hero">
+<div class="container">
+<span class="eyebrow" data-i18n="server.for_server_owners_hosts">서버 소유자 및 호스트를 위한</span>
+<h1 data-i18n="server.host_modded_serversyour_friends">모드 서버 호스팅<br/><span class="hl" data-i18n="server.your_friends_can_actually">친구들이 실제로 접속할 수 있습니다.</span></h1>
+<p data-i18n="server.the_selfhosted_engine_behind">Zircon의 자체 호스팅 엔진: 플레이어에게 정확한 모드 매니페스트를 게시하고, 게임 및 웹 트래픽을 단일 포트에서 멀티플렉싱하며, 완전한 브라우저 대시보드를 포함합니다.</p>
+<div data-i18n="server.get_server_managerread_hosting" style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 26px;"><a class="btn btn-primary btn-lg" data-i18n="server.get_server_manager" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+          서버 관리자 가져오기
+        </a>
+<a class="btn btn-ghost btn-lg" data-i18n="server.read_hosting_guide" href="docs.html#server-guide">호스팅 가이드 읽기</a></div>
+</div>
+</section>
+<!-- ================= INTERACTIVE SERVER MANAGER CAROUSEL ================= -->
+<section class="section" style="padding-top: 0;">
+<div class="container">
+<div class="carousel">
+<div class="carousel-track">
+<!-- Slide 1: Performance & Stats -->
+<div class="carousel-slide active">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.system_stats_multiinstance"><span data-i18n="server.system_stats_multiinstance_1">시스템 통계 &amp; 다중 인스턴스</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Server Performance Stats" height="600" loading="eager" src="../assets/img/performance_server.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.dashboard_statsrealtime_cpu_ram"><b data-i18n="server.dashboard_stats">대시보드 &amp; 통계:</b> 모든 서버 인스턴스에서 실시간 CPU, RAM 및 틱 속도 모니터링.</div>
+</div>
+<!-- Slide 2: Mod Browser -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.curseforge_modrinth_search"><span data-i18n="server.curseforge_modrinth_search_1">CurseForge &amp; Modrinth 검색</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Server Mod Browser" height="600" loading="lazy" src="../assets/img/mod_browser_server.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.integrated_mod_browsersearch_and"><b data-i18n="server.integrated_mod_browser">통합 모드 브라우저:</b> Modrinth 및 CurseForge에서 종속성 해결과 API 키 불필요로 모드를 검색하고 원클릭으로 설치하세요.</div>
+</div>
+<!-- Slide 3: Live Console -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.live_interactive_terminal"><span data-i18n="server.live_interactive_terminal_1">실시간 대화형 터미널</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Live Console" height="600" loading="lazy" src="../assets/img/console_log_server.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.live_consolesend_commands_review"><b data-i18n="server.live_console">실시간 콘솔:</b> 명령어를 전송하고, 색상으로 구분된 로그를 검토하며, 경고 또는 오류 스택을 필터링하세요.</div>
+</div>
+<!-- Slide 4: Shaders & Resource Packs -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.shaders_resource_packs"><span data-i18n="server.shaders_resource_packs_1">셰이더 &amp; 리소스 팩</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Shaders and Texture Packs" height="600" loading="lazy" src="../assets/img/shaders_server.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.visual_packsmanage_recommended_shaders"><b data-i18n="server.visual_packs">비주얼 팩:</b> 추천 셰이더 및 텍스처 팩을 관리하여 접속하는 플레이어에게 자동으로 동기화합니다.</div>
+</div>
+<!-- Slide 5: File Manager -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.web_file_manager_bom"><span data-i18n="server.web_file_manager_bom_1">웹 파일 관리자 &amp; BOM 동기화</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Server File Manager" height="600" loading="lazy" src="../assets/img/files_server.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.file_managerbrowse_server_directory"><b data-i18n="server.file_manager">파일 관리자:</b> 서버 디렉터리를 탐색하고, 파일을 업로드하며, "BOM에 동기화"로 클라이언트 동기화 항목을 표시하세요.</div>
+</div>
+<!-- Slide 6: In-Browser Config Editor -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.inbrowser_config_editor"><span data-i18n="server.inbrowser_config_editor_1">브라우저 내 설정 편집기</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="In-Browser File Editor" height="600" loading="lazy" src="../assets/img/files_text_editor.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.web_code_editoredit_serverproperties"><b data-i18n="server.web_code_editor">웹 코드 편집기:</b> 키보드 단축키와 즉각적인 클라이언트 동기화로 server.properties, JSON 설정 및 게임 파일을 편집하세요.</div>
+</div>
+<!-- Slide 7: Player Management -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.players_operators_whitelist"><span data-i18n="server.players_operators_whitelist_1">플레이어, 운영자 &amp; 화이트리스트</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Player Management" height="600" loading="lazy" src="../assets/img/players_server.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.player_controlmanage_whitelisted_users"><b data-i18n="server.player_control">플레이어 제어:</b> 화이트리스트 사용자, 운영자 권한 수준 및 금지 목록을 시각적으로 관리하세요.</div>
+</div>
+<!-- Slide 8: Automated Backups & World ZIP -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.automated_backups_world_zip"><span data-i18n="server.automated_backups_world_zip_1">자동 백업 &amp; 월드 ZIP 가져오기</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Server Backups" height="600" loading="lazy" src="../assets/img/backups_server.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.automated_snapshots_zipscheduled_lz4"><b data-i18n="server.automated_snapshots_zip">자동 스냅샷 &amp; ZIP:</b> 구성 가능한 보존 기간이 있는 예약된 LZ4 백업, 드래그 앤 드롭 .zip 월드 가져오기 및 원클릭 복원.</div>
+</div>
+<!-- Slide 9: Live World Map -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.live_2d3d_world_map"><span data-i18n="server.live_2d3d_world_map_1">실시간 2D/3D 월드 맵 &amp; 플레이어 레이더</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Live Server World Map" height="600" loading="lazy" src="../assets/img/world_seed_radar.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.live_world_mapexplore_rendered"><b data-i18n="server.live_world_map">실시간 월드 맵:</b> 브라우저에서 직접 렌더링된 지형, 생물군계 및 실시간 플레이어 위치 핀을 탐색하세요.</div>
+</div>
+<!-- Slide 10: Server Settings & Sleep Trigger -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.server_settings_sleep_trigger"><span data-i18n="server.server_settings_sleep_trigger_1">서버 설정 &amp; 슬립 트리거</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Server Settings" height="600" loading="lazy" src="../assets/img/settings_server.png" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="server.server_settingsport_multiplexing_configuration"><b data-i18n="server.server_settings">서버 설정:</b> 포트 멀티플렉싱 구성, 내장된 Modrinth 및 CurseForge 통합 및 유휴 상태 슬립 타임아웃 규칙.</div>
+</div>
+<!-- Floating On-Image Navigation Controls -->
+<button aria-label="Previous screenshot" class="carousel-btn carousel-prev">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+</button>
+<button aria-label="Next screenshot" class="carousel-btn carousel-next">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+</button>
+</div>
+<!-- Carousel Navigation Controls -->
+<div class="carousel-nav">
+<div class="carousel-dots">
+<button aria-label="Slide 1" class="carousel-dot active"></button>
+<button aria-label="Slide 2" class="carousel-dot"></button>
+<button aria-label="Slide 3" class="carousel-dot"></button>
+<button aria-label="Slide 4" class="carousel-dot"></button>
+<button aria-label="Slide 5" class="carousel-dot"></button>
+<button aria-label="Slide 6" class="carousel-dot"></button>
+<button aria-label="Slide 7" class="carousel-dot"></button>
+<button aria-label="Slide 8" class="carousel-dot"></button>
+<button aria-label="Slide 9" class="carousel-dot"></button>
+<button aria-label="Slide 10" class="carousel-dot"></button>
+</div>
+</div>
+<!-- Carousel Thumbnails -->
+<div class="carousel-thumbs">
+<button aria-label="View Stats" class="carousel-thumb active"><img alt="Stats" src="../assets/img/performance_server.png"/></button>
+<button aria-label="View Mod Browser" class="carousel-thumb"><img alt="Mod Browser" src="../assets/img/mod_browser_server.png"/></button>
+<button aria-label="View Live Console" class="carousel-thumb"><img alt="Console" src="../assets/img/console_log_server.png"/></button>
+<button aria-label="View Shaders" class="carousel-thumb"><img alt="Shaders" src="../assets/img/shaders_server.png"/></button>
+<button aria-label="View Files" class="carousel-thumb"><img alt="Files" src="../assets/img/files_server.png"/></button>
+<button aria-label="View Config Editor" class="carousel-thumb"><img alt="Editor" src="../assets/img/files_text_editor.png"/></button>
+<button aria-label="View Players" class="carousel-thumb"><img alt="Players" src="../assets/img/players_server.png"/></button>
+<button aria-label="View Backups" class="carousel-thumb"><img alt="Backups" src="../assets/img/backups_server.png"/></button>
+<button aria-label="View World Map" class="carousel-thumb"><img alt="World Map" src="../assets/img/world_seed_radar.png"/></button>
+<button aria-label="View Settings" class="carousel-thumb"><img alt="Settings" src="../assets/img/settings_server.png"/></button>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SCREENSHOT SPOTLIGHT: LIVE CONSOLE ================= -->
+<section class="section">
+<div class="container">
+<div class="feature-split">
+<div class="feature-split-text">
+<h2 data-i18n="server.live_terminal_colorized_logs">실시간 터미널 & 색상 로그</h2>
+<p data-i18n="server.execute_server_commands_directly">즉각적인 stdout/stderr 스트리밍으로 브라우저에서 서버 명령어를 직접 실행하세요. Info, Warn 또는 Error로 로그를 필터링하여 모드 예외를 빠르게 격리하고 게임 이벤트를 추적하세요.</p>
+<ul class="spec-list">
+<li data-i18n="server.live_websocket_streamcolorcoded_logs"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="server.live_websocket_streamcolorcoded_logs_1"><b data-i18n="server.live_websocket_stream">실시간 WebSocket 스트림:</b> 새로고침 지연 없이 업데이트되는 색상 코딩된 로그.</span></li>
+<li data-i18n="server.command_dispatchsend_op_commands"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="server.command_dispatchsend_op_commands_1"><b data-i18n="server.command_dispatch">명령어 디스패치:</b> op 명령어 전송, 아이템 지급 및 시간 관리.</span></li>
+<li data-i18n="server.log_level_filtersinstantly_toggle"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="server.log_level_filtersinstantly_toggle_1"><b data-i18n="server.log_level_filters">로그 레벨 필터:</b> Info, Warning 또는 Error 스트림을 즉시 전환하세요.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.live_terminal_console"><span data-i18n="server.live_terminal_console_1">실시간 터미널 콘솔</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Live Console" height="500" loading="lazy" src="../assets/img/console_log_server.png" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SCREENSHOT SPOTLIGHT: FILE MANAGER & EDITOR ================= -->
+<section class="section">
+<div class="container">
+<div class="feature-split reverse">
+<div class="feature-split-text">
+<h2 data-i18n="server.web_file_manager_config">웹 파일 관리자 & 설정 편집기</h2>
+<p data-i18n="server.no_need_for_external">외부 FTP 클라이언트나 SSH 세션이 필요 없습니다. 인스턴스 파일을 탐색하고, 내장된 구문 강조 편집기로 <code>server.properties</code> 및 JSON 설정을 편집하며, "클라이언트에 동기화"를 사용하여 설정을 플레이어 런처에 직접 전파하세요.</p>
+<ul class="spec-list">
+<li data-i18n="server.inbrowser_editorsyntax_highlighting_and"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="server.inbrowser_editorsyntax_highlighting_and_1"><b data-i18n="server.inbrowser_editor">브라우저 내 편집기:</b> 구문 강조 및 키보드 단축키(Ctrl+S).</span></li>
+<li data-i18n="server.oneclick_client_syncdistribute_modified"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="server.oneclick_client_syncdistribute_modified_1"><b data-i18n="server.oneclick_client_sync">원클릭 클라이언트 동기화:</b> 수정된 설정을 플레이어에게 바로 배포하세요.</span></li>
+<li data-i18n="server.upload_extractupload_zip_packs"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="server.upload_extractupload_zip_packs_1"><b data-i18n="server.upload_extract">업로드 &amp; 추출:</b> ZIP 팩 및 커스텀 모드 JAR을 쉽게 업로드하세요.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="server.serverproperties_editor"><span data-i18n="server.serverproperties_editor_1">server.properties 편집기</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Config Editor" height="500" loading="lazy" src="../assets/img/files_text_editor.png" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= FEATURE HIGHLIGHTS ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="server.no_support_tickets_no">지원 티켓 없음. 버전 충돌 없음.</h2>
+<p data-i18n="server.your_server_dictates_the">서버가 모드, 셰이더 및 설정을 결정합니다. 플레이어는 PLAY를 클릭하고 동기화된 상태로 생성됩니다.</p>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M4 4h16v4H4z"></path><path d="M4 10h16v4H4z"></path><path d="M4 16h16v4H4z"></path><path d="M7 6h.01M7 12h.01M7 18h.01"></path></svg></span>
+<h3 data-i18n="server.singleport_multiserver">단일 포트 & 다중 서버</h3>
+<p data-i18n="server.game_traffic_25565_and">게임 트래픽(25565)과 웹 매니페스트가 <strong data-i18n="server.same_single_port">동일한 단일 포트</strong>에서 실행됩니다. 하나의 중앙 집중식 브라우저 대시보드에서 여러 서버 또는 모드팩을 호스팅하고 관리하세요.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
+<h3 data-i18n="server.sleepwhenempty_save_ram">비어 있을 때 슬립(RAM 절약)</h3>
+<p data-i18n="server.when_nobody_is_online">아무도 온라인이 아닐 때, 서버는 호스트 CPU와 RAM을 절약하기 위해 JVM 실행을 동결합니다. 플레이어가 ping을 하거나 Zircon에서 PLAY를 누르면 밀리초 단위로 자동으로 복구됩니다.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"></path></svg></span>
+<h3 data-i18n="server.modrinth_curseforge_store">Modrinth & CurseForge 스토어</h3>
+<p data-i18n="server.search_and_1click_install">웹 패널 내에서 모드, 셰이더 및 리소스 팩을 직접 검색하고 원클릭으로 설치하세요. 자동 종속성 해결 및 API 키 불필요.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg></span>
+<h3 data-i18n="server.live_web_console_players">실시간 웹 콘솔 & 플레이어</h3>
+<p data-i18n="server.execute_commands_stream_colorized">명령어를 실행하고, 실시간으로 색상 코딩된 Minecraft 서버 로그를 스트리밍하며, 화이트리스트, 운영자 권한 및 플레이어 금지를 시각적으로 관리하세요.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" x2="8" y1="13" y2="13"></line><line x1="16" x2="8" y1="17" y2="17"></line></svg></span>
+<h3 data-i18n="server.file_studio_world_zip">파일 스튜디오 & 월드 ZIP 가져오기</h3>
+<p data-i18n="server.edit_serverproperties_and_json">구문 강조로 브라우저에서 server.properties 및 JSON 파일을 편집하세요. .zip 파일에서 전체 월드를 드래그 앤 드롭으로 가져오고 변경 사항을 클라이언트에 즉시 푸시하세요.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span>
+<h3 data-i18n="server.world_map_performance_metrics">월드 맵 & 성능 지표</h3>
+<p data-i18n="server.inspect_live_rendered_terrain">렌더링된 지형, 생물군계 및 실시간 플레이어 위치 핀을 초당 단위 CPU, RAM 및 틱 속도(TPS) 모니터링 그래프와 함께 검사하세요.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= HOW IT OPERATES ================= -->
+<section class="section">
+<div class="container" style="max-width: 900px;">
+<div class="section-head">
+<h2 data-i18n="server.how_port_multiplexing_works">포트 멀티플렉싱 작동 방식</h2>
+<p data-i18n="server.traditional_servers_require_separate">전통적인 서버는 게임, 웹 매니페스트 및 관리자 콘솔에 별도의 포트가 필요합니다. Zircon은 포트 25565에서 이를 수행합니다.</p>
+</div>
+<div class="codeblock" data-i18n="server.1_start_zircon_server"><span class="c" data-i18n="server.1_start_zircon_server_1"># 1. Zircon 서버 관리자 시작</span>
+./zircon-server --port 25565 --admin-port 25564
+
+<span class="c" data-i18n="server.public_address_25565_serves"># 공개 주소: 25565 (Minecraft 프로토콜 + REST 모드 매니페스트 제공)</span>
+<span class="c" data-i18n="server.local_admin_panel_httplocalhost25564"># 로컬 관리자 패널: http://localhost:25564 (생성된 비밀번호가 포함된 보안 대시보드)</span></div>
+<div class="callout" data-i18n="server.security_by_designthe_admin" style="margin-top: 24px;"><strong data-i18n="server.security_by_design">설계 단계부터 보안:</strong> 관리자 대시보드(25564)는 로컬 또는 VPN/리버스 프록시 뒤에 유지됩니다. 플레이어에게는 멀티플렉싱된 Minecraft 포트(25565)만 포워딩하면 됩니다.</div>
+</div>
+</section>
+<!-- ================= CTA ================= -->
+<section class="section" style="padding-top: 40px;">
+<div class="container">
+<div class="cta-band">
+<h2 data-i18n="server.ready_to_run_your">서버를 실행할 준비가 되셨나요?</h2>
+<p data-i18n="server.download_the_free_selfhosted">무료 자체 호스팅 관리자를 다운로드하고 Minecraft 서버를 완전히 제어하세요.</p>
+<div data-i18n="server.get_server_managerview_setup" style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;"><a class="btn btn-primary btn-lg" data-i18n="server.get_server_manager_1" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+            서버 관리자 가져오기
+          </a>
+<a class="btn btn-ghost btn-lg" data-i18n="server.view_setup_guide" href="docs.html#server-guide">설정 가이드 보기</a></div>
+</div>
+</div>
+</section>
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+<div class="container">
+<div class="footer-grid">
+<div class="footer-brand">
+<a class="brand" href="./" style="display: inline-block; margin-bottom: 14px; text-decoration: none;">
+<img alt="Zircon" class="brand-text" height="26" src="../assets/img/zircon-title.svg"/>
+</a>
+<p data-i18n="server.a_free_opensource_launcher">모드 Minecraft를 위한 무료 오픈 소스 런처 및 서버 관리자입니다. Modrinth 및 CurseForge에서 매 실행 시 정확한 모드 동기화를 검증합니다.</p>
+<a class="pill pill-accent" data-i18n="server.sourceavailable_bsl_11" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">소스 공개(BSL 1.1)</a>
+</div>
+<div class="footer-col">
+<h4 data-i18n="server.pages">페이지</h4>
+<ul>
+<li data-i18n="server.home_2"><a data-i18n="server.home_3" href="/">홈</a></li>
+<li data-i18n="server.launcher_2"><a data-i18n="server.launcher_3" href="launcher.html">런처</a></li>
+<li data-i18n="server.server_manager_2"><a data-i18n="server.server_manager_3" href="server.html">서버 관리자</a></li>
+<li data-i18n="server.guides_docs"><a data-i18n="server.guides_docs_1" href="docs.html">가이드 &amp; 문서</a></li>
+<li data-i18n="server.faq_2"><a data-i18n="server.faq_3" href="faq.html">FAQ</a></li>
+<li data-i18n="server.downloads_2"><a data-i18n="server.downloads_3" href="downloads.html">다운로드</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<h4 data-i18n="server.project_community">프로젝트 & 커뮤니티</h4>
+<ul>
+<li data-i18n="server.github_repository"><a data-i18n="server.github_repository_1" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">GitHub 저장소</a></li>
+<li data-i18n="server.releases_changelogs"><a data-i18n="server.releases_changelogs_1" href="https://github.com/DevTheDev189/Zircon/releases" rel="noopener" target="_blank">릴리스 &amp; 변경 로그</a></li>
+<li data-i18n="server.business_source_license_11"><a data-i18n="server.business_source_license_11_1" href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" rel="noopener" target="_blank">Business Source License 1.1</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-legal" data-i18n="server.zircon_contributors_v0421_active"><span data-i18n="server.zircon_contributors_v0421_active_1">© Zircon 기여자 · v0.4.21 (활성 개발 중)</span>
+<span data-i18n="server.not_an_official_minecraft">공식 Minecraft 제품이 아닙니다. Mojang Studios 또는 Microsoft에 의해 승인되거나 관련되지 않았습니다.</span></div>
+</div>
+</footer>
+<script src="../assets/js/main.js?v=2"></script>
+</body>
+</html>

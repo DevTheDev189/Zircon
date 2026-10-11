@@ -17,14 +17,15 @@
           </div>
           <div>
             <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
-              Mod Health & Disaster Recovery
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Integrity Audit</span>
+              {{ $t('audit_repair.title') }}
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{{ $t('audit_repair.integrity_audit') }}</span>
             </h2>
-            <p class="text-xs text-slate-400">Verifies local JARs against cryptographic BOM hashes</p>
+            <p class="text-xs text-slate-400">{{ $t('audit_repair.subtitle') }}</p>
           </div>
         </div>
         <button
           class="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800/60 transition-colors"
+          :title="$t('common.close')"
           @click="handleClose"
         >
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -37,7 +38,7 @@
       <div class="p-6 overflow-y-auto space-y-4 flex-1">
         <div v-if="auditing" class="text-center py-8 space-y-3">
           <div class="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p class="text-xs text-slate-400">Auditing physical files against BOM...</p>
+          <p class="text-xs text-slate-400">{{ $t('audit_repair.auditing_progress') }}</p>
         </div>
 
         <div v-else-if="auditReport" class="space-y-4">
@@ -45,19 +46,19 @@
           <div class="grid grid-cols-3 gap-2 text-center text-xs">
             <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
               <div class="text-emerald-400 font-bold text-base">{{ auditReport.verifiedCount }} / {{ auditReport.totalExpected }}</div>
-              <div class="text-[10px] text-slate-400 mt-0.5">Verified Intact</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">{{ $t('audit_repair.verified_intact') }}</div>
             </div>
             <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
               <div class="font-bold text-base" :class="auditReport.missingMods?.length ? 'text-rose-400' : 'text-slate-400'">
                 {{ auditReport.missingMods?.length || 0 }}
               </div>
-              <div class="text-[10px] text-slate-400 mt-0.5">Missing Files</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">{{ $t('audit_repair.missing_files') }}</div>
             </div>
             <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
               <div class="font-bold text-base" :class="auditReport.corruptedMods?.length ? 'text-amber-400' : 'text-slate-400'">
                 {{ auditReport.corruptedMods?.length || 0 }}
               </div>
-              <div class="text-[10px] text-slate-400 mt-0.5">Hash Mismatch</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">{{ $t('audit_repair.hash_mismatch') }}</div>
             </div>
           </div>
 
@@ -67,14 +68,14 @@
             class="bg-emerald-950/30 border border-emerald-800/50 rounded-xl p-3.5 text-xs text-emerald-300 flex items-center gap-2.5"
           >
             <span class="text-base">✓</span>
-            <span>All mods are healthy and verified! No missing or corrupted files detected.</span>
+            <span>{{ $t('audit_repair.all_healthy') }}</span>
           </div>
 
           <!-- Problem Items -->
           <div v-else class="space-y-2">
             <div class="text-xs font-semibold text-rose-300 flex items-center justify-between">
-              <span>Issues Detected</span>
-              <span class="text-[11px] text-slate-400">{{ (auditReport.missingMods?.length || 0) + (auditReport.corruptedMods?.length || 0) }} total</span>
+              <span>{{ $t('audit_repair.issues_detected') }}</span>
+              <span class="text-[11px] text-slate-400">{{ $t('audit_repair.issues_total', { count: (auditReport.missingMods?.length || 0) + (auditReport.corruptedMods?.length || 0) }) }}</span>
             </div>
 
             <div class="max-h-48 overflow-y-auto space-y-1.5 bg-[#070b10] border border-slate-800 rounded-xl p-3">
@@ -84,7 +85,7 @@
                 class="flex items-center justify-between text-xs py-1 text-rose-300"
               >
                 <span class="truncate font-mono">{{ m.filename }}</span>
-                <span class="text-[10px] px-2 py-0.5 rounded bg-rose-950/80 border border-rose-800 text-rose-400 shrink-0">Missing</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-rose-950/80 border border-rose-800 text-rose-400 shrink-0">{{ $t('audit_repair.missing_badge') }}</span>
               </div>
               <div
                 v-for="m in auditReport.corruptedMods"
@@ -92,14 +93,14 @@
                 class="flex items-center justify-between text-xs py-1 text-amber-300"
               >
                 <span class="truncate font-mono">{{ m.filename }}</span>
-                <span class="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800 text-amber-400 shrink-0">Corrupted Hash</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800 text-amber-400 shrink-0">{{ $t('audit_repair.corrupted_badge') }}</span>
               </div>
             </div>
           </div>
 
           <!-- Unmanaged Files -->
           <div v-if="auditReport.unmanagedFiles?.length > 0" class="p-3 bg-slate-950/40 border border-slate-800/80 rounded-xl text-xs space-y-1">
-            <div class="text-slate-400 font-semibold">Unmanaged Files ({{ auditReport.unmanagedFiles.length }}):</div>
+            <div class="text-slate-400 font-semibold">{{ $t('audit_repair.unmanaged_files', { count: auditReport.unmanagedFiles.length }) }}</div>
             <div class="text-[11px] text-slate-500 truncate" v-for="f in auditReport.unmanagedFiles.slice(0, 3)" :key="f">
               • {{ f }}
             </div>
@@ -110,7 +111,7 @@
       <!-- Footer -->
       <div class="px-6 py-4 border-t border-slate-800/80 bg-slate-950/60 flex items-center justify-between">
         <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold" @click="handleClose">
-          Close
+          {{ $t('common.close') }}
         </button>
 
         <button
@@ -120,7 +121,7 @@
           @click="handleRepair"
         >
           <span v-if="repairing" class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-          <span>{{ repairing ? 'Repairing from CDNs...' : '1-Click Repair from CDNs' }}</span>
+          <span>{{ repairing ? $t('audit_repair.repairing_progress') : $t('audit_repair.repair_button') }}</span>
         </button>
       </div>
     </div>

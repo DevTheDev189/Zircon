@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+
+<html lang="ko">
+<head>
+  <link rel="canonical" href="https://zirconmc.net/ko/">
+  <link rel="alternate" hreflang="x-default" href="https://zirconmc.net/">
+  <link rel="alternate" hreflang="en" href="https://zirconmc.net/">
+  <link rel="alternate" hreflang="es" href="https://zirconmc.net/es/">
+  <link rel="alternate" hreflang="pt-BR" href="https://zirconmc.net/pt-br/">
+  <link rel="alternate" hreflang="pt-PT" href="https://zirconmc.net/pt-pt/">
+  <link rel="alternate" hreflang="de" href="https://zirconmc.net/de/">
+  <link rel="alternate" hreflang="fr" href="https://zirconmc.net/fr/">
+  <link rel="alternate" hreflang="it" href="https://zirconmc.net/it/">
+  <link rel="alternate" hreflang="ru" href="https://zirconmc.net/ru/">
+  <link rel="alternate" hreflang="pl" href="https://zirconmc.net/pl/">
+  <link rel="alternate" hreflang="nl" href="https://zirconmc.net/nl/">
+  <link rel="alternate" hreflang="tr" href="https://zirconmc.net/tr/">
+  <link rel="alternate" hreflang="sv" href="https://zirconmc.net/sv/">
+  <link rel="alternate" hreflang="uk" href="https://zirconmc.net/uk/">
+  <link rel="alternate" hreflang="cs" href="https://zirconmc.net/cs/">
+  <link rel="alternate" hreflang="fi" href="https://zirconmc.net/fi/">
+  <link rel="alternate" hreflang="da" href="https://zirconmc.net/da/">
+  <link rel="alternate" hreflang="no" href="https://zirconmc.net/no/">
+  <link rel="alternate" hreflang="hu" href="https://zirconmc.net/hu/">
+  <link rel="alternate" hreflang="ro" href="https://zirconmc.net/ro/">
+  <link rel="alternate" hreflang="el" href="https://zirconmc.net/el/">
+  <link rel="alternate" hreflang="bg" href="https://zirconmc.net/bg/">
+  <link rel="alternate" hreflang="sk" href="https://zirconmc.net/sk/">
+  <link rel="alternate" hreflang="hr" href="https://zirconmc.net/hr/">
+  <link rel="alternate" hreflang="sr" href="https://zirconmc.net/sr/">
+  <link rel="alternate" hreflang="sl" href="https://zirconmc.net/sl/">
+  <link rel="alternate" hreflang="lt" href="https://zirconmc.net/lt/">
+  <link rel="alternate" hreflang="lv" href="https://zirconmc.net/lv/">
+  <link rel="alternate" hreflang="et" href="https://zirconmc.net/et/">
+  <link rel="alternate" hreflang="zh-CN" href="https://zirconmc.net/zh-cn/">
+  <link rel="alternate" hreflang="zh-TW" href="https://zirconmc.net/zh-tw/">
+  <link rel="alternate" hreflang="ja" href="https://zirconmc.net/ja/">
+  <link rel="alternate" hreflang="ko" href="https://zirconmc.net/ko/">
+  <link rel="alternate" hreflang="id" href="https://zirconmc.net/id/">
+  <link rel="alternate" hreflang="vi" href="https://zirconmc.net/vi/">
+  <link rel="alternate" hreflang="th" href="https://zirconmc.net/th/">
+  <link rel="alternate" hreflang="ms" href="https://zirconmc.net/ms/">
+  <link rel="alternate" hreflang="fil" href="https://zirconmc.net/fil/">
+  <link rel="alternate" hreflang="hi" href="https://zirconmc.net/hi/">
+  <link rel="alternate" hreflang="ar" href="https://zirconmc.net/ar/">
+  <link rel="alternate" hreflang="he" href="https://zirconmc.net/he/">
+  <link rel="alternate" hreflang="fa" href="https://zirconmc.net/fa/">
+
+<!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+<script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zircon — Modded Minecraft with friends, without the headache</title>
+<meta content="Zircon is a free, open-source launcher for modded Minecraft. Pick a server, hit PLAY, and the exact mods that server runs install themselves — verified against Modrinth &amp; CurseForge on every launch. Windows 10/11 now; macOS &amp; Linux planned." name="description"/>
+<meta content="modded minecraft launcher, minecraft mod sync, modrinth launcher, curseforge launcher, minecraft server manager, fabric launcher, forge launcher, neoforge, automatic mod installer" name="keywords"/>
+<meta content="Zircon Contributors" name="author"/>
+<meta content="index, follow" name="robots"/>
+<meta content="#0d1117" name="theme-color"/>
+<!-- Canonical URL -->
+<link href="https://zirconmc.net/" rel="canonical"/>
+<!-- Open Graph / Social Sharing -->
+<meta content="Zircon" property="og:site_name"/>
+<meta content="https://zirconmc.net/" property="og:url"/>
+<meta content="Zircon — Modded Minecraft with friends, without the headache" property="og:title"/>
+<meta content="Free open-source launcher &amp; server manager for modded Minecraft. Pick a server, hit PLAY, and mods sync automatically with Modrinth &amp; CurseForge verification." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://zirconmc.net/assets/img/locales/ko/main_launcher.png" property="og:image"/>
+<meta content="Zircon Modded Minecraft Launcher Interface" property="og:image:alt"/>
+<meta content="en_US" property="og:locale"/>
+<!-- Twitter Cards -->
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Zircon — Modded Minecraft with friends, without the headache" name="twitter:title"/>
+<meta content="Free open-source launcher &amp; server manager for modded Minecraft. Exact mod sync verified on every launch via Modrinth &amp; CurseForge." name="twitter:description"/>
+<meta content="https://zirconmc.net/assets/img/locales/ko/main_launcher.png" name="twitter:image"/>
+<meta content="Zircon Launcher Preview" name="twitter:image:alt"/>
+<!-- Favicons & Manifest -->
+<link href="../assets/img/favicon.png" rel="icon" type="image/png"/>
+<link href="../assets/img/favicon.png" rel="apple-touch-icon"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+<!-- Structured Data / JSON-LD -->
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://zirconmc.net/#website",
+        "url": "https://zirconmc.net/",
+        "name": "Zircon",
+        "description": "Free and open-source launcher & server manager for modded Minecraft.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Zircon",
+          "url": "https://github.com/DevTheDev189/Zircon"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://zirconmc.net/#launcher",
+        "name": "Zircon Launcher",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Windows 10, Windows 11",
+        "description": "A free, open-source companion launcher for modded Minecraft servers with automatic Modrinth & CurseForge verification.",
+        "url": "https://zirconmc.net/",
+        "downloadUrl": "https://zirconmc.net/downloads.html#players",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://zirconmc.net/#server-manager",
+        "name": "Zircon Server Manager",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "description": "Self-hosted Minecraft server manager featuring automatic player mod syncing, Modrinth & CurseForge integration, web dashboard, and single-port multiplexing.",
+        "url": "https://zirconmc.net/downloads.html#server-owners",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://zirconmc.net/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How does Zircon automatically sync Minecraft mods?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "When you hit PLAY, the Zircon Launcher connects to the server, fetches its exact mod manifest, verifies each mod hash against Modrinth and CurseForge, and automatically downloads any missing mods directly to your isolated instance folder."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use Modrinth and CurseForge to find and download mods?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes! Zircon natively integrates with both Modrinth and CurseForge with zero API key configuration needed. Server owners and players can search, browse, and download mods directly from both platforms."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Zircon free and open source?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, Zircon is free and source-available under the Business Source License 1.1 (BSL 1.1). It is 100% free for players, homelabbers, and gaming communities, while commercial managed cloud hosting is reserved."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is my Microsoft Minecraft account safe with Zircon?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Zircon uses Microsoft OAuth 2.0 authentication in your browser. Your password and credentials are submitted directly to Microsoft and never touch or get stored by Zircon."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which mod loaders does Zircon support?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Zircon supports Fabric, Quilt, Forge, and NeoForge mod loaders across supported Minecraft versions."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+<!-- Animated Procedural Background Elements -->
+<div class="z-bg-dots"></div>
+<div class="z-orb z-orb-1"></div>
+<div class="z-orb z-orb-2"></div>
+<div class="z-orb z-orb-3"></div>
+<div class="z-orb z-orb-4"></div>
+<div class="z-particle z-particle-1"></div>
+<div class="z-particle z-particle-2"></div>
+<div class="z-particle z-particle-3"></div>
+<div class="z-particle z-particle-4"></div>
+<div class="z-particle z-particle-5"></div>
+<div class="z-particle z-particle-6"></div>
+<!-- ================= NAV ================= -->
+<header class="site-nav">
+<div class="container">
+<a aria-label="Zircon home" class="brand" href="./">
+<img alt="Zircon" class="brand-text" height="28" src="../assets/img/zircon-title.svg" width="130"/>
+</a>
+<button aria-expanded="false" aria-label="Toggle navigation" class="nav-toggle">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"></path>
+</svg>
+</button>
+<ul class="nav-links">
+<li data-i18n="index.home"><a class="active" data-i18n="index.home_1" href="/">홈</a></li>
+<li data-i18n="index.launcher"><a data-i18n="index.launcher_1" href="launcher.html">런처</a></li>
+<li data-i18n="index.server_manager"><a data-i18n="index.server_manager_1" href="server.html">서버 관리자</a></li>
+<li data-i18n="index.guides"><a data-i18n="index.guides_1" href="docs.html">가이드</a></li>
+<li data-i18n="index.faq"><a data-i18n="index.faq_1" href="faq.html">FAQ</a></li>
+<li data-i18n="index.downloads"><a data-i18n="index.downloads_1" href="downloads.html">다운로드</a></li>
+<li data-i18n="index.github"><a aria-label="GitHub Repository" class="nav-github-link" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg viewbox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+<span data-i18n="index.github_1">GitHub</span>
+</a></li>
+<li data-i18n="index.get_launcher"><a class="nav-cta" data-i18n="index.get_launcher_1" href="downloads.html#players">런처 받기</a></li>
+</ul>
+</div>
+</header>
+<!-- ================= HERO ================= -->
+<section class="hero">
+<div class="container">
+<span class="eyebrow" data-i18n="index.the_fastest_way_to">친구들과 모드를 적용한 Minecraft를 즐기는 가장 빠른 방법</span>
+<img alt="Zircon" class="hero-title" src="../assets/img/zircon-title.svg"/>
+<h1 data-i18n="index.modded_minecraft_with_friendswithout">친구들과 함께 모드를 적용한 Minecraft를,<br/><span class="hl" data-i18n="index.without_the_headache">번거로움 없이.</span></h1>
+<p class="lede" data-i18n="index.zircon_eliminates_modpack_mismatches">Zircon은 모드팩 불일치 문제를 영구적으로 해결합니다. 서버를 선택하고,
+        <strong data-i18n="index.play">PLAY</strong> 버튼을 누르면 모든 모드가 수 초 만에 설치되고 암호화 검증됩니다.
+        또한: CurseForge 및 Prism에서 원클릭 가져오기, 4인 소파 협동 플레이, LAN 자동 발견 기능을 제공합니다.</p>
+<div class="hero-actions-stacked" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 12px;">
+<div data-i18n="index.download_for_windows_exestar" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><a class="btn btn-primary btn-xl" data-i18n="index.download_for_windows_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe" id="hero-primary-download">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+<span class="download-label" data-i18n="index.download_for_windows_exe_1">Windows용 다운로드 (.exe)</span>
+</a>
+<a class="btn btn-secondary btn-xl" data-i18n="index.star_on_github" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg fill="currentColor" height="20" viewbox="0 0 24 24" width="20"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+            GitHub에 Star 주기
+          </a></div>
+<div class="hero-sublinks-row" data-i18n="index.also_onmacos_dmglinux_appimagehosting" style="color: var(--muted); font-size: 0.9rem; margin-top: 4px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><span data-i18n="index.also_onmacos_dmglinux_appimage">또한 <a data-i18n="index.macos_dmg" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">macOS (.dmg)</a> &amp; <a data-i18n="index.linux_appimage" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">Linux (.AppImage)</a>에서도 사용 가능</span>
+<span>·</span>
+<span data-i18n="index.hosting_a_serverjump_to">서버 호스팅 중이신가요? <a data-i18n="index.jump_to_server_engine" href="#server-hosts" style="color: var(--primary); font-weight: 600;">서버 엔진으로 이동 ↓</a></span></div>
+</div>
+<div class="hero-foot" data-i18n="index.100_free_open_sourcezero"><span data-i18n="index.100_free_open_source"><i class="dot"></i> 100% 무료 & 오픈 소스</span>
+<span data-i18n="index.zero_telemetry"><i class="dot"></i> 제로 텔레메트리</span>
+<span data-i18n="index.modrinth_curseforge_integrated"><i class="dot"></i> Modrinth & CurseForge 통합</span>
+<span data-i18n="index.subsecond_verification"><i class="dot"></i> 1초 미만 검증</span></div>
+<!-- ================= INTERACTIVE SHOWCASE FRAME (70% Launcher Focus) ================= -->
+<div class="hero-shot showcase-container">
+<div class="showcase-tabs" data-i18n="index.launcheruniversal_migration4player_coop3d_skin" role="tablist"><button class="showcase-tab active" data-i18n="index.launcher_2" data-title="Zircon Launcher — One-Click Join &amp; Mod Sync" data-view="launcher">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            런처
+          </button>
+<button class="showcase-tab" data-i18n="index.universal_migration" data-title="Universal Migration — 1-Click Import from Any Launcher" data-view="migration">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+            범용 마이그레이션
+          </button>
+<button class="showcase-tab" data-i18n="index.4player_coop" data-title="4-Player Split-Screen Couch Co-op with Gamepads" data-view="coop">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle><path d="M12 9v6"></path></svg>
+            4인 협동 플레이
+          </button>
+<button class="showcase-tab" data-i18n="index.3d_skin_studio" data-title="Zircon 3D Skin Studio &amp; Mojang Sync" data-view="skin">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            3D 스킨 스튜디오
+          </button>
+<button class="showcase-tab" data-i18n="index.server_engine_preview" data-title="Zircon Server Manager — Single-Port 25565 Engine" data-view="server">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+            서버 엔진 (미리보기)
+          </button></div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots">
+<span class="dot dot-red"></span>
+<span class="dot dot-yellow"></span>
+<span class="dot dot-green"></span>
+</div>
+<div class="frame-title" data-i18n="index.zircon_launcher_oneclick_join"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="11" rx="2" ry="2" width="18" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+<span data-i18n="index.zircon_launcher_oneclick_join_1" id="frameTitleText">Zircon 런처 — 원클릭 참여 & 모드 동기화</span></div>
+<div class="frame-controls">
+<button aria-label="Zoom image" class="frame-zoom-btn" title="Click to view full screen">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg>
+</button>
+</div>
+</div>
+<!-- View 1: Launcher -->
+<div class="showcase-view active" data-view="launcher">
+<img alt="Zircon Launcher Main Screen" fetchpriority="high" height="600" loading="eager" src="../assets/img/locales/ko/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="1000"/>
+</div>
+<!-- View 2: Universal Migration -->
+<div class="showcase-view" data-view="migration">
+<img alt="Universal Migration Importer" height="600" loading="lazy" src="../assets/img/locales/ko/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="1000"/>
+</div>
+<!-- View 3: Couch Co-op -->
+<div class="showcase-view" data-view="coop">
+<img alt="4-Player Split-Screen Couch Co-op" height="600" loading="lazy" src="../assets/img/locales/ko/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="1000"/>
+</div>
+<!-- View 4: 3D Skin Studio -->
+<div class="showcase-view" data-view="skin">
+<img alt="Zircon 3D Skin Studio with Live Preview" height="600" loading="lazy" src="../assets/img/locales/ko/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="1000"/>
+</div>
+<!-- View 5: Server Dashboard -->
+<div class="showcase-view" data-view="server">
+<img alt="Zircon Server Performance Stats" height="600" loading="lazy" src="../assets/img/performance_server.png" width="1000"/>
+</div>
+</div>
+<p class="shot-caption" data-i18n="index.click_any_tab_above">위의 탭을 클릭하거나 이미지를 클릭하여 전체 화면 세부 정보를 확인하세요.</p>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 1: THE HOOK — AUTOMATIC MOD SYNC ================= -->
+<section class="section" id="mod-sync">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.never_send_a_google">더 이상 Google Drive 링크를 보내지 마세요.</h2>
+<p data-i18n="index.end_the_2hour_discord">게임 밤 전에 2시간 동안 이어지는 Discord 논쟁을 끝내세요. PLAY 버튼만 누르고 바로 입장하세요.</p>
+</div>
+<!-- Problem vs Solution Contrast Arena -->
+<div class="contrast-arena">
+<div class="contrast-box contrast-old">
+<span class="contrast-badge" data-i18n="index.the_900_pm_discord">오후 9시의 Discord 악몽</span>
+<h3 data-i18n="index.the_old_way_modpack" style="color: var(--white); margin: 0; font-size: 22px;">과거 방식: 모드팩 혼란</h3>
+<ul class="contrast-list">
+<li class="contrast-item" data-i18n="index.which_fabric_build_are"><span class="contrast-icon">✕</span>
+<span data-i18n="index.which_fabric_build_are_1"><strong data-i18n="index.which_fabric_build_are_2">"어떤 Fabric 빌드를 사용하나요?"</strong> — 서버는 비어 있는데 45분간 Discord에서 트러블슈팅을 해야 합니다.</span></li>
+<li class="contrast-item" data-i18n="index.sketchy_zip_links_downloading"><span class="contrast-icon">✕</span>
+<span data-i18n="index.sketchy_zip_links_downloading_1"><strong data-i18n="index.sketchy_zip_links">위험한 zip 링크</strong> — 랜덤 Google Drive 링크에서 80개의 느슨한 .jar 파일을 다운로드해야 합니다.</span></li>
+<li class="contrast-item" data-i18n="index.crash_on_launch_missing"><span class="contrast-icon">✕</span>
+<span data-i18n="index.crash_on_launch_missing_1"><strong data-i18n="index.crash_on_launch">실행 시 충돌</strong> — "Missing dependency: cloth-config-v12"와 같은 난해한 오류 로그가 발생합니다.</span></li>
+<li class="contrast-item" data-i18n="index.game_night_canceled_one"><span class="contrast-icon">✕</span>
+<span data-i18n="index.game_night_canceled_one_1"><strong data-i18n="index.game_night_canceled">게임 밤 취소</strong> — 한 친구가 포기하면 모두가 다른 게임을 하기 위해 로그아웃합니다.</span></li>
+</ul>
+</div>
+<div class="contrast-box contrast-zircon">
+<span class="contrast-badge" data-i18n="index.instant_game_night">즉시 게임 밤</span>
+<h3 data-i18n="index.the_zircon_way_1click" style="color: var(--white); margin: 0; font-size: 22px;">Zircon 방식: 원클릭 & 플레이</h3>
+<ul class="contrast-list">
+<li class="contrast-item" data-i18n="index.zero_file_hunting_your"><span class="contrast-icon">✓</span>
+<span data-i18n="index.zero_file_hunting_your_1"><strong data-i18n="index.zero_file_hunting">파일 탐색 제로</strong> — 친구가 서버 주소나 로컬 LAN 초대장을 알려줍니다.</span></li>
+<li class="contrast-item" data-i18n="index.one_click_hit_play"><span class="contrast-icon">✓</span>
+<span data-i18n="index.one_click_hit_play_1"><strong data-i18n="index.one_click">원클릭</strong> — PLAY 버튼을 누르세요. Zircon이 서버의 모드 목록을 확인하고 모든 파일을 검증합니다.</span></li>
+<li class="contrast-item" data-i18n="index.automatic_fastdownload_missing_mods"><span class="contrast-icon">✓</span>
+<span data-i18n="index.automatic_fastdownload_missing_mods_1"><strong data-i18n="index.automatic_fastdownload">자동 고속 다운로드</strong> — 누락된 모드, 설정, 텍스처가 Modrinth & CurseForge에서 수 초 만에 가져옵니다.</span></li>
+<li class="contrast-item" data-i18n="index.ingame_in_seconds_you"><span class="contrast-icon">✓</span>
+<span data-i18n="index.ingame_in_seconds_you_1"><strong data-i18n="index.ingame_in_seconds">수 초 만에 게임 내 입장</strong> — 즉시 함께 스폰됩니다. 모드 폴더 드래그 앤 드롭이 필요 없습니다.</span></li>
+</ul>
+</div>
+</div>
+<!-- 3-Step Sync Flow -->
+<div class="steps">
+<div class="step">
+<h3 data-i18n="index.1_cryptographic_manifest">1. 암호화 매니페스트</h3>
+<p data-i18n="index.the_server_broadcasts_its">서버는 포트 25565를 통해 정확한 자재 목록(BOM)을 브로드캐스트합니다 — 모드 ID, 버전 해시, 로더, 설정 등.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.2_instant_hash_audit">2. 즉각적인 해시 감사</h3>
+<p data-i18n="index.the_launcher_scans_your">런처는 밀리초 단위로 로컬 인스턴스를 스캔하여 이미 보유한 파일은 건너뛰고 누락된 파일만 표시합니다.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.3_parallel_verified_fetch">3. 병렬 검증된 가져오기</h3>
+<p data-i18n="index.missing_files_download_in">누락된 파일은 Modrinth 및 CurseForge CDN에서 병렬로 직접 다운로드됩니다. 손상된 JAR 파일이나 버전 불일치가 없습니다.</p>
+</div>
+</div>
+<div style="margin-top: 36px; text-align: center;">
+<div class="app-frame" style="max-width: 900px; margin: 0 auto;">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.cryptographic_mod_synchronization_verification"><span data-i18n="index.cryptographic_mod_synchronization_verification_1">암호화 모드 동기화 & 검증 엔진</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Cryptographic Mod Sync Verification Interface" height="540" loading="lazy" src="../assets/img/sync_verification.png" width="900"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 2: THE OBJECTION KILLER — UNIVERSAL MIGRATION ================= -->
+<section class="section" id="migration">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.switching_from_curseforge_or">CurseForge 또는 Prism에서 전환하시나요? 모든 것을 원클릭으로 가져오세요.</h2>
+<p data-i18n="index.dont_abandon_your_worlds">월드, 키 바인딩, 모드팩 인스턴스를 포기하지 마세요. Zircon은 설치된 런처를 자동으로 감지하고 2초 이내에 손실 없이 마이그레이션합니다.</p>
+</div>
+<!-- 4-Launcher Migration Badges Grid -->
+<div class="grid grid-4" style="margin-bottom: 36px;">
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="CurseForge Logo" height="48" src="../assets/img/curseforge.svg" width="48"/>
+</div>
+<h4 data-i18n="index.curseforge" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">CurseForge</h4>
+<p data-i18n="index.autodetects_modpacks_overrides_custom" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">모드팩, 오버라이드, 사용자 지정 설정 및 월드 저장을 자동으로 감지합니다.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="Prism Launcher Logo" height="48" src="../assets/img/prism.svg" width="48"/>
+</div>
+<h4 data-i18n="index.prism_launcher" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">Prism Launcher</h4>
+<p data-i18n="index.imports_instance_trees_jvm" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">인스턴스 트리, JVM 인수 및 월드 저장을 가져옵니다.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="Modrinth App Logo" height="48" src="../assets/img/modrinth.svg" width="48"/>
+</div>
+<h4 data-i18n="index.modrinth_app" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">Modrinth App</h4>
+<p data-i18n="index.preserves_mr_packs_index" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">MR 팩, 인덱스 파일 및 사용자 지정 리소스 팩을 보존합니다.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="ATLauncher Logo" height="48" src="../assets/img/atlauncher.svg" width="48"/>
+</div>
+<h4 data-i18n="index.atlauncher" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">ATLauncher</h4>
+<p data-i18n="index.transfers_instances_custom_backups" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">인스턴스, 사용자 지정 백업 및 텍스처 팩 폴더를 전송합니다.</p>
+</div>
+</div>
+<!-- Feature Split Spotlight -->
+<div class="feature-split">
+<div class="feature-split-text">
+<h2 data-i18n="index.zero_data_loss_zero">데이터 손실 제로. 수동 파일 드래그 제로.</h2>
+<p data-i18n="index.when_you_launch_zircon">Zircon을 실행하면 네이티브 Rust 디텍터가 시스템에 설치된 프로필을 찾습니다. 가져올 인스턴스를 선택하면 Zircon이 모든 것을 깔끔하고 격리된 샌드박스로 마이그레이션합니다.</p>
+<ul class="spec-list">
+<li data-i18n="index.100_offline_local_detectionscans"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.100_offline_local_detectionscans_1"><b data-i18n="index.100_offline_local_detection">100% 오프라인 로컬 감지:</b> 외부 클라우드 업로드 없이 표준 디스크 디렉터리를 스캔합니다.</span></li>
+<li data-i18n="index.complete_instance_preservationkeeps_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.complete_instance_preservationkeeps_your_1"><b data-i18n="index.complete_instance_preservation">완전한 인스턴스 보존:</b> 정확한 키 바인딩, options.txt, 리소스 팩 및 월드를 그대로 유지합니다.</span></li>
+<li data-i18n="index.immediate_fastlaunchautomatically_configures_matching"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.immediate_fastlaunchautomatically_configures_matching_1"><b data-i18n="index.immediate_fastlaunch">즉시 빠른 실행:</b> 일치하는 Java 버전과 최적의 메모리 플래그를 자동으로 구성합니다.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.universal_launcher_importer"><span data-i18n="index.universal_launcher_importer_1">범용 런처 가져오기</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Universal Migration Importer Window" height="500" loading="lazy" src="../assets/img/locales/ko/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 3: DELIGHT FEATURES SLIDESHOW ================= -->
+<section class="section" id="features">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.your_new_minecraft_command">새로운 Minecraft 명령 센터</h2>
+<p data-i18n="index.everything_youve_always_wished">다른 런처에서 항상 원했던 모든 기능 — 데스크톱 앱에 기본 탑재되었습니다.</p>
+</div>
+<div class="delight-slideshow">
+<!-- Slideshow Navigation Tabs -->
+<div class="delight-nav" role="tablist">
+<button aria-label="Couch Co-op" class="delight-nav-btn active" data-slide="0">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle><path d="M12 9v6"></path></svg>
+</div>
+<div data-i18n="index.couch_coop4player_gamepads"><span class="delight-nav-title" data-i18n="index.couch_coop">소파 협동 플레이</span>
+<span class="delight-nav-sub" data-i18n="index.4player_gamepads">4인 게임패드</span></div>
+</button>
+<button aria-label="3D Skin Studio" class="delight-nav-btn" data-slide="1">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+</div>
+<div data-i18n="index.3d_skin_studiolive_3d"><span class="delight-nav-title" data-i18n="index.3d_skin_studio_1">3D 스킨 스튜디오</span>
+<span class="delight-nav-sub" data-i18n="index.live_3d_mojang_sync">라이브 3D & Mojang 동기화</span></div>
+</button>
+<button aria-label="LAN Friends" class="delight-nav-btn" data-slide="2">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+</div>
+<div data-i18n="index.lan_friendsautodetect_upnp"><span class="delight-nav-title" data-i18n="index.lan_friends">LAN 친구</span>
+<span class="delight-nav-sub" data-i18n="index.autodetect_upnp">자동 감지 & UPnP</span></div>
+</button>
+<button aria-label="2048 &amp; Discord" class="delight-nav-btn" data-slide="3">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="7" rx="1.5" width="7" x="3" y="3"></rect><rect height="7" rx="1.5" width="7" x="14" y="3"></rect><rect height="7" rx="1.5" width="7" x="14" y="14"></rect><rect height="7" rx="1.5" width="7" x="3" y="14"></rect></svg>
+</div>
+<div data-i18n="index.2048_discordplay_while_loading"><span class="delight-nav-title" data-i18n="index.2048_discord">2048 & Discord</span>
+<span class="delight-nav-sub" data-i18n="index.play_while_loading">로딩 중 플레이</span></div>
+</button>
+</div>
+<!-- Slideshow Stage -->
+<div class="delight-stage">
+<!-- Slide 0: Couch Co-op -->
+<div class="delight-slide active" data-slide="0">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.hand_your_friend_a">친구에게 컨트롤러를 건네주세요. 소파에서 플레이하세요.</h3>
+<p data-i18n="index.turn_your_pc_or">PC나 거실 TV를 분할 화면 콘솔로 만드세요. 최대 4개의 Xbox, PlayStation 또는 일반 Bluetooth 게임패드를 연결하고 별도의 인벤토리, 뷰포트, 스킨으로 모드가 적용된 Java 에디션을 나란히 플레이하세요.</p>
+<ul class="spec-list">
+<li data-i18n="index.plug_play_gamepadssmooth_analog"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.plug_play_gamepadssmooth_analog_1"><b data-i18n="index.plug_play_gamepads">플러그 앤 플레이 게임패드:</b> Xbox, PlayStation & Bluetooth 컨트롤러로 부드러운 아날로그 스틱 움직임.</span></li>
+<li data-i18n="index.automatic_splitscreenclean_2player_horizontalvertical"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.automatic_splitscreenclean_2player_horizontalvertical_1"><b data-i18n="index.automatic_splitscreen">자동 분할 화면:</b> 깔끔한 2인 수평/수직 또는 4인 사분면 창 타일링.</span></li>
+<li data-i18n="index.separate_player_profileseach_player"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.separate_player_profileseach_player_1"><b data-i18n="index.separate_player_profiles">별도 플레이어 프로필:</b> 각 플레이어는 자신의 캐릭터 스킨과 별도 인벤토리를 사용합니다.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.4player_couch_coop_gamepad"><span data-i18n="index.4player_couch_coop_gamepad_1">4인 소파 협동 플레이 게임패드 설정</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="4-Player Couch Co-op" height="500" loading="lazy" src="../assets/img/locales/ko/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 1: 3D Skin Studio -->
+<div class="delight-slide" data-slide="1">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.look_sharp_ingame_with">라이브 3D 미리보기로 게임 내에서 멋지게 보이세요.</h3>
+<p data-i18n="index.stop_guessing_how_skins">게임을 로드하기 전에 스킨이 어떻게 보일지 추측하는 것을 멈추세요. 실시간 3D로 캐릭터를 회전하고, API를 통해 직접 가져온 수천 개의 인기 커뮤니티 스킨을 검색하며, 원클릭으로 공식 Mojang 서버와 동기화하세요.</p>
+<ul class="spec-list">
+<li data-i18n="index.rotating_3d_viewportlive_steve"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.rotating_3d_viewportlive_steve_1"><b data-i18n="index.rotating_3d_viewport">회전식 3D 뷰포트:</b> 망토 미리보기가 포함된 라이브 Steve(클래식) 및 Alex(슬림) 지오메트리.</span></li>
+<li data-i18n="index.trending_community_librarysearch_thousands"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.trending_community_librarysearch_thousands_1"><b data-i18n="index.trending_community_library">인기 커뮤니티 라이브러리:</b> 수천 개의 스킨을 검색하고 몇 초 만에 적용하세요.</span></li>
+<li data-i18n="index.1click_mojang_syncpushes_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.1click_mojang_syncpushes_your_1"><b data-i18n="index.1click_mojang_sync">원클릭 Mojang 동기화:</b> 활성 스킨을 공식 Minecraft 서버로 직접 푸시합니다.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.3d_skin_studio_mojang"><span data-i18n="index.3d_skin_studio_mojang_1">3D 스킨 스튜디오 & Mojang 동기화</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="3D Skin Studio" height="500" loading="lazy" src="../assets/img/locales/ko/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 2: LAN Auto-Discovery & UPnP -->
+<div class="delight-slide" data-slide="2">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.find_wifi_friends_instantly">Wi-Fi 친구를 즉시 찾으세요. 코드로 참여하세요.</h3>
+<p data-i18n="index.no_ip_addresses_to">복사-붙여넣기 할 IP 주소가 없습니다. Hamachi 가상 네트워크가 없습니다. 라우터 방화벽 포트를 열 필요가 없습니다. 로컬 Wi-Fi에서 누군가가 월드나 서버를 실행하면 자동으로 팝업됩니다. 인터넷으로 플레이하시나요? 자동화된 UPnP 포트 포워딩으로 6자리 참여 코드를 공유하세요.</p>
+<ul class="spec-list">
+<li data-i18n="index.local_wifi_autodiscoverybroadcasts_and"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.local_wifi_autodiscoverybroadcasts_and_1"><b data-i18n="index.local_wifi_autodiscovery">로컬 Wi-Fi 자동 발견:</b> 네트워크 전반에서 가까운 게임을 즉시 브로드캐스트하고 감지합니다.</span></li>
+<li data-i18n="index.6digit_join_code_upnpconnect"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.6digit_join_code_upnpconnect_1"><b data-i18n="index.6digit_join_code_upnp">6자리 참여 코드 & UPnP:</b> 수동 라우터 구성 없이 인터넷으로 연결하세요.</span></li>
+<li data-i18n="index.live_ping_player_countinspect"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.live_ping_player_countinspect_1"><b data-i18n="index.live_ping_player_count">라이브 핑 & 플레이어 수:</b> 클릭하여 참여하기 전에 플레이어 수와 지연 시간을 확인하세요.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.lan_autodiscovery_nearby_games"><span data-i18n="index.lan_autodiscovery_nearby_games_1">LAN 자동 발견 & 가까운 게임</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="LAN Auto-Discovery" height="500" loading="lazy" src="../assets/img/locales/ko/lan_nearby_friends.png" onerror="this.onerror=null; this.src='../assets/img/lan_nearby_friends.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 3: 2048 & Discord Rich Presence -->
+<div class="delight-slide" data-slide="3">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.play_2048_while_your">300개 모드 팩이 로드되는 동안 2048을 플레이하세요.</h3>
+<p data-i18n="index.never_stare_at_a">더 이상 얼어붙은 Minecraft 로딩 화면을 응시하지 마세요. 거대한 Forge 또는 Fabric 팩이 텍스처를 초기화하는 동안 런처 창에서 내장 2048을 플레이하세요. 게임 로딩이 끝나면 바로 진입하세요. Discord Rich Presence가 친구들에게 당신이 무엇을 플레이하고 있는지 정확히 보여줍니다.</p>
+<ul class="spec-list">
+<li data-i18n="index.builtin_2048_minigamefull_keyboard"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.builtin_2048_minigamefull_keyboard_1"><b data-i18n="index.builtin_2048_minigame">내장 2048 미니 게임:</b> 완전한 키보드 제어, 지속되는 최고 점수, 그리고 제로 메모리 오버헤드.</span></li>
+<li data-i18n="index.discord_rich_presencebroadcasts_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.discord_rich_presencebroadcasts_your_1"><b data-i18n="index.discord_rich_presence">Discord Rich Presence:</b> 활성 모드팩, 서버 IP/이름 및 경과된 게임 시간을 브로드캐스트합니다.</span></li>
+<li data-i18n="index.background_throttlingsuspends_launcher_ui"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.background_throttlingsuspends_launcher_ui_1"><b data-i18n="index.background_throttling">백그라운드 스로틀링:</b> Minecraft에 시스템 RAM의 100%를 제공하기 위해 게임플레이 중에 런처 UI를 일시 중지합니다.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.zircon_launcher_2048_discord"><span data-i18n="index.zircon_launcher_2048_discord_1">Zircon 런처 — 2048 & Discord Presence</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Launcher Loading Features" height="500" loading="lazy" src="../assets/img/locales/ko/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="800"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Slideshow controls (arrows + indicators) -->
+<div class="delight-controls">
+<button aria-label="Previous feature" class="delight-arrow delight-prev">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+</button>
+<div class="delight-dots">
+<button aria-label="Go to Couch Co-op" class="delight-dot active" data-slide="0"></button>
+<button aria-label="Go to 3D Skin Studio" class="delight-dot" data-slide="1"></button>
+<button aria-label="Go to LAN Auto-Discovery" class="delight-dot" data-slide="2"></button>
+<button aria-label="Go to 2048 &amp; Discord" class="delight-dot" data-slide="3"></button>
+</div>
+<button aria-label="Next feature" class="delight-arrow delight-next">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+</button>
+</div>
+</div>
+<!-- Player Power Tools Row -->
+<div class="grid grid-3" style="margin-top: 48px;">
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+</span>
+<h3 data-i18n="index.ui_customization_themes" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">UI 맞춤 설정 & 테마</h3>
+<p data-i18n="index.tailor_the_launcher_to" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">사용자 지정 강조 색상, 어두운 팔레트 및 구성 가능한 보기 스타일로 런처를 개인 취향에 맞게 조정하세요.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+</span>
+<h3 data-i18n="index.offline_play_world_import" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">오프라인 플레이 & 월드 가져오기</h3>
+<p data-i18n="index.play_anywhere_without_an" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">활성 인터넷 연결 없이 어디서나 플레이하세요. 기존 싱글플레이 월드를 가져오고, 사용자 지정 RAM을 할당하며, 모드팩을 격리하세요.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+</span>
+<h3 data-i18n="index.clientside_server_tweaks" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">클라이언트 측 서버 튜닝</h3>
+<p data-i18n="index.add_your_own_optional" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">동기화를 손상시키지 않고 모든 서버 인스턴스에 자체 옵션 클라이언트 모드, 셰이더, 리소스 팩 및 키 바인딩을 추가하세요.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 4: FOR SERVER HOSTS (The 30% Slice) ================= -->
+<section class="section" id="server-hosts">
+<div class="container">
+<div class="feature-split reverse">
+<div class="feature-split-text">
+<h2 data-i18n="index.manage_multiple_servers_save">다중 서버 관리, 수면 중 RAM 절약, 단일 포트 실행.</h2>
+<p data-i18n="index.the_selfhosted_management_engine">Zircon 뒤의 셀프 호스팅 관리 엔진입니다. Docker 번거로움이 없고, 다중 포트 방화벽 악몽이 없습니다. 기술 지원 없이 플레이어가 실제로 연결할 수 있는 모드 서버를 실행하세요.</p>
+<ul class="spec-list">
+<li data-i18n="index.singleport_multiplexing_25565game_packets"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.singleport_multiplexing_25565game_packets_1"><b data-i18n="index.singleport_multiplexing_25565">단일 포트 멀티플렉싱 (25565):</b> 게임 패킷과 REST 모드 매니페스트 모두 기본 포트 25565에서 실행됩니다. 포워딩할 포트는 1개뿐입니다.</span></li>
+<li data-i18n="index.sleepwhenempty_ram_saverfreezes_jvm"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.sleepwhenempty_ram_saverfreezes_jvm_1"><b data-i18n="index.sleepwhenempty_ram_saver">비어 있을 때 잠자기 (RAM 절약):</b> 온라인 플레이어가 0명일 때 JVM 메모리를 CPU 0%로 동결하고, 플레이어가 핑을 보내면 밀리초 만에 부활합니다.</span></li>
+<li data-i18n="index.integrated_mod_store1click_install"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.integrated_mod_store1click_install_1"><b data-i18n="index.integrated_mod_store">통합 모드 상점:</b> Modrinth 및 CurseForge에서 모드, 셰이더, 리소스 팩을 원클릭으로 직접 설치하세요.</span></li>
+<li data-i18n="index.live_console_player_managementcolorized"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.live_console_player_managementcolorized_1"><b data-i18n="index.live_console_player_management">라이브 콘솔 & 플레이어 관리:</b> 색상 지정된 터미널 로그, 즉각적인 명령 발송, 시각적 화이트리스트, OP 및 밴.</span></li>
+<li data-i18n="index.autobackups_world_zip_importhighspeed"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.autobackups_world_zip_importhighspeed_1"><b data-i18n="index.autobackups_world_zip_import">자동 백업 & 월드 ZIP 가져오기:</b> 사용자 지정 보존 기간, 원클릭 롤백 및 드래그 앤 드롭 월드 가져오기가 포함된 고속 LZ4 스냅샷.</span></li>
+<li data-i18n="index.live_2d3d_world_mapexplore"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.live_2d3d_world_mapexplore_1"><b data-i18n="index.live_2d3d_world_map">라이브 2D/3D 월드 맵:</b> 브라우저에서 렌더링된 지형, 바이옴 및 라이브 플레이어 위치를 직접 탐색하세요.</span></li>
+</ul>
+<div data-i18n="index.explore_server_manager_details" style="margin-top: 26px;"><a class="btn btn-primary" data-i18n="index.explore_server_manager_details_1" href="server.html">서버 관리자 세부 정보 살펴보기 →</a></div>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.zircon_server_manager_engine"><span data-i18n="index.zircon_server_manager_engine_1">Zircon 서버 관리자 엔진</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Server Manager Dashboard" height="500" loading="lazy" src="../assets/img/performance_server.png" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= PAIN POINTS ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.if_youve_done_any">이 중 하나라도 경험했다면, Zircon은 당신을 위한 것입니다</h2>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.hunting_mod_versions">모드 버전 찾기</h3>
+<p data-i18n="index.scrolling_mod_sites_for">친구가 실행 중인 것과 일치하기를 바라면서 '올바른 빌드'를 찾아 모드 사이트를 스크롤하기.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.dragging_jars_into_folders">JAR 파일을 폴더에 드래그하기</h3>
+<p data-i18n="index.manually_dropping_mod_files"><code>mods/</code>에 모드 파일을 수동으로 떨어뜨리고 실행 시 충돌하는 파일을 삭제하기.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.it_works_on_my">"내 컴퓨터에서는 작동해"</h3>
+<p data-i18n="index.comparing_configs_with_your">서버가 비어 있는 상태에서 새벽 1시에 친구와 설정을 비교하며 하나씩 불일치를 해결하기.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= WHY PLAYERS LOVE IT ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.everything_between_you_and">당신과 플레이 사이의 모든 것이... 작동합니다</h2>
+<p data-i18n="index.built_for_people_who">친구들과 <em>모드 적용된 Minecraft</em>를 플레이하고 싶은 사람들을 위해 만들어졌습니다 —
+        저녁 시간을 모드 버전과 충돌 로그를 조율하는 데 쓰지 않도록.</p>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg></span>
+<h3 data-i18n="index.one_click_youre_in">원클릭. 입장 완료.</h3>
+<p data-i18n="index.hit_play_and_zircon">PLAY를 누르면 Zircon이 올바른 Minecraft 버전과 모드 로더(Fabric, Quilt, Forge 또는 NeoForge)를 다운로드하고,
+          모드를 설치하며, 곧바로 게임으로 데려다줍니다.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path><path d="M3 21v-5h5"></path></svg></span>
+<h3 data-i18n="index.curseforge_modrinth_sync">CurseForge & Modrinth 동기화</h3>
+<p data-i18n="index.search_download_mods_from">Modrinth와 CurseForge에서 모드를 검색하고 다운로드하며, 모든 실행 시 SHA-512 및 지문 검사로 검증합니다. 누락되거나 오래된 것이 없습니다.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
+<h3 data-i18n="index.sign_in_with_your">실제 계정으로 로그인</h3>
+<p data-i18n="index.official_microsoft_signin_your">공식 Microsoft 로그인 — 비밀번호는 Microsoft로만 전달되며
+          Zircon에는 절대 전달되지 않습니다. 공용 로그인, 크랙 런처, 오프라인 우회 없음.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
+<h3 data-i18n="index.3d_skins_community_library">3D 스킨 & 커뮤니티 라이브러리</h3>
+<p data-i18n="index.saved_skin_selector_with">라이브 3D 미리보기, 공식 Mojang 클라우드 동기화 및 API를 통해 인기 스킨을 가져오는 앱 내 커뮤니티 스킨 탐색기가 포함된 저장된 스킨 선택기.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"></path></svg></span>
+<h3 data-i18n="index.shaders_packs_autoapplied">셰이더 & 팩, 자동 적용</h3>
+<p data-i18n="index.servers_can_offer_their">서버는 자체 셰이더와 리소스 팩을 제공할 수 있습니다. Zircon은 참여 시 이를 적용합니다 —
+          한 번만 수락하면 됩니다.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg></span>
+<h3 data-i18n="index.solo_adventures_too">솔로 모험도 가능합니다</h3>
+<p data-i18n="index.create_offline_singleplayer_instances">자체 모드, 셰이더 및 텍스처 팩이 포함된 오프라인 싱글플레이 인스턴스를 생성하세요. 서버가 필요 없습니다 —
+          조용히 건축하세요.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= HOW IT WORKS ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.three_steps_then_youre">세 단계. 그러면 입장합니다.</h2>
+</div>
+<div class="steps">
+<div class="step">
+<h3 data-i18n="index.sign_in_with_microsoft">Microsoft로 로그인</h3>
+<p data-i18n="index.one_click_in_your">브라우저에서 원클릭. Zircon은 공식 Microsoft 플로우를 사용합니다 —
+          비밀번호는 앱에 절대 닿지 않습니다.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.pick_a_server">서버 선택</h3>
+<p data-i18n="index.your_saved_servers_most">저장된 서버, 최근 플레이 순 — 추천 포함.
+          각 서버는 자체 모드 목록을 가져옵니다.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.hit_play">PLAY 누르기</h3>
+<p data-i18n="index.zircon_syncs_and_verifies">Zircon이 Modrinth & CurseForge에서 모드를 동기화하고 검증하며, 서버가 잠들어 있으면 깨우고
+          연결합니다. 당신은 완전히 모드가 적용된 상태로 스폰됩니다.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= ENGINEERING & TRUST ================= -->
+<section class="section" style="padding-top: 24px; padding-bottom: 24px;">
+<div class="container">
+<div class="engineering-trust-box">
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px;">
+<div style="max-width: 660px;">
+<span class="badge" data-i18n="index.engineering_standards" style="background: rgba(71, 210, 201, 0.15); color: var(--accent-bright); border: 1px solid rgba(71, 210, 201, 0.35); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: inline-block;">엔지니어링 표준</span>
+<h3 data-i18n="index.built_for_pure_speed" style="color: var(--white); margin: 0 0 8px; font-size: 22px; font-weight: 700;">컴파일된 Rust & Vue 3로 순수한 속도를 위해 구축됨</h3>
+<p data-i18n="index.no_sluggish_electron_runtimes" style="color: var(--text-secondary); margin: 0; font-size: 15px; line-height: 1.65;">플레이 중에 기가바이트의 백그라운드 메모리를 잡아먹는 느린 Electron 런타임이 없습니다. Zircon의 핵심 데스크톱 엔진은 즉각적인 시작, 서브 밀리초 해시 검증 및 초경량 시스템 풋프린트를 위해 완전히 컴파일된 Rust로 작성되었습니다.</p>
+</div>
+<div class="reassurance-strip" style="margin: 0; gap: 20px;">
+<div class="reassurance-item" data-i18n="index.blazing_native_rust"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> 눈부신 네이티브 Rust</div>
+<div class="reassurance-item" data-i18n="index.100_free_open_source_1"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> 100% 무료 & 오픈 소스</div>
+<div class="reassurance-item" data-i18n="index.zero_telemetry_tracking"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> 제로 텔레메트리 추적</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= FREQUENTLY ASKED QUESTIONS ================= -->
+<section class="section" id="faq">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.frequently_asked_questions">자주 묻는 질문</h2>
+<p data-i18n="index.everything_you_need_to">Zircon 시작에 대해 알아야 할 모든 것.</p>
+</div>
+<div class="faq-list">
+<details class="faq-item" open="">
+<summary class="faq-question" data-i18n="index.how_does_zircon_automatically">Zircon은 Minecraft 모드를 어떻게 자동으로 동기화하나요?</summary>
+<div class="faq-answer">
+<p data-i18n="index.when_you_join_a">서버에 참여하고 <strong data-i18n="index.play_1">PLAY</strong>를 누르면, Zircon은 서버의 공개된 자재 목록(BOM) 매니페스트를 로컬 클라이언트 폴더와 비교합니다. 누락되거나 업데이트된 모드는 Modrinth & CurseForge SHA-512 해시 및 지문으로 검증된 후, 수동 파일 드래그 없이 병렬로 즉시 다운로드됩니다.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.can_i_migrate_my">CurseForge, Prism 또는 Modrinth에서 인스턴스를 마이그레이션할 수 있나요?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_includes_a">예! Zircon에는 네이티브 원클릭 범용 마이그레이션 도구가 포함되어 있습니다. CurseForge, Prism Launcher, Modrinth App 및 ATLauncher에서 설치된 디렉터리를 자동으로 감지하여 완전한 인스턴스 트리, 저장 데이터, 키 바인딩 및 모드 구성을 2초 이내에 가져올 수 있습니다.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.how_does_4player_splitscreen">4인 분할 화면 소파 협동 플레이는 어떻게 작동하나요?</summary>
+<div class="faq-answer">
+<p data-i18n="index.zircon_allows_you_to">Zircon은 최대 4개의 게임패드(Xbox, PlayStation 또는 일반 Bluetooth 컨트롤러)를 연결하고 모니터나 TV에서 매끄러운 분할 화면 그리드로 배열된 여러 개의 격리된 게임 창을 실행할 수 있게 해줍니다. 각 플레이어는 자신의 게임패드로 자신의 캐릭터를 제어합니다.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.can_i_use_curseforge">CurseForge와 Modrinth를 사용하여 모드를 찾고 다운로드할 수 있나요?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_natively_supports">예! Zircon은 API 키 구성 없이 <strong data-i18n="index.modrinth">Modrinth</strong>와 <strong data-i18n="index.curseforge_1">CurseForge</strong>에서 모드를 직접 검색, 설치 및 동기화하는 것을 네이티브로 지원합니다. 두 저장소 모두 박스 오픈 상태로 완전히 통합되어 있습니다.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.is_zircon_free_and">Zircon은 무료이고 오픈 소스인가요?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_is_sourceavailable">예, Zircon은 Business Source License 1.1 (BSL 1.1) 하에 소스 이용 가능합니다. 클라이언트 런처와 셀프 호스팅 서버 관리자 모두 플레이어, 홈랩 사용자 및 게이밍 네트워크를 위해 100% 무료입니다. 전체 코드베이스는 GitHub에서 공개 검사, 셀프 호스팅 및 커뮤니티 기여를 위해 열려 있습니다.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.is_my_microsoft_minecraft">내 Microsoft / Minecraft 계정은 안전한가요?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_authentication_is_performed">예. 인증은 기본 시스템 브라우저에서 표준 Microsoft OAuth 2.0 PKCE를 통해 수행됩니다. 로그인 자격 증명은 직접 Microsoft 로그인 서버로 전달되며 Zircon에 의해 절대 접근, 처리 또는 저장되지 않습니다.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.which_mod_loaders_and">어떤 모드 로더와 Minecraft 버전이 지원되나요?</summary>
+<div class="faq-answer">
+<p data-i18n="index.zircon_natively_supportsfabric_quilt">Zircon은 <strong data-i18n="index.fabric_quilt_forge_and">Fabric, Quilt, Forge 및 NeoForge</strong>를 네이티브로 지원합니다. 런처는 인스턴스를 실행하거나 서버에 참여할 때 필요한 모드 로더 버전과 검증된 Adoptium Temurin Java 런타임을 자동으로 설치합니다.</p>
+</div>
+</details>
+</div>
+</div>
+</section>
+<!-- ================= CTA ================= -->
+<section class="section" style="padding-top: 32px;">
+<div class="container">
+<div class="cta-band">
+<h2 data-i18n="index.ready_to_actually_play">실제로 플레이할 준비가 되셨나요?</h2>
+<p data-i18n="index.download_the_free_opensource">무료 오픈 소스 런처를 다운로드하거나 셀프 호스팅 서버 관리자를 받으세요.</p>
+<div data-i18n="index.download_launcher_exeget_server" style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;"><a class="btn btn-primary btn-lg" data-i18n="index.download_launcher_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+            런처 다운로드 (.exe)
+          </a>
+<a class="btn btn-secondary btn-lg" data-i18n="index.get_server_manager" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+            서버 관리자 받기
+          </a>
+<a class="btn btn-ghost btn-lg" data-i18n="index.view_on_github" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">GitHub에서 보기</a></div>
+</div>
+</div>
+</section>
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+<div class="container">
+<div class="footer-grid">
+<div class="footer-brand">
+<a class="brand" href="./" style="display: inline-block; margin-bottom: 14px; text-decoration: none;">
+<img alt="Zircon" class="brand-text" height="26" src="../assets/img/zircon-title.svg"/>
+</a>
+<p data-i18n="index.a_free_opensource_launcher">모드 적용된 Minecraft를 위한 무료 오픈 소스 런처 및 서버 관리자입니다.
+          플레이어는 PLAY를 누르고 서버가 실행하는 정확한 모드를 얻습니다 —
+          모든 실행 시 Modrinth & CurseForge에 대해 검증됩니다.</p>
+<a class="pill pill-accent" data-i18n="index.open_source_bsl_11" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank"><svg aria-hidden="true" fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.14c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"></path></svg>
+            오픈 소스 (BSL 1.1)</a>
+</div>
+<div class="footer-col">
+<h4 data-i18n="index.pages">페이지</h4>
+<ul>
+<li data-i18n="index.home_2"><a data-i18n="index.home_3" href="/">홈</a></li>
+<li data-i18n="index.launcher_3"><a data-i18n="index.launcher_4" href="launcher.html">런처</a></li>
+<li data-i18n="index.server_manager_2"><a data-i18n="index.server_manager_3" href="server.html">서버 관리자</a></li>
+<li data-i18n="index.guides_docs"><a data-i18n="index.guides_docs_1" href="docs.html">가이드 & 문서</a></li>
+<li data-i18n="index.faq_2"><a data-i18n="index.faq_3" href="faq.html">FAQ</a></li>
+<li data-i18n="index.downloads_2"><a data-i18n="index.downloads_3" href="downloads.html">다운로드</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<h4 data-i18n="index.project_community">프로젝트 & 커뮤니티</h4>
+<ul>
+<li data-i18n="index.github_repository"><a data-i18n="index.github_repository_1" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">GitHub 저장소</a></li>
+<li data-i18n="index.releases_changelogs"><a data-i18n="index.releases_changelogs_1" href="https://github.com/DevTheDev189/Zircon/releases" rel="noopener" target="_blank">릴리스 & 변경 로그</a></li>
+<li data-i18n="index.business_source_license_11"><a data-i18n="index.business_source_license_11_1" href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" rel="noopener" target="_blank">Business Source License 1.1</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-legal" data-i18n="index.zircon_contributors_v0421_active"><span data-i18n="index.zircon_contributors_v0421_active_1">© Zircon 기여자 · v0.4.21 (활발한 개발 중)</span>
+<span data-i18n="index.not_an_official_minecraft">공식 Minecraft 제품이 아닙니다. Mojang Studios 또는 Microsoft의 승인 또는 제휴를 받지 않았습니다.</span></div>
+</div>
+</footer>
+<script src="../assets/js/main.js?v=2"></script>
+</body>
+</html>

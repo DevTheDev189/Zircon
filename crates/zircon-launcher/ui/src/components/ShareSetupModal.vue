@@ -17,10 +17,10 @@
           </div>
           <div>
             <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
-              Share Mod Setup
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Universal Recipe</span>
+              {{ $t('share_setup.title') }}
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{{ $t('share_setup.badge') }}</span>
             </h2>
-            <p class="text-xs text-slate-400">{{ instance?.name }} • {{ instance?.minecraft_version }} • {{ modCount }} mods</p>
+            <p class="text-xs text-slate-400">{{ $t('share_setup.subtitle', { name: instance?.name, version: instance?.minecraft_version, count: modCount }) }}</p>
           </div>
         </div>
         <button
@@ -40,28 +40,28 @@
           :class="activeTab === 'share_code' ? 'text-cyan-400 border-cyan-400 bg-cyan-950/20' : 'text-slate-400 border-transparent hover:text-slate-200'"
           @click="selectTab('share_code')"
         >
-          <span>1-Line Share Code</span>
+          <span>{{ $t('share_setup.tab_share_code') }}</span>
         </button>
         <button
           class="px-3.5 py-2 text-xs font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-1.5"
           :class="activeTab === 'mrpack' ? 'text-cyan-400 border-cyan-400 bg-cyan-950/20' : 'text-slate-400 border-transparent hover:text-slate-200'"
           @click="selectTab('mrpack')"
         >
-          <span>Modpack (.mrpack)</span>
+          <span>{{ $t('share_setup.tab_mrpack') }}</span>
         </button>
         <button
           class="px-3.5 py-2 text-xs font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-1.5"
           :class="activeTab === 'json' ? 'text-cyan-400 border-cyan-400 bg-cyan-950/20' : 'text-slate-400 border-transparent hover:text-slate-200'"
           @click="selectTab('json')"
         >
-          <span>Recipe Manifest (.json)</span>
+          <span>{{ $t('share_setup.tab_json') }}</span>
         </button>
         <button
           class="px-3.5 py-2 text-xs font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-1.5"
           :class="activeTab === 'markdown' ? 'text-cyan-400 border-cyan-400 bg-cyan-950/20' : 'text-slate-400 border-transparent hover:text-slate-200'"
           @click="selectTab('markdown')"
         >
-          <span>Discord / Markdown</span>
+          <span>{{ $t('share_setup.tab_markdown') }}</span>
         </button>
       </div>
 
@@ -70,11 +70,11 @@
         <!-- TAB 1: Share Code -->
         <div v-if="activeTab === 'share_code'" class="space-y-4">
           <div class="bg-cyan-950/20 border border-cyan-500/20 rounded-xl p-3.5 text-xs text-cyan-200/90 leading-relaxed">
-            <strong>Instant Friend & Hoster Sharing:</strong> This compressed code contains the full recipe (<span class="text-white font-mono">&lt; 2 KB</span>). Friends can paste it into Zircon Launcher or Zircon Server Manager to clone the exact mod list with parallel CDN downloads.
+            <strong>{{ $t('share_setup.share_banner_title') }}</strong> {{ $t('share_setup.share_banner_desc') }}
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Zircon Share String</label>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">{{ $t('share_setup.share_string_label') }}</label>
             <div class="relative">
               <textarea
                 readonly
@@ -86,7 +86,7 @@
           </div>
 
           <div class="flex items-center justify-between pt-2">
-            <span class="text-xs text-slate-500">Decodes completely offline on any client</span>
+            <span class="text-xs text-slate-500">{{ $t('share_setup.decodes_offline') }}</span>
             <button
               class="z-btn-primary text-xs px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-cyan-900/30"
               @click="copyShareCode"
@@ -95,7 +95,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
               </svg>
               <span v-else class="text-emerald-400">✓</span>
-              <span>{{ codeCopied ? 'Copied to Clipboard!' : 'Copy Share Code' }}</span>
+              <span>{{ codeCopied ? $t('share_setup.copied_clipboard') : $t('share_setup.copy_share_code') }}</span>
             </button>
           </div>
         </div>
@@ -103,13 +103,13 @@
         <!-- TAB 2: Modpack (.mrpack) -->
         <div v-if="activeTab === 'mrpack'" class="space-y-4">
           <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 leading-relaxed">
-            <strong>Spec-Compliant Modrinth Modpack:</strong> Exports a lightweight (<span class="text-white font-mono">&lt; 50 KB</span>) archive pointing to official CDN download links. Compatible with Zircon, Modrinth App, Prism Launcher, and ATLauncher.
+            <strong>{{ $t('share_setup.mrpack_banner_title') }}</strong> {{ $t('share_setup.mrpack_banner_desc') }}
           </div>
 
           <div class="p-4 bg-slate-950/50 border border-slate-800 rounded-xl flex items-center justify-between">
             <div>
               <div class="text-xs font-bold text-white">{{ instance?.name }}.mrpack</div>
-              <div class="text-[11px] text-slate-500 mt-0.5">Includes custom configs + CDN manifest</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">{{ $t('share_setup.mrpack_manifest_desc') }}</div>
             </div>
             <button
               class="z-btn-primary text-xs px-4 py-2 rounded-xl font-bold flex items-center gap-1.5"
@@ -117,7 +117,7 @@
               @click="handleExportMrpack"
             >
               <span v-if="exportingMrpack" class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span>{{ exportingMrpack ? 'Exporting...' : 'Export .mrpack' }}</span>
+              <span>{{ exportingMrpack ? $t('share_setup.exporting_mrpack') : $t('share_setup.export_mrpack') }}</span>
             </button>
           </div>
         </div>
@@ -125,7 +125,7 @@
         <!-- TAB 3: Recipe Manifest (.json) -->
         <div v-if="activeTab === 'json'" class="space-y-4">
           <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 leading-relaxed">
-            <strong>Raw Zircon BOM JSON:</strong> The authoritative manifest format. Useful for storing versioned backups, CI/CD, and uploading directly to Zircon Cloud servers.
+            <strong>{{ $t('share_setup.json_banner_title') }}</strong> {{ $t('share_setup.json_banner_desc') }}
           </div>
 
           <div class="relative">
@@ -134,10 +134,10 @@
 
           <div class="flex items-center justify-end gap-2">
             <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold" @click="copyJson">
-              {{ jsonCopied ? 'Copied!' : 'Copy JSON' }}
+              {{ jsonCopied ? $t('share_setup.copied_json') : $t('share_setup.copy_json') }}
             </button>
             <button class="z-btn-primary text-xs px-4 py-2 rounded-xl font-bold" @click="downloadJsonFile">
-              Save .json File
+              {{ $t('share_setup.save_json') }}
             </button>
           </div>
         </div>
@@ -145,7 +145,7 @@
         <!-- TAB 4: Discord / Markdown -->
         <div v-if="activeTab === 'markdown'" class="space-y-4">
           <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 leading-relaxed">
-            <strong>Discord & Forum Formatted Table:</strong> Clean Markdown with clickable links to Modrinth/CurseForge and environment badges. Ready to paste into announcement channels.
+            <strong>{{ $t('share_setup.markdown_banner_title') }}</strong> {{ $t('share_setup.markdown_banner_desc') }}
           </div>
 
           <div class="relative">
@@ -159,7 +159,7 @@
 
           <div class="flex items-center justify-end">
             <button class="z-btn-primary text-xs px-4 py-2 rounded-xl font-bold flex items-center gap-1.5" @click="copyMarkdown">
-              <span>{{ markdownCopied ? 'Copied Markdown!' : 'Copy Markdown Table' }}</span>
+              <span>{{ markdownCopied ? $t('share_setup.copied_markdown') : $t('share_setup.copy_markdown') }}</span>
             </button>
           </div>
         </div>
@@ -168,7 +168,7 @@
       <!-- Footer -->
       <div class="px-6 py-4 border-t border-slate-800/80 bg-slate-950/60 flex items-center justify-end">
         <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold" @click="handleClose">
-          Close
+          {{ $t('common.close') }}
         </button>
       </div>
     </div>

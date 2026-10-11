@@ -7,13 +7,13 @@
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
           <circle cx="12" cy="7" r="4" />
         </svg>
-        Part Isolation
+        {{ $t('skin_studio.part_isolation') }}
       </span>
       <button
         class="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
         @click="showAllParts"
       >
-        Show All
+        {{ $t('skin_studio.show_all') }}
       </button>
     </div>
 
@@ -32,7 +32,7 @@
           title="Toggle Head Visibility"
           @click="togglePart('head')"
         >
-          HEAD
+          {{ $t('skin_studio.part_head') }}
         </button>
 
         <!-- Torso + Arms Row -->
@@ -65,7 +65,7 @@
             title="Toggle Torso Visibility"
             @click="togglePart('body')"
           >
-            BODY
+            {{ $t('skin_studio.part_body') }}
           </button>
 
           <!-- Left Arm -->
@@ -122,7 +122,7 @@
 
     <!-- Layer Visibility Toggles -->
     <div class="flex flex-col gap-1.5 pt-1">
-      <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Layer Visibility</span>
+      <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $t('skin_studio.layer_visibility') }}</span>
       <div class="grid grid-cols-2 gap-1.5">
         <button
           type="button"
@@ -137,7 +137,7 @@
           <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2" />
           </svg>
-          Inner (Base)
+          {{ $t('skin_studio.inner_layer') }}
         </button>
 
         <button
@@ -155,14 +155,14 @@
             <polyline points="2 17 12 22 22 17" />
             <polyline points="2 12 12 17 22 12" />
           </svg>
-          Outer (Overlay)
+          {{ $t('skin_studio.outer_layer') }}
         </button>
       </div>
     </div>
 
     <!-- Active Paint Target Filter -->
     <div class="flex flex-col gap-1.5 pt-1">
-      <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Paint Target</span>
+      <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $t('skin_studio.paint_target') }}</span>
       <div class="grid grid-cols-3 gap-1 bg-[#070b10] p-1 rounded-lg border border-slate-800/80">
         <button
           type="button"
@@ -174,7 +174,7 @@
           "
           @click="studio.state.activeLayer = 'all'"
         >
-          All
+          {{ $t('skin_studio.target_all') }}
         </button>
         <button
           type="button"
@@ -186,7 +186,7 @@
           "
           @click="studio.state.activeLayer = 'base'"
         >
-          Inner
+          {{ $t('skin_studio.target_inner') }}
         </button>
         <button
           type="button"
@@ -198,7 +198,7 @@
           "
           @click="studio.state.activeLayer = 'overlay'"
         >
-          Outer
+          {{ $t('skin_studio.target_outer') }}
         </button>
       </div>
     </div>

@@ -1,35 +1,41 @@
 <template>
   <div class="w-full h-full flex flex-col bg-[#070b10] overflow-hidden select-none relative">
-    <!-- TIER 1: Document & File Action Bar (Height 40px, never wraps or overlaps) -->
-    <div class="h-10 px-3.5 bg-[#0a0f16] border-b border-slate-800/80 flex items-center justify-between gap-2.5 shrink-0 z-20">
-      <!-- Left: File / Skin Name & Model Variant -->
-      <div class="flex items-center gap-2.5 min-w-0">
+    <!-- TIER 1: Document & File Action Bar (Spacious 2026 Glassmorphism) -->
+    <div class="h-11 px-4 bg-gradient-to-r from-[#0e1622]/95 via-[#0e1622]/90 to-[#070b10]/95 border-b border-white/10 flex items-center justify-between gap-3 shrink-0 z-20 backdrop-blur-xl">
+      <!-- Left: File / Skin Name & Model Variant (Never squished) -->
+      <div class="flex items-center gap-3 flex-1 min-w-0 max-w-2xl">
         <!-- Studio Icon Indicator -->
-        <div class="flex items-center gap-1.5 shrink-0 text-cyan-400">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="w-7 h-7 rounded-lg bg-accent/15 border border-accent/30 flex items-center justify-center text-accent-bright shrink-0 shadow-[0_0_10px_var(--color-accent-glow)]">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
           </svg>
         </div>
 
-        <!-- Skin Name Input -->
-        <div class="flex items-center min-w-0">
+        <!-- Skin Name Input Box (Spacious, prominent & glowing) -->
+        <div class="flex-1 min-w-[200px] sm:min-w-[240px] max-w-sm flex items-center bg-[#070b10]/80 border border-slate-700/70 hover:border-slate-600 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40 focus-within:shadow-[0_0_12px_var(--color-accent-glow)] rounded-xl px-2.5 py-1 transition-all">
+          <svg class="w-3.5 h-3.5 text-accent-bright/80 mr-1.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
           <input
             v-model="studio.state.skinName"
             type="text"
-            class="bg-[#111c2a] border border-slate-700/80 hover:border-slate-600 focus:border-cyan-400 rounded-lg px-2.5 py-1 text-xs font-bold text-white w-32 sm:w-44 truncate focus:outline-none transition-colors"
-            placeholder="skin_name.png"
+            class="bg-transparent border-0 p-0 text-xs font-bold text-white placeholder-slate-500 w-full focus:outline-none focus:ring-0 min-w-0"
+            :placeholder="$t('skin_studio.filename_placeholder')"
             title="Skin Filename"
           />
+          <span class="text-[9px] font-mono font-bold text-slate-500 bg-white/5 px-1.5 py-0.5 rounded border border-white/5 shrink-0 ml-1.5 select-none">
+            PNG
+          </span>
         </div>
 
         <!-- Variant Selector Dropdown -->
         <select
           v-model="studio.state.variant"
-          class="text-xs font-semibold py-1 px-2.5 bg-[#121c27] border border-slate-700/80 hover:border-slate-600 text-slate-200 rounded-lg shrink-0 focus:outline-none focus:border-cyan-400 cursor-pointer"
+          class="text-xs font-semibold py-1 px-2.5 bg-[#070b10]/80 border border-slate-700/70 hover:border-slate-600 text-slate-200 rounded-xl shrink-0 focus:outline-none focus:border-accent cursor-pointer transition-colors shadow-sm"
           title="Minecraft Skin Model Type"
         >
-          <option value="classic">Classic (4px arms)</option>
-          <option value="slim">Slim (3px arms)</option>
+          <option value="classic">{{ $t('skin_studio.classic_variant') }}</option>
+          <option value="slim">{{ $t('skin_studio.slim_variant') }}</option>
         </select>
       </div>
 
@@ -39,21 +45,21 @@
         <button
           v-if="ENABLE_AI_STUDIO"
           type="button"
-          class="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-gradient-to-r from-cyan-500/15 to-blue-500/15 hover:from-cyan-500/25 hover:to-blue-500/25 border border-cyan-500/40 text-cyan-300 shadow-sm transition-all"
+          class="px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent-bright shadow-sm transition-all"
           title="Open AI Concept Studio (100% Local ONNX)"
           @click="emit('openAiModal')"
         >
-          <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="w-3.5 h-3.5 text-accent-bright" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
           </svg>
-          <span>AI Concept</span>
+          <span class="hidden sm:inline">AI Concept</span>
         </button>
 
         <!-- New Skin Menu Button -->
         <div class="relative">
           <button
             type="button"
-            class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 hover:text-white"
+            class="z-btn-ghost text-xs px-2.5 py-1 rounded-xl font-semibold flex items-center gap-1.5 hover:text-white"
             @click="showNewModal = !showNewModal"
           >
             <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -62,7 +68,7 @@
               <line x1="12" y1="18" x2="12" y2="12" />
               <line x1="9" y1="15" x2="15" y2="15" />
             </svg>
-            <span>New</span>
+            <span class="hidden sm:inline">{{ $t('skin_studio.new_btn') }}</span>
           </button>
 
           <!-- New Skin Dropdown Popover -->
@@ -75,21 +81,21 @@
               class="w-full text-left px-2.5 py-1.5 text-xs text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-300 rounded-lg font-semibold transition-colors"
               @click="loadTemplateAndClose('steve')"
             >
-              Steve Template (Classic)
+              {{ $t('skin_studio.steve_template') }}
             </button>
             <button
               type="button"
               class="w-full text-left px-2.5 py-1.5 text-xs text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-300 rounded-lg font-semibold transition-colors"
               @click="loadTemplateAndClose('alex')"
             >
-              Alex Template (Slim)
+              {{ $t('skin_studio.alex_template') }}
             </button>
             <button
               type="button"
               class="w-full text-left px-2.5 py-1.5 text-xs text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-300 rounded-lg font-semibold transition-colors"
               @click="loadTemplateAndClose('blank')"
             >
-              Blank Transparent
+              {{ $t('skin_studio.blank_template') }}
             </button>
           </div>
         </div>
@@ -97,7 +103,7 @@
         <!-- Import PNG -->
         <button
           type="button"
-          class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 hover:text-white"
+          class="z-btn-ghost text-xs px-2.5 py-1 rounded-xl font-semibold flex items-center gap-1.5 hover:text-white"
           title="Import an existing 64x64 skin PNG"
           @click="importSkinFile"
         >
@@ -106,13 +112,13 @@
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          <span>Import</span>
+          <span class="hidden sm:inline">{{ $t('skin_studio.import_btn') }}</span>
         </button>
 
         <!-- Export PNG -->
         <button
           type="button"
-          class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 hover:text-white"
+          class="z-btn-ghost text-xs px-2.5 py-1 rounded-xl font-semibold flex items-center gap-1.5 hover:text-white"
           title="Export current skin as PNG"
           @click="exportSkinPng"
         >
@@ -121,13 +127,13 @@
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
-          <span>Export</span>
+          <span class="hidden sm:inline">{{ $t('skin_studio.export_btn') }}</span>
         </button>
 
         <!-- Save to My Skins Gallery -->
         <button
           type="button"
-          class="z-btn-ghost text-xs px-3 py-1 rounded-lg font-bold flex items-center gap-1.5 border border-slate-700/80 hover:border-cyan-400 hover:text-cyan-300"
+          class="z-btn-ghost text-xs px-3 py-1 rounded-xl font-bold flex items-center gap-1.5 border border-slate-700/80 hover:border-accent/40 hover:text-accent-bright transition"
           :disabled="isSaving"
           @click="saveToGallery"
         >
@@ -136,13 +142,13 @@
             <polyline points="17 21 17 13 7 13 7 21" />
             <polyline points="7 3 7 8 15 8" />
           </svg>
-          <span>Save</span>
+          <span>{{ $t('skin_studio.save_btn') }}</span>
         </button>
 
         <!-- Apply & Sync to Minecraft -->
         <button
           type="button"
-          class="z-btn-accent text-xs px-3.5 py-1 rounded-lg font-bold flex items-center gap-1.5 shadow-md hover:shadow-cyan-500/25 shrink-0"
+          class="z-btn-accent text-xs px-3.5 py-1 rounded-xl font-bold flex items-center gap-1.5 shadow-[0_0_14px_var(--color-accent-glow)] hover:shadow-[0_0_20px_var(--color-accent-glow-strong)] shrink-0 transition active:scale-95 cursor-pointer"
           :disabled="isApplying"
           @click="applyAndSync"
         >
@@ -150,7 +156,7 @@
           <svg v-else class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span>{{ isApplying ? 'Applying…' : 'Apply & Sync' }}</span>
+          <span>{{ isApplying ? $t('skin_studio.applying_btn') : $t('skin_studio.apply_btn') }}</span>
         </button>
       </div>
     </div>
@@ -175,7 +181,7 @@
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <line x1="9" y1="3" x2="9" y2="21" />
           </svg>
-          <span>Sidebar</span>
+          <span>{{ $t('skin_studio.sidebar_toggle') }}</span>
         </button>
 
         <div class="h-4 w-px bg-slate-800" />
@@ -237,7 +243,7 @@
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <line x1="12" y1="3" x2="12" y2="21" />
           </svg>
-          <span>Split</span>
+          <span>{{ $t('skin_studio.split_view') }}</span>
         </button>
 
         <button
@@ -256,7 +262,7 @@
             <line x1="3" y1="9" x2="21" y2="9" />
             <line x1="9" y1="21" x2="9" y2="9" />
           </svg>
-          <span>2D Canvas</span>
+          <span>{{ $t('skin_studio.canvas_2d') }}</span>
         </button>
 
         <button
@@ -274,7 +280,7 @@
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
             <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
           </svg>
-          <span>3D Model</span>
+          <span>{{ $t('skin_studio.model_3d') }}</span>
         </button>
       </div>
 
@@ -282,7 +288,7 @@
       <div class="flex items-center gap-2 shrink-0">
         <!-- Split Ratio Presets (Only visible in Split mode) -->
         <div v-if="workspaceMode === 'split'" class="flex items-center gap-1 bg-[#070b10] px-1 py-0.5 rounded-lg border border-slate-800 text-[10px] font-semibold text-slate-400">
-          <span class="text-[9px] uppercase tracking-wider text-slate-500 px-1">Ratio:</span>
+          <span class="text-[9px] uppercase tracking-wider text-slate-500 px-1">{{ $t('skin_studio.ratio_label') }}</span>
           <button
             type="button"
             class="px-1.5 py-0.5 rounded hover:text-white transition-colors"
@@ -341,7 +347,7 @@
             <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
             </svg>
-            Tools & Colors
+            {{ $t('skin_studio.tools_colors_tab') }}
           </button>
           <button
             type="button"
@@ -357,7 +363,7 @@
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
-            Parts & Layers
+            {{ $t('skin_studio.parts_layers_tab') }}
           </button>
         </div>
 

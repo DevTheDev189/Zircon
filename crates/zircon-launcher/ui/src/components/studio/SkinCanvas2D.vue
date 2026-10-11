@@ -33,7 +33,7 @@
                 ? 'bg-cyan-500/25 text-cyan-300 font-bold shadow-sm'
                 : 'text-slate-400 hover:text-white'
             "
-            title="Toggle Pixel Grid Lines"
+            :title="$t('skin_studio.grid_tooltip')"
             @click="studio.state.showGrid = !studio.state.showGrid"
           >
             <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -43,7 +43,7 @@
               <line x1="9" y1="3" x2="9" y2="21" />
               <line x1="15" y1="3" x2="15" y2="21" />
             </svg>
-            <span>Grid</span>
+            <span>{{ $t('skin_studio.grid') }}</span>
           </button>
 
           <button
@@ -54,7 +54,7 @@
                 ? 'bg-cyan-500/25 text-cyan-300 font-bold shadow-sm'
                 : 'text-slate-400 hover:text-white'
             "
-            title="Toggle UV Body Region Guides"
+            :title="$t('skin_studio.guides_tooltip')"
             @click="studio.state.showGuides = !studio.state.showGuides"
           >
             <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -62,7 +62,7 @@
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <span>Guides</span>
+            <span>{{ $t('skin_studio.guides') }}</span>
           </button>
         </div>
 

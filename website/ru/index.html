@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+  <link rel="canonical" href="https://zirconmc.net/ru/">
+  <link rel="alternate" hreflang="x-default" href="https://zirconmc.net/">
+  <link rel="alternate" hreflang="en" href="https://zirconmc.net/">
+  <link rel="alternate" hreflang="es" href="https://zirconmc.net/es/">
+  <link rel="alternate" hreflang="pt-BR" href="https://zirconmc.net/pt-br/">
+  <link rel="alternate" hreflang="pt-PT" href="https://zirconmc.net/pt-pt/">
+  <link rel="alternate" hreflang="de" href="https://zirconmc.net/de/">
+  <link rel="alternate" hreflang="fr" href="https://zirconmc.net/fr/">
+  <link rel="alternate" hreflang="it" href="https://zirconmc.net/it/">
+  <link rel="alternate" hreflang="ru" href="https://zirconmc.net/ru/">
+  <link rel="alternate" hreflang="pl" href="https://zirconmc.net/pl/">
+  <link rel="alternate" hreflang="nl" href="https://zirconmc.net/nl/">
+  <link rel="alternate" hreflang="tr" href="https://zirconmc.net/tr/">
+  <link rel="alternate" hreflang="sv" href="https://zirconmc.net/sv/">
+  <link rel="alternate" hreflang="uk" href="https://zirconmc.net/uk/">
+  <link rel="alternate" hreflang="cs" href="https://zirconmc.net/cs/">
+  <link rel="alternate" hreflang="fi" href="https://zirconmc.net/fi/">
+  <link rel="alternate" hreflang="da" href="https://zirconmc.net/da/">
+  <link rel="alternate" hreflang="no" href="https://zirconmc.net/no/">
+  <link rel="alternate" hreflang="hu" href="https://zirconmc.net/hu/">
+  <link rel="alternate" hreflang="ro" href="https://zirconmc.net/ro/">
+  <link rel="alternate" hreflang="el" href="https://zirconmc.net/el/">
+  <link rel="alternate" hreflang="bg" href="https://zirconmc.net/bg/">
+  <link rel="alternate" hreflang="sk" href="https://zirconmc.net/sk/">
+  <link rel="alternate" hreflang="hr" href="https://zirconmc.net/hr/">
+  <link rel="alternate" hreflang="sr" href="https://zirconmc.net/sr/">
+  <link rel="alternate" hreflang="sl" href="https://zirconmc.net/sl/">
+  <link rel="alternate" hreflang="lt" href="https://zirconmc.net/lt/">
+  <link rel="alternate" hreflang="lv" href="https://zirconmc.net/lv/">
+  <link rel="alternate" hreflang="et" href="https://zirconmc.net/et/">
+  <link rel="alternate" hreflang="zh-CN" href="https://zirconmc.net/zh-cn/">
+  <link rel="alternate" hreflang="zh-TW" href="https://zirconmc.net/zh-tw/">
+  <link rel="alternate" hreflang="ja" href="https://zirconmc.net/ja/">
+  <link rel="alternate" hreflang="ko" href="https://zirconmc.net/ko/">
+  <link rel="alternate" hreflang="id" href="https://zirconmc.net/id/">
+  <link rel="alternate" hreflang="vi" href="https://zirconmc.net/vi/">
+  <link rel="alternate" hreflang="th" href="https://zirconmc.net/th/">
+  <link rel="alternate" hreflang="ms" href="https://zirconmc.net/ms/">
+  <link rel="alternate" hreflang="fil" href="https://zirconmc.net/fil/">
+  <link rel="alternate" hreflang="hi" href="https://zirconmc.net/hi/">
+  <link rel="alternate" hreflang="ar" href="https://zirconmc.net/ar/">
+  <link rel="alternate" hreflang="he" href="https://zirconmc.net/he/">
+  <link rel="alternate" hreflang="fa" href="https://zirconmc.net/fa/">
+
+<!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+<script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zircon — Modded Minecraft with friends, without the headache</title>
+<meta content="Zircon is a free, open-source launcher for modded Minecraft. Pick a server, hit PLAY, and the exact mods that server runs install themselves — verified against Modrinth &amp; CurseForge on every launch. Windows 10/11 now; macOS &amp; Linux planned." name="description"/>
+<meta content="modded minecraft launcher, minecraft mod sync, modrinth launcher, curseforge launcher, minecraft server manager, fabric launcher, forge launcher, neoforge, automatic mod installer" name="keywords"/>
+<meta content="Zircon Contributors" name="author"/>
+<meta content="index, follow" name="robots"/>
+<meta content="#0d1117" name="theme-color"/>
+<!-- Canonical URL -->
+<link href="https://zirconmc.net/" rel="canonical"/>
+<!-- Open Graph / Social Sharing -->
+<meta content="Zircon" property="og:site_name"/>
+<meta content="https://zirconmc.net/" property="og:url"/>
+<meta content="Zircon — Modded Minecraft with friends, without the headache" property="og:title"/>
+<meta content="Free open-source launcher &amp; server manager for modded Minecraft. Pick a server, hit PLAY, and mods sync automatically with Modrinth &amp; CurseForge verification." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://zirconmc.net/assets/img/locales/ru/main_launcher.png" property="og:image"/>
+<meta content="Zircon Modded Minecraft Launcher Interface" property="og:image:alt"/>
+<meta content="en_US" property="og:locale"/>
+<!-- Twitter Cards -->
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Zircon — Modded Minecraft with friends, without the headache" name="twitter:title"/>
+<meta content="Free open-source launcher &amp; server manager for modded Minecraft. Exact mod sync verified on every launch via Modrinth &amp; CurseForge." name="twitter:description"/>
+<meta content="https://zirconmc.net/assets/img/locales/ru/main_launcher.png" name="twitter:image"/>
+<meta content="Zircon Launcher Preview" name="twitter:image:alt"/>
+<!-- Favicons & Manifest -->
+<link href="../assets/img/favicon.png" rel="icon" type="image/png"/>
+<link href="../assets/img/favicon.png" rel="apple-touch-icon"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+<!-- Structured Data / JSON-LD -->
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://zirconmc.net/#website",
+        "url": "https://zirconmc.net/",
+        "name": "Zircon",
+        "description": "Free and open-source launcher & server manager for modded Minecraft.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Zircon",
+          "url": "https://github.com/DevTheDev189/Zircon"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://zirconmc.net/#launcher",
+        "name": "Zircon Launcher",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Windows 10, Windows 11",
+        "description": "A free, open-source companion launcher for modded Minecraft servers with automatic Modrinth & CurseForge verification.",
+        "url": "https://zirconmc.net/",
+        "downloadUrl": "https://zirconmc.net/downloads.html#players",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://zirconmc.net/#server-manager",
+        "name": "Zircon Server Manager",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "description": "Self-hosted Minecraft server manager featuring automatic player mod syncing, Modrinth & CurseForge integration, web dashboard, and single-port multiplexing.",
+        "url": "https://zirconmc.net/downloads.html#server-owners",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://zirconmc.net/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How does Zircon automatically sync Minecraft mods?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "When you hit PLAY, the Zircon Launcher connects to the server, fetches its exact mod manifest, verifies each mod hash against Modrinth and CurseForge, and automatically downloads any missing mods directly to your isolated instance folder."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use Modrinth and CurseForge to find and download mods?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes! Zircon natively integrates with both Modrinth and CurseForge with zero API key configuration needed. Server owners and players can search, browse, and download mods directly from both platforms."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Zircon free and open source?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, Zircon is free and source-available under the Business Source License 1.1 (BSL 1.1). It is 100% free for players, homelabbers, and gaming communities, while commercial managed cloud hosting is reserved."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is my Microsoft Minecraft account safe with Zircon?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Zircon uses Microsoft OAuth 2.0 authentication in your browser. Your password and credentials are submitted directly to Microsoft and never touch or get stored by Zircon."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which mod loaders does Zircon support?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Zircon supports Fabric, Quilt, Forge, and NeoForge mod loaders across supported Minecraft versions."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+<!-- Animated Procedural Background Elements -->
+<div class="z-bg-dots"></div>
+<div class="z-orb z-orb-1"></div>
+<div class="z-orb z-orb-2"></div>
+<div class="z-orb z-orb-3"></div>
+<div class="z-orb z-orb-4"></div>
+<div class="z-particle z-particle-1"></div>
+<div class="z-particle z-particle-2"></div>
+<div class="z-particle z-particle-3"></div>
+<div class="z-particle z-particle-4"></div>
+<div class="z-particle z-particle-5"></div>
+<div class="z-particle z-particle-6"></div>
+<!-- ================= NAV ================= -->
+<header class="site-nav">
+<div class="container">
+<a aria-label="Zircon home" class="brand" href="./">
+<img alt="Zircon" class="brand-text" height="28" src="../assets/img/zircon-title.svg" width="130"/>
+</a>
+<button aria-expanded="false" aria-label="Toggle navigation" class="nav-toggle">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"></path>
+</svg>
+</button>
+<ul class="nav-links">
+<li data-i18n="index.home"><a class="active" data-i18n="index.home_1" href="/">Главная</a></li>
+<li data-i18n="index.launcher"><a data-i18n="index.launcher_1" href="launcher.html">Лаунчер</a></li>
+<li data-i18n="index.server_manager"><a data-i18n="index.server_manager_1" href="server.html">Менеджер серверов</a></li>
+<li data-i18n="index.guides"><a data-i18n="index.guides_1" href="docs.html">Руководства</a></li>
+<li data-i18n="index.faq"><a data-i18n="index.faq_1" href="faq.html">FAQ</a></li>
+<li data-i18n="index.downloads"><a data-i18n="index.downloads_1" href="downloads.html">Загрузки</a></li>
+<li data-i18n="index.github"><a aria-label="GitHub Repository" class="nav-github-link" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg viewbox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+<span data-i18n="index.github_1">GitHub</span>
+</a></li>
+<li data-i18n="index.get_launcher"><a class="nav-cta" data-i18n="index.get_launcher_1" href="downloads.html#players">Скачать лаунчер</a></li>
+</ul>
+</div>
+</header>
+<!-- ================= HERO ================= -->
+<section class="hero">
+<div class="container">
+<span class="eyebrow" data-i18n="index.the_fastest_way_to">Самый быстрый способ играть в модифицированный Minecraft с друзьями</span>
+<img alt="Zircon" class="hero-title" src="../assets/img/zircon-title.svg"/>
+<h1 data-i18n="index.modded_minecraft_with_friendswithout">Модифицированный Minecraft с друзьями,<br/><span class="hl" data-i18n="index.without_the_headache">без головной боли.</span></h1>
+<p class="lede" data-i18n="index.zircon_eliminates_modpack_mismatches">Zircon навсегда устраняет несовпадения модпаков. Выберите сервер,
+        нажмите <strong data-i18n="index.play">ИГРАТЬ</strong>, и каждый мод установится и будет криптографически верифицирован за секунды.
+        Плюс: импорт в один клик из CurseForge & Prism, кооператив на диване для 4 игроков и автоматическое обнаружение по LAN.</p>
+<div class="hero-actions-stacked" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 12px;">
+<div data-i18n="index.download_for_windows_exestar" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><a class="btn btn-primary btn-xl" data-i18n="index.download_for_windows_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe" id="hero-primary-download">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+<span class="download-label" data-i18n="index.download_for_windows_exe_1">Скачать для Windows (.exe)</span>
+</a>
+<a class="btn btn-secondary btn-xl" data-i18n="index.star_on_github" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg fill="currentColor" height="20" viewbox="0 0 24 24" width="20"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+            Поставить звезду на GitHub
+          </a></div>
+<div class="hero-sublinks-row" data-i18n="index.also_onmacos_dmglinux_appimagehosting" style="color: var(--muted); font-size: 0.9rem; margin-top: 4px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><span data-i18n="index.also_onmacos_dmglinux_appimage">Также доступно для <a data-i18n="index.macos_dmg" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">macOS (.dmg)</a> &amp; <a data-i18n="index.linux_appimage" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">Linux (.AppImage)</a></span>
+<span>·</span>
+<span data-i18n="index.hosting_a_serverjump_to">Хостите сервер? <a data-i18n="index.jump_to_server_engine" href="#server-hosts" style="color: var(--primary); font-weight: 600;">Перейти к движку сервера ↓</a></span></div>
+</div>
+<div class="hero-foot" data-i18n="index.100_free_open_sourcezero"><span data-i18n="index.100_free_open_source"><i class="dot"></i> 100% Бесплатно &amp; Open Source</span>
+<span data-i18n="index.zero_telemetry"><i class="dot"></i> Нулевая телеметрия</span>
+<span data-i18n="index.modrinth_curseforge_integrated"><i class="dot"></i> Интеграция с Modrinth &amp; CurseForge</span>
+<span data-i18n="index.subsecond_verification"><i class="dot"></i> Верификация менее чем за секунду</span></div>
+<!-- ================= INTERACTIVE SHOWCASE FRAME (70% Launcher Focus) ================= -->
+<div class="hero-shot showcase-container">
+<div class="showcase-tabs" data-i18n="index.launcheruniversal_migration4player_coop3d_skin" role="tablist"><button class="showcase-tab active" data-i18n="index.launcher_2" data-title="Zircon Launcher — Подключение в один клик & Синхронизация модов" data-view="launcher">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Лаунчер
+          </button>
+<button class="showcase-tab" data-i18n="index.universal_migration" data-title="Универсальная миграция — Импорт в 1 клик из любого лаунчера" data-view="migration">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+            Универсальная миграция
+          </button>
+<button class="showcase-tab" data-i18n="index.4player_coop" data-title="Кооператив на диване для 4 игроков с геймпадами" data-view="coop">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle><path d="M12 9v6"></path></svg>
+            Кооператив для 4 игроков
+          </button>
+<button class="showcase-tab" data-i18n="index.3d_skin_studio" data-title="Zircon 3D Skin Studio &amp; Синхронизация с Mojang" data-view="skin">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            3D Skin Studio
+          </button>
+<button class="showcase-tab" data-i18n="index.server_engine_preview" data-title="Zircon Server Manager — Движок с одним портом 25565" data-view="server">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+            Движок сервера (Preview)
+          </button></div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots">
+<span class="dot dot-red"></span>
+<span class="dot dot-yellow"></span>
+<span class="dot dot-green"></span>
+</div>
+<div class="frame-title" data-i18n="index.zircon_launcher_oneclick_join"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="11" rx="2" ry="2" width="18" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+<span data-i18n="index.zircon_launcher_oneclick_join_1" id="frameTitleText">Zircon Launcher — Подключение в один клик & Синхронизация модов</span></div>
+<div class="frame-controls">
+<button aria-label="Zoom image" class="frame-zoom-btn" title="Click to view full screen">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg>
+</button>
+</div>
+</div>
+<!-- View 1: Launcher -->
+<div class="showcase-view active" data-view="launcher">
+<img alt="Zircon Launcher Main Screen" fetchpriority="high" height="600" loading="eager" src="../assets/img/locales/ru/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="1000"/>
+</div>
+<!-- View 2: Universal Migration -->
+<div class="showcase-view" data-view="migration">
+<img alt="Universal Migration Importer" height="600" loading="lazy" src="../assets/img/locales/ru/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="1000"/>
+</div>
+<!-- View 3: Couch Co-op -->
+<div class="showcase-view" data-view="coop">
+<img alt="4-Player Split-Screen Couch Co-op" height="600" loading="lazy" src="../assets/img/locales/ru/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="1000"/>
+</div>
+<!-- View 4: 3D Skin Studio -->
+<div class="showcase-view" data-view="skin">
+<img alt="Zircon 3D Skin Studio with Live Preview" height="600" loading="lazy" src="../assets/img/locales/ru/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="1000"/>
+</div>
+<!-- View 5: Server Dashboard -->
+<div class="showcase-view" data-view="server">
+<img alt="Zircon Server Performance Stats" height="600" loading="lazy" src="../assets/img/performance_server.png" width="1000"/>
+</div>
+</div>
+<p class="shot-caption" data-i18n="index.click_any_tab_above">Нажмите на любую вкладку выше или на изображение, чтобы рассмотреть детали в полноэкранном режиме.</p>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 1: THE HOOK — AUTOMATIC MOD SYNC ================= -->
+<section class="section" id="mod-sync">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.never_send_a_google">Никогда больше не отправляйте ссылки на Google Drive.</h2>
+<p data-i18n="index.end_the_2hour_discord">Закончите двухчасовой спор в Discord перед игровым вечером. Просто нажмите ИГРАТЬ и появляйтесь в мире.</p>
+</div>
+<!-- Problem vs Solution Contrast Arena -->
+<div class="contrast-arena">
+<div class="contrast-box contrast-old">
+<span class="contrast-badge" data-i18n="index.the_900_pm_discord">Кошмар в Discord в 21:00</span>
+<h3 data-i18n="index.the_old_way_modpack" style="color: var(--white); margin: 0; font-size: 22px;">Старый способ: Хаос с модпаками</h3>
+<ul class="contrast-list">
+<li class="contrast-item" data-i18n="index.which_fabric_build_are"><span class="contrast-icon">✕</span>
+<span data-i18n="index.which_fabric_build_are_1"><strong data-i18n="index.which_fabric_build_are_2">"Какая у тебя сборка Fabric?"</strong> — 45 минут troubleshooting в Discord, пока сервер пустует.</span></li>
+<li class="contrast-item" data-i18n="index.sketchy_zip_links_downloading"><span class="contrast-icon">✕</span>
+<span data-i18n="index.sketchy_zip_links_downloading_1"><strong data-i18n="index.sketchy_zip_links">Подозрительные zip-ссылки</strong> — Скачивание 80 отдельных .jar файлов со случайных ссылок Google Drive.</span></li>
+<li class="contrast-item" data-i18n="index.crash_on_launch_missing"><span class="contrast-icon">✕</span>
+<span data-i18n="index.crash_on_launch_missing_1"><strong data-i18n="index.crash_on_launch">Вылет при запуске</strong> — "Missing dependency: cloth-config-v12" и загадочные логи ошибок.</span></li>
+<li class="contrast-item" data-i18n="index.game_night_canceled_one"><span class="contrast-icon">✕</span>
+<span data-i18n="index.game_night_canceled_one_1"><strong data-i18n="index.game_night_canceled">Игровой вечер отменен</strong> — Один друг сдается, и все выходят из игры, чтобы поиграть во что-то другое.</span></li>
+</ul>
+</div>
+<div class="contrast-box contrast-zircon">
+<span class="contrast-badge" data-i18n="index.instant_game_night">Мгновенный игровой вечер</span>
+<h3 data-i18n="index.the_zircon_way_1click" style="color: var(--white); margin: 0; font-size: 22px;">Путь Zircon: 1 клик и играй</h3>
+<ul class="contrast-list">
+<li class="contrast-item" data-i18n="index.zero_file_hunting_your"><span class="contrast-icon">✓</span>
+<span data-i18n="index.zero_file_hunting_your_1"><strong data-i18n="index.zero_file_hunting">Ноль поиска файлов</strong> — Ваш друг дает вам адрес сервера или приглашение по локальной сети.</span></li>
+<li class="contrast-item" data-i18n="index.one_click_hit_play"><span class="contrast-icon">✓</span>
+<span data-i18n="index.one_click_hit_play_1"><strong data-i18n="index.one_click">Один клик</strong> — Нажмите ИГРАТЬ. Zircon проверяет список модов сервера и верифицирует каждый файл.</span></li>
+<li class="contrast-item" data-i18n="index.automatic_fastdownload_missing_mods"><span class="contrast-icon">✓</span>
+<span data-i18n="index.automatic_fastdownload_missing_mods_1"><strong data-i18n="index.automatic_fastdownload">Автоматическая быстрая загрузка</strong> — Недостающие моды, конфиги и текстуры скачиваются с Modrinth &amp; CurseForge за секунды.</span></li>
+<li class="contrast-item" data-i18n="index.ingame_in_seconds_you"><span class="contrast-icon">✓</span>
+<span data-i18n="index.ingame_in_seconds_you_1"><strong data-i18n="index.ingame_in_seconds">В игре за секунды</strong> — Вы появляетесь вместе мгновенно. Никакого перетаскивания папок с модами.</span></li>
+</ul>
+</div>
+</div>
+<!-- 3-Step Sync Flow -->
+<div class="steps">
+<div class="step">
+<h3 data-i18n="index.1_cryptographic_manifest">1. Криптографический манифест</h3>
+<p data-i18n="index.the_server_broadcasts_its">Сервер транслирует свой точный Bill of Materials (BOM) через порт 25565 — ID модов, хеши версий, загрузчик и конфиги.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.2_instant_hash_audit">2. Мгновенный аудит хешей</h3>
+<p data-i18n="index.the_launcher_scans_your">Лаунчер сканирует вашу локальную инстанцию за миллисекунды, пропуская уже имеющиеся файлы и отмечая только недостающие.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.3_parallel_verified_fetch">3. Параллельная верифицированная загрузка</h3>
+<p data-i18n="index.missing_files_download_in">Недостающие файлы загружаются параллельно напрямую с CDN Modrinth и CurseForge. Ноль поврежденных JAR, ноль несовпадений версий.</p>
+</div>
+</div>
+<div style="margin-top: 36px; text-align: center;">
+<div class="app-frame" style="max-width: 900px; margin: 0 auto;">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.cryptographic_mod_synchronization_verification"><span data-i18n="index.cryptographic_mod_synchronization_verification_1">Движок криптографической синхронизации и верификации модов</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Cryptographic Mod Sync Verification Interface" height="540" loading="lazy" src="../assets/img/sync_verification.png" width="900"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 2: THE OBJECTION KILLER — UNIVERSAL MIGRATION ================= -->
+<section class="section" id="migration">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.switching_from_curseforge_or">Переходите с CurseForge или Prism? Перенесите всё в один клик.</h2>
+<p data-i18n="index.dont_abandon_your_worlds">Не бросайте свои миры, настройки клавиш или инстансы модпаков. Zircon автоматически обнаруживает установленные лаунчеры и переносит их без потерь менее чем за 2 секунды.</p>
+</div>
+<!-- 4-Launcher Migration Badges Grid -->
+<div class="grid grid-4" style="margin-bottom: 36px;">
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="CurseForge Logo" height="48" src="../assets/img/curseforge.svg" width="48"/>
+</div>
+<h4 data-i18n="index.curseforge" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">CurseForge</h4>
+<p data-i18n="index.autodetects_modpacks_overrides_custom" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">Автообнаружение модпаков, оверрайдов, кастомных конфигов и сохранений миров.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="Prism Launcher Logo" height="48" src="../assets/img/prism.svg" width="48"/>
+</div>
+<h4 data-i18n="index.prism_launcher" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">Prism Launcher</h4>
+<p data-i18n="index.imports_instance_trees_jvm" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">Импортирует деревья инстансов, аргументы JVM и сохранения миров.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="Modrinth App Logo" height="48" src="../assets/img/modrinth.svg" width="48"/>
+</div>
+<h4 data-i18n="index.modrinth_app" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">Modrinth App</h4>
+<p data-i18n="index.preserves_mr_packs_index" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">Сохраняет MR-паки, индексные файлы и кастомные ресурспаки.</p>
+</div>
+<div class="migration-badge-card">
+<div class="migration-logo">
+<img alt="ATLauncher Logo" height="48" src="../assets/img/atlauncher.svg" width="48"/>
+</div>
+<h4 data-i18n="index.atlauncher" style="color: var(--white); margin: 0 0 8px; font-size: 18px;">ATLauncher</h4>
+<p data-i18n="index.transfers_instances_custom_backups" style="color: var(--text-secondary); font-size: 14px; margin: 0; line-height: 1.5;">Переносит инстансы, кастомные бэкапы и папки текстурпаков.</p>
+</div>
+</div>
+<!-- Feature Split Spotlight -->
+<div class="feature-split">
+<div class="feature-split-text">
+<h2 data-i18n="index.zero_data_loss_zero">Ноль потери данных. Ноль ручного перетаскивания файлов.</h2>
+<p data-i18n="index.when_you_launch_zircon">При запуске Zircon наш нативный детектор на Rust находит установленные профили в вашей системе. Выберите, какие инстансы импортировать, и Zircon перенесет всё в чистые изолированные песочницы.</p>
+<ul class="spec-list">
+<li data-i18n="index.100_offline_local_detectionscans"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.100_offline_local_detectionscans_1"><b data-i18n="index.100_offline_local_detection">100% Локальное офлайн-обнаружение:</b> Сканирует стандартные директории диска без загрузки в облако.</span></li>
+<li data-i18n="index.complete_instance_preservationkeeps_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.complete_instance_preservationkeeps_your_1"><b data-i18n="index.complete_instance_preservation">Полное сохранение инстанса:</b> Сохраняет ваши точные настройки клавиш, options.txt, ресурспаки и миры нетронутыми.</span></li>
+<li data-i18n="index.immediate_fastlaunchautomatically_configures_matching"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.immediate_fastlaunchautomatically_configures_matching_1"><b data-i18n="index.immediate_fastlaunch">Мгновенный быстрый запуск:</b> Автоматически настраивает подходящие версии Java и оптимальные флаги памяти.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.universal_launcher_importer"><span data-i18n="index.universal_launcher_importer_1">Универсальный импортёр лаунчеров</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Universal Migration Importer Window" height="500" loading="lazy" src="../assets/img/locales/ru/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 3: DELIGHT FEATURES SLIDESHOW ================= -->
+<section class="section" id="features">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.your_new_minecraft_command">Ваш новый командный центр Minecraft</h2>
+<p data-i18n="index.everything_youve_always_wished">Всё, чего вы всегда хотели от других лаунчеров — прямо в вашем десктопном приложении.</p>
+</div>
+<div class="delight-slideshow">
+<!-- Slideshow Navigation Tabs -->
+<div class="delight-nav" role="tablist">
+<button aria-label="Couch Co-op" class="delight-nav-btn active" data-slide="0">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle><path d="M12 9v6"></path></svg>
+</div>
+<div data-i18n="index.couch_coop4player_gamepads"><span class="delight-nav-title" data-i18n="index.couch_coop">Кооп на диване</span>
+<span class="delight-nav-sub" data-i18n="index.4player_gamepads">Геймпады для 4 игроков</span></div>
+</button>
+<button aria-label="3D Skin Studio" class="delight-nav-btn" data-slide="1">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+</div>
+<div data-i18n="index.3d_skin_studiolive_3d"><span class="delight-nav-title" data-i18n="index.3d_skin_studio_1">3D Skin Studio</span>
+<span class="delight-nav-sub" data-i18n="index.live_3d_mojang_sync">Живое 3D &amp; Синхронизация с Mojang</span></div>
+</button>
+<button aria-label="LAN Friends" class="delight-nav-btn" data-slide="2">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+</div>
+<div data-i18n="index.lan_friendsautodetect_upnp"><span class="delight-nav-title" data-i18n="index.lan_friends">Друзья по LAN</span>
+<span class="delight-nav-sub" data-i18n="index.autodetect_upnp">Автообнаружение &amp; UPnP</span></div>
+</button>
+<button aria-label="2048 &amp; Discord" class="delight-nav-btn" data-slide="3">
+<div class="delight-nav-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="7" rx="1.5" width="7" x="3" y="3"></rect><rect height="7" rx="1.5" width="7" x="14" y="3"></rect><rect height="7" rx="1.5" width="7" x="14" y="14"></rect><rect height="7" rx="1.5" width="7" x="3" y="14"></rect></svg>
+</div>
+<div data-i18n="index.2048_discordplay_while_loading"><span class="delight-nav-title" data-i18n="index.2048_discord">2048 &amp; Discord</span>
+<span class="delight-nav-sub" data-i18n="index.play_while_loading">Играйте во время загрузки</span></div>
+</button>
+</div>
+<!-- Slideshow Stage -->
+<div class="delight-stage">
+<!-- Slide 0: Couch Co-op -->
+<div class="delight-slide active" data-slide="0">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.hand_your_friend_a">Передайте другу контроллер. Играйте на диване.</h3>
+<p data-i18n="index.turn_your_pc_or">Превратите ваш ПК или телевизор в гостиной в консоль с разделенным экраном. Подключите до 4 геймпадов Xbox, PlayStation или Bluetooth и играйте в модифицированную Java Edition бок о бок с отдельными инвентарями, видами и скинами.</p>
+<ul class="spec-list">
+<li data-i18n="index.plug_play_gamepadssmooth_analog"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.plug_play_gamepadssmooth_analog_1"><b data-i18n="index.plug_play_gamepads">Геймпады Plug &amp; Play:</b> Плавное движение аналоговых стиков с контроллерами Xbox, PlayStation &amp; Bluetooth.</span></li>
+<li data-i18n="index.automatic_splitscreenclean_2player_horizontalvertical"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.automatic_splitscreenclean_2player_horizontalvertical_1"><b data-i18n="index.automatic_splitscreen">Автоматический разделенный экран:</b> Чистая горизонтальная/вертикальная сетка для 2 игроков или квадранты для 4 игроков.</span></li>
+<li data-i18n="index.separate_player_profileseach_player"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.separate_player_profileseach_player_1"><b data-i18n="index.separate_player_profiles">Отдельные профили игроков:</b> Каждый игрок использует свой собственный скин персонажа и отдельный инвентарь.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.4player_couch_coop_gamepad"><span data-i18n="index.4player_couch_coop_gamepad_1">Настройка кооператива на диване для 4 игроков с геймпадами</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="4-Player Couch Co-op" height="500" loading="lazy" src="../assets/img/locales/ru/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 1: 3D Skin Studio -->
+<div class="delight-slide" data-slide="1">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.look_sharp_ingame_with">Выглядите круто в игре с живым 3D-превью.</h3>
+<p data-i18n="index.stop_guessing_how_skins">Перестаньте гадать, как выглядят скины, до загрузки игры. Вращайте персонажа в реальном времени в 3D, просматривайте тысячи популярных скинов сообщества, получаемых напрямую через API, и синхронизируйте их с официальными серверами Mojang одним кликом.</p>
+<ul class="spec-list">
+<li data-i18n="index.rotating_3d_viewportlive_steve"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.rotating_3d_viewportlive_steve_1"><b data-i18n="index.rotating_3d_viewport">Вращающийся 3D-вид:</b> Живые геометрии Steve (Classic) и Alex (Slim) с превью плаща.</span></li>
+<li data-i18n="index.trending_community_librarysearch_thousands"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.trending_community_librarysearch_thousands_1"><b data-i18n="index.trending_community_library">Библиотека трендовых скинов:</b> Ищите тысячи скинов и применяйте их за секунды.</span></li>
+<li data-i18n="index.1click_mojang_syncpushes_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.1click_mojang_syncpushes_your_1"><b data-i18n="index.1click_mojang_sync">Синхронизация с Mojang в 1 клик:</b> Отправляет ваш активный скин напрямую на официальные серверы Minecraft.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.3d_skin_studio_mojang"><span data-i18n="index.3d_skin_studio_mojang_1">3D Skin Studio &amp; Синхронизация с Mojang</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="3D Skin Studio" height="500" loading="lazy" src="../assets/img/locales/ru/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 2: LAN Auto-Discovery & UPnP -->
+<div class="delight-slide" data-slide="2">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.find_wifi_friends_instantly">Находите друзей по Wi-Fi мгновенно. Присоединяйтесь по кодам.</h3>
+<p data-i18n="index.no_ip_addresses_to">Никаких IP-адресов для копирования. Никаких виртуальных сетей Hamachi. Никакого открытия портов файрвола роутера. Когда кто-то в вашей локальной Wi-Fi сети запускает мир или сервер, он появляется автоматически. Играете через интернет? Поделитесь 6-значным кодом присоединения с автоматическим пробросом портов UPnP.</p>
+<ul class="spec-list">
+<li data-i18n="index.local_wifi_autodiscoverybroadcasts_and"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.local_wifi_autodiscoverybroadcasts_and_1"><b data-i18n="index.local_wifi_autodiscovery">Автообнаружение по локальному Wi-Fi:</b> Транслирует и обнаруживает ближайшие игры мгновенно по всей сети.</span></li>
+<li data-i18n="index.6digit_join_code_upnpconnect"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.6digit_join_code_upnpconnect_1"><b data-i18n="index.6digit_join_code_upnp">6-значный код присоединения &amp; UPnP:</b> Подключайтесь через интернет без ручной настройки роутера.</span></li>
+<li data-i18n="index.live_ping_player_countinspect"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.live_ping_player_countinspect_1"><b data-i18n="index.live_ping_player_count">Живой пинг &amp; количество игроков:</b> Проверяйте количество игроков и задержку перед тем, как нажать «Присоединиться».</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.lan_autodiscovery_nearby_games"><span data-i18n="index.lan_autodiscovery_nearby_games_1">Автообнаружение по LAN &amp; Ближайшие игры</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="LAN Auto-Discovery" height="500" loading="lazy" src="../assets/img/locales/ru/lan_nearby_friends.png" onerror="this.onerror=null; this.src='../assets/img/lan_nearby_friends.png';" width="800"/>
+</div>
+</div>
+</div>
+<!-- Slide 3: 2048 & Discord Rich Presence -->
+<div class="delight-slide" data-slide="3">
+<div class="delight-split">
+<div class="delight-info">
+<h3 data-i18n="index.play_2048_while_your">Играйте в 2048, пока загружается ваш пак из 300 модов.</h3>
+<p data-i18n="index.never_stare_at_a">Больше никогда не смотрите на зависший экран загрузки Minecraft. Пока массивные паки Forge или Fabric инициализируют текстуры, играйте во встроенную игру 2048 прямо в окне лаунчера. Когда игра закончит загрузку, ныряйте сразу же, пока Discord Rich Presence показывает друзьям, во что вы играете.</p>
+<ul class="spec-list">
+<li data-i18n="index.builtin_2048_minigamefull_keyboard"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.builtin_2048_minigamefull_keyboard_1"><b data-i18n="index.builtin_2048_minigame">Встроенная мини-игра 2048:</b> Полное управление с клавиатуры, постоянные рекорды и нулевая нагрузка на память.</span></li>
+<li data-i18n="index.discord_rich_presencebroadcasts_your"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.discord_rich_presencebroadcasts_your_1"><b data-i18n="index.discord_rich_presence">Discord Rich Presence:</b> Транслирует ваш активный модпак, IP/имя сервера и время в игре.</span></li>
+<li data-i18n="index.background_throttlingsuspends_launcher_ui"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg><span data-i18n="index.background_throttlingsuspends_launcher_ui_1"><b data-i18n="index.background_throttling">Фоновое ограничение ресурсов:</b> Приостанавливает UI лаунчера во время игры, чтобы отдать Minecraft 100% оперативной памяти системы.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.zircon_launcher_2048_discord"><span data-i18n="index.zircon_launcher_2048_discord_1">Zircon Launcher — 2048 &amp; Присутствие в Discord</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Launcher Loading Features" height="500" loading="lazy" src="../assets/img/locales/ru/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="800"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Slideshow controls (arrows + indicators) -->
+<div class="delight-controls">
+<button aria-label="Previous feature" class="delight-arrow delight-prev">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+</button>
+<div class="delight-dots">
+<button aria-label="Go to Couch Co-op" class="delight-dot active" data-slide="0"></button>
+<button aria-label="Go to 3D Skin Studio" class="delight-dot" data-slide="1"></button>
+<button aria-label="Go to LAN Auto-Discovery" class="delight-dot" data-slide="2"></button>
+<button aria-label="Go to 2048 &amp; Discord" class="delight-dot" data-slide="3"></button>
+</div>
+<button aria-label="Next feature" class="delight-arrow delight-next">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+</button>
+</div>
+</div>
+<!-- Player Power Tools Row -->
+<div class="grid grid-3" style="margin-top: 48px;">
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+</span>
+<h3 data-i18n="index.ui_customization_themes" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">Кастомизация интерфейса и темы</h3>
+<p data-i18n="index.tailor_the_launcher_to" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">Настройте лаунчер под свою эстетику с помощью кастомных акцентных цветов, темных палитр и конфигурируемых стилей просмотра.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+</span>
+<h3 data-i18n="index.offline_play_world_import" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">Офлайн-игра и импорт миров</h3>
+<p data-i18n="index.play_anywhere_without_an" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">Играйте где угодно без активного интернет-соединения. Импортируйте существующие одиночные миры, выделяйте кастомную RAM и изолируйте модпаки.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+</span>
+<h3 data-i18n="index.clientside_server_tweaks" style="color: var(--white); font-size: 18px; margin: 0 0 8px;">Клиентские настройки сервера</h3>
+<p data-i18n="index.add_your_own_optional" style="color: var(--text-secondary); font-size: 14.5px; margin: 0; line-height: 1.6;">Добавляйте свои опциональные клиентские моды, шейдеры, ресурспаки и бинды клавиш к любой серверной инстанции, не нарушая синхронизацию.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 4: FOR SERVER HOSTS (The 30% Slice) ================= -->
+<section class="section" id="server-hosts">
+<div class="container">
+<div class="feature-split reverse">
+<div class="feature-split-text">
+<h2 data-i18n="index.manage_multiple_servers_save">Управляйте несколькими серверами, экономьте RAM во сне и работайте на одном порту.</h2>
+<p data-i18n="index.the_selfhosted_management_engine">Самохостимый движок управления за Zircon. Никаких проблем с Docker, никаких кошмаров с многопортовым файрволом. Запускайте модифицированные серверы, к которым игроки могут реально подключаться без техподдержки.</p>
+<ul class="spec-list">
+<li data-i18n="index.singleport_multiplexing_25565game_packets"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.singleport_multiplexing_25565game_packets_1"><b data-i18n="index.singleport_multiplexing_25565">Мультиплексирование одного порта (25565):</b> Игровые пакеты и REST-манифесты модов работают на дефолтном порту 25565. Только 1 порт для проброса.</span></li>
+<li data-i18n="index.sleepwhenempty_ram_saverfreezes_jvm"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.sleepwhenempty_ram_saverfreezes_jvm_1"><b data-i18n="index.sleepwhenempty_ram_saver">Спящий режим при пустоте (Экономия RAM):</b> Замораживает память JVM до 0% CPU, когда онлайн 0 игроков; оживает за миллисекунды, когда игрок пингует.</span></li>
+<li data-i18n="index.integrated_mod_store1click_install"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.integrated_mod_store1click_install_1"><b data-i18n="index.integrated_mod_store">Интегрированный магазин модов:</b> Установка модов, шейдеров и ресурспаков в 1 клик напрямую с Modrinth и CurseForge.</span></li>
+<li data-i18n="index.live_console_player_managementcolorized"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.live_console_player_managementcolorized_1"><b data-i18n="index.live_console_player_management">Живая консоль &amp; Управление игроками:</b> Цветные терминальные логи, мгновенная отправка команд, визуальные белые списки, OP и баны.</span></li>
+<li data-i18n="index.autobackups_world_zip_importhighspeed"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.autobackups_world_zip_importhighspeed_1"><b data-i18n="index.autobackups_world_zip_import">Автобэкапы &amp; Импорт миров ZIP:</b> Высокоскоростные LZ4 снапшоты с кастомным хранением, откат в 1 клик и импорт миров drag-and-drop.</span></li>
+<li data-i18n="index.live_2d3d_world_mapexplore"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="index.live_2d3d_world_mapexplore_1"><b data-i18n="index.live_2d3d_world_map">Живая 2D/3D карта мира:</b> Исследуйте рендеренный ландшафт, биомы и местоположение игроков прямо в браузере.</span></li>
+</ul>
+<div data-i18n="index.explore_server_manager_details" style="margin-top: 26px;"><a class="btn btn-primary" data-i18n="index.explore_server_manager_details_1" href="server.html">Изучить детали Менеджера серверов →</a></div>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="index.zircon_server_manager_engine"><span data-i18n="index.zircon_server_manager_engine_1">Движок Zircon Server Manager</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Zircon Server Manager Dashboard" height="500" loading="lazy" src="../assets/img/performance_server.png" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= PAIN POINTS ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.if_youve_done_any">Если вы делали хоть что-то из этого, Zircon для вас</h2>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.hunting_mod_versions">Поиск версий модов</h3>
+<p data-i18n="index.scrolling_mod_sites_for">Листание сайтов с модами в поисках «правильной сборки» и надежда, что она совпадает с тем, что используют друзья.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.dragging_jars_into_folders">Перетаскивание JAR в папки</h3>
+<p data-i18n="index.manually_dropping_mod_files">Ручное размещение файлов модов в <code>mods/</code> и удаление тех, что вызывают вылеты при запуске.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+<h3 data-i18n="index.it_works_on_my">"У меня работает"</h3>
+<p data-i18n="index.comparing_configs_with_your">Сравнение конфигов с другом в 1 ночи, по одному несовпадению за раз, пока сервер пустует.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= WHY PLAYERS LOVE IT ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.everything_between_you_and">Всё между вами и игрой просто… работает</h2>
+<p data-i18n="index.built_for_people_who">Создан для людей, которые хотят <em>играть в модифицированный Minecraft</em> с друзьями — а не
+        тратить вечер на сверку версий модов и логов крашей.</p>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg></span>
+<h3 data-i18n="index.one_click_youre_in">Один клик. Вы внутри.</h3>
+<p data-i18n="index.hit_play_and_zircon">Нажмите ИГРАТЬ, и Zircon скачает нужную версию Minecraft и загрузчик модов —
+          Fabric, Quilt, Forge или NeoForge — установит моды и доставит вас
+          прямо в игру.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path><path d="M3 21v-5h5"></path></svg></span>
+<h3 data-i18n="index.curseforge_modrinth_sync">Синхронизация с CurseForge & Modrinth</h3>
+<p data-i18n="index.search_download_mods_from">Ищите и скачивайте моды с Modrinth и CurseForge с проверкой SHA-512 и отпечатков при каждом запуске. Ничего не отсутствует, ничего не устарело.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
+<h3 data-i18n="index.sign_in_with_your">Вход с вашим реальным аккаунтом</h3>
+<p data-i18n="index.official_microsoft_signin_your">Официальный вход Microsoft — ваш пароль уходит в Microsoft, никогда в
+          Zircon. Никаких общих логинов, взломанных лаунчеров или обходов офлайна.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
+<h3 data-i18n="index.3d_skins_community_library">3D Скины & Библиотека сообщества</h3>
+<p data-i18n="index.saved_skin_selector_with">Сохраненный выборщик скинов с живым 3D-превью, официальной облачной синхронизацией Mojang и встроенным обозревателем скинов сообщества, получающим трендовые скины через API.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"></path></svg></span>
+<h3 data-i18n="index.shaders_packs_autoapplied">Шейдеры и паки, автоприменение</h3>
+<p data-i18n="index.servers_can_offer_their">Серверы могут предлагать свои шейдеры и ресурспаки. Zircon применяет
+          их при входе — вы просто соглашаетесь один раз, и всё готово.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg></span>
+<h3 data-i18n="index.solo_adventures_too">Одиночные приключения тоже</h3>
+<p data-i18n="index.create_offline_singleplayer_instances">Создавайте офлайн-инстанции для одиночной игры со своими модами, шейдерами и
+          текстурпаками. Сервер не требуется — просто стройте в тишине.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= HOW IT WORKS ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.three_steps_then_youre">Три шага. И вы внутри.</h2>
+</div>
+<div class="steps">
+<div class="step">
+<h3 data-i18n="index.sign_in_with_microsoft">Войдите через Microsoft</h3>
+<p data-i18n="index.one_click_in_your">Один клик в браузере. Zircon использует официальный поток Microsoft —
+          ваш пароль никогда не касается приложения.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.pick_a_server">Выберите сервер</h3>
+<p data-i18n="index.your_saved_servers_most">Ваши сохраненные серверы, сначала последние сыгранные — плюс рекомендации.
+          Каждый сервер приносит свой список модов.</p>
+</div>
+<div class="step">
+<h3 data-i18n="index.hit_play">Нажмите ИГРАТЬ</h3>
+<p data-i18n="index.zircon_syncs_and_verifies">Zircon синхронизирует и верифицирует моды с Modrinth & CurseForge, будит сервер, если тот спит,
+          и подключает вас. Вы появляетесь — полностью модифицированные, готовые к бою.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= ENGINEERING & TRUST ================= -->
+<section class="section" style="padding-top: 24px; padding-bottom: 24px;">
+<div class="container">
+<div class="engineering-trust-box">
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px;">
+<div style="max-width: 660px;">
+<span class="badge" data-i18n="index.engineering_standards" style="background: rgba(71, 210, 201, 0.15); color: var(--accent-bright); border: 1px solid rgba(71, 210, 201, 0.35); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: inline-block;">Инженерные стандарты</span>
+<h3 data-i18n="index.built_for_pure_speed" style="color: var(--white); margin: 0 0 8px; font-size: 22px; font-weight: 700;">Создан для чистой скорости на компилированном Rust & Vue 3</h3>
+<p data-i18n="index.no_sluggish_electron_runtimes" style="color: var(--text-secondary); margin: 0; font-size: 15px; line-height: 1.65;">Никаких медленных рантаймов Electron, съедающих гигабайты фоновой памяти во время игры. Ядро десктопного движка Zircon написано полностью на компилированном Rust для мгновенного запуска, субмиллисекундной валидации хешей и сверхлегкого системного следа.</p>
+</div>
+<div class="reassurance-strip" style="margin: 0; gap: 20px;">
+<div class="reassurance-item" data-i18n="index.blazing_native_rust"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> Молниеносный нативный Rust</div>
+<div class="reassurance-item" data-i18n="index.100_free_open_source_1"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> 100% Бесплатно & Open Source</div>
+<div class="reassurance-item" data-i18n="index.zero_telemetry_tracking"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> Нулевой трекинг телеметрии</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= FREQUENTLY ASKED QUESTIONS ================= -->
+<section class="section" id="faq">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="index.frequently_asked_questions">Часто задаваемые вопросы</h2>
+<p data-i18n="index.everything_you_need_to">Всё, что нужно знать о начале работы с Zircon.</p>
+</div>
+<div class="faq-list">
+<details class="faq-item" open="">
+<summary class="faq-question" data-i18n="index.how_does_zircon_automatically">Как Zircon автоматически синхронизирует моды Minecraft?</summary>
+<div class="faq-answer">
+<p data-i18n="index.when_you_join_a">Когда вы присоединяетесь к серверу и нажимаете <strong data-i18n="index.play_1">ИГРАТЬ</strong>, Zircon сравнивает опубликованный манифест Bill of Materials сервера с вашей локальной папкой клиента. Любые отсутствующие или обновленные моды верифицируются через SHA-512 хеши и отпечатки Modrinth & CurseForge, затем мгновенно скачиваются параллельно без ручного перетаскивания файлов.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.can_i_migrate_my">Могу ли я мигрировать мои инстансы из CurseForge, Prism или Modrinth?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_includes_a">Да! Zircon включает нативный инструмент универсальной миграции в 1 клик. Он автоматически обнаруживает установленные директории из CurseForge, Prism Launcher, Modrinth App и ATLauncher, позволяя импортировать полные деревья инстансов, сохранения, бинды клавиш и конфигурации модов менее чем за две секунды.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.how_does_4player_splitscreen">Как работает кооператив на диване с разделенным экраном для 4 игроков?</summary>
+<div class="faq-answer">
+<p data-i18n="index.zircon_allows_you_to">Zircon позволяет подключить до 4 геймпадов (Xbox, PlayStation или универсальные Bluetooth-контроллеры) и запустить несколько изолированных окон игры, расположенных в бесшовной сетке разделенного экрана на мониторе или ТВ. Каждый игрок управляет своим персонажем своим геймпадом.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.can_i_use_curseforge">Могу ли я использовать CurseForge и Modrinth для поиска и скачивания модов?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_natively_supports">Да! Zircon нативно поддерживает поиск, установку и синхронизацию модов напрямую с обоих <strong data-i18n="index.modrinth">Modrinth</strong> и <strong data-i18n="index.curseforge_1">CurseForge</strong> без необходимости конфигурации API-ключей. Оба репозитория полностью интегрированы из коробки.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.is_zircon_free_and">Бесплатен ли Zircon и является ли он open source?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_zircon_is_sourceavailable">Да, Zircon доступен исходный код под лицензией Business Source License 1.1 (BSL 1.1). Клиентский лаунчер и самохостимый менеджер серверов на 100% бесплатны для игроков, энтузиастов домашней лаборатории и игровых сетей. Весь кодовый доступ открыт для публичного изучения, самохостинга и участия сообщества на GitHub.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.is_my_microsoft_minecraft">Безопасен ли мой аккаунт Microsoft / Minecraft?</summary>
+<div class="faq-answer">
+<p data-i18n="index.yes_authentication_is_performed">Да. Аутентификация выполняется через стандартный протокол Microsoft OAuth 2.0 PKCE в вашем системном браузере по умолчанию. Ваши учетные данные идут напрямую на серверы входа Microsoft и никогда не доступны, не обрабатываются и не хранятся Zircon.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="index.which_mod_loaders_and">Какие загрузчики модов и версии Minecraft поддерживаются?</summary>
+<div class="faq-answer">
+<p data-i18n="index.zircon_natively_supportsfabric_quilt">Zircon нативно поддерживает <strong data-i18n="index.fabric_quilt_forge_and">Fabric, Quilt, Forge и NeoForge</strong>. Лаунчер автоматически устанавливает требуемую версию загрузчика модов и верифицированный runtime Adoptium Temurin Java при запуске инстанса или присоединении к серверу.</p>
+</div>
+</details>
+</div>
+</div>
+</section>
+<!-- ================= CTA ================= -->
+<section class="section" style="padding-top: 32px;">
+<div class="container">
+<div class="cta-band">
+<h2 data-i18n="index.ready_to_actually_play">Готовы реально играть?</h2>
+<p data-i18n="index.download_the_free_opensource">Скачайте бесплатный open-source лаунчер или получите самохостимый менеджер серверов.</p>
+<div data-i18n="index.download_launcher_exeget_server" style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;"><a class="btn btn-primary btn-lg" data-i18n="index.download_launcher_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+            Скачать лаунчер (.exe)
+          </a>
+<a class="btn btn-secondary btn-lg" data-i18n="index.get_server_manager" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+            Получить менеджер серверов
+          </a>
+<a class="btn btn-ghost btn-lg" data-i18n="index.view_on_github" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">Посмотреть на GitHub</a></div>
+</div>
+</div>
+</section>
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+<div class="container">
+<div class="footer-grid">
+<div class="footer-brand">
+<a class="brand" href="./" style="display: inline-block; margin-bottom: 14px; text-decoration: none;">
+<img alt="Zircon" class="brand-text" height="26" src="../assets/img/zircon-title.svg"/>
+</a>
+<p data-i18n="index.a_free_opensource_launcher">Бесплатный, open-source лаунчер и менеджер серверов для модифицированного Minecraft.
+          Игроки нажимают ИГРАТЬ и получают точно те моды, что на сервере — верифицированные
+          против Modrinth & CurseForge при каждом запуске.</p>
+<a class="pill pill-accent" data-i18n="index.open_source_bsl_11" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank"><svg aria-hidden="true" fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.14c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"></path></svg>
+            Open Source (BSL 1.1)</a>
+</div>
+<div class="footer-col">
+<h4 data-i18n="index.pages">Страницы</h4>
+<ul>
+<li data-i18n="index.home_2"><a data-i18n="index.home_3" href="/">Главная</a></li>
+<li data-i18n="index.launcher_3"><a data-i18n="index.launcher_4" href="launcher.html">Лаунчер</a></li>
+<li data-i18n="index.server_manager_2"><a data-i18n="index.server_manager_3" href="server.html">Менеджер серверов</a></li>
+<li data-i18n="index.guides_docs"><a data-i18n="index.guides_docs_1" href="docs.html">Руководства &amp; Документация</a></li>
+<li data-i18n="index.faq_2"><a data-i18n="index.faq_3" href="faq.html">FAQ</a></li>
+<li data-i18n="index.downloads_2"><a data-i18n="index.downloads_3" href="downloads.html">Загрузки</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<h4 data-i18n="index.project_community">Проект & Сообщество</h4>
+<ul>
+<li data-i18n="index.github_repository"><a data-i18n="index.github_repository_1" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">Репозиторий GitHub</a></li>
+<li data-i18n="index.releases_changelogs"><a data-i18n="index.releases_changelogs_1" href="https://github.com/DevTheDev189/Zircon/releases" rel="noopener" target="_blank">Релизы &amp; Журнал изменений</a></li>
+<li data-i18n="index.business_source_license_11"><a data-i18n="index.business_source_license_11_1" href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" rel="noopener" target="_blank">Business Source License 1.1</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-legal" data-i18n="index.zircon_contributors_v0421_active">
+<span data-i18n="index.zircon_contributors_v0421_active_1">© Zircon contributors · v0.5.0 (active development)</span>
+<span data-i18n="index.not_an_official_minecraft">Not an official Minecraft product. Not approved by or associated with Mojang Studios or Microsoft.</span>
+</div>
+</div>
+</footer>
+<script src="../assets/js/main.js?v=2"></script>
+</body>
+</html>

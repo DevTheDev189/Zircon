@@ -29,7 +29,10 @@ window.Zircon.instances = {
             extraJvmArgs: parsed.extra,
             idleShutdownEnabled: !!inst.idleShutdownEnabled,
             idleShutdownMinutes: inst.idleShutdownMinutes || 5,
-            autoStart: !!inst.autoStart
+            autoStart: !!inst.autoStart,
+            joinGateMode: inst.joinGateMode || 'universal',
+            publicAddress: inst.publicAddress || '',
+            subdomain: inst.subdomain || inst.serverUrl || inst.publicAddress || ''
         };
         this.loadSettingsLoaderVersions();
         this.loadMinecraftVersions();
@@ -249,6 +252,7 @@ window.Zircon.instances = {
                 method: 'POST',
                 body: JSON.stringify({
                     name: this.newServerForm.name,
+                    subdomain: (this.newServerForm.subdomain || '').trim(),
                     mcVersion: this.newServerForm.mcVersion,
                     loaderType: this.newServerForm.loaderType,
                     loaderVersion: this.newServerForm.loaderVersion,
@@ -257,7 +261,7 @@ window.Zircon.instances = {
                 })
             });
             this.showAddServerModal = false;
-            this.newServerForm = { name: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4, autoStart: false };
+            this.newServerForm = { name: '', subdomain: '', mcVersion: '1.21.4', loaderType: 'fabric', loaderVersion: '', ramAuto: true, ramGB: 4, autoStart: false };
             await this.loadInstances();
         } catch (e) {
             alert('Create failed: ' + e.message);
@@ -580,7 +584,10 @@ window.Zircon.instances = {
                     externalPort: Number(this.settingsForm.externalPort) || 0,
                     idleShutdownEnabled: !!this.settingsForm.idleShutdownEnabled,
                     idleShutdownMinutes: Number(this.settingsForm.idleShutdownMinutes) || 5,
-                    autoStart: !!this.settingsForm.autoStart
+                    autoStart: !!this.settingsForm.autoStart,
+                    joinGateMode: this.settingsForm.joinGateMode || 'universal',
+                    publicAddress: (this.settingsForm.publicAddress || this.settingsForm.subdomain || '').trim(),
+                    subdomain: (this.settingsForm.subdomain || '').trim()
                 })
             });
             alert(`Instance updated! ${res.updatedCount || 0} mods auto-updated, ${res.incompatibleCount || 0} flagged incompatible.`);
@@ -778,9 +785,11 @@ window.Zircon.instances = {
     copyServerIp(inst) {
         const target = inst || this.selectedInstance;
         if (!target) return;
-        const port = target.externalPort || target.serverPort || 25565;
-        const host = location.hostname || 'localhost';
-        const address = `${host}:${port}`;
+        const address = (target.subdomain && target.subdomain.trim())
+            ? target.subdomain.trim()
+            : (target.publicAddress && target.publicAddress.trim()
+                ? target.publicAddress.trim()
+                : `${location.hostname || 'localhost'}:${target.externalPort || target.serverPort || 25565}`);
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(address).then(() => {
                 this.copiedIp = true;
@@ -808,5 +817,34 @@ window.Zircon.instances = {
             // ignore
         }
         document.body.removeChild(ta);
+    },
+
+    copyMrpackUrl(inst) {
+        const target = inst || this.selectedInstance;
+        if (!target) return;
+        const origin = window.location.origin;
+        const url = `${origin}/api/instances/${target.id}/pack.mrpack`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => {
+                alert(`✓ Copied .mrpack URL to clipboard!\n\n${url}\n\nPaste this URL directly into Modrinth App, Prism Launcher, or CurseForge.`);
+            }).catch(() => {
+                window.prompt('Copy .mrpack URL:', url);
+            });
+        } else {
+            window.prompt('Copy .mrpack URL:', url);
+        }
+    },
+
+    downloadMrpack(inst) {
+        const target = inst || this.selectedInstance;
+        if (!target) return;
+        const url = `/api/instances/${target.id}/pack.mrpack`;
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = (target.name || 'modpack').replace(/[^a-zA-Z0-9_\-]/g, '_');
+        a.download = `${safeName}.mrpack`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 };

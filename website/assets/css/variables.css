@@ -1,6 +1,4 @@
-/* ============================================================
-   Zircon — Design Tokens, Resets, Base Elements & Buttons
-   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700;800&family=JetBrains+Mono:wght@450;600&display=swap');
 
 :root {
   /* Brand Accents (Parity with Zircon Launcher & Zircon Cloud) */
@@ -26,26 +24,28 @@
   --bg-sidebar-rgb: 10, 15, 20;
   --bg-well: #070b10;
   --bg-well-rgb: 7, 11, 16;
-  --card: #0e1622;
-  --card-rgb: 14, 22, 34;
-  --card-glass: rgba(14, 22, 34, 0.72);
-  --card-hover: #141f2e;
-  --edge: #263545;
-  --edge-rgb: 38, 53, 69;
-  --edge-soft: rgba(38, 53, 69, 0.55);
+  --card: #0b111a;
+  --card-rgb: 11, 17, 26;
+  --card-glass: rgba(11, 17, 26, 0.94);
+  --card-hover: #121c2b;
+  --edge: #233446;
+  --edge-rgb: 35, 52, 70;
+  --edge-soft: rgba(35, 52, 70, 0.65);
   --edge-glow: rgba(71, 210, 201, 0.45);
   --btn-secondary: #1c2530;
   --btn-secondary-rgb: 28, 37, 48;
 
-  /* Typography & Semantics */
-  --muted: #9bb0c7;
-  --text: #dbe4ef;
+  /* Typography & High-Contrast Semantics */
+  --text: #f8fafc;
+  --text-rgb: 248, 250, 252;
+  --text-secondary: #cbd5e1;
+  --muted: #94a3b8;
   --white: #ffffff;
   --danger: #f85149;
   --ok: #3fb950;
   --warn: #d29922;
-  --font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  --mono: 'Cascadia Code', 'SF Mono', Consolas, 'Liberation Mono', monospace;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', Consolas, monospace;
 
   /* Dimensions & Curves */
   --radius: 16px;
@@ -70,16 +70,24 @@ html {
 body {
   margin: 0;
   background: var(--bg);
-  color: var(--text);
+  color: var(--text-secondary);
   font-family: var(--font);
-  font-size: 16.5px;
-  line-height: 1.7;
+  font-size: 16px;
+  font-weight: 450;
+  line-height: 1.68;
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   overflow-x: hidden;
   position: relative;
-  background-color: transparent !important;
   min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--white);
+  letter-spacing: -0.025em;
+  font-weight: 700;
 }
 
 button, input, select, textarea {

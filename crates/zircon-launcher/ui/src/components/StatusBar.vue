@@ -3,10 +3,10 @@
     <span
       class="w-2 h-2 rounded-full shrink-0 shadow-sm"
       :class="dotClass"
-      :title="status || 'Ready.'"
+      :title="status || $t('status_bar.ready')"
     ></span>
     <div class="flex-1 truncate text-xs font-medium" :class="textClass">
-      {{ status || 'Ready.' }}
+      {{ status || $t('status_bar.ready') }}
     </div>
     <div v-if="busy || progress !== null" class="w-44 h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
       <div

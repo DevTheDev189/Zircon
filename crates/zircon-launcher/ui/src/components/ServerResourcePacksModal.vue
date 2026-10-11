@@ -21,16 +21,16 @@
           </div>
           <div class="min-w-0">
             <h2 class="text-sm font-bold text-slate-100 tracking-wide truncate">
-              Server Resource Packs Offered
+              {{ $t('server_packs_modal.title') }}
             </h2>
             <p class="text-[11px] text-slate-400 mt-0.5 truncate">
-              Choose which server resource packs to enable on your client.
+              {{ $t('server_packs_modal.subtitle') }}
             </p>
           </div>
         </div>
         <button
           class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800/80 transition ml-2 shrink-0"
-          title="Close dialog"
+          :title="$t('common.cancel')"
           @click="dismiss"
         >
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -42,12 +42,12 @@
       <!-- Body / Packs List -->
       <div class="p-6 overflow-y-auto flex flex-col gap-3 text-xs">
         <div class="text-[11px] text-slate-400 flex items-center justify-between px-1">
-          <span>Available Server Packs ({{ serverPacks.length }})</span>
-          <span class="text-cyan-400/90 font-mono text-[10px]">Toggled to Accept by default</span>
+          <span>{{ $t('server_packs_modal.available_packs', { count: serverPacks.length }) }}</span>
+          <span class="text-cyan-400/90 font-mono text-[10px]">{{ $t('server_packs_modal.default_accept') }}</span>
         </div>
 
         <div v-if="serverPacks.length === 0" class="text-xs text-slate-500 py-6 text-center italic">
-          No server resource packs currently advertised.
+          {{ $t('server_packs_modal.no_packs') }}
         </div>
 
         <div
@@ -86,7 +86,7 @@
               class="text-[10px] font-mono font-bold uppercase transition"
               :class="decisions[pack.filename] ? 'text-cyan-400' : 'text-slate-500'"
             >
-              {{ decisions[pack.filename] ? 'Accept' : 'Decline' }}
+              {{ decisions[pack.filename] ? $t('server_packs_modal.accept') : $t('server_packs_modal.decline') }}
             </span>
             <button
               type="button"
@@ -110,7 +110,7 @@
           class="text-xs text-slate-400 hover:text-slate-200 transition font-medium"
           @click="declineAll"
         >
-          Decline All
+          {{ $t('server_packs_modal.decline_all') }}
         </button>
 
         <div class="flex items-center gap-2.5">
@@ -119,7 +119,7 @@
             class="z-btn-ghost text-xs px-4 py-2 rounded-xl border border-slate-700 hover:border-slate-600 text-slate-300 transition"
             @click="dismiss"
           >
-            Cancel
+            {{ $t('common.cancel') }}
           </button>
           <button
             type="button"
@@ -129,7 +129,7 @@
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            <span>Accept Selection</span>
+            <span>{{ $t('server_packs_modal.accept_selection') }}</span>
           </button>
         </div>
       </div>

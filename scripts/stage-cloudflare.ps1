@@ -7,7 +7,7 @@
 #   4. Packages static website into 'cloudflare-pages/' (for zirconmc.net).
 # ===========================================================================
 param(
-    [string]$Version = "0.4.7",
+    [string]$Version,
     [string]$Domain = "https://downloads.zirconmc.net",
     [string]$ArtifactsDir = "download-artifacts",
     [string]$PagesUploadDir = "cloudflare-pages",
@@ -17,6 +17,17 @@ param(
 $ErrorActionPreference = "Stop"
 $rootDir = Split-Path -Path $PSScriptRoot -Parent
 Set-Location -Path $rootDir
+
+if (-not $Version) {
+    $tauriPath = Join-Path $rootDir "crates/zircon-launcher/tauri.conf.json"
+    if (Test-Path $tauriPath) {
+        $tauriJson = Get-Content $tauriPath -Raw | ConvertFrom-Json
+        $Version = $tauriJson.version
+    }
+    if (-not $Version) {
+        $Version = "0.4.21"
+    }
+}
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host " Zircon Multi-Platform Release Staging (v$Version)" -ForegroundColor Cyan

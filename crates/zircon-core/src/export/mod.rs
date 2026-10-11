@@ -18,7 +18,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::model::bom::{BillOfMaterials, ModEntry, ModSide};
 
+pub mod mrpack;
+pub mod servers_dat;
 pub mod snapshots;
+pub use mrpack::*;
+pub use servers_dat::*;
 pub use snapshots::*;
 
 /// Canonical URL scheme prefix for 1-line Zircon Share Codes.

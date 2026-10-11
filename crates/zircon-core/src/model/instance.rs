@@ -56,6 +56,39 @@ pub const SHUTDOWN_REASON_IDLE: &str = "idle";
 /// manually, so an admin can take a server offline for maintenance.
 pub const SHUTDOWN_REASON_MANUAL: &str = "manual";
 
+/// Mode for gatekeeping player joins and container wake-from-sleep.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum JoinGateMode {
+    /// Any standard client (Prism, Modrinth, Vanilla) can wake the server and play.
+    #[default]
+    Universal,
+    /// Whitelisted players only can wake the server; anyone can connect once awake.
+    WhitelistOnly,
+    /// Strict: Requires the Zircon Companion Launcher with signed pre-join ticket.
+    StrictTicket,
+}
+
+/// Helper that inspects a standard Minecraft `whitelist.json` payload to determine
+/// if `username` is an allowed player. Case-insensitive comparison is performed.
+pub fn is_username_in_whitelist(whitelist_json: &str, username: &str) -> bool {
+    let clean_user = username.trim().to_ascii_lowercase();
+    if clean_user.is_empty() {
+        return false;
+    }
+
+    if let Ok(entries) = serde_json::from_str::<Vec<serde_json::Value>>(whitelist_json) {
+        for entry in entries {
+            if let Some(name) = entry.get("name").and_then(|n| n.as_str()) {
+                if name.trim().eq_ignore_ascii_case(&clean_user) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Persistent metadata for one isolated Zircon server instance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -105,6 +138,12 @@ pub struct InstanceConfig {
     /// Customer subdomain (e.g. "emerald" for "emerald.zirconmc.net") when provisioned in Zircon Cloud.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subdomain: Option<String>,
+    /// Mode governing join access and auto-wake authorization.
+    #[serde(default)]
+    pub join_gate_mode: JoinGateMode,
+    /// Optional custom public connection address or hostname for homelabbers (e.g. "play.example.com" or "73.18.24.10:25565").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_address: Option<String>,
 }
 
 fn random_instance_id() -> String {
@@ -181,6 +220,8 @@ impl InstanceConfig {
             idle_shutdown_minutes: default_idle_shutdown_minutes(),
             last_shutdown_reason: None,
             subdomain: None,
+            join_gate_mode: JoinGateMode::default(),
+            public_address: None,
         };
         // "vanilla" installs carry no mod loader metadata.
         if config.mod_loader.as_ref().map(|l| l.r#type.as_str()) == Some("vanilla") {
@@ -228,6 +269,18 @@ impl InstanceConfig {
             Some(loader_info) => ModLoaderType::from_id(&loader_info.r#type).unwrap_or(ModLoaderType::Vanilla),
             None => ModLoaderType::Vanilla,
         }
+    }
+
+    /// Resolves the effective player-facing connection address.
+    pub fn resolved_connection_address(&self, fallback_host: &str) -> String {
+        if let Some(ref addr) = self.public_address {
+            let trimmed = addr.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_string();
+            }
+        }
+        let port = if self.external_mc_port > 0 { self.external_mc_port } else { 25565 };
+        format!("{fallback_host}:{port}")
     } // end loader_enum
     // loader version getter
     /// Loader version string, empty for vanilla installs.
@@ -325,5 +378,31 @@ mod tests {
         assert!(!old.idle_shutdown_enabled);
         assert_eq!(DEFAULT_IDLE_SHUTDOWN_MINUTES, old.idle_shutdown_minutes);
         assert!(old.last_shutdown_reason.is_none());
+        assert_eq!(JoinGateMode::Universal, old.join_gate_mode);
+    }
+
+    #[test]
+    fn join_gate_mode_round_trip_and_whitelist_check() {
+        let mut config = InstanceConfig::new("Universal SMP", "1.20.1", "fabric", "0.15.11", 25566);
+        assert_eq!(JoinGateMode::Universal, config.join_gate_mode);
+
+        config.join_gate_mode = JoinGateMode::WhitelistOnly;
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("\"joinGateMode\":\"whitelist_only\""));
+        let parsed: InstanceConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(JoinGateMode::WhitelistOnly, parsed.join_gate_mode);
+
+        // Whitelist helper tests
+        let whitelist_json = r#"[
+            {"uuid": "11111111-1111-1111-1111-111111111111", "name": "DevTheDev"},
+            {"uuid": "22222222-2222-2222-2222-222222222222", "name": "PlayerOne"}
+        ]"#;
+
+        assert!(is_username_in_whitelist(whitelist_json, "DevTheDev"));
+        assert!(is_username_in_whitelist(whitelist_json, "devthedev")); // case-insensitive
+        assert!(is_username_in_whitelist(whitelist_json, "PlayerOne"));
+        assert!(!is_username_in_whitelist(whitelist_json, "Hacker99"));
+        assert!(!is_username_in_whitelist(whitelist_json, ""));
+        assert!(!is_username_in_whitelist("invalid json", "DevTheDev"));
     }
 }

@@ -66,7 +66,13 @@
             >
               <path v-for="(d, i) in item.icon" :key="i" :d="d" />
             </svg>
-            {{ item.label }}
+            <span class="flex-1 truncate">{{ $t('nav.' + (item.key === 'offline' ? 'instances' : item.key)) || item.label }}</span>
+            <span
+              v-if="item.key === 'mission_control' && gameStatus?.running"
+              class="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse font-mono shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.3)]"
+            >
+              LIVE
+            </span>
           </button>
         </nav>
 
@@ -76,8 +82,8 @@
         <div class="px-3 pb-4 relative user-account-switcher-container">
           <div
             class="z-card flex items-center gap-2.5 p-2.5 transition-all hover:border-accent/40 cursor-pointer"
-            @click="showAccountSwitcher = !showAccountSwitcher"
-            title="Account Switcher"
+            @click="session ? (showAccountSwitcher = !showAccountSwitcher) : addAccount()"
+            :title="session ? 'Account Switcher' : 'Sign in / Add Account'"
           >
             <img
               v-if="avatarUrl"
@@ -163,12 +169,13 @@
       </aside>
 
 
-      <!-- Main view with theme-aware gradient and subtle dynamic corner accent glow -->
+      <!-- Main view with theme-aware gradient and consistent dynamic ambient radial glow -->
       <main
         class="relative flex-1 min-w-0 flex flex-col bg-gradient-to-br from-card/85 via-bg to-well overflow-hidden"
       >
-        <!-- Dynamic ambient corner flare matching active theme accent (2x enlarged) -->
-        <div class="absolute -top-72 -left-72 w-[48rem] h-[48rem] rounded-full pointer-events-none blur-3xl opacity-15 bg-accent z-0"></div>
+        <!-- Dynamic ambient radial glow layers (top center beam + corner aura, gradually animated) -->
+        <div class="z-ambient-glow-top"></div>
+        <div class="z-ambient-glow-corner"></div>
 
         <div class="relative z-10 flex-1 min-h-0 overflow-hidden">
           <KeepAlive>
@@ -185,9 +192,16 @@
             <OfflineView
               v-else-if="view === 'offline'"
               :session="session"
+              :deep-link-code="deepLinkCode"
               @launching="onLaunching"
               @stopped="onStopped"
               @error="onLaunchError"
+            />
+            <MissionControlView
+              v-else-if="view === 'mission_control'"
+              :game-status="gameStatus"
+              :session="session"
+              @stopped="onStopped"
             />
             <SkinsView v-else-if="view === 'skins'" :session="session" />
             <SettingsView v-else-if="view === 'settings'" />
@@ -245,8 +259,9 @@ import StatusBar from './components/StatusBar.vue';
 import ServersView from './views/ServersView.vue';
 import OfflineView from './views/OfflineView.vue';
 import SkinsView from './views/SkinsView.vue';
+import MissionControlView from './views/MissionControlView.vue';
 import SettingsView from './views/SettingsView.vue';
-import { api, createDefaultSteveDataUrl, onDeepLinkAddServer, onDeepLinkJoin, onGameCrashed, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
+import { api, createDefaultSteveDataUrl, onDeepLinkAddServer, onDeepLinkJoin, onDeepLinkJoinRequest, onGameCrashed, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { applyTheme } from './lib/theme';
@@ -277,6 +292,15 @@ const navItems = [
     ],
   },
   {
+    key: 'mission_control',
+    label: 'Mission Control',
+    icon: [
+      'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z',
+      'M12 6a6 6 0 1 0 6 6',
+      'M12 12l3-3',
+    ],
+  },
+  {
     key: 'skins',
     label: 'Skins',
     icon: [
@@ -300,7 +324,10 @@ const navItems = [
   },
 ];
 
-const view = ref('servers');
+const queryView = typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined'
+  ? new URLSearchParams(window.location.search).get('view')
+  : null;
+const view = ref(queryView || 'offline');
 const session = ref(null);
 const authChecking = ref(true);
 const avatarUrl = ref('');
@@ -317,6 +344,7 @@ const keyPrompt = ref(null);
 const launchingServer = ref(null);
 const deepLinkAddress = ref('');
 const deepLinkServer = ref(null);
+const deepLinkCode = ref('');
 const crashReportData = ref(null);
 const showCrashReportModal = ref(false);
 
@@ -398,9 +426,10 @@ onMounted(async () => {
       refreshAvatar();
     }),
     onGameWindowReady(() => {
-      // Game window is open and active — dismiss launch overlay
+      // Game window is open and active — dismiss launch overlay and switch to Mission Control companion
       launchModalActive.value = false;
       busy.value = false;
+      view.value = 'mission_control';
     }),
     onShaderRequest((payload) => {
       shaderPrompt.value = payload;
@@ -419,6 +448,18 @@ onMounted(async () => {
       if (payload && payload.address) {
         deepLinkAddress.value = payload.address;
       }
+    }),
+    onDeepLinkJoinRequest((req) => {
+      if (req && req.joinCode) {
+        view.value = 'offline';
+        deepLinkCode.value = req.joinCode;
+      } else if (req && req.serverAddress) {
+        view.value = 'servers';
+        deepLinkAddress.value = req.serverAddress;
+        if (req.serverName) {
+          deepLinkServer.value = { name: req.serverName, address: req.serverAddress };
+        }
+      }
     })
   );
 
@@ -428,6 +469,12 @@ onMounted(async () => {
   };
   window.addEventListener('zircon-status', onStatusEvent);
   unlisten.push(() => window.removeEventListener('zircon-status', onStatusEvent));
+
+  const onAccountsUpdated = () => {
+    loadAccounts();
+  };
+  window.addEventListener('accounts-updated', onAccountsUpdated);
+  unlisten.push(() => window.removeEventListener('accounts-updated', onAccountsUpdated));
 
   api.getSettings().then((s) => {
     if (s) {

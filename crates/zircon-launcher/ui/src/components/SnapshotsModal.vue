@@ -17,14 +17,15 @@
           </div>
           <div>
             <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
-              Mod List Time Machine
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Snapshots</span>
+              {{ $t('snapshots.title') }}
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{{ $t('snapshots.badge') }}</span>
             </h2>
-            <p class="text-xs text-slate-400">Save named recovery points and rollback instantly</p>
+            <p class="text-xs text-slate-400">{{ $t('snapshots.subtitle') }}</p>
           </div>
         </div>
         <button
           class="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800/60 transition-colors"
+          :title="$t('common.close')"
           @click="handleClose"
         >
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -37,12 +38,12 @@
       <div class="p-6 overflow-y-auto space-y-4 flex-1">
         <!-- Create Snapshot Box -->
         <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4 space-y-3">
-          <label class="block text-xs font-semibold text-slate-300">Save New Snapshot</label>
+          <label class="block text-xs font-semibold text-slate-300">{{ $t('snapshots.save_new') }}</label>
           <div class="flex gap-2">
             <input
               v-model="newLabel"
               type="text"
-              placeholder="e.g. Before 1.21 update, Stable shaders"
+              :placeholder="$t('snapshots.placeholder')"
               class="z-input flex-1 text-xs px-3 py-2 placeholder:text-slate-600 focus:border-cyan-500"
               @keyup.enter="handleCreateSnapshot"
             />
@@ -56,21 +57,21 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              <span>{{ creating ? 'Saving...' : 'Save Snapshot' }}</span>
+              <span>{{ creating ? $t('snapshots.saving') : $t('snapshots.save_button') }}</span>
             </button>
           </div>
         </div>
 
         <!-- Snapshots List -->
         <div class="space-y-2">
-          <div class="text-xs font-semibold text-slate-400">Saved Snapshots ({{ snapshots.length }})</div>
+          <div class="text-xs font-semibold text-slate-400">{{ $t('snapshots.saved_snapshots', { count: snapshots.length }) }}</div>
 
           <div v-if="loading" class="text-xs text-slate-500 text-center py-6">
-            Loading snapshots...
+            {{ $t('snapshots.loading') }}
           </div>
 
           <div v-else-if="snapshots.length === 0" class="text-xs text-slate-500 text-center py-6 border border-dashed border-slate-800 rounded-xl">
-            No snapshots saved yet. Create one above to preserve your current mod setup!
+            {{ $t('snapshots.empty') }}
           </div>
 
           <div v-else class="space-y-2 max-h-72 overflow-y-auto pr-1">
@@ -83,7 +84,7 @@
                 <div class="text-xs font-bold text-slate-200 truncate flex items-center gap-2">
                   <span>{{ snap.label }}</span>
                   <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                    {{ snap.modCount }} mods
+                    {{ $t('snapshots.mods_count', { count: snap.modCount }) }}
                   </span>
                 </div>
                 <div class="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
@@ -100,11 +101,11 @@
                   @click="handleRestore(snap)"
                 >
                   <span v-if="restoring === snap.filename" class="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
-                  <span>{{ restoring === snap.filename ? 'Restoring...' : 'Rollback' }}</span>
+                  <span>{{ restoring === snap.filename ? $t('snapshots.restoring') : $t('snapshots.rollback') }}</span>
                 </button>
                 <button
                   class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
-                  title="Delete snapshot"
+                  :title="$t('snapshots.delete_tooltip')"
                   @click="handleDelete(snap)"
                 >
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -120,7 +121,7 @@
       <!-- Footer -->
       <div class="px-6 py-4 border-t border-slate-800/80 bg-slate-950/60 flex items-center justify-end">
         <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold" @click="handleClose">
-          Done
+          {{ $t('snapshots.done') }}
         </button>
       </div>
     </div>

@@ -13,13 +13,13 @@
         <div class="min-w-0">
           <div class="flex items-center gap-2.5">
             <h3 class="text-white font-extrabold text-lg truncate">
-              {{ server?.name || server?.address || 'Server Configuration' }}
+              {{ server?.name || server?.address || $t('server_config.title') }}
             </h3>
             <span
               v-if="serverData?.hasBom"
               class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
             >
-              Managed Sync
+              {{ $t('server_config.managed_sync') }}
             </span>
           </div>
           <div class="flex items-center gap-2 mt-1 text-xs text-slate-400 font-mono">
@@ -46,7 +46,7 @@
               <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <span>Folder</span>
+              <span>{{ $t('server_config.folder_btn') }}</span>
             </button>
             <button
               class="hover:bg-slate-800 hover:text-white text-xs px-2 border-l border-slate-700/80 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
@@ -64,35 +64,35 @@
               class="absolute right-0 top-9 w-52 bg-[#0c141f] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50 text-xs text-slate-200"
             >
               <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder(null)">
-                <span>Instance Root</span>
+                <span>{{ $t('server_config.folder_root') }}</span>
                 <span class="text-[10px] text-slate-500 font-mono">.minecraft</span>
               </button>
               <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('mods')">
-                <span>Mods</span>
+                <span>{{ $t('server_config.folder_mods') }}</span>
                 <span class="text-[10px] text-slate-500 font-mono">mods/</span>
               </button>
               <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('config')">
-                <span>Config</span>
+                <span>{{ $t('server_config.folder_config') }}</span>
                 <span class="text-[10px] text-slate-500 font-mono">config/</span>
               </button>
               <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('saves')">
-                <span>Saves (Worlds)</span>
+                <span>{{ $t('server_config.folder_saves') }}</span>
                 <span class="text-[10px] text-slate-500 font-mono">saves/</span>
               </button>
               <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('screenshots')">
-                <span>Screenshots</span>
+                <span>{{ $t('server_config.folder_screenshots') }}</span>
                 <span class="text-[10px] text-slate-500 font-mono">screenshots/</span>
               </button>
               <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('shaderpacks')">
-                <span>Shaders</span>
+                <span>{{ $t('server_config.folder_shaders') }}</span>
                 <span class="text-[10px] text-slate-500 font-mono">shaderpacks/</span>
               </button>
               <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('resourcepacks')">
-                <span>Resource Packs</span>
+                <span>{{ $t('server_config.folder_resourcepacks') }}</span>
                 <span class="text-[10px] text-slate-500 font-mono">resourcepacks/</span>
               </button>
               <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('logs')">
-                <span>Logs</span>
+                <span>{{ $t('server_config.folder_logs') }}</span>
                 <span class="text-[10px] text-slate-500 font-mono">logs/</span>
               </button>
               <div class="h-px bg-slate-800 my-1"></div>
@@ -101,7 +101,7 @@
                   <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
-                  <span>Export Server (.zip)</span>
+                  <span>{{ $t('server_config.export_zip') }}</span>
                 </span>
                 <span class="text-[10px] text-cyan-400 font-mono font-bold">ZIP</span>
               </button>
@@ -132,7 +132,7 @@
             :class="{ 'active': activeTab === 'mods' }"
             @click="activeTab = 'mods'"
           >
-            Mods ({{ mods.length }})
+            {{ $t('server_config.tab_mods', { count: mods.length }) }}
           </button>
           <button
             type="button"
@@ -140,7 +140,7 @@
             :class="{ 'active': activeTab === 'shaders' }"
             @click="activeTab = 'shaders'"
           >
-            Shaders ({{ detailedPacks.shaderpacks?.length || 0 }})
+            {{ $t('server_config.tab_shaders', { count: detailedPacks.shaderpacks?.length || 0 }) }}
           </button>
           <button
             type="button"
@@ -148,7 +148,7 @@
             :class="{ 'active': activeTab === 'resources' || activeTab === 'textures' }"
             @click="activeTab = 'resources'"
           >
-            Resource Packs ({{ detailedPacks.resourcepacks?.length || 0 }})
+            {{ $t('server_config.tab_resourcepacks', { count: detailedPacks.resourcepacks?.length || 0 }) }}
           </button>
           <button
             type="button"
@@ -156,7 +156,7 @@
             :class="{ 'active': activeTab === 'export' }"
             @click="activeTab = 'export'"
           >
-            Export
+            {{ $t('server_config.tab_export') }}
           </button>
         </div>
       </div>
@@ -169,7 +169,7 @@
           <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2.5">
-                <span class="z-section text-white font-bold text-sm">Installed &amp; Server Mods</span>
+                <span class="z-section text-white font-bold text-sm">{{ $t('server_config.installed_mods_title') }}</span>
                 <span class="text-xs text-slate-500 font-mono">({{ filteredMods.length }})</span>
                 <button
                   class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition ml-1"
@@ -179,7 +179,7 @@
                 >
                   <span v-if="checkingUpdates" class="w-2.5 h-2.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
                   <span v-else class="text-cyan-400">⟳</span>
-                  <span>{{ checkingUpdates ? 'Checking…' : 'Check Updates' }}</span>
+                  <span>{{ checkingUpdates ? $t('server_config.checking_updates') : $t('server_config.check_updates') }}</span>
                 </button>
 
                 <span
@@ -196,7 +196,7 @@
                   title="Update all mods with automatic rollback backup"
                 >
                   <span v-if="updatingMods" class="w-2.5 h-2.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
-                  <span>{{ updatingMods ? 'Updating…' : 'Update All' }}</span>
+                  <span>{{ updatingMods ? $t('server_config.updating_all') : $t('server_config.update_all') }}</span>
                 </button>
               </div>
 
@@ -208,21 +208,21 @@
                   :class="modFilter === 'all' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400 hover:text-white'"
                   @click="modFilter = 'all'"
                 >
-                  All ({{ mods.length }})
+                  {{ $t('server_config.filter_all', { count: mods.length }) }}
                 </button>
                 <button
                   class="px-2.5 py-0.5 rounded-md font-semibold transition"
                   :class="modFilter === 'server' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400 hover:text-white'"
                   @click="modFilter = 'server'"
                 >
-                  Server ({{ bomModsCount }})
+                  {{ $t('server_config.filter_server', { count: bomModsCount }) }}
                 </button>
                 <button
                   class="px-2.5 py-0.5 rounded-md font-semibold transition"
                   :class="modFilter === 'custom' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400 hover:text-white'"
                   @click="modFilter = 'custom'"
                 >
-                  Custom ({{ customModsCount }})
+                  {{ $t('server_config.filter_custom', { count: customModsCount }) }}
                 </button>
               </div>
             </div>
@@ -230,12 +230,12 @@
             <!-- Loading State -->
             <div v-if="loadingMods" class="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
               <span class="inline-block w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
-              <span class="text-xs">Inspecting instance mods &amp; server BOM...</span>
+              <span class="text-xs">{{ $t('server_config.inspecting_mods') }}</span>
             </div>
 
             <!-- Empty List -->
             <div v-else-if="filteredMods.length === 0" class="py-8 text-center text-slate-500 text-xs">
-              No mods found in this category. Use search or file drop below to add client mods.
+              {{ $t('server_config.no_mods_category') }}
             </div>
 
             <!-- Mods List -->
@@ -278,7 +278,7 @@
                     </span>
                   </div>
                   <div class="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
-                    <span v-if="mod.author" class="truncate">by {{ mod.author }}</span>
+                    <span v-if="mod.author" class="truncate">{{ $t('server_config.by_author', { author: mod.author }) }}</span>
                     <span v-if="mod.author">•</span>
                     <span class="font-mono">{{ fmtBytes(mod.sizeBytes) }}</span>
                   </div>
@@ -289,30 +289,30 @@
                   <span
                     v-if="mod.isBom"
                     class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-800/90 text-slate-300 border border-slate-700"
-                    title="Required or recommended by server"
+                    :title="$t('server_config.badge_server_title')"
                   >
-                    Server
+                    {{ $t('server_config.badge_server') }}
                   </span>
                   <span
                     v-if="mod.isCustom"
                     class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 shadow-sm"
-                    title="Player-added client mod"
+                    :title="$t('server_config.badge_custom_title')"
                   >
-                    Custom
+                    {{ $t('server_config.badge_custom') }}
                   </span>
                   <span
                     v-if="!mod.isDownloaded"
                     class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                    title="Will download automatically on next launch"
+                    :title="$t('server_config.badge_pending_title')"
                   >
-                    Pending Sync
+                    {{ $t('server_config.badge_pending') }}
                   </span>
                   <span
                     v-if="!mod.enabled"
                     class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/30"
                     title="Mod is disabled"
                   >
-                    Disabled
+                    {{ $t('server_config.badge_disabled') }}
                   </span>
                 </div>
 
@@ -349,7 +349,7 @@
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                       <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
-                    <span>Delete</span>
+                    <span>{{ $t('server_config.delete_btn') }}</span>
                   </button>
                 </div>
               </div>
@@ -361,15 +361,15 @@
               @dragover.prevent
               @drop.prevent="onModDrop"
             >
-              Drop <code class="text-cyan-300 font-mono">.jar</code> mod files here (or
-              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseMods">browse files</button>)
+              {{ $t('server_config.drop_jar_mods') }} <code class="text-cyan-300 font-mono">.jar</code>
+              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300 ml-1" @click="browseMods">{{ $t('server_config.browse_files') }}</button>)
             </div>
           </div>
 
           <!-- Mod Discovery (Modrinth & CurseForge) -->
           <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
             <div class="flex items-center justify-between gap-2 mb-3">
-              <div class="z-section text-white font-bold text-sm">Search &amp; Install Mods</div>
+              <div class="z-section text-white font-bold text-sm">{{ $t('server_config.search_install_mods') }}</div>
               <!-- Provider toggle pills -->
               <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-0.5">
                 <button
@@ -396,7 +396,7 @@
               <input
                 v-model="modSearchQuery"
                 class="z-input flex-1 text-xs"
-                :placeholder="`Search ${modProvider === 'curseforge' ? 'CurseForge' : 'Modrinth'} (e.g. Sodium, Iris, JourneyMap)...`"
+                :placeholder="$t('server_config.search_placeholder_mod', { provider: modProvider === 'curseforge' ? 'CurseForge' : 'Modrinth' })"
                 @keydown.enter="searchMods"
               />
               <button
@@ -404,18 +404,18 @@
                 :disabled="modSearchBusy"
                 @click="searchMods"
               >
-                Search
+                {{ $t('server_config.search_btn') }}
               </button>
             </div>
 
             <div class="flex items-center justify-between mt-2 text-xs text-slate-400">
               <label class="flex items-center gap-1.5 cursor-pointer select-none">
                 <input type="checkbox" v-model="modSearchAllVersions" class="zircon-check" @change="searchMods" />
-                <span>Show all Minecraft versions</span>
+                <span>{{ $t('server_config.show_all_versions') }}</span>
               </label>
               <span v-if="modSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
                 <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
-                Searching…
+                {{ $t('server_config.searching') }}
               </span>
             </div>
 
@@ -509,13 +509,42 @@
           <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-4">
             <div class="flex items-center justify-between">
               <div>
-                <div class="z-section text-white font-bold text-sm">Shaders</div>
-                <div class="text-xs text-slate-400 mt-0.5">Select active shaderpack or drop custom ones below.</div>
+                <div class="z-section text-white font-bold text-sm">{{ $t('server_config.shaders_title') }}</div>
+                <div class="text-xs text-slate-400 mt-0.5">{{ $t('server_config.shaders_subtitle') }}</div>
               </div>
               <div v-if="packs.activeShaderpack" class="text-xs text-cyan-300 font-mono font-bold flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                Active: {{ packs.activeShaderpack }}
+                {{ $t('server_config.shaders_active', { name: packs.activeShaderpack }) }}
               </div>
+            </div>
+
+            <!-- 1-Click Cinematic Graphics Preset Banner -->
+            <div class="p-3.5 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-cyan-500/10 flex items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    <span>{{ $t('server_config.cinematic_preset') }}</span>
+                  </span>
+                  <span class="text-[10px] bg-amber-400/20 text-amber-300 font-mono px-1.5 py-0.5 rounded border border-amber-400/30">{{ $t('server_config.recommended_badge') }}</span>
+                </div>
+                <div class="text-[11px] text-slate-300 mt-1">
+                  {{ $t('server_config.cinematic_desc') }}
+                </div>
+              </div>
+              <button
+                class="z-btn-accent shrink-0 px-3.5 py-2 text-xs font-bold flex items-center gap-2"
+                :disabled="applyingCinematicPreset"
+                @click="applyCinematicPreset"
+              >
+                <span v-if="applyingCinematicPreset" class="w-3.5 h-3.5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></span>
+                <svg v-else class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                  <path d="M12 2L4 12h5v8h6v-8h5L12 2z" />
+                </svg>
+                <span>{{ applyingCinematicPreset ? $t('server_config.configuring_graphics') : $t('server_config.install_cinematic_bundle') }}</span>
+              </button>
             </div>
 
             <!-- Shaderpack Selector Cards -->
@@ -525,7 +554,7 @@
                 :class="!activeShaderpack ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300' : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'"
                 @click="setShaderpack('')"
               >
-                <div class="text-xs font-bold">None (Shaders Disabled)</div>
+                <div class="text-xs font-bold">{{ $t('server_config.shaders_disabled') }}</div>
                 <span v-if="!activeShaderpack" class="text-cyan-400 font-bold text-xs">✓</span>
               </div>
 
@@ -538,19 +567,19 @@
               >
                 <div class="min-w-0">
                   <div class="text-xs font-bold truncate">{{ sp.title || sp.filename }}</div>
-                  <div v-if="sp.author" class="text-[10px] text-slate-500 truncate">by {{ sp.author }}</div>
+                  <div v-if="sp.author" class="text-[10px] text-slate-500 truncate">{{ $t('server_config.by_author', { author: sp.author }) }}</div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                   <span v-if="activeShaderpack === sp.filename" class="text-cyan-400 font-bold text-xs">✓</span>
                   <button
                     class="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 hover:bg-red-500/10 rounded-lg transition-colors font-medium flex items-center gap-1 shrink-0"
-                    title="Delete Shaderpack"
+                    :title="$t('server_config.delete_shaderpack_tooltip')"
                     @click.stop="deletePack('shader', sp.filename)"
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                       <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
-                    <span>Delete</span>
+                    <span>{{ $t('server_config.delete_btn') }}</span>
                   </button>
                 </div>
               </div>
@@ -562,8 +591,8 @@
               @dragover.prevent
               @drop.prevent="onShaderDrop"
             >
-              Drop <code class="text-cyan-300 font-mono">.zip</code> shaderpacks here (or
-              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseShaders">browse files</button>)
+              {{ $t('server_config.drop_shaders') }}
+              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseShaders">{{ $t('server_config.browse_files') }}</button>)
             </div>
           </div>
         </template>
@@ -573,8 +602,8 @@
           <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-4">
             <div class="flex items-center justify-between">
               <div>
-                <div class="z-section text-white font-bold text-sm">Resource Packs</div>
-                <div class="text-xs text-slate-400 mt-0.5">Toggle and order packs to customize textures, models, and audio.</div>
+                <div class="z-section text-white font-bold text-sm">{{ $t('server_config.resource_packs_title') }}</div>
+                <div class="text-xs text-slate-400 mt-0.5">{{ $t('server_config.resource_packs_desc') }}</div>
               </div>
             </div>
 
@@ -590,8 +619,8 @@
                   </svg>
                 </div>
                 <div>
-                  <div class="text-xs font-bold text-cyan-200">Server Resource Packs ({{ serverAdvertisedPacks.length }})</div>
-                  <div class="text-[10px] text-slate-400">This server offers recommended resource packs.</div>
+                  <div class="text-xs font-bold text-cyan-200">{{ $t('server_config.server_packs_offered', { count: serverAdvertisedPacks.length }) }}</div>
+                  <div class="text-[10px] text-slate-400">{{ $t('server_config.server_packs_offered_desc') }}</div>
                 </div>
               </div>
               <button
@@ -599,7 +628,7 @@
                 class="z-btn-primary text-xs px-3.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 shrink-0"
                 @click="openServerPacksModal"
               >
-                <span>Review &amp; Accept / Decline</span>
+                <span>{{ $t('server_config.review_accept_decline') }}</span>
               </button>
             </div>
 
@@ -607,11 +636,11 @@
             <div class="mb-4">
               <div class="flex items-center justify-between mb-2">
                 <div>
-                  <div class="text-xs font-bold text-white">Active Resource Packs ({{ activeResourcepacksList.length }})</div>
-                  <div class="text-[10px] text-slate-400">Packs higher in the list override packs below them. Drag to reorder.</div>
+                  <div class="text-xs font-bold text-white">{{ $t('server_config.active_resource_packs', { count: activeResourcepacksList.length }) }}</div>
+                  <div class="text-[10px] text-slate-400">{{ $t('server_config.active_packs_order_desc') }}</div>
                 </div>
                 <span class="text-[9px] text-cyan-400 font-mono bg-cyan-950/40 border border-cyan-800/60 px-2 py-0.5 rounded-full">
-                  Priority Stack
+                  {{ $t('server_config.priority_stack') }}
                 </span>
               </div>
 
@@ -635,13 +664,13 @@
                     <!-- Drag Handle -->
                     <div
                       class="text-slate-500 hover:text-cyan-400 cursor-grab px-0.5 select-none font-mono text-xs"
-                      title="Drag to reorder priority"
+                      :title="$t('server_config.active_packs_order_desc')"
                     >
                       ⠿
                     </div>
 
                     <div class="px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
-                      #{{ index + 1 }} {{ index === 0 ? 'Top' : '' }}
+                      #{{ index + 1 }} {{ index === 0 ? $t('server_config.priority_top') : '' }}
                     </div>
 
                     <div class="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
@@ -656,8 +685,12 @@
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-1.5">
                         <span class="text-xs font-bold text-white truncate">{{ rp.title || rp.filename }}</span>
-                        <span v-if="rp.serverEnforced" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
-                          🔒 Server Enforced
+                        <span v-if="rp.serverEnforced" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 flex items-center gap-1">
+                          <svg class="w-2.5 h-2.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                          {{ $t('server_config.server_enforced') }}
                         </span>
                       </div>
                       <div v-if="rp.description" class="text-[10px] text-slate-400 line-clamp-1">{{ rp.description }}</div>
@@ -667,7 +700,7 @@
                       <button
                         class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
                         :disabled="index === 0"
-                        title="Move Up (Higher Priority)"
+                        :title="$t('server_config.move_up_tooltip')"
                         @click.stop="moveResourcepack(index, -1)"
                       >
                         ▲
@@ -675,14 +708,14 @@
                       <button
                         class="z-btn-ghost text-xs w-6 h-6 p-0 flex items-center justify-center rounded border border-slate-700 hover:border-cyan-400 hover:text-cyan-300 disabled:opacity-25 disabled:pointer-events-none"
                         :disabled="index === activeResourcepacksList.length - 1"
-                        title="Move Down (Lower Priority)"
+                        :title="$t('server_config.move_down_tooltip')"
                         @click.stop="moveResourcepack(index, 1)"
                       >
                         ▼
                       </button>
                       <button
                         class="text-slate-400 hover:text-amber-300 text-xs px-2 py-0.5 hover:bg-amber-500/10 rounded transition font-medium ml-1"
-                        title="Deactivate Pack"
+                        :title="$t('server_config.deactivate_pack_tooltip')"
                         @click.stop="disableResourcepack(rp.filename)"
                       >
                         ✕
@@ -691,12 +724,12 @@
                   </div>
                 </TransitionGroup>
               </div>
-              <div v-else class="text-xs text-slate-500 italic py-2">No resource packs currently active.</div>
+              <div v-else class="text-xs text-slate-500 italic py-2">{{ $t('server_config.no_active_packs') }}</div>
             </div>
 
             <!-- Available / Inactive Packs -->
             <div>
-              <div class="text-xs font-bold text-white mb-2">Available Packs ({{ inactiveResourcepacksList.length }})</div>
+              <div class="text-xs font-bold text-white mb-2">{{ $t('server_config.available_packs', { count: inactiveResourcepacksList.length }) }}</div>
               <div v-if="inactiveResourcepacksList.length" class="flex flex-col gap-1.5 max-h-[200px] overflow-y-auto pr-1">
                 <div
                   v-for="rp in inactiveResourcepacksList"
@@ -711,29 +744,29 @@
                   <div class="flex items-center gap-2 shrink-0">
                     <button
                       class="z-btn text-xs px-2.5 py-1 rounded-lg font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition flex items-center gap-1"
-                      title="Add to active resource packs stack"
+                      :title="$t('server_config.add_active_tooltip')"
                       @click="enableResourcepack(rp.filename)"
                     >
-                      <span>+ Enable</span>
+                      <span>{{ $t('server_config.enable_pack') }}</span>
                     </button>
                     <button
                       class="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 hover:bg-red-500/10 rounded-lg transition-colors font-medium flex items-center gap-1"
-                      title="Delete Resource Pack"
+                      :title="$t('server_config.delete_rp_tooltip')"
                       @click="deletePack('resource', rp.filename)"
                     >
                       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                         <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                       </svg>
-                      <span>Delete</span>
+                      <span>{{ $t('server_config.delete_btn') }}</span>
                     </button>
                   </div>
                 </div>
               </div>
-              <div v-else class="text-xs text-slate-500 italic py-1">All installed resource packs are active.</div>
+              <div v-else class="text-xs text-slate-500 italic py-1">{{ $t('server_config.all_packs_active') }}</div>
             </div>
 
             <div v-if="!detailedPacks.resourcepacks || !detailedPacks.resourcepacks.length" class="py-6 text-center text-slate-500 text-xs">
-              No resource packs installed. Drop a .zip archive below to add one.
+              {{ $t('server_config.no_packs_installed') }}
             </div>
 
             <!-- Custom Drop Zone -->
@@ -742,8 +775,8 @@
               @dragover.prevent
               @drop.prevent="onResourceDrop"
             >
-              Drop <code class="text-cyan-300 font-mono">.zip</code> resource packs here (or
-              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseResources">browse files</button>)
+              {{ $t('server_config.drop_resourcepacks') }}
+              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseResources">{{ $t('server_config.browse_files') }}</button>)
             </div>
           </div>
         </template>
@@ -752,37 +785,37 @@
         <template v-if="activeTab === 'export'">
           <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-5 shadow-inner flex flex-col gap-4">
             <div>
-              <h4 class="text-white font-bold text-sm">Export Server Package</h4>
+              <h4 class="text-white font-bold text-sm">{{ $t('server_config.export_server_title') }}</h4>
               <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-                Package this server's configuration, mods, and metadata into a Zircon-compatible ZIP archive. This archive can be imported into Zircon Server or shared with team members.
+                {{ $t('server_config.export_server_desc') }}
               </p>
             </div>
 
             <div class="p-3.5 bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col gap-2.5 text-xs">
-              <span class="text-slate-300 font-semibold">Included in export archive:</span>
+              <span class="text-slate-300 font-semibold">{{ $t('server_config.export_included') }}</span>
               <ul class="space-y-2 text-slate-400">
                 <li class="flex items-start gap-2.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
                   <div>
-                    <strong class="text-slate-200 font-mono">mods/</strong> — Installed &amp; server synced mods ({{ mods.length }} total)
+                    <strong class="text-slate-200 font-mono">mods/</strong> — {{ $t('server_config.export_inc_mods', { count: mods.length }) }}
                   </div>
                 </li>
                 <li class="flex items-start gap-2.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
                   <div>
-                    <strong class="text-slate-200 font-mono">config/</strong> — Server &amp; mod configuration files
+                    <strong class="text-slate-200 font-mono">config/</strong> — {{ $t('server_config.export_inc_config') }}
                   </div>
                 </li>
                 <li class="flex items-start gap-2.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
                   <div>
-                    <strong class="text-slate-200 font-mono">bom.json</strong> — Server bill of materials and mod checksums
+                    <strong class="text-slate-200 font-mono">bom.json</strong> — {{ $t('server_config.export_inc_bom') }}
                   </div>
                 </li>
                 <li class="flex items-start gap-2.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0"></span>
                   <div>
-                    <strong class="text-slate-200 font-mono">server.properties &amp; eula.txt</strong> — Server configuration parameters
+                    <strong class="text-slate-200 font-mono">server.properties &amp; eula.txt</strong> — {{ $t('server_config.export_inc_props') }}
                   </div>
                 </li>
               </ul>
@@ -806,7 +839,7 @@
                 <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
-                <span>{{ exporting ? 'Packaging Server Archive…' : 'Export Server Archive (.zip)' }}</span>
+                <span>{{ exporting ? $t('server_config.packaging_archive') : $t('server_config.export_archive_btn') }}</span>
               </button>
             </div>
           </div>
@@ -1347,6 +1380,28 @@ async function deletePack(kind, filename) {
   if (!dir) return;
   await api.removeLocalPack(dir, kind, filename);
   await loadPacks(dir);
+}
+
+const applyingCinematicPreset = ref(false);
+
+async function applyCinematicPreset() {
+  const instanceId = props.server?.address ? `server:${props.server.address}` : null;
+  if (!instanceId) return;
+  applyingCinematicPreset.value = true;
+  try {
+    const msg = await api.applyCinematicGraphicsPreset(instanceId);
+    const dir = serverData.value?.gameDir;
+    if (dir) await loadPacks(dir);
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', { detail: msg || 'Cinematic Shaders preset installed!' })
+    );
+  } catch (e) {
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', { detail: `Cinematic preset failed: ${e}` })
+    );
+  } finally {
+    applyingCinematicPreset.value = false;
+  }
 }
 
 async function browseShaders() {

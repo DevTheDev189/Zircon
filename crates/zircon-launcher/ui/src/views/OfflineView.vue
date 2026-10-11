@@ -1,10 +1,14 @@
 <template>
-  <div class="h-full flex gap-5 p-5 overflow-hidden">
-    <!-- Left: instance list -->
-    <div class="w-[300px] min-w-[300px] z-card flex flex-col p-4 bg-[#0e1622]/90 border border-slate-800/80">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-          <span class="z-section text-white font-bold">Instances</span>
+  <div
+    class="h-full flex flex-col p-5 gap-4"
+    :class="viewMode === 'split' ? 'overflow-hidden' : 'overflow-y-auto'"
+  >
+    <!-- Master Header & Control Bar -->
+    <div class="relative z-50 z-card bg-[#0e1622]/90 border border-slate-800/80 px-4 py-3 flex items-center justify-between gap-3 shrink-0 flex-wrap sm:flex-nowrap">
+      <!-- Left: Title, Count, Search, Loader Filter Pills -->
+      <div class="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+        <div class="flex items-center gap-2 mr-1">
+          <span class="z-section text-white font-bold text-sm tracking-wide">{{ $t('offline.instances_title') }}</span>
           <span
             v-if="instances.length > 0"
             class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono shadow-[0_0_8px_rgba(71,210,201,0.15)]"
@@ -12,61 +16,372 @@
             {{ instances.length }}
           </span>
         </div>
-        <div class="flex items-center gap-1.5">
+
+        <!-- Quick Search Bar -->
+        <div class="relative w-48 sm:w-60 min-w-[160px]">
+          <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            v-model="searchQuery"
+            type="text"
+            :placeholder="$t('offline.search_placeholder')"
+            class="w-full bg-[#070b10]/80 border border-slate-700/80 rounded-xl pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/40 transition-all font-sans"
+            style="padding-left: 2.35rem !important;"
+            @focus="onSearchFocus"
+          />
           <button
-            class="z-btn-ghost text-[11px] font-bold px-2 py-1 rounded-lg border border-slate-700/80 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400/50 flex items-center gap-1"
-            title="Import setup from Share Code or JSON manifest"
-            @click="showImportModal = true"
+            v-if="searchQuery"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs cursor-pointer"
+            @click="searchQuery = ''"
           >
-            Import Setup
+            ✕
           </button>
+        </div>
+
+        <!-- Loader Filter Pills -->
+        <div class="hidden md:flex items-center gap-1 bg-[#070b10]/80 p-1 rounded-xl border border-slate-800 text-[11px] shadow-inner">
           <button
-            class="z-btn-ghost text-[11px] font-bold px-2 py-1 rounded-lg border border-slate-700/80 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400/50 flex items-center gap-1"
-            title="Join a friend's world via 6-character code"
-            @click="showJoinCodeModal = true"
+            v-for="loader in ['all', 'fabric', 'neoforge', 'forge', 'vanilla']"
+            :key="loader"
+            class="px-3 py-1 rounded-lg font-semibold transition-all capitalize cursor-pointer select-none"
+            :class="
+              filterLoader === loader
+                ? 'bg-accent/20 text-accent-bright border border-accent/40 shadow-[0_0_10px_var(--color-accent-glow)] font-bold'
+                : 'text-slate-400 hover:text-white border border-transparent hover:bg-slate-800/40'
+            "
+            @click="filterLoader = loader"
           >
-            Join Code
+            {{ loader }}
           </button>
-          <button class="z-btn-accent text-xs font-bold px-3 py-1.5 rounded-xl shadow-md hover:shadow-cyan-500/25 flex items-center gap-1.5" @click="openNewInstance('scratch')">+ Create Instance</button>
         </div>
       </div>
-      <div class="flex-1 min-h-0 overflow-y-auto pr-1">
-        <div
-          v-for="instance in instances"
-          :key="instance.id"
-          class="flex items-center gap-3.5 border rounded-xl p-3.5 mb-2.5 cursor-pointer transition-all duration-200"
-          :class="
-            selected?.id === instance.id
-              ? 'border-accent ring-1 ring-accent/60 shadow-[0_0_16px_var(--color-accent-glow)] bg-[#111c29]'
-              : 'border-slate-800/80 bg-[#070b10]/60 hover:border-accent/40 hover:shadow-[0_0_10px_var(--color-accent-glow)] hover:bg-[#121d2b]'
-          "
-          @click="selectInstance(instance)"
-        >
-          <div
-            class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-bright via-accent to-accent-deep text-accent-ink font-black flex items-center justify-center text-base shrink-0 shadow-[0_0_10px_var(--color-accent-glow)]"
+
+      <!-- Right: Sort, View Switcher, Tools Dropdown, New Instance Button -->
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- Sort Selector -->
+        <div class="relative hidden sm:inline-flex items-center">
+          <select
+            v-model="sortBy"
+            class="bg-[#070b10]/80 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-medium focus:outline-none focus:border-cyan-500/60 transition-all cursor-pointer appearance-none pr-7"
           >
-            {{ instance.name.charAt(0).toUpperCase() }}
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[13px] font-bold text-white truncate">{{ instance.name }}</div>
-            <div class="text-[11px] text-slate-400 font-mono truncate mt-0.5">
-              MC {{ instance.minecraftVersion }} · <span class="capitalize">{{ instance.modLoader.type }}</span>
+            <option value="recent">{{ $t('offline.sort_recent') }}</option>
+            <option value="name">{{ $t('offline.sort_name') }}</option>
+            <option value="version">{{ $t('offline.sort_version') }}</option>
+          </select>
+          <svg class="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+
+        <!-- View Switcher (Grid vs Split) -->
+        <div class="flex items-center bg-[#070b10]/80 p-1 rounded-xl border border-slate-700/80 shadow-inner">
+          <button
+            class="p-1.5 rounded-lg transition-all cursor-pointer"
+            :class="viewMode === 'grid' ? 'bg-accent/20 text-accent-bright border border-accent/40 shadow-[0_0_8px_var(--color-accent-glow)]' : 'text-slate-400 hover:text-white border border-transparent hover:bg-slate-800/40'"
+            :title="$t('offline.grid_view')"
+            @click="viewMode = 'grid'; isStudioFocused = false;"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </button>
+          <button
+            class="p-1.5 rounded-lg transition-all cursor-pointer"
+            :class="viewMode === 'split' ? 'bg-accent/20 text-accent-bright border border-accent/40 shadow-[0_0_8px_var(--color-accent-glow)]' : 'text-slate-400 hover:text-white border border-transparent hover:bg-slate-800/40'"
+            :title="$t('offline.split_view')"
+            @click="viewMode = 'split'"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm7 1v12h7a1 1 0 001-1V6a1 1 0 00-1-1h-7z" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Tools Dropdown (Migrate, Import, Join) -->
+        <div class="relative z-50" data-dropdown="tools">
+          <button
+            class="px-2.5 py-1.5 rounded-xl border border-slate-700/80 bg-[#070b10]/80 hover:bg-[#111c2a] hover:border-cyan-500/40 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            @click="showToolsDropdown = !showToolsDropdown"
+            :title="$t('offline.tools_tooltip')"
+          >
+            <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            <span class="hidden sm:inline">{{ $t('offline.tools_btn') }}</span>
+            <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-180': showToolsDropdown }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <transition name="dropdown-pop">
+            <div
+              v-if="showToolsDropdown"
+              class="absolute right-0 top-full mt-2 w-64 bg-[#0c1322] border border-white/15 ring-1 ring-cyan-500/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_25px_rgba(71,210,201,0.2)] p-1.5 z-50 text-xs backdrop-blur-2xl"
+            >
+              <!-- Ambient Top Accent Glow -->
+              <div class="absolute top-0 inset-x-4 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent pointer-events-none"></div>
+
+              <!-- Header label -->
+              <div class="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/80 font-mono">
+                {{ $t('offline.tools_header') }}
+              </div>
+
+              <!-- Item 1: Migrate Launchers -->
+              <button
+                class="w-full text-left px-3 py-2 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 text-slate-300 hover:text-white flex items-center gap-2.5 transition-all duration-150 group cursor-pointer"
+                @click="showMigrationModal = true; showToolsDropdown = false;"
+              >
+                <div class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shadow-sm shrink-0">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold text-xs text-white group-hover:text-cyan-200 transition-colors">{{ $t('offline.migrate_launchers') }}</div>
+                  <div class="text-[10px] text-slate-400 group-hover:text-slate-300 font-sans truncate">{{ $t('offline.migrate_launchers_sub') }}</div>
+                </div>
+              </button>
+
+              <!-- Item 2: Import Setup -->
+              <button
+                class="w-full text-left px-3 py-2 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 text-slate-300 hover:text-white flex items-center gap-2.5 transition-all duration-150 group cursor-pointer"
+                @click="showImportModal = true; showToolsDropdown = false;"
+              >
+                <div class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shadow-sm shrink-0">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold text-xs text-white group-hover:text-cyan-200 transition-colors">{{ $t('offline.import_setup') }}</div>
+                  <div class="text-[10px] text-slate-400 group-hover:text-slate-300 font-sans truncate">{{ $t('offline.import_setup_sub') }}</div>
+                </div>
+              </button>
+
+              <!-- Item 3: Join Friend (P2P) -->
+              <button
+                class="w-full text-left px-3 py-2 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 text-slate-300 hover:text-white flex items-center gap-2.5 transition-all duration-150 group cursor-pointer"
+                @click="showJoinCodeModal = true; showToolsDropdown = false;"
+              >
+                <div class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shadow-sm shrink-0">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold text-xs text-white group-hover:text-cyan-200 transition-colors">{{ $t('offline.join_friend') }}</div>
+                  <div class="text-[10px] text-slate-400 group-hover:text-slate-300 font-sans truncate">{{ $t('offline.join_friend_sub') }}</div>
+                </div>
+              </button>
             </div>
-          </div>
+          </transition>
         </div>
-        <div v-if="instances.length === 0" class="text-slate-500 text-xs py-8 text-center">
-          No instances created yet. Click + New Instance to get started!
-        </div>
+
+        <!-- Hero New Instance Button -->
+        <button
+          class="z-btn-accent text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-md hover:shadow-cyan-500/25 flex items-center gap-1.5 transition-transform active:scale-95"
+          @click="openNewInstance('scratch')"
+        >
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span>{{ $t('offline.new_instance') }}</span>
+        </button>
       </div>
     </div>
 
-    <!-- Right: instance detail & management -->
-    <div class="flex-1 min-w-0 z-card flex flex-col p-5 bg-[#0e1622]/90 border border-slate-800/80">
+    <!-- Main Content Area -->
+    <div
+      class="flex gap-5 relative z-0"
+      :class="viewMode === 'split' ? 'flex-1 min-h-0 overflow-hidden' : 'w-full min-h-fit'"
+    >
+      <!-- MODE A: GRID VIEW (when viewMode === 'grid' and not in studio focus) -->
+      <div
+        v-if="viewMode === 'grid' && !isStudioFocused"
+        class="flex-1 flex flex-col p-2 -m-2"
+      >
+        <!-- Cards Grid -->
+        <div
+          v-if="filteredInstances.length > 0"
+          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 pb-6"
+        >
+          <!-- Add Instance Tile (matching Skins style) -->
+          <button
+            v-if="!searchQuery"
+            type="button"
+            class="group relative z-card bg-[#070b10]/60 hover:bg-[#0e1622]/90 border-2 border-dashed border-slate-700/60 hover:border-accent/60 rounded-2xl p-5 flex flex-col items-center justify-center min-h-[185px] h-full text-center transition-all duration-300 hover:shadow-[0_8px_30px_var(--color-accent-glow)] hover:-translate-y-0.5 cursor-pointer"
+            :title="$t('offline.create_tile_tooltip')"
+            @click="openNewInstance('scratch')"
+          >
+            <div class="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent-bright group-hover:scale-110 group-hover:bg-accent/20 transition-all shadow-[0_0_16px_var(--color-accent-glow)] mb-3">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
+              </svg>
+            </div>
+            <div class="text-xs font-bold text-white group-hover:text-accent-bright transition-colors">
+              {{ $t('offline.create_tile_title') }}
+            </div>
+            <span class="text-[11px] text-slate-400 mt-1 font-sans">
+              {{ $t('offline.create_tile_desc') }}
+            </span>
+          </button>
+
+          <InstanceCard
+            v-for="instance in filteredInstances"
+            :key="instance.id"
+            :instance="instance"
+            :selected="selected?.id === instance.id"
+            :banner-url="instanceBanner(instance)"
+            :icon-url="instanceArtworks[instance.id]?.iconDataUrl"
+            :active-dropdown="activeCardDropdownId === instance.id"
+            :launching="launching"
+            :format-relative-time="formatRelativeTime"
+            @select="selectInstance"
+            @play="playInstanceDirectly"
+            @manage="openManageStudio"
+            @toggle-dropdown="toggleCardDropdown"
+            @clone="cloneInstanceCard"
+            @open-folder="openInstanceFolderCard"
+            @export-mrpack="exportMrpackCard"
+            @install-cinematic="installCinematicPresetCard"
+            @delete="deleteInstanceById"
+          />
+        </div>
+
+        <!-- Empty State for Grid View -->
+        <div v-else class="flex-1 min-h-[360px] flex flex-col items-center justify-center text-center p-8">
+          <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4 shadow-[0_0_20px_rgba(71,210,201,0.2)]">
+            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+          <div v-if="instances.length === 0">
+            <h2 class="text-base font-bold text-white mb-1">No instances installed yet</h2>
+            <p class="text-xs text-slate-400 max-w-sm mb-5 leading-relaxed">
+              Create a fresh vanilla or modded profile, or effortlessly migrate your instances from Prism, CurseForge, or Modrinth.
+            </p>
+            <div class="flex items-center gap-3 justify-center">
+              <button
+                class="z-btn-accent text-xs font-bold py-2.5 px-4 rounded-xl shadow-lg hover:shadow-cyan-500/25 flex items-center gap-2"
+                @click="openNewInstance('scratch')"
+              >
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                <span>Create Clean Instance</span>
+              </button>
+              <button
+                class="z-btn-ghost text-xs font-semibold py-2.5 px-4 rounded-xl border border-slate-700/80 text-slate-300 hover:text-white"
+                @click="showMigrationModal = true"
+              >
+                <span>Migrate Launchers</span>
+              </button>
+            </div>
+          </div>
+          <div v-else>
+            <h2 class="text-base font-bold text-white mb-1">No matching instances</h2>
+            <p class="text-xs text-slate-400 max-w-sm mb-4">
+              No instances found matching your search or loader filter.
+            </p>
+            <button
+              class="px-3 py-1.5 rounded-xl border border-slate-700/80 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold"
+              @click="searchQuery = ''; filterLoader = 'all';"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODE B: SPLIT VIEW SIDEBAR (only when viewMode === 'split') -->
+      <div
+        v-if="viewMode === 'split'"
+        class="w-[300px] min-w-[300px] z-card flex flex-col p-3.5 bg-[#0e1622]/90 border border-slate-800/80 shrink-0"
+      >
+        <div class="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2">
+          <div
+            v-for="instance in filteredInstances"
+            :key="instance.id"
+            class="relative flex items-center gap-3 border rounded-xl p-3 cursor-pointer transition-all duration-200"
+            :class="
+              selected?.id === instance.id
+                ? 'border-accent bg-[#111c29] shadow-[0_0_16px_var(--color-accent-glow)]'
+                : 'border-slate-800/80 bg-[#070b10]/60 hover:border-accent/40 hover:shadow-[0_0_10px_var(--color-accent-glow)] hover:bg-[#121d2b]'
+            "
+            @click="selectInstance(instance)"
+          >
+            <span
+              v-if="selected?.id === instance.id"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-7 rounded-r-full bg-accent shadow-[0_0_10px_var(--color-accent)]"
+            ></span>
+            <div
+              v-if="instanceArtworks[instance.id]?.iconDataUrl"
+              class="w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-slate-700/80 bg-slate-900 shadow-sm"
+            >
+              <img :src="instanceArtworks[instance.id].iconDataUrl" class="w-full h-full object-cover" alt="" />
+            </div>
+            <div
+              v-else
+              class="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-bright via-accent to-accent-deep text-accent-ink font-black flex items-center justify-center text-sm shrink-0 shadow-[0_0_10px_var(--color-accent-glow)]"
+            >
+              {{ instance.name.charAt(0).toUpperCase() }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[13px] font-bold text-white truncate">{{ instance.name }}</div>
+              <div class="text-[11px] text-slate-400 font-mono truncate mt-0.5">
+                MC {{ instance.minecraftVersion }} · <span class="capitalize">{{ instance.modLoader.type }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="filteredInstances.length === 0" class="p-4 my-auto text-center space-y-3">
+            <div class="text-xs font-bold text-white">No instances match</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right / Studio Detail & Management Pane -->
+      <div
+        v-if="viewMode === 'split' || isStudioFocused"
+        class="z-card flex flex-col p-5 bg-[#0e1622]/90 border border-slate-800/80"
+        :class="viewMode === 'split' ? 'flex-1 min-w-0 min-h-0 overflow-y-auto' : 'w-full shrink-0 min-h-fit'"
+      >
+        <!-- Studio Mode Breadcrumb Header -->
+        <div
+          v-if="viewMode === 'grid' && isStudioFocused"
+          class="mb-3.5 pb-2.5 border-b border-slate-800/80 flex items-center justify-between"
+        >
+          <button
+            class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-semibold transition-all group"
+            @click="closeStudio"
+          >
+            <svg class="w-4 h-4 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span>{{ $t('offline.all_instances') }}</span>
+          </button>
+          <div class="flex items-center gap-2 text-xs font-mono text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span>{{ $t('offline.instance_studio', { name: selected?.name }) }}</span>
+          </div>
+        </div>
       <template v-if="selected">
         <!-- Header summary & play action -->
-        <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner mb-4">
+        <div
+          class="relative bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner mb-4 shrink-0 min-h-fit"
+          :class="(showActionsDropdown || showOpenFolderDropdown) ? 'z-40 overflow-visible' : 'z-20 overflow-hidden'"
+        >
+          <!-- Static Ambient Wallpaper Backdrop (Matches ServersView) -->
+          <div
+            v-if="instanceBanner(selected)"
+            class="absolute inset-0 pointer-events-none opacity-25 overflow-hidden rounded-xl z-0"
+          >
+            <img
+              :src="instanceBanner(selected)"
+              class="w-full h-full object-cover filter blur-[1px]"
+              alt=""
+            />
+            <div class="absolute inset-0 bg-gradient-to-r from-[#070b10] via-transparent to-[#070b10]"></div>
+          </div>
+
           <!-- Tier 1: Identity & Hero Play Action -->
-          <div class="flex items-center justify-between gap-4">
+          <div class="relative z-10 flex items-center justify-between gap-4">
             <div class="min-w-0 flex-1">
               <div class="text-white font-bold text-lg tracking-wide truncate mb-1.5">{{ selected.name }}</div>
               <div class="flex items-center gap-2 text-xs flex-wrap font-mono">
@@ -93,11 +408,11 @@
             >
               <span v-if="launching" class="inline-flex items-center gap-2">
                 <span class="inline-block w-3.5 h-3.5 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
-                LAUNCHING…
+                {{ $t('offline.launching') }}
               </span>
               <span v-else class="flex items-center gap-2">
                 <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                Play
+                {{ $t('offline.play_btn') }}
               </span>
             </button>
           </div>
@@ -107,263 +422,358 @@
           <div class="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2 flex-wrap">
               <!-- Flush Open Folder split-button dropdown -->
-              <div class="relative inline-flex items-stretch rounded-xl overflow-hidden border border-slate-700/80 shadow-sm h-8 bg-slate-900/80">
-                <button
-                  class="hover:bg-slate-800 hover:text-white text-xs px-3 font-semibold text-slate-200 flex items-center gap-1.5 transition-colors"
-                  @click="openFolder(null)"
-                  title="Open Instance Folder (.minecraft)"
-                >
-                  <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
-                  <span>Folder</span>
-                </button>
-                <button
-                  class="hover:bg-slate-800 hover:text-white text-xs px-2 border-l border-slate-700/80 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
-                  @click="showOpenFolderDropdown = !showOpenFolderDropdown"
-                  title="Choose Subfolder"
-                >
-                  <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-180': showOpenFolderDropdown }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                <!-- Dropdown Menu -->
-                <div
-                  v-if="showOpenFolderDropdown"
-                  class="absolute left-0 top-9 w-52 bg-[#0c141f] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50 text-xs text-slate-200"
-                >
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder(null)">
-                    <span>Instance Root</span>
-                    <span class="text-[10px] text-slate-500 font-mono">.minecraft</span>
+              <div
+                class="relative inline-flex"
+                :class="showOpenFolderDropdown ? 'z-50' : ''"
+                data-dropdown="open-folder"
+              >
+                <div class="inline-flex items-stretch rounded-xl overflow-hidden border border-slate-700/80 shadow-sm h-8 bg-slate-900/80 hover:border-cyan-500/40 transition-colors">
+                  <button
+                    class="hover:bg-cyan-500/15 hover:text-white text-xs px-3 font-semibold text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    @click="openFolder(null)"
+                    title="Open Instance Folder (.minecraft)"
+                  >
+                    <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    <span>{{ $t('server_config.folder_btn') }}</span>
                   </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('mods')">
-                    <span>Mods</span>
-                    <span class="text-[10px] text-slate-500 font-mono">mods/</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('config')">
-                    <span>Config</span>
-                    <span class="text-[10px] text-slate-500 font-mono">config/</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('saves')">
-                    <span>Saves (Worlds)</span>
-                    <span class="text-[10px] text-slate-500 font-mono">saves/</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('screenshots')">
-                    <span>Screenshots</span>
-                    <span class="text-[10px] text-slate-500 font-mono">screenshots/</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('shaderpacks')">
-                    <span>Shaders</span>
-                    <span class="text-[10px] text-slate-500 font-mono">shaderpacks/</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('resourcepacks')">
-                    <span>Resource Packs</span>
-                    <span class="text-[10px] text-slate-500 font-mono">resourcepacks/</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between" @click="openFolder('logs')">
-                    <span>Logs</span>
-                    <span class="text-[10px] text-slate-500 font-mono">logs/</span>
+                  <button
+                    class="hover:bg-cyan-500/15 hover:text-white text-xs px-2 border-l border-slate-700/80 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                    @click="showOpenFolderDropdown = !showOpenFolderDropdown"
+                    title="Choose Subfolder"
+                  >
+                    <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-180': showOpenFolderDropdown }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
                 </div>
+
+                <!-- Dropdown Menu -->
+                <transition name="dropdown-pop">
+                  <div
+                    v-if="showOpenFolderDropdown"
+                    class="absolute left-0 top-full mt-1.5 w-60 bg-[#0c1322] border border-white/15 ring-1 ring-cyan-500/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_25px_rgba(71,210,201,0.2)] p-1.5 z-50 text-xs text-slate-200"
+                  >
+                    <div class="absolute top-0 inset-x-3 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent pointer-events-none"></div>
+
+                    <div class="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/80 font-mono">
+                      Directories
+                    </div>
+
+                    <button
+                      v-for="item in [
+                        { name: 'Instance Root', path: '.minecraft', key: null },
+                        { name: 'Mods', path: 'mods/', key: 'mods' },
+                        { name: 'Config', path: 'config/', key: 'config' },
+                        { name: 'Saves (Worlds)', path: 'saves/', key: 'saves' },
+                        { name: 'Screenshots', path: 'screenshots/', key: 'screenshots' },
+                        { name: 'Shaders', path: 'shaderpacks/', key: 'shaderpacks' },
+                        { name: 'Resource Packs', path: 'resourcepacks/', key: 'resourcepacks' },
+                        { name: 'Logs', path: 'logs/', key: 'logs' }
+                      ]"
+                      :key="item.path"
+                      class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center justify-between text-slate-300 hover:text-white transition-all duration-150 group cursor-pointer"
+                      @click="openFolder(item.key)"
+                    >
+                      <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-cyan-400/70 group-hover:text-cyan-300 shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <span class="font-medium text-xs text-white group-hover:text-cyan-200 transition-colors">{{ item.name }}</span>
+                      </div>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 border border-white/5 text-slate-400 font-mono group-hover:text-cyan-300 group-hover:border-cyan-500/30 transition-colors">{{ item.path }}</span>
+                    </button>
+                  </div>
+                </transition>
               </div>
 
               <!-- Host for Friends Co-Op (On-Brand Cyan) -->
               <button
-                class="text-xs px-3 h-8 rounded-xl font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 shadow-sm flex items-center gap-1.5 transition-colors"
+                class="text-xs px-3 h-8 rounded-xl font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
                 @click="openCoopModal"
-                title="Host this instance for friends with a zero-config Join Code"
+                :title="$t('offline.host_for_friends_tooltip')"
               >
                 <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
-                <span>Host for Friends</span>
+                <span>{{ $t('offline.host_for_friends') }}</span>
+              </button>
+
+              <!-- Couch Co-Op Split-Screen (Dynamic Theme Accent) -->
+              <button
+                class="text-xs px-3 h-8 rounded-xl font-semibold bg-accent/15 hover:bg-accent/25 text-accent-bright border border-accent/30 shadow-[0_0_10px_var(--color-accent-glow)] flex items-center gap-1.5 transition-all hover:border-accent/50 cursor-pointer"
+                @click="showCouchCoopModal = true"
+                :title="$t('offline.split_screen_tooltip')"
+              >
+                <svg class="w-3.5 h-3.5 text-accent-bright" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                </svg>
+                <span>{{ $t('offline.split_screen_btn') }}</span>
               </button>
 
               <!-- Actions Dropdown -->
-              <div class="relative inline-flex">
+              <div
+                class="relative inline-flex"
+                :class="showActionsDropdown ? 'z-50' : ''"
+                data-dropdown="actions"
+              >
                 <button
-                  class="z-btn-ghost text-xs px-3 h-8 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white flex items-center gap-1.5 transition"
+                  class="z-btn-ghost text-xs px-3 h-8 rounded-xl font-semibold border border-slate-700/80 hover:border-cyan-500/40 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
                   @click="showActionsDropdown = !showActionsDropdown"
                 >
                   <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                   </svg>
-                  <span>Actions</span>
+                  <span>{{ $t('offline.actions_btn') }}</span>
                   <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-180': showActionsDropdown }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div
-                  v-if="showActionsDropdown"
-                  class="absolute left-0 top-9 w-52 bg-[#0c141f] border border-slate-700 rounded-xl shadow-2xl py-1.5 z-50 text-xs text-slate-200"
-                >
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="promptCloneInstance">
-                    <span>Clone Instance</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2 text-cyan-300 hover:text-cyan-200" @click="showShareModal = true; showActionsDropdown = false;">
-                    <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                    </svg>
-                    <span>Share Setup (Code / JSON)</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="showSnapshotsModal = true; showActionsDropdown = false;">
-                    <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Time Machine (Snapshots)</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="showAuditModal = true; showActionsDropdown = false;">
-                    <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    <span>Audit & Repair Mods</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="exportMrpack">
-                    <span>Export .mrpack</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2" @click="exportDedicatedServer">
-                    <span>Export to Server ZIP</span>
-                  </button>
-                  <button class="w-full text-left px-3.5 py-1.5 hover:bg-slate-800/80 flex items-center gap-2 text-cyan-300 hover:text-cyan-200" @click="openCoopModal">
-                    <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <span>Host for Friends Co-Op</span>
-                  </button>
-                </div>
+
+                <transition name="dropdown-pop">
+                  <div
+                    v-if="showActionsDropdown"
+                    class="absolute left-0 top-full mt-1.5 w-64 bg-[#0c1322] border border-white/15 ring-1 ring-cyan-500/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_25px_rgba(71,210,201,0.2)] p-1.5 z-50 text-xs max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar"
+                  >
+                    <div class="absolute top-0 inset-x-3 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent pointer-events-none"></div>
+
+                    <!-- Group 1: Manage & Versioning -->
+                    <div class="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/80 font-mono">
+                      {{ $t('offline.actions_manage_versioning') }}
+                    </div>
+
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="promptCloneInstance">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.clone_instance') }}</span>
+                    </button>
+
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="showSnapshotsModal = true; showActionsDropdown = false;">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.time_machine') }}</span>
+                    </button>
+
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="showAuditModal = true; showActionsDropdown = false;">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.audit_repair') }}</span>
+                    </button>
+
+                    <!-- Temporarily disabled for v0.5.0: Seed & Biome Radar Map
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="showRadarModal = true; showActionsDropdown = false;">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="9" stroke-dasharray="3 2" />
+                          <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.3" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.seed_radar') }}</span>
+                    </button>
+                    -->
+
+                    <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-1.5 mx-2"></div>
+
+                    <!-- Group 2: Multiplayer & Sharing -->
+                    <div class="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/80 font-mono">
+                      {{ $t('offline.actions_multiplayer_sharing') }}
+                    </div>
+
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="showShareModal = true; showActionsDropdown = false;">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.share_setup_item') }}</span>
+                    </button>
+
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="showCouchCoopModal = true; showActionsDropdown = false;">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.split_screen_btn') }}</span>
+                    </button>
+
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="openCoopModal">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.host_for_friends') }}</span>
+                    </button>
+
+                    <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-1.5 mx-2"></div>
+
+                    <!-- Group 3: Export Packages -->
+                    <div class="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/80 font-mono">
+                      {{ $t('offline.actions_export_packages') }}
+                    </div>
+
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="exportMrpack">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.export_mrpack') }}</span>
+                    </button>
+
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="exportDedicatedServer">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.export_server_zip') }}</span>
+                    </button>
+                  </div>
+                </transition>
               </div>
             </div>
 
             <!-- Danger Delete Button -->
             <button
-              class="text-xs px-3 h-8 rounded-xl font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-all flex items-center gap-1.5 shrink-0"
+              class="text-xs px-3 h-8 rounded-xl font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
               @click="deleteInstance"
-              title="Delete this offline instance"
+              :title="$t('offline.delete_instance_tooltip')"
             >
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-              <span>Delete</span>
+              <span>{{ $t('common.delete') }}</span>
             </button>
           </div>
 
           <!-- Segmented tab selector matching web-app style -->
-          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center">
-            <div class="z-segmented-track">
+          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center overflow-x-auto pb-1 max-w-full">
+            <div class="z-segmented-track flex-nowrap shrink-0">
               <button
                 type="button"
-                class="z-segmented-pill"
+                class="z-segmented-pill shrink-0 whitespace-nowrap"
                 :class="{ 'active': activeTab === 'mods' }"
                 @click="activeTab = 'mods'"
               >
-                Mods ({{ mods.length }})
+                {{ $t('server_config.tab_mods', { count: mods.length }) }}
               </button>
               <button
                 type="button"
-                class="z-segmented-pill"
+                class="z-segmented-pill shrink-0 whitespace-nowrap"
                 :class="{ 'active': activeTab === 'shaders' }"
                 @click="activeTab = 'shaders'"
               >
-                Shaders ({{ detailedPacks.shaderpacks.length }})
+                {{ $t('server_config.tab_shaders', { count: detailedPacks?.shaderpacks?.length || 0 }) }}
               </button>
               <button
                 type="button"
-                class="z-segmented-pill"
+                class="z-segmented-pill shrink-0 whitespace-nowrap"
                 :class="{ 'active': activeTab === 'resources' || activeTab === 'textures' }"
                 @click="activeTab = 'resources'"
               >
-                Resource Packs ({{ detailedPacks.resourcepacks.length }})
+                {{ $t('server_config.tab_resourcepacks', { count: detailedPacks?.resourcepacks?.length || 0 }) }}
               </button>
               <button
                 type="button"
-                class="z-segmented-pill"
+                class="z-segmented-pill shrink-0 whitespace-nowrap"
                 :class="{ 'active': activeTab === 'worlds' }"
                 @click="activeTab = 'worlds'; loadWorlds();"
               >
-                Worlds & Saves ({{ worldsList.length }})
+                {{ $t('offline.tab_worlds', { count: worldsList.length }) }}
               </button>
               <button
                 type="button"
-                class="z-segmented-pill"
+                class="z-segmented-pill shrink-0 whitespace-nowrap"
                 :class="{ 'active': activeTab === 'screenshots' }"
                 @click="activeTab = 'screenshots'; loadScreenshots();"
               >
-                Screenshots ({{ screenshotsList.length }})
+                {{ $t('offline.tab_screenshots', { count: screenshotsList.length }) }}
               </button>
             </div>
           </div>
         </div>
 
 
-        <!-- Tab contents (scrollable body) -->
-        <div class="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-4">
+        <!-- Tab contents -->
+        <div class="flex flex-col gap-4 relative z-10 pb-6 shrink-0 min-h-fit">
           <!-- ================= TAB: MODS ================= -->
           <template v-if="activeTab === 'mods'">
-            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
+            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner shrink-0 min-h-fit">
               <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2.5">
-                  <div class="z-section text-white font-bold text-sm">Installed Mods ({{ mods.length }})</div>
+                  <div class="z-section text-white font-bold text-sm">{{ $t('offline.installed_mods', { count: mods.length }) }}</div>
                   <button
                     class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition"
                     :disabled="checkingUpdates || updatingMods"
                     @click="checkModUpdates"
-                    title="Check Modrinth for updates to installed mods"
+                    :title="$t('offline.check_updates_tooltip')"
                   >
                     <span v-if="checkingUpdates" class="w-2.5 h-2.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
                     <span v-else class="text-cyan-400">⟳</span>
-                    <span>{{ checkingUpdates ? 'Checking…' : 'Check Updates' }}</span>
+                    <span>{{ checkingUpdates ? $t('offline.checking_updates') : $t('offline.check_updates') }}</span>
                   </button>
 
                   <span
                     v-if="availableUpdates.length > 0"
                     class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30"
                   >
-                    {{ availableUpdates.length }} update{{ availableUpdates.length > 1 ? 's' : '' }} available
+                    {{ $t('offline.updates_available', { count: availableUpdates.length }) }}
                   </span>
                   <button
                     v-if="availableUpdates.length > 0"
                     class="z-btn text-xs px-3 py-1 rounded-lg font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 shadow-sm flex items-center gap-1.5 transition"
                     :disabled="updatingMods"
                     @click="applyModUpdates(availableUpdates)"
-                    title="Update all mods with automatic rollback backup"
+                    :title="$t('offline.update_all_tooltip')"
                   >
                     <span v-if="updatingMods" class="w-2.5 h-2.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
-                    <span>{{ updatingMods ? 'Updating…' : 'Update All' }}</span>
+                    <span>{{ updatingMods ? $t('offline.updating_mods') : $t('offline.update_all') }}</span>
                   </button>
 
                   <button
                     class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition text-cyan-400 hover:text-cyan-300"
                     @click="showSnapshotsModal = true"
-                    title="Time Machine: View snapshots, create backups, or rollback mod list"
+                    :title="$t('offline.snapshots_tooltip')"
                   >
                     <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span>Snapshots</span>
+                    <span>{{ $t('offline.snapshots') }}</span>
                   </button>
 
                   <button
                     class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition text-cyan-400 hover:text-cyan-300"
                     @click="showShareModal = true"
-                    title="Share this mod setup via Share Code, .mrpack, JSON manifest, or Markdown"
+                    :title="$t('offline.share_setup_tooltip')"
                   >
                     <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
-                    <span>Share Setup</span>
+                    <span>{{ $t('offline.share_setup') }}</span>
                   </button>
 
                   <button
                     class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition text-emerald-400 hover:text-emerald-300"
                     @click="showAuditModal = true"
-                    title="Audit integrity of installed mods against official CDN hashes and repair missing files"
+                    :title="$t('offline.audit_repair_tooltip')"
                   >
                     <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
-                    <span>Audit &amp; Repair</span>
+                    <span>{{ $t('offline.audit_repair') }}</span>
                   </button>
                 </div>
 
@@ -377,20 +787,64 @@
                     :checked="Boolean(allModsSelected)"
                     @change="toggleSelectAllMods"
                   />
-                  <span>Select All</span>
+                  <span>{{ $t('offline.select_all') }}</span>
                 </label>
+              </div>
+
+              <!-- Rollback Banner -->
+              <div
+                v-if="updateRollbackBanner"
+                class="flex items-center justify-between gap-3 mb-3 px-3.5 py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 text-xs shadow-lg backdrop-blur-md transition-all"
+              >
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <span class="flex h-2 w-2 relative shrink-0">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                  <div class="truncate">
+                    <span class="font-bold text-amber-100">{{ updateRollbackBanner.count }} mod(s).</span>
+                    <span class="text-amber-300/80 ml-1.5 text-[11px]">Time Machine snapshot created.</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-semibold text-xs flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                    :disabled="rollingBack"
+                    @click="triggerBatchRollback"
+                  >
+                    <svg v-if="!rollingBack" class="w-3.5 h-3.5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                    <span v-if="rollingBack" class="w-3 h-3 border-2 border-amber-300 border-t-transparent rounded-full animate-spin"></span>
+                    <span>{{ rollingBack ? $t('offline.rolling_back') : $t('offline.one_click_rollback') }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="p-1 text-amber-400/70 hover:text-amber-200 transition"
+                    title="Dismiss"
+                    @click="dismissRollbackBanner"
+                  >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <!-- Bulk selection bar -->
               <div
                 v-if="selectedModCount > 0"
-                class="flex items-center gap-2 mb-3 bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs"
+                class="flex items-center gap-3 mb-3 bg-[#0a121e]/90 border border-accent/40 rounded-xl px-3.5 py-2 text-xs shadow-[0_0_12px_var(--color-accent-glow)]"
               >
-                <span class="text-slate-400 font-medium">{{ selectedModCount }} selected</span>
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-accent animate-pulse shadow-[0_0_6px_var(--color-accent)]"></span>
+                  <span class="text-white font-bold">{{ $t('offline.selected_count', { count: selectedModCount }) }}</span>
+                </div>
                 <div class="flex-1"></div>
-                <button type="button" class="z-btn-ghost text-[10px] px-2.5 py-1 rounded-lg font-semibold" @click="bulkEnableSelected">Enable</button>
-                <button type="button" class="z-btn-ghost text-[10px] px-2.5 py-1 rounded-lg font-semibold" @click="bulkDisableSelected">Disable</button>
-                <button type="button" class="text-[10px] px-2.5 py-1 text-red-400 hover:text-red-300 font-semibold" @click="bulkDeleteSelected">Delete</button>
+                <button type="button" class="z-btn-ghost text-xs px-3 py-1 rounded-lg font-semibold hover:text-white" @click="bulkEnableSelected">{{ $t('offline.enable') }}</button>
+                <button type="button" class="z-btn-ghost text-xs px-3 py-1 rounded-lg font-semibold hover:text-white" @click="bulkDisableSelected">{{ $t('offline.disable') }}</button>
+                <button type="button" class="text-xs px-3 py-1 text-red-400 hover:text-red-300 font-semibold hover:bg-red-500/10 rounded-lg transition" @click="bulkDeleteSelected">{{ $t('common.delete') }}</button>
               </div>
 
               <!-- Category Filter Pills -->
@@ -399,12 +853,12 @@
                   v-for="cat in modCategoriesWithCounts"
                   :key="cat.id"
                   type="button"
-                  class="px-2.5 py-1 rounded-lg font-semibold transition shrink-0 flex items-center gap-1.5 cursor-pointer"
-                  :class="activeModCategory === cat.id ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm' : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'"
+                  class="px-2.5 py-1 rounded-lg font-semibold transition shrink-0 flex items-center gap-1.5 cursor-pointer select-none"
+                  :class="activeModCategory === cat.id ? 'bg-accent/20 text-accent-bright border border-accent/40 shadow-sm font-bold' : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'"
                   @click="activeModCategory = cat.id"
                 >
                   <span>{{ cat.label }}</span>
-                  <span class="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-black/40" :class="activeModCategory === cat.id ? 'text-cyan-200' : 'text-slate-500'">
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/40" :class="activeModCategory === cat.id ? 'text-accent-bright' : 'text-slate-500'">
                     {{ cat.count }}
                   </span>
                 </button>
@@ -415,7 +869,7 @@
                 v-if="displayedMods.length"
                 name="stack-flip"
                 tag="div"
-                class="max-h-[260px] overflow-y-auto mb-3 flex flex-col gap-1.5 pr-1"
+                class="mb-3 flex flex-col gap-1.5"
               >
                 <div
                   v-for="(mod, index) in displayedMods"
@@ -503,7 +957,7 @@
                 </div>
               </TransitionGroup>
               <div v-else-if="mods.length > 0" class="py-6 text-center text-slate-500 text-xs">
-                No mods found in this category.
+                {{ $t('offline.no_mods_category') }}
               </div>
 
               <!-- Custom upload / drop zone -->
@@ -512,14 +966,14 @@
                 @dragover.prevent
                 @drop.prevent="onModDrop"
               >
-                Drop <code class="text-cyan-300 font-mono">.jar</code> mod files here (or <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseMods">browse files</button>)
+                {{ $t('offline.drop_mods_prefix') }} <code class="text-cyan-300 font-mono">.jar</code> {{ $t('offline.drop_mods_middle') }} <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseMods">{{ $t('offline.browse_files') }}</button>{{ $t('offline.drop_mods_suffix') }}
               </div>
             </div>
 
             <!-- Mod Discovery: Modrinth & CurseForge -->
-            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
+            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner shrink-0 min-h-fit">
               <div class="flex items-center justify-between gap-2 mb-3">
-                <div class="z-section text-white font-bold text-sm">Search &amp; Install Mods</div>
+                <div class="z-section text-white font-bold text-sm">{{ $t('offline.search_mods_title') }}</div>
                 <!-- Provider toggle pills -->
                 <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-0.5">
                   <button
@@ -546,25 +1000,25 @@
                 <input
                   v-model="modSearchQuery"
                   class="z-input flex-1 text-xs"
-                  :placeholder="`Search ${modProvider === 'curseforge' ? 'CurseForge' : 'Modrinth'} (e.g. Sodium, Iris, FerriteCore)...`"
+                  :placeholder="$t('offline.search_mods_placeholder', { provider: modProvider === 'curseforge' ? 'CurseForge' : 'Modrinth' })"
                   @keydown.enter="searchMods"
                 />
-                <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="modSearchBusy" @click="searchMods">Search</button>
+                <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="modSearchBusy" @click="searchMods">{{ $t('common.search') }}</button>
               </div>
 
               <div class="flex items-center justify-between mt-2 text-xs text-slate-400">
                 <label class="flex items-center gap-1.5 cursor-pointer select-none">
                   <input type="checkbox" v-model="modSearchAllVersions" class="zircon-check" @change="searchMods" />
-                  <span>Show all Minecraft versions</span>
+                  <span>{{ $t('offline.show_all_versions') }}</span>
                 </label>
                 <span v-if="modSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
                   <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
-                  Searching…
+                  {{ $t('offline.searching') }}
                 </span>
               </div>
 
               <!-- Search results list -->
-              <div class="mt-3 flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+              <div class="mt-3 flex flex-col gap-2">
                 <div
                   v-for="hit in modResults"
                   :key="hit.projectId || hit.id"
@@ -585,7 +1039,7 @@
                           class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#F16436]/20 text-orange-200 border border-[#F16436]/40 hover:bg-[#F16436]/30 shadow-sm"
                           @click="openCurseforgeModal(hit, 'mod')"
                         >
-                          Get on CurseForge
+                          {{ $t('offline.get_curseforge') }}
                         </button>
                         <button
                           v-else
@@ -603,7 +1057,7 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          <span>{{ installingId === (hit.projectId || hit.id) ? 'Installing…' : 'Install' }}</span>
+                          <span>{{ installingId === (hit.projectId || hit.id) ? ($t('offline.installing') || 'Installing…') : $t('offline.install_mod') }}</span>
                         </button>
                       </div>
                       <div v-if="hit.description || hit.summary" class="text-[11px] text-slate-300 line-clamp-2 my-1">
@@ -657,17 +1111,17 @@
 
           <!-- ================= TAB: SHADERS ================= -->
           <template v-else-if="activeTab === 'shaders'">
-            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
-              <div class="z-section mb-2 text-white font-bold text-sm">Active Shaderpack</div>
+            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner shrink-0 min-h-fit">
+              <div class="z-section mb-2 text-white font-bold text-sm">{{ $t('offline.active_shaderpack') }}</div>
               <select v-model="activeShaderpack" class="z-input mb-4 text-xs" @change="onShaderpackChange">
-                <option value="">None (shaders disabled)</option>
+                <option value="">{{ $t('offline.no_shaders') }}</option>
                 <option v-for="p in detailedPacks.shaderpacks" :key="p.filename" :value="p.filename">
                   {{ p.title || p.filename }} {{ p.version ? `(${p.version})` : '' }}
                 </option>
               </select>
 
-              <div class="z-section mb-2 text-white font-bold text-sm">Installed Shaders ({{ detailedPacks.shaderpacks.length }})</div>
-              <div v-if="detailedPacks.shaderpacks.length" class="max-h-[180px] overflow-y-auto mb-3 flex flex-col gap-1.5 pr-1">
+              <div class="z-section mb-2 text-white font-bold text-sm">{{ $t('offline.installed_shaders', { count: detailedPacks.shaderpacks.length }) }}</div>
+              <div v-if="detailedPacks.shaderpacks.length" class="mb-3 flex flex-col gap-1.5">
                 <div
                   v-for="p in detailedPacks.shaderpacks"
                   :key="p.filename"
@@ -680,13 +1134,13 @@
                   <span class="text-slate-500 font-mono text-[11px]">{{ fmtBytes(p.sizeBytes) }}</span>
                   <button
                     class="text-red-400 hover:text-red-300 text-xs px-2 py-0.5 hover:bg-red-500/10 rounded-lg transition-colors font-medium flex items-center gap-1 shrink-0"
-                    title="Delete"
+                    :title="$t('common.delete')"
                     @click="deletePack('shader', p.filename)"
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                       <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
-                    <span>Delete</span>
+                    <span>{{ $t('common.delete') }}</span>
                   </button>
                 </div>
               </div>
@@ -697,14 +1151,14 @@
                 @dragover.prevent
                 @drop.prevent="onShaderDrop"
               >
-                Drop <code class="text-cyan-300 font-mono">.zip</code> shaderpack files here (or <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseShaders">browse files</button>)
+                {{ $t('offline.drop_shaders_prefix') }} <code class="text-cyan-300 font-mono">.zip</code> {{ $t('offline.drop_shaders_middle') }} <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseShaders">{{ $t('offline.browse_files') }}</button>{{ $t('offline.drop_shaders_suffix') }}
               </div>
             </div>
 
             <!-- Shaders Discovery: Modrinth & CurseForge -->
-            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
+            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner shrink-0 min-h-fit">
               <div class="flex items-center justify-between gap-2 mb-3">
-                <div class="z-section text-white font-bold text-sm">Search &amp; Install Shaders</div>
+                <div class="z-section text-white font-bold text-sm">{{ $t('offline.search_shaders_title') }}</div>
                 <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-0.5">
                   <button
                     class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all"
@@ -729,25 +1183,25 @@
                 <input
                   v-model="shaderSearchQuery"
                   class="z-input flex-1 text-xs"
-                  placeholder="Search shaderpacks (e.g. Complementary, BSL, Bliss)..."
+                  :placeholder="$t('offline.search_shaders_placeholder', { provider: shaderProvider === 'curseforge' ? 'CurseForge' : 'Modrinth' })"
                   @keydown.enter="searchShaders"
                 />
-                <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="shaderSearchBusy" @click="searchShaders">Search</button>
+                <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="shaderSearchBusy" @click="searchShaders">{{ $t('common.search') }}</button>
               </div>
 
               <div class="flex items-center justify-between mt-2 text-xs text-slate-400">
                 <label class="flex items-center gap-1.5 cursor-pointer select-none">
                   <input type="checkbox" v-model="shaderSearchAllVersions" class="zircon-check" @change="searchShaders" />
-                  <span>Show all Minecraft versions</span>
+                  <span>{{ $t('offline.show_all_versions') }}</span>
                 </label>
                 <span v-if="shaderSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
                   <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
-                  Searching…
+                  {{ $t('offline.searching') }}
                 </span>
               </div>
 
               <!-- Shaders results -->
-              <div class="mt-3 flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+              <div class="mt-3 flex flex-col gap-2">
                 <div
                   v-for="hit in shaderResults"
                   :key="hit.projectId || hit.id"
@@ -768,7 +1222,7 @@
                           class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#F16436]/20 text-orange-200 border border-[#F16436]/40 hover:bg-[#F16436]/30 shadow-sm"
                           @click="openCurseforgeModal(hit, 'shaderpack')"
                         >
-                          Get on CurseForge
+                          {{ $t('offline.get_curseforge') }}
                         </button>
                         <button
                           v-else
@@ -786,7 +1240,7 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          <span>{{ installingId === (hit.projectId || hit.id) ? 'Installing…' : 'Install' }}</span>
+                          <span>{{ installingId === (hit.projectId || hit.id) ? ($t('offline.installing') || 'Installing…') : $t('offline.install_mod') }}</span>
                         </button>
                       </div>
                       <div v-if="hit.description || hit.summary" class="text-[11px] text-slate-300 line-clamp-2 my-1">
@@ -835,14 +1289,14 @@
 
           <!-- ================= TAB: RESOURCE PACKS ================= -->
           <template v-else-if="activeTab === 'resources' || activeTab === 'textures'">
-            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
+            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner shrink-0 min-h-fit">
               <div class="flex items-center justify-between mb-2">
                 <div>
-                  <div class="z-section text-white font-bold text-sm">Active Resource Packs ({{ activeResourcepacksList.length }})</div>
-                  <div class="text-[11px] text-slate-400">Packs higher in the stack override packs below them. Drag to reorder priority.</div>
+                  <div class="z-section text-white font-bold text-sm">{{ $t('offline.active_resourcepacks', { count: activeResourcepacksList.length }) }}</div>
+                  <div class="text-[11px] text-slate-400">{{ $t('offline.rp_priority_desc') }}</div>
                 </div>
                 <span class="text-[10px] text-cyan-400 font-mono bg-cyan-950/40 border border-cyan-800/60 px-2 py-0.5 rounded-full">
-                  Priority Stack
+                  {{ $t('offline.priority_stack') }}
                 </span>
               </div>
 
@@ -858,8 +1312,8 @@
                     </svg>
                   </div>
                   <div>
-                    <div class="text-xs font-bold text-cyan-200">Server Resource Packs ({{ serverAdvertisedPacks.length }})</div>
-                    <div class="text-[10px] text-slate-400">This instance offers server-recommended resource packs.</div>
+                    <div class="text-xs font-bold text-cyan-200">{{ $t('offline.server_rp_title', { count: serverAdvertisedPacks.length }) }}</div>
+                    <div class="text-[10px] text-slate-400">{{ $t('offline.server_rp_desc') }}</div>
                   </div>
                 </div>
                 <button
@@ -867,7 +1321,7 @@
                   class="z-btn-primary text-xs px-3.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 shrink-0"
                   @click="openServerPacksModal"
                 >
-                  <span>Review &amp; Accept / Decline</span>
+                  <span>{{ $t('offline.review_server_rp') }}</span>
                 </button>
               </div>
 
@@ -876,7 +1330,7 @@
                 <TransitionGroup
                   name="stack-flip"
                   tag="div"
-                  class="max-h-[260px] overflow-y-auto mb-4 flex flex-col gap-1.5 pr-1"
+                  class="mb-4 flex flex-col gap-1.5"
                 >
                   <div
                     v-for="(p, index) in activeResourcepacksList"
@@ -911,8 +1365,12 @@
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-1.5">
                         <span class="text-white font-semibold truncate">{{ p.title || p.filename }}</span>
-                        <span v-if="p.serverEnforced" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
-                          🔒 Server Enforced
+                        <span v-if="p.serverEnforced" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 flex items-center gap-1">
+                          <svg class="w-2.5 h-2.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                          Server Enforced
                         </span>
                       </div>
                       <div v-if="p.description" class="text-[10px] text-slate-400 truncate">{{ p.description }}</div>
@@ -956,7 +1414,7 @@
 
               <!-- Available / Inactive Packs -->
               <div class="z-section mb-2 text-white font-bold text-sm">Available Packs ({{ inactiveResourcepacksList.length }})</div>
-              <div v-if="inactiveResourcepacksList.length" class="max-h-[220px] overflow-y-auto mb-3 flex flex-col gap-1.5 pr-1">
+              <div v-if="inactiveResourcepacksList.length" class="mb-3 flex flex-col gap-1.5">
                 <div
                   v-for="p in inactiveResourcepacksList"
                   :key="p.filename"
@@ -1001,14 +1459,14 @@
                 @dragover.prevent
                 @drop.prevent="onResourceDrop"
               >
-                Drop <code class="text-cyan-300 font-mono">.zip</code> resource pack files here (or <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseResources">browse files</button>)
+                {{ $t('offline.drop_rp_prefix') }} <code class="text-cyan-300 font-mono">.zip</code> {{ $t('offline.drop_rp_middle') }} <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseResources">{{ $t('offline.browse_files') }}</button>{{ $t('offline.drop_rp_suffix') }}
               </div>
             </div>
 
             <!-- Resource Packs Discovery: Modrinth & CurseForge -->
-            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner">
+            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner shrink-0 min-h-fit">
               <div class="flex items-center justify-between gap-2 mb-3">
-                <div class="z-section text-white font-bold text-sm">Search &amp; Install Resource Packs</div>
+                <div class="z-section text-white font-bold text-sm">{{ $t('offline.search_rp_title') }}</div>
                 <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-0.5">
                   <button
                     class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all"
@@ -1033,25 +1491,25 @@
                 <input
                   v-model="resourceSearchQuery"
                   class="z-input flex-1 text-xs"
-                  placeholder="Search resource packs (e.g. Faithful, Bare Bones, Fresh Animations)..."
+                  :placeholder="$t('offline.search_rp_placeholder', { provider: resourceProvider === 'curseforge' ? 'CurseForge' : 'Modrinth' })"
                   @keydown.enter="searchResources"
                 />
-                <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="resourceSearchBusy" @click="searchResources">Search</button>
+                <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="resourceSearchBusy" @click="searchResources">{{ $t('common.search') }}</button>
               </div>
 
               <div class="flex items-center justify-between mt-2 text-xs text-slate-400">
                 <label class="flex items-center gap-1.5 cursor-pointer select-none">
                   <input type="checkbox" v-model="resourceSearchAllVersions" class="zircon-check" @change="searchResources" />
-                  <span>Show all Minecraft versions</span>
+                  <span>{{ $t('offline.show_all_versions') }}</span>
                 </label>
                 <span v-if="resourceSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
                   <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
-                  Searching packs…
+                  {{ $t('offline.searching') }}
                 </span> <!-- end busy spinner -->
               </div>
 
               <!-- Resource results -->
-              <div class="mt-3 flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+              <div class="mt-3 flex flex-col gap-2">
                 <div
                   v-for="hit in resourceResults"
                   :key="hit.projectId || hit.id"
@@ -1072,7 +1530,7 @@
                           class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#F16436]/20 text-orange-200 border border-[#F16436]/40 hover:bg-[#F16436]/30 shadow-sm"
                           @click="openCurseforgeModal(hit, 'resourcepack')"
                         >
-                          Get on CurseForge
+                          {{ $t('offline.get_curseforge') }}
                         </button>
                         <button
                           v-else
@@ -1090,7 +1548,7 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          <span>{{ installingId === (hit.projectId || hit.id) ? 'Installing…' : 'Install' }}</span>
+                          <span>{{ installingId === (hit.projectId || hit.id) ? ($t('offline.installing') || 'Installing…') : $t('offline.install_mod') }}</span>
                         </button>
                       </div>
                       <div v-if="hit.description || hit.summary" class="text-[11px] text-slate-300 line-clamp-2 my-1">
@@ -1139,31 +1597,46 @@
 
           <!-- ================= TAB: WORLDS & SAVES ================= -->
           <template v-else-if="activeTab === 'worlds'">
-            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-4">
+            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-4 shrink-0 min-h-fit">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
-                  <div class="z-section text-white font-bold text-sm">Singleplayer Worlds ({{ worldsList.length }})</div>
+                  <div class="z-section text-white font-bold text-sm">{{ $t('offline.singleplayer_worlds', { count: worldsList.length }) }}</div>
                   <button
                     class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition"
                     :disabled="loadingWorldsState"
                     @click="loadWorlds"
-                    title="Refresh worlds list"
+                    :title="$t('common.refresh')"
                   >
                     <span v-if="loadingWorldsState" class="w-2.5 h-2.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
                     <span v-else class="text-cyan-400">⟳</span>
-                    <span>Refresh</span>
+                    <span>{{ $t('common.refresh') }}</span>
                   </button>
                 </div>
-                <button
-                  class="z-btn-ghost text-xs px-3 py-1.5 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition"
-                  @click="openBackupsModal(null)"
-                  title="View all world backup snapshots"
-                >
-                  <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>All Backups</span>
-                </button>
+                <div class="flex items-center gap-2">
+                  <!-- Temporarily disabled for v0.5.0: Seed Radar HUD
+                  <button
+                    class="z-btn-accent text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition font-bold"
+                    @click="showRadarModal = true"
+                    title="Open Seed & Biome Radar Visualizer"
+                  >
+                    <svg class="w-3.5 h-3.5 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <circle cx="12" cy="12" r="9" stroke-dasharray="3 2" />
+                      <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.3" />
+                    </svg>
+                    <span>{{ $t('offline.seed_radar_hud') }}</span>
+                  </button>
+                  -->
+                  <button
+                    class="z-btn-ghost text-xs px-3 py-1.5 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition"
+                    @click="openBackupsModal(null)"
+                    title="View all world backup snapshots"
+                  >
+                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ $t('offline.all_backups') }}</span>
+                  </button>
+                </div>
               </div>
 
               <!-- Worlds List Grid -->
@@ -1203,6 +1676,19 @@
 
                   <!-- World Card Actions -->
                   <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/80">
+                    <!-- Temporarily disabled for v0.5.0: World Radar
+                    <button
+                      class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-300 flex items-center gap-1.5 transition"
+                      @click="showRadarModal = true"
+                      title="Inspect this world in the Seed & Biome Radar Visualizer"
+                    >
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="9" stroke-dasharray="3 2" />
+                        <circle cx="12" cy="12" r="3" fill="currentColor" fill-opacity="0.3" />
+                      </svg>
+                      <span>{{ $t('offline.radar') }}</span>
+                    </button>
+                    -->
                     <button
                       class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition"
                       @click="createWorldBackup(w.folderName)"
@@ -1211,46 +1697,46 @@
                       <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                       </svg>
-                      <span>Backup</span>
+                      <span>{{ $t('offline.backup') }}</span>
                     </button>
                     <button
                       class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition"
                       @click="openBackupsModal(w.folderName)"
                       title="View and restore previous backups for this world"
                     >
-                      <span>Snapshots</span>
+                      <span>{{ $t('offline.snapshots') }}</span>
                     </button>
                     <button
                       class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition"
                       @click="exportWorldZip(w.folderName)"
                       title="Export world as a .zip anywhere on your disk"
                     >
-                      <span>Export</span>
+                      <span>{{ $t('offline.export') }}</span>
                     </button>
                   </div>
                 </div>
               </div>
               <div v-else-if="!loadingWorldsState" class="py-8 text-center text-slate-500 text-xs">
-                No singleplayer worlds found in this instance. Launch Minecraft and create a world to manage it here!
+                {{ $t('offline.no_worlds') }}
               </div>
             </div>
           </template>
 
           <!-- ================= TAB: SCREENSHOTS ================= -->
           <template v-else-if="activeTab === 'screenshots'">
-            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-4">
+            <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-4 shrink-0 min-h-fit">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
-                  <div class="z-section text-white font-bold text-sm">Screenshot Gallery ({{ screenshotsList.length }})</div>
+                  <div class="z-section text-white font-bold text-sm">{{ $t('offline.screenshots_gallery', { count: screenshotsList.length }) }}</div>
                   <button
                     class="z-btn-ghost text-xs px-2.5 py-1 rounded-lg border border-slate-700 hover:border-slate-600 flex items-center gap-1.5 transition"
                     :disabled="loadingScreenshotsState"
                     @click="loadScreenshots"
-                    title="Refresh screenshots gallery"
+                    :title="$t('common.refresh')"
                   >
                     <span v-if="loadingScreenshotsState" class="w-2.5 h-2.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
                     <span v-else class="text-cyan-400">⟳</span>
-                    <span>Refresh</span>
+                    <span>{{ $t('common.refresh') }}</span>
                   </button>
                 </div>
                 <button
@@ -1261,7 +1747,7 @@
                   <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
                   </svg>
-                  <span>Open Folder</span>
+                  <span>{{ $t('offline.open_folder') }}</span>
                 </button>
               </div>
 
@@ -1311,484 +1797,89 @@
         Select an instance to manage mods, shaders &amp; texture packs.
       </div>
     </div>
+  </div>
 
     <!-- ================= MODAL: CURSEFORGE COUNTDOWN & DROP ================= -->
-    <div
-      v-if="curseforgeModal.open"
-      class="absolute inset-0 z-50 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="closeCurseforgeModal"
-    >
-      <div class="z-card w-full max-w-[500px] p-6 overflow-hidden shadow-2xl relative border border-slate-700/70 rounded-2xl bg-[#0e1622]">
-        <div class="flex items-start justify-between gap-3 mb-4">
-          <div class="flex items-center gap-3">
-            <img v-if="curseforgeModal.iconUrl" :src="curseforgeModal.iconUrl" class="w-11 h-11 rounded-xl object-cover bg-slate-950 shrink-0" />
-            <div class="w-11 h-11 rounded-xl bg-[#f16436]/20 border border-[#f16436]/40 flex items-center justify-center shrink-0" v-else>
-              <img src="../assets/curseforge.svg" class="w-6 h-6" />
-            </div>
-            <div>
-              <div class="text-white font-bold text-base truncate">{{ curseforgeModal.title }}</div>
-              <div class="text-[11px] text-slate-400">CurseForge {{ curseforgeModal.packType === 'shaderpack' ? 'Shaderpack' : (curseforgeModal.packType === 'resourcepack' ? 'Texture Pack' : 'Mod') }}</div>
-            </div>
-          </div>
-          <button class="text-slate-400 hover:text-white text-lg leading-none" @click="closeCurseforgeModal">✕</button>
-        </div>
-
-        <!-- Countdown / Download link state -->
-        <div v-if="!curseforgeModal.success" class="mb-4 bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 flex flex-col gap-2">
-          <div v-if="curseforgeModal.countdown > 0" class="flex items-center justify-between">
-            <span>Opening CurseForge download page in <strong class="text-cyan-400 font-mono">{{ curseforgeModal.countdown }}s</strong>…</span>
-            <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="triggerCurseforgeDownload">Open Now</button>
-          </div>
-          <div v-else class="flex items-center justify-between">
-            <span class="text-emerald-400 font-medium">✓ CurseForge download page opened</span>
-            <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="triggerCurseforgeDownload">Re-open Link</button>
-          </div>
-          <div v-if="curseforgeModal.targetFileName" class="text-[11px] text-slate-400 font-mono">
-            Expected file: <span class="text-slate-200">{{ curseforgeModal.targetFileName }}</span>
-          </div>
-        </div>
-
-        <!-- Success feedback state -->
-        <div v-if="curseforgeModal.success" class="mb-4 bg-emerald-950/50 border border-emerald-800/80 rounded-xl p-3.5 text-xs text-emerald-300 flex items-center gap-2.5">
-          <span class="text-emerald-400 text-base font-bold">✓</span>
-          <span><strong>{{ curseforgeModal.successTitle || curseforgeModal.title }}</strong> installed successfully!</span>
-        </div>
-
-        <!-- Drop zone inside modal -->
-        <div
-          class="zircon-drop-zone p-6 text-center text-xs text-slate-400 cursor-pointer rounded-xl border border-dashed transition mb-4"
-          :class="curseforgeModal.success ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-700 hover:border-cyan-500/60 bg-slate-950/40'"
-          @dragover.prevent
-          @drop.prevent="onCurseforgeModalDrop"
-        >
-          <div class="text-slate-200 font-semibold mb-1">
-            {{ curseforgeModal.success ? 'File received!' : 'Drop downloaded file here' }}
-          </div>
-          <div class="text-[11px] text-slate-400">
-            Accepts <code class="text-cyan-300 font-mono">{{ curseforgeModal.packType === 'mod' ? '.jar' : '.zip' }}</code> (or <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseCurseforgeModalFile">browse file</button>)
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2.5 pt-3 border-t border-slate-800/80">
-          <button class="z-btn-ghost text-xs px-5 py-2 rounded-xl font-semibold" @click="closeCurseforgeModal">
-            {{ curseforgeModal.success ? 'Done' : 'Close' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <PackSyncModal
+      :modal="curseforgeModal"
+      @close="closeCurseforgeModal"
+      @trigger-download="triggerCurseforgeDownload"
+      @drop="onCurseforgeDrop"
+      @browse="browseCurseforgePack"
+    />
 
     <!-- ================= MODAL: NEW INSTANCE ================= -->
-    <div
-      v-if="showNewDialog"
-      class="absolute inset-0 z-40 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="!modpackProgress.active && (showNewDialog = false)"
-    >
-      <div class="z-card w-full max-w-[640px] max-h-[85vh] flex flex-col p-6 overflow-hidden shadow-2xl relative border border-slate-700/60 rounded-2xl bg-[#0e1622]">
-        <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-4">
-          <h3 class="text-white font-bold text-base">New Instance</h3>
-          <button
-            v-if="!modpackProgress.active"
-            class="text-slate-400 hover:text-white text-lg leading-none"
-            @click="showNewDialog = false"
-          >
-            ✕
-          </button>
-        </div>
-
-        <!-- 3 Tab Selector: Scratch, Import, Clone -->
-        <div class="z-segmented-track mb-4 w-full flex">
-          <button
-            type="button"
-            class="z-segmented-pill flex-1 text-center py-2 text-xs font-semibold"
-            :class="{ 'active': newInstanceTab === 'scratch' }"
-            @click="newInstanceTab = 'scratch'"
-          >
-            Create from Scratch
-          </button>
-          <button
-            type="button"
-            class="z-segmented-pill flex-1 text-center py-2 text-xs font-semibold"
-            :class="{ 'active': newInstanceTab === 'import' }"
-            @click="newInstanceTab = 'import'"
-          >
-            Upload Archive
-          </button>
-          <button
-            type="button"
-            class="z-segmented-pill flex-1 text-center py-2 text-xs font-semibold"
-            :class="{ 'active': newInstanceTab === 'clone' }"
-            @click="newInstanceTab = 'clone'"
-          >
-            Clone Existing
-          </button>
-        </div>
-
-        <!-- TAB 1: CREATE FROM SCRATCH -->
-        <div v-if="newInstanceTab === 'scratch'" class="flex-1 overflow-y-auto pr-1">
-          <label class="z-label font-semibold text-slate-300 block mb-1">Instance name</label>
-          <input v-model="newForm.name" class="z-input mb-3 text-xs" placeholder="My Modded World" />
-          <label class="z-label font-semibold text-slate-300 block mb-1">Minecraft version</label>
-          <select v-model="newForm.mcVersion" class="z-input mb-3 text-xs" @change="updateLoaderVersions">
-            <option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</option>
-          </select>
-          <label class="z-label font-semibold text-slate-300 block mb-1">Mod loader</label>
-          <select v-model="newForm.loaderType" class="z-input mb-3 text-xs" @change="updateLoaderVersions">
-            <option v-for="l in loaderTypes" :key="l" :value="l" class="capitalize">{{ l }}</option>
-          </select>
-          <template v-if="newForm.loaderType !== 'vanilla'">
-            <label class="z-label font-semibold text-slate-300 block mb-1 flex items-center justify-between">
-              <span>Loader version</span>
-              <span v-if="loadingLoaderVersions" class="text-[11px] text-cyan-400 font-mono">Fetching versions…</span>
-              <span v-else-if="recommendedLoaderVersion" class="text-[11px] text-slate-400 font-mono">
-                Recommended: {{ recommendedLoaderVersion }}
-              </span>
-            </label>
-            <div v-if="loaderVersions.length > 0" class="mb-5">
-              <select v-model="newForm.loaderVersion" class="z-input text-xs">
-                <option v-for="lv in loaderVersions" :key="lv" :value="lv">
-                  {{ lv }} {{ lv === recommendedLoaderVersion ? '★ (Recommended)' : '' }}
-                </option>
-              </select>
-            </div>
-            <input
-              v-else
-              v-model="newForm.loaderVersion"
-              class="z-input mb-5 text-xs"
-              placeholder="e.g. 0.16.10"
-            />
-          </template>
-
-          <div class="mb-5">
-            <label class="z-label mb-1.5 text-xs text-slate-300">World Seed (Optional)</label>
-            <input
-              v-model="newForm.seed"
-              class="z-input text-xs font-mono"
-              placeholder="Leave blank for random"
-            />
-          </div>
-          <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80 mt-auto">
-            <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="showNewDialog = false">Cancel</button>
-            <button class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25" :disabled="!newForm.name.trim() || creating" @click="createInstance">
-              {{ creating ? 'Creating…' : 'Create Instance' }}
-            </button>
-          </div>
-        </div>
-
-        <!-- TAB 2: UPLOAD ARCHIVE / IMPORT -->
-        <div v-else-if="newInstanceTab === 'import'" class="flex-1 flex flex-col gap-3 overflow-hidden">
-          <div class="flex items-center justify-between px-0.5">
-            <span class="text-xs text-slate-400 font-medium">
-              {{ importMode === 'discovery' ? 'Discover online modpacks from Modrinth' : 'Upload or drop a server/modpack archive' }}
-            </span>
-            <button
-              class="text-xs text-cyan-400 hover:text-cyan-300 font-semibold underline flex items-center gap-1"
-              @click="toggleImportMode"
-            >
-              <span>{{ importMode === 'discovery' ? '← Upload Archive File' : 'Browse Modrinth Modpacks →' }}</span>
-            </button>
-          </div>
-
-          <!-- Sub-view A: Archive File Drop -->
-          <div v-if="importMode === 'archive'" class="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
-            <div
-              class="zircon-drop-zone p-6 text-center text-xs text-slate-400 cursor-pointer rounded-2xl border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-900/40 transition"
-              @click="browseLocalMrpack"
-              @dragover.prevent
-              @drop.prevent="onImportDrop"
-            >
-              <svg class="w-8 h-8 mx-auto mb-2 text-slate-500 hover:text-cyan-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <div v-if="importFilePath" class="font-mono text-cyan-300 text-xs break-all mb-1 font-semibold">
-                {{ importFilePath }}
-              </div>
-              <div v-else>
-                Click to browse or drop a <code class="text-cyan-300 font-mono">.zip</code> or <code class="text-amber-300 font-mono">.mrpack</code> archive here
-              </div>
-              <div class="text-[10px] text-slate-500 mt-1">Supports Zircon Server, CurseForge (.zip), and Modrinth (.mrpack) export archives</div>
-            </div>
-
-            <div>
-              <label class="z-label font-semibold text-slate-300 block mb-1">Instance Name (Optional)</label>
-              <input
-                v-model="importCustomName"
-                class="z-input text-xs"
-                placeholder="Defaults to pack name declared in archive manifest"
-              />
-            </div>
-
-            <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80 mt-auto">
-              <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="showNewDialog = false">Cancel</button>
-              <button
-                class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25"
-                :disabled="!importFilePath || importingModpack || modpackProgress.active"
-                @click="installLocalMrpack"
-              >
-                {{ importingModpack ? 'Importing…' : 'Import & Install' }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Sub-view B: Modrinth Online Discovery -->
-          <div v-else class="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
-            <div class="flex gap-2">
-              <input
-                v-model="modpackSearchQuery"
-                class="z-input flex-1 text-xs"
-                placeholder="Search Modrinth modpacks (e.g. Cobblemon, Fabulously Optimized, Better MC)..."
-                @keydown.enter="searchModpacks"
-              />
-              <button
-                class="z-btn-ghost px-4 text-xs font-bold shrink-0"
-                :disabled="modpackSearchBusy"
-                @click="searchModpacks"
-              >
-                Search
-              </button>
-            </div>
-
-            <div class="flex items-center justify-between text-xs text-slate-400 px-0.5">
-              <span>{{ modpackResults.length ? `${modpackResults.length} modpacks found` : 'Popular modpacks' }}</span>
-              <span v-if="modpackSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
-                <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
-                Searching…
-              </span>
-            </div>
-
-            <!-- Modpack results scroll area -->
-            <div class="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-2">
-              <div
-                v-for="hit in modpackResults"
-                :key="hit.projectId || hit.id"
-                class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 transition hover:border-slate-700"
-              >
-                <div class="flex items-start gap-3">
-                  <img
-                    v-if="hit.iconUrl"
-                    :src="hit.iconUrl"
-                    class="w-11 h-11 rounded-lg shrink-0 mt-0.5 object-cover bg-slate-950"
-                    loading="lazy"
-                  />
-                  <div class="w-11 h-11 rounded-lg shrink-0 mt-0.5 bg-gradient-to-br from-[#1bd96a]/20 to-[#1bd96a]/5 border border-[#1bd96a]/30 flex items-center justify-center font-bold text-white text-sm" v-else>
-                    {{ (hit.title || hit.name || 'M').charAt(0).toUpperCase() }}
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between gap-2">
-                      <div class="text-xs font-bold text-white truncate">{{ hit.title || hit.name }}</div>
-                      <button
-                        class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#1bd96a]/20 text-emerald-300 border border-[#1bd96a]/40 hover:bg-[#1bd96a]/30 shadow-sm"
-                        :disabled="installingModpackId === (hit.projectId || hit.id) || modpackProgress.active"
-                        @click="installModpack(hit)"
-                      >
-                        <svg
-                          v-if="installingModpackId === (hit.projectId || hit.id)"
-                          class="animate-spin h-3.5 w-3.5 text-[#1bd96a]"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Install Modpack</span>
-                      </button>
-                    </div>
-                    <div class="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
-                      {{ hit.summary || hit.description || 'No description provided.' }}
-                    </div>
-                    <div class="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-1.5">
-                      <span v-if="hit.author">by <strong class="text-slate-300">{{ hit.author }}</strong></span>
-                      <span v-if="hit.downloads">⬇ {{ fmtCount(hit.downloads) }}</span>
-                    </div>
-
-                    <!-- Version selector -->
-                    <div class="mt-2 flex items-center gap-2">
-                      <span class="text-[10px] text-slate-400 shrink-0 font-mono">Version:</span>
-                      <select
-                        v-model="selectedModpackVersions[hit.projectId || hit.id]"
-                        :disabled="installingModpackId === (hit.projectId || hit.id) || hit.versionsLoading"
-                        class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] text-slate-200 disabled:opacity-50 focus:border-cyan-400 focus:outline-none"
-                      >
-                        <option v-if="hit.versionsLoading" value="" disabled>Loading versions…</option>
-                        <option v-else-if="!hit.versionOptions?.length" value="" disabled>No downloadable versions</option>
-                        <option v-for="v in hit.versionOptions" :key="v.id" :value="v.id">
-                          {{ v.versionNumber || v.name }}
-                        </option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-if="!modpackSearchBusy && modpackSearchDone && modpackResults.length === 0" class="text-xs text-slate-500 py-6 text-center">
-                No modpacks found. Try a different search keyword.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 3: CLONE EXISTING INSTANCE -->
-        <div v-else-if="newInstanceTab === 'clone'" class="flex-1 overflow-y-auto pr-1 flex flex-col gap-3.5">
-          <div v-if="instances.length === 0" class="py-10 text-center text-slate-500 text-xs">
-            No existing instances found to clone. Create your first instance using "Create from Scratch" or "Upload Archive".
-          </div>
-
-          <template v-else>
-            <div>
-              <label class="z-label font-semibold text-slate-300 block mb-1">Source Instance to Clone</label>
-              <select v-model="cloneSourceId" class="z-input text-xs" @change="onCloneSourceChange">
-                <option v-for="inst in instances" :key="inst.id" :value="inst.id">
-                  {{ inst.name }} (MC {{ inst.minecraftVersion }} · {{ inst.modLoader?.type || 'vanilla' }})
-                </option>
-              </select>
-            </div>
-
-            <div>
-              <label class="z-label font-semibold text-slate-300 block mb-1">Cloned Instance Name</label>
-              <input v-model="cloneName" class="z-input text-xs" placeholder="e.g. My Instance (Copy)" />
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="z-label font-semibold text-slate-300 block mb-1">Mod Loader</label>
-                <select v-model="cloneLoaderType" class="z-input text-xs" @change="updateCloneLoaderVersions">
-                  <option v-for="l in loaderTypes" :key="l" :value="l" class="capitalize">{{ l }}</option>
-                </select>
-              </div>
-              <div v-if="cloneLoaderType !== 'vanilla'">
-                <label class="z-label font-semibold text-slate-300 block mb-1 flex items-center justify-between">
-                  <span>Loader Version</span>
-                  <span v-if="loadingCloneLoaderVersions" class="text-[10px] text-cyan-400 font-mono">Fetching…</span>
-                </label>
-                <select v-if="cloneLoaderVersions.length > 0" v-model="cloneLoaderVersion" class="z-input text-xs">
-                  <option v-for="lv in cloneLoaderVersions" :key="lv" :value="lv">
-                    {{ lv }} {{ lv === cloneRecommendedLoaderVersion ? '★ (Recommended)' : '' }}
-                  </option>
-                </select>
-                <input v-else v-model="cloneLoaderVersion" class="z-input text-xs" placeholder="e.g. 0.16.10" />
-              </div>
-            </div>
-
-            <!-- Loader Change Warning Card -->
-            <div
-              v-if="isCloneLoaderChanged"
-              class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-amber-200 text-xs"
-            >
-              <svg class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <span class="font-bold block mb-0.5">Caution: Mod Loader Changed</span>
-                <span class="text-amber-300/90 leading-relaxed">
-                  Changing the mod loader from <strong class="text-amber-100 font-mono uppercase">{{ selectedCloneSource?.modLoader?.type || 'vanilla' }}</strong> to <strong class="text-amber-100 font-mono uppercase">{{ cloneLoaderType }}</strong> may cause existing mods or configs to crash. Consider unchecking "Copy Installed Mods" to build a fresh mod list.
-                </span>
-              </div>
-            </div>
-
-            <!-- Selective Copy Options -->
-            <div class="p-3 bg-slate-900/50 border border-slate-800/80 rounded-xl space-y-2">
-              <span class="text-xs font-semibold text-slate-300 block mb-1">Selective Copy Options</span>
-              <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
-                <input type="checkbox" v-model="cloneCopyWorld" class="zircon-check" />
-                <span>Copy Worlds &amp; Saved Data (<span class="font-mono text-slate-400">saves/</span>)</span>
-              </label>
-              <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
-                <input type="checkbox" v-model="cloneCopyMods" class="zircon-check" />
-                <span>Copy Installed Mods (<span class="font-mono text-slate-400">mods/</span>)</span>
-              </label>
-            </div>
-
-            <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-800/80 mt-auto">
-              <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white" @click="showNewDialog = false">Cancel</button>
-              <button
-                class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25 flex items-center gap-1.5"
-                :disabled="!cloneSourceId || !cloneName.trim() || cloning"
-                @click="executeCloneInstance"
-              >
-                <span v-if="cloning" class="w-3 h-3 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></span>
-                <span>{{ cloning ? 'Cloning…' : 'Clone Instance' }}</span>
-              </button>
-            </div>
-          </template>
-        </div>
-
-        <!-- INSTALLATION PROGRESS OVERLAY -->
-        <div
-          v-if="modpackProgress.active"
-          class="absolute inset-0 bg-[#0e1622]/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 text-center"
-        >
-          <div class="w-12 h-12 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin mb-4"></div>
-          <div class="text-white font-bold text-sm mb-1">{{ modpackProgress.phase || 'Installing Modpack…' }}</div>
-          <div class="text-xs text-slate-400 font-mono max-w-sm truncate mb-4">{{ modpackProgress.detail }}</div>
-          <div class="w-full max-w-md bg-slate-950 border border-slate-800 rounded-full h-2.5 overflow-hidden shadow-inner">
-            <div
-              class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full transition-all duration-300 ease-out"
-              :style="{ width: `${Math.round((modpackProgress.fraction || 0) * 100)}%` }"
-            ></div>
-          </div>
-          <div class="text-[11px] text-slate-500 font-mono mt-2">
-            {{ Math.round((modpackProgress.fraction || 0) * 100) }}% complete
-          </div>
-        </div>
-      </div>
-    </div>
+    <InstanceCreationModal
+      :open="showNewDialog"
+      :active-tab="newDialogTab"
+      :modpack-progress="modpackProgress"
+      :new-form="newForm"
+      :mc-versions="mcVersions"
+      :loader-types="loaderTypes"
+      :loader-versions="loaderVersions"
+      :loading-loader-versions="loadingLoaderVersions"
+      :recommended-loader-version="recommendedLoaderVersion"
+      :creating="creating"
+      :import-mode="importMode"
+      :import-file-path="importFilePath"
+      :import-custom-name="importCustomName"
+      :importing-modpack="importingModpack"
+      :modpack-search-query="modpackSearchQuery"
+      :modpack-search-busy="modpackSearchBusy"
+      :modpack-search-done="modpackSearchDone"
+      :modpack-results="modpackResults"
+      :installing-modpack-id="installingModpackId"
+      :selected-modpack-versions="selectedModpackVersions"
+      :instances="instances"
+      :clone-source-id="cloneSourceId"
+      :clone-name="cloneName"
+      :clone-loader-type="cloneLoaderType"
+      :clone-loader-version="cloneLoaderVersion"
+      :clone-loader-versions="cloneLoaderVersions"
+      :loading-clone-loader-versions="loadingCloneLoaderVersions"
+      :clone-recommended-loader-version="cloneRecommendedLoaderVersion"
+      :is-clone-loader-changed="isCloneLoaderChanged"
+      :selected-clone-source="selectedCloneSource"
+      :clone-copy-world="cloneCopyWorld"
+      :clone-copy-mods="cloneCopyMods"
+      :cloning="cloning"
+      :fmt-count="fmtCount"
+      @close="showNewDialog = false"
+      @migrate="showMigrationModal = true"
+      @update:active-tab="newDialogTab = $event"
+      @update:import-custom-name="importCustomName = $event"
+      @update:modpack-search-query="modpackSearchQuery = $event"
+      @update:clone-source-id="cloneSourceId = $event"
+      @update:clone-name="cloneName = $event"
+      @update:clone-loader-type="cloneLoaderType = $event"
+      @update:clone-loader-version="cloneLoaderVersion = $event"
+      @update:clone-copy-world="cloneCopyWorld = $event"
+      @update:clone-copy-mods="cloneCopyMods = $event"
+      @update-loader-versions="updateLoaderVersions"
+      @create="createInstance"
+      @toggle-import-mode="importMode = $event"
+      @browse-archive="browseImportArchive"
+      @drop-archive="onImportDrop"
+      @install-archive="installImportArchive"
+      @search-modpacks="searchModpacks"
+      @install-modpack="installModpack"
+      @clone-source-change="onCloneSourceChange"
+      @update-clone-loader-versions="updateCloneLoaderVersions"
+      @clone="executeCloneInstance"
+    />
 
     <!-- ================= MODAL: WORLD BACKUPS ================= -->
-    <div
-      v-if="showBackupsDialog"
-      class="absolute inset-0 z-40 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="showBackupsDialog = false"
-    >
-      <div class="z-card w-full max-w-lg max-h-[80vh] flex flex-col p-6 shadow-2xl relative border border-slate-700/60 rounded-2xl bg-[#0e1622]">
-        <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
-          <h3 class="text-white font-bold text-base">
-            {{ backupsFilterWorld ? `Backups for "${backupsFilterWorld}"` : 'All World Backups' }}
-          </h3>
-          <button class="text-slate-400 hover:text-white text-lg leading-none" @click="showBackupsDialog = false">✕</button>
-        </div>
-
-        <div class="flex-1 overflow-y-auto flex flex-col gap-2 min-h-0 pr-1">
-          <div v-if="loadingBackups" class="py-6 text-center text-xs text-slate-400">Loading backups…</div>
-          <div v-else-if="backupsList.length === 0" class="py-8 text-center text-xs text-slate-500">
-            No backup snapshots found. Click "Backup" on any world to create one!
-          </div>
-          <div
-            v-for="b in backupsList"
-            :key="b.filename"
-            class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3 hover:border-slate-700 transition"
-          >
-            <div class="flex-1 min-w-0">
-              <div class="text-xs font-bold text-slate-200 truncate">{{ b.worldName }}</div>
-              <div class="text-[11px] text-slate-400 font-mono mt-0.5 truncate">{{ b.filename }}</div>
-              <div class="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
-                <span>{{ fmtSize(b.sizeBytes) }}</span>
-                <span>·</span>
-                <span>{{ formatRelativeTime(b.createdTimestamp) }}</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                class="text-xs px-2.5 py-1 rounded-lg font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition"
-                @click="restoreBackup(b.filename)"
-                title="Restore this snapshot"
-              >
-                Restore
-              </button>
-              <button
-                class="text-xs px-2 py-1 rounded-lg font-semibold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition"
-                @click="deleteBackup(b.filename)"
-                title="Delete this snapshot"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex justify-end pt-3 border-t border-slate-800/80 mt-3">
-          <button class="z-btn-ghost text-xs px-5 py-2 rounded-xl font-semibold" @click="showBackupsDialog = false">Close</button>
-        </div>
-      </div>
-    </div>
+    <WorldManagerModal
+      :open="showBackupsDialog"
+      :filter-world="filterBackupWorld"
+      :loading="loadingBackups"
+      :backups="filteredBackups"
+      :fmt-size="fmtSize"
+      :format-relative-time="formatRelativeTime"
+      @close="showBackupsDialog = false"
+      @restore="restoreBackup"
+      @delete="deleteBackup"
+    />
 
     <!-- ================= MODAL: SCREENSHOT LIGHTBOX ================= -->
     <div
@@ -1815,26 +1906,26 @@
         <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
           <div class="flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <h3 class="text-white font-bold text-base">Host for Friends Co-Op</h3>
+            <h3 class="text-white font-bold text-base">{{ $t('coop_host.title') }}</h3>
           </div>
           <button class="text-slate-400 hover:text-white text-lg leading-none" @click="showCoopModal = false">✕</button>
         </div>
 
         <p class="text-xs text-slate-300 mb-4 leading-relaxed">
-          Zero-config peer multiplayer session. Share this code with friends running Zircon Launcher — their clients will automatically synchronize your mods and connect seamlessly!
+          {{ $t('coop_host.subtitle') }}
         </p>
 
         <div class="bg-slate-950 border border-cyan-500/40 rounded-2xl p-4 text-center mb-4 shadow-inner">
-          <div class="text-[10px] font-bold text-cyan-300 uppercase tracking-widest mb-1">Your Join Code</div>
+          <div class="text-[10px] font-bold text-cyan-300 uppercase tracking-widest mb-1">{{ $t('coop_host.join_code_label') }}</div>
           <div class="text-3xl font-mono font-black tracking-wider text-white select-all">
             {{ coopSession?.joinCode || 'GENERATING…' }}
           </div>
-          <div class="text-[11px] text-slate-400 mt-1">World: <strong>{{ coopSession?.worldName }}</strong></div>
+          <div class="text-[11px] text-slate-400 mt-1">{{ $t('coop_host.hosted_world') }} <strong>{{ coopSession?.worldName }}</strong></div>
           <div v-if="coopSession?.upnp?.externalIp" class="text-[11px] font-mono text-cyan-300 mt-0.5">
-            Public IP: <span class="font-bold select-all">{{ coopSession.upnp.externalIp }}</span>
+            {{ $t('coop_host.detected_ip') }} <span class="font-bold select-all">{{ coopSession.upnp.externalIp }}</span>
           </div>
           <div class="text-[10px] font-mono text-slate-500 mt-0.5">
-            Game Port: {{ coopSession?.gamePort || 25565 }} · P2P Port: {{ coopSession?.p2pPort || 25566 }}
+            {{ $t('coop_host.game_port') }}: {{ coopSession?.gamePort || 25565 }} · {{ $t('coop_host.sync_port') }}: {{ coopSession?.p2pPort || 25566 }}
           </div>
         </div>
 
@@ -1854,12 +1945,12 @@
           ></span>
           <div>
             <strong class="font-semibold block mb-0.5">
-              {{ (coopSession.upnp.available && coopSession.upnp.gamePortMapped && coopSession.upnp.p2pPortMapped) ? 'UPnP Active · Zero-Config Ready' : 'UPnP Not Available' }}
+              {{ (coopSession.upnp.available && coopSession.upnp.gamePortMapped && coopSession.upnp.p2pPortMapped) ? $t('coop_host.upnp_active') : $t('coop_host.upnp_unavailable') }}
             </strong>
             <span class="text-slate-300">
               {{ (coopSession.upnp.available && coopSession.upnp.gamePortMapped && coopSession.upnp.p2pPortMapped)
-                ? 'Ports 25565 & 25566 opened automatically on your router. Friends can join seamlessly!'
-                : 'UPnP is disabled on this router. Local friends can join via LAN, but internet friends may require manual router port forwarding.' }}
+                ? $t('coop_host.upnp_active_desc', { game: '25565', p2p: '25566' })
+                : $t('coop_host.upnp_unavailable_desc') }}
             </span>
           </div>
         </div>
@@ -1880,16 +1971,16 @@
             class="flex-1 z-btn-accent py-2 text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-1.5"
             @click="copyJoinCode"
           >
-            <span>{{ codeCopied ? '✓ Copied Code!' : 'Copy Join Code' }}</span>
+            <span>{{ codeCopied ? $t('coop_host.copied_feedback') : $t('coop_host.copy_code_tooltip') }}</span>
           </button>
         </div>
 
         <div class="flex items-center justify-between pt-3 border-t border-slate-800/80">
           <button class="text-xs text-red-400 hover:text-red-300 font-semibold" @click="stopCoop">
-            Stop Hosting Session
+            {{ $t('coop_host.stop_hosting') }}
           </button>
           <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold" @click="showCoopModal = false">
-            Minimize
+            {{ $t('common.close') }}
           </button>
         </div>
       </div>
@@ -1900,6 +1991,7 @@
       :open="showJoinCodeModal"
       :instances="instances"
       :default-instance-id="selected?.id"
+      :initial-code="deepLinkCode"
       @close="showJoinCodeModal = false"
       @joined="onJoinedViaCode"
     />
@@ -1924,9 +2016,12 @@
     <!-- IMPORT SETUP MODAL -->
     <ImportSetupModal
       :open="showImportModal"
+      :target-instance="selected"
       :current-instance="selected"
-      @close="showImportModal = false"
+      :initial-file-path="droppedMrpackPath"
+      @close="closeImportModal"
       @applied="onSetupImported"
+      @imported="onSetupImported"
     />
 
     <!-- TIME MACHINE SNAPSHOTS MODAL -->
@@ -1955,11 +2050,33 @@
       @accepted="onServerPacksAccepted"
       @close="showServerPacksModal = false"
     />
+
+    <!-- UNIVERSAL LAUNCHER MIGRATION MODAL -->
+    <LauncherMigrationModal
+      :open="showMigrationModal"
+      @close="showMigrationModal = false"
+      @imported="onInstancesMigrated"
+    />
+
+    <!-- COUCH CO-OP SPLIT-SCREEN MODAL -->
+    <CouchCoopModal
+      :is-open="showCouchCoopModal"
+      :instance="selected"
+      @close="showCouchCoopModal = false"
+    />
+
+    <!-- Temporarily disabled for v0.5.0: WORLD SEED & BIOME RADAR MODAL
+    <WorldSeedRadarModal
+      :open="showRadarModal"
+      :instance="selected"
+      @close="showRadarModal = false"
+    />
+    -->
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import DependencyPromptModal from '../components/DependencyPromptModal.vue';
 import ServerResourcePacksModal from '../components/ServerResourcePacksModal.vue';
@@ -1968,6 +2085,13 @@ import ShareSetupModal from '../components/ShareSetupModal.vue';
 import ImportSetupModal from '../components/ImportSetupModal.vue';
 import SnapshotsModal from '../components/SnapshotsModal.vue';
 import AuditRepairModal from '../components/AuditRepairModal.vue';
+import LauncherMigrationModal from '../components/LauncherMigrationModal.vue';
+import CouchCoopModal from '../components/CouchCoopModal.vue';
+import WorldSeedRadarModal from '../components/WorldSeedRadarModal.vue';
+import InstanceCard from '../components/offline/InstanceCard.vue';
+import PackSyncModal from '../components/offline/PackSyncModal.vue';
+import InstanceCreationModal from '../components/offline/InstanceCreationModal.vue';
+import WorldManagerModal from '../components/offline/WorldManagerModal.vue';
 import {
   api,
   fmtBytes,
@@ -1984,10 +2108,198 @@ import {
 
 const emit = defineEmits(['launching', 'stopped', 'error']);
 
+const props = defineProps({
+  session: { type: Object, default: null },
+  deepLinkCode: { type: String, default: '' },
+});
+
 const instances = ref([]);
+const instanceArtworks = ref({});
 const selected = ref(null);
 const selectedDir = ref('');
 const activeTab = ref('mods'); // 'mods' | 'shaders' | 'textures' | 'worlds' | 'screenshots'
+
+
+watch(
+  () => props.deepLinkCode,
+  (code) => {
+    if (code) {
+      showJoinCodeModal.value = true;
+    }
+  },
+  { immediate: true }
+);
+
+function instanceBanner(instance) {
+  if (!instance) return null;
+  const art = instanceArtworks.value[instance.id];
+  if (!art) return null;
+  if (art.bannerDataUrl) return art.bannerDataUrl;
+  if (art.panoramaDataUrls && art.panoramaDataUrls.length > 0) {
+    return art.panoramaDataUrls[0];
+  }
+  return null;
+}
+
+const instanceBannerUrls = computed(() => {
+  const map = {};
+  for (const inst of instances.value || []) {
+    map[inst.id] = instanceBanner(inst);
+  }
+  return map;
+});
+
+const instanceIconUrls = computed(() => {
+  const map = {};
+  for (const inst of instances.value || []) {
+    map[inst.id] = instanceArtworks.value[inst.id]?.iconDataUrl || null;
+  }
+  return map;
+});
+
+// View Mode, Search, Filter & Sort
+const viewMode = ref('grid'); // 'grid' | 'split'
+const isStudioFocused = ref(false);
+const searchQuery = ref('');
+const filterLoader = ref('all'); // 'all' | 'fabric' | 'neoforge' | 'forge' | 'vanilla'
+const sortBy = ref('recent'); // 'recent' | 'name' | 'version'
+const showToolsDropdown = ref(false);
+const activeCardDropdownId = ref(null);
+
+const filteredInstances = computed(() => {
+  let list = [...(instances.value || [])];
+  if (searchQuery.value && searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase().trim();
+    list = list.filter((i) =>
+      (i.name && i.name.toLowerCase().includes(q)) ||
+      (i.minecraftVersion && i.minecraftVersion.toLowerCase().includes(q)) ||
+      (i.modLoader?.type && i.modLoader.type.toLowerCase().includes(q))
+    );
+  }
+  if (filterLoader.value !== 'all') {
+    list = list.filter((i) =>
+      (i.modLoader?.type || 'vanilla').toLowerCase() === filterLoader.value.toLowerCase()
+    );
+  }
+  if (sortBy.value === 'recent') {
+    list.sort((a, b) => {
+      const tA = a.lastPlayed ? new Date(a.lastPlayed).getTime() : 0;
+      const tB = b.lastPlayed ? new Date(b.lastPlayed).getTime() : 0;
+      return tB - tA;
+    });
+  } else if (sortBy.value === 'name') {
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } else if (sortBy.value === 'version') {
+    list.sort((a, b) => (b.minecraftVersion || '').localeCompare(a.minecraftVersion || ''));
+  }
+  return list;
+});
+
+function openManageStudio(instance) {
+  selectInstance(instance);
+  isStudioFocused.value = true;
+}
+
+function closeStudio() {
+  isStudioFocused.value = false;
+}
+
+function onSearchFocus() {
+  if (isStudioFocused.value) {
+    isStudioFocused.value = false;
+  }
+}
+
+watch(searchQuery, (newVal) => {
+  if (newVal && newVal.trim() && isStudioFocused.value) {
+    isStudioFocused.value = false;
+  }
+});
+
+async function playInstanceDirectly(instance) {
+  await selectInstance(instance);
+  await playOffline();
+}
+
+function toggleCardDropdown(instanceId, e) {
+  e?.stopPropagation();
+  activeCardDropdownId.value = activeCardDropdownId.value === instanceId ? null : instanceId;
+}
+
+function cloneInstanceCard(instance) {
+  activeCardDropdownId.value = null;
+  selected.value = instance;
+  promptCloneInstance();
+}
+
+async function openInstanceFolderCard(instance) {
+  activeCardDropdownId.value = null;
+  try {
+    await api.openInstanceFolder(instance.id, null);
+  } catch (err) {
+    window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Could not open folder: ${err}` }));
+  }
+}
+
+async function exportMrpackCard(instance) {
+  activeCardDropdownId.value = null;
+  selected.value = instance;
+  await exportMrpack();
+}
+
+async function installCinematicPresetCard(instance) {
+  activeCardDropdownId.value = null;
+  window.dispatchEvent(
+    new CustomEvent('zircon-status', {
+      detail: `Installing Cinematic Graphics preset (Sodium + Iris + Shaders) for ${instance.name}…`,
+    })
+  );
+  try {
+    const pack = await api.applyCinematicGraphicsPreset(instance.id);
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', {
+        detail: `Cinematic Graphics enabled with ${pack}!`,
+      })
+    );
+    if (selected.value?.id === instance.id) {
+      await Promise.all([loadMods(), loadPacks()]);
+    }
+  } catch (err) {
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', {
+        detail: `Failed to install Cinematic Preset: ${err}`,
+      })
+    );
+  }
+}
+
+async function deleteInstanceById(instance) {
+  if (!instance) return;
+  activeCardDropdownId.value = null;
+  if (!window.confirm(`Delete '${instance.name}' and all of its files?`)) return;
+  await api.deleteOfflineInstance(instance.id);
+  if (selected.value?.id === instance.id) {
+    selected.value = null;
+    isStudioFocused.value = false;
+  }
+  await loadInstances();
+}
+
+function openInstanceStudio(instance) {
+  openManageStudio(instance);
+}
+
+function openCloneModal(instance) {
+  cloneInstanceCard(instance);
+}
+
+function exportInstanceAsMrpack(instance) {
+  exportMrpackCard(instance);
+}
+
+function installCinematicPresets(instance) {
+  installCinematicPresetCard(instance);
+}
 
 // Actions & Open folder dropdowns
 const showOpenFolderDropdown = ref(false);
@@ -2018,6 +2330,7 @@ const isCloneLoaderChanged = computed(() => {
 // Worlds state
 const worldsList = ref([]);
 const loadingWorldsState = ref(false);
+const showRadarModal = ref(false);
 
 // Backups state
 const showBackupsDialog = ref(false);
@@ -2044,14 +2357,35 @@ function onJoinedViaCode() {
 // Setup Sharing, Snapshots & Audit Modals
 const showShareModal = ref(false);
 const showImportModal = ref(false);
+const droppedMrpackPath = ref('');
 const showSnapshotsModal = ref(false);
 const showAuditModal = ref(false);
+const showMigrationModal = ref(false);
+const showCouchCoopModal = ref(false);
+
+function closeImportModal() {
+  showImportModal.value = false;
+  droppedMrpackPath.value = '';
+}
+
+async function onInstancesMigrated(newInstances) {
+  await loadInstances();
+  if (newInstances && newInstances.length > 0) {
+    const firstId = newInstances[0].id;
+    const target = instances.value.find((i) => i.id === firstId);
+    if (target) {
+      selectInstance(target);
+    }
+  }
+}
 
 async function onSetupImported(res) {
   showImportModal.value = false;
+  droppedMrpackPath.value = '';
   await loadInstances();
-  if (res && res.instanceId) {
-    const target = instances.value.find((i) => i.id === res.instanceId);
+  const targetId = res?.id || res?.instanceId;
+  if (targetId) {
+    const target = instances.value.find((i) => i.id === targetId);
     if (target) {
       selectInstance(target);
       return;
@@ -2360,10 +2694,19 @@ async function loadInstances() {
   if (instances.value.length && !selected.value) {
     await selectInstance(instances.value[0]);
   }
+  // Asynchronously fetch artwork for each instance
+  for (const inst of instances.value) {
+    api.getInstanceArtwork(inst.id).then((art) => {
+      if (art) {
+        instanceArtworks.value[inst.id] = art;
+      }
+    }).catch(() => {});
+  }
 }
 
 async function selectInstance(instance) {
   selected.value = instance;
+  updateRollbackBanner.value = null;
   selectedDir.value = await api.getOfflineInstanceDir(instance.id);
   await Promise.all([loadMods(), loadPacks()]);
 }
@@ -2588,6 +2931,8 @@ const pendingHit = ref(null);
 
 const checkingUpdates = ref(false);
 const updatingMods = ref(false);
+const rollingBack = ref(false);
+const updateRollbackBanner = ref(null);
 const availableUpdates = ref([]);
 const modUpdateMap = computed(() => {
   const map = {};
@@ -2629,6 +2974,14 @@ async function applyModUpdates(updateList) {
     const res = await api.updateInstanceMods(selected.value.id, payloads);
     await loadMods();
     await checkModUpdates();
+    if (res && res.snapshotFilename) {
+      updateRollbackBanner.value = {
+        snapshotFilename: res.snapshotFilename,
+        snapshotLabel: res.snapshotLabel || 'Pre-Update Snapshot',
+        count: res.updatedCount,
+        timestamp: Date.now(),
+      };
+    }
     window.dispatchEvent(
       new CustomEvent('zircon-status', {
         detail: `Successfully updated ${res.updatedCount} mod(s). Backups created in .mod_staging/backups/`,
@@ -2639,6 +2992,31 @@ async function applyModUpdates(updateList) {
   } finally {
     updatingMods.value = false;
   }
+}
+
+async function triggerBatchRollback() {
+  if (!selected.value || !updateRollbackBanner.value?.snapshotFilename || rollingBack.value) return;
+  rollingBack.value = true;
+  try {
+    const filename = updateRollbackBanner.value.snapshotFilename;
+    const res = await api.rollbackModUpdate(selected.value.id, filename);
+    await loadMods();
+    await checkModUpdates();
+    window.dispatchEvent(
+      new CustomEvent('zircon-status', {
+        detail: `Successfully rolled back ${res.restoredCount} mod(s) in < 1 second!`,
+      })
+    );
+    updateRollbackBanner.value = null;
+  } catch (e) {
+    window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Rollback error: ${e}` }));
+  } finally {
+    rollingBack.value = false;
+  }
+}
+
+function dismissRollbackBanner() {
+  updateRollbackBanner.value = null;
 }
 
 async function installMod(hit) {
@@ -3313,11 +3691,17 @@ async function createInstance() {
 }
 
 function onWindowClick(e) {
-  if (showOpenFolderDropdown.value && !e.target.closest('.relative')) {
+  if (showOpenFolderDropdown.value && !e.target.closest('[data-dropdown="open-folder"]')) {
     showOpenFolderDropdown.value = false;
   }
-  if (showActionsDropdown.value && !e.target.closest('.relative')) {
+  if (showActionsDropdown.value && !e.target.closest('[data-dropdown="actions"]')) {
     showActionsDropdown.value = false;
+  }
+  if (showToolsDropdown.value && !e.target.closest('[data-dropdown="tools"]')) {
+    showToolsDropdown.value = false;
+  }
+  if (activeCardDropdownId.value && !e.target.closest('[data-dropdown="card-menu"]')) {
+    activeCardDropdownId.value = null;
   }
 }
 
@@ -3621,6 +4005,24 @@ onMounted(async () => {
   }
   await loadInstances();
 
+  // Support automated navigation to modals via ?modal= query param for screenshots
+  if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const modalParam = params.get('modal');
+    if (modalParam === 'migration') {
+      showMigrationModal.value = true;
+    } else if (modalParam === 'couch_coop') {
+      if (!selected.value && instances.value.length > 0) {
+        selected.value = instances.value[0];
+      }
+      showCouchCoopModal.value = true;
+    } else if (modalParam === 'audit') {
+      showAuditModal.value = true;
+    } else if (modalParam === 'share') {
+      showShareModal.value = true;
+    }
+  }
+
   try {
     unlistenModpackProgress = await onModpackProgress((p) => {
       modpackProgress.value = {
@@ -3637,11 +4039,28 @@ onMounted(async () => {
   }
 
   try {
-    const webview = getCurrentWebview();
-    unlistenFileDrop = await webview.onDragDropEvent(async (event) => {
+    if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
+      const webview = getCurrentWebview();
+      unlistenFileDrop = await webview.onDragDropEvent(async (event) => {
       if (event.payload.type === 'drop') {
         const paths = event.payload.paths;
-        if (selected.value && paths && paths.length) {
+        if (!paths || !paths.length) return;
+
+        // 1. Detect .mrpack modpacks dropped anywhere onto the window
+        const mrpackPath = paths.find(
+          (p) => p.toLowerCase().endsWith('.mrpack')
+        );
+        if (mrpackPath) {
+          droppedMrpackPath.value = mrpackPath;
+          showImportModal.value = true;
+          window.dispatchEvent(
+            new CustomEvent('zircon-mrpack-dropped', { detail: { filePath: mrpackPath } })
+          );
+          return;
+        }
+
+        // 2. Mod / Resource Pack drops when an instance is selected
+        if (selected.value) {
           for (const path of paths) {
             if (path.endsWith('.jar')) {
               await api.importOfflineModFile(selected.value.id, path);
@@ -3653,6 +4072,7 @@ onMounted(async () => {
         }
       }
     });
+    }
   } catch (err) {
     console.warn('Native drag-drop listener unavailable:', err);
   }
@@ -3667,3 +4087,30 @@ onBeforeUnmount(() => {
   }
 });
 </script>
+
+<style scoped>
+.dropdown-pop-enter-active,
+.dropdown-pop-leave-active {
+  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dropdown-pop-enter-from,
+.dropdown-pop-leave-to {
+  opacity: 0;
+  transform: translateY(-5px) scale(0.97);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(7, 11, 16, 0.4);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(71, 210, 201, 0.35);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 210, 201, 0.7);
+}
+</style>

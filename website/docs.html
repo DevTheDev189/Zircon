@@ -1,6 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+  <script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Documentation &amp; Setup Guides — Zircon Minecraft</title>
@@ -26,7 +82,9 @@
   <link rel="icon" type="image/png" href="assets/img/favicon.png">
   <link rel="apple-touch-icon" href="assets/img/favicon.png">
   <link rel="manifest" href="site.webmanifest">
-  <link rel="stylesheet" href="assets/css/styles.css?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="assets/css/styles.css?v=3">
 </head>
 <body>
 
@@ -85,7 +143,6 @@
         <button class="docs-pill filter-pill active" data-guide="all">All Guides</button>
         <button class="docs-pill filter-pill" data-guide="players">Player Quickstart</button>
         <button class="docs-pill filter-pill" data-guide="servers">Server Host Setup</button>
-        <button class="docs-pill filter-pill" data-guide="cloud">Zircon Cloud Setup</button>
       </div>
     </div>
   </section>
@@ -113,14 +170,6 @@
             <li><a href="#server-instance">3. Create Instance</a></li>
             <li><a href="#server-mods">4. Add Mods (Modrinth/CF)</a></li>
             <li><a href="#server-ports">5. Port Forwarding (25565)</a></li>
-          </ul>
-
-          <h4 style="margin-top: 20px;">Zircon Cloud Setup</h4>
-          <ul>
-            <li><a href="#cloud-deploy">1. Deploy Server Instance</a></li>
-            <li><a href="#cloud-mods">2. Select Modpacks</a></li>
-            <li><a href="#cloud-retention">3. Pause-to-Sleep Engine</a></li>
-            <li><a href="#cloud-connect">4. Connect via Launcher</a></li>
           </ul>
         </nav>
 
@@ -268,44 +317,6 @@
 
           </section>
 
-          <!-- ================= CLOUD SECTION ================= -->
-          <section id="cloud-guide" class="docs-guide-section" data-guide="cloud">
-            <h2 style="margin-top: 0; color: var(--accent);">Zircon Cloud Setup Guide</h2>
-
-            <div id="cloud-deploy" class="docs-step">
-              <div class="step-num">1</div>
-              <div class="step-body">
-                <h4>Deploy Server on Zircon Cloud</h4>
-                <p>Sign in at <a href="https://cloud.zirconmc.net" target="_blank" rel="noopener"><strong>cloud.zirconmc.net</strong></a> with your Discord or Microsoft account. Click <em>New Instance</em>, choose your desired server region for lowest ping, and select your RAM tier.</p>
-              </div>
-            </div>
-
-            <div id="cloud-mods" class="docs-step">
-              <div class="step-num">2</div>
-              <div class="step-body">
-                <h4>Select Modpack &amp; Minecraft Version</h4>
-                <p>Choose your Minecraft version and loader (Fabric, NeoForge, Forge, or Quilt). Install individual mods or full modpacks directly from CurseForge &amp; Modrinth in one click with automatic dependency resolution.</p>
-              </div>
-            </div>
-
-            <div id="cloud-retention" class="docs-step">
-              <div class="step-num">3</div>
-              <div class="step-body">
-                <h4>Pause-to-Sleep World Retention</h4>
-                <p>Zircon Cloud automatically enables smart Pause-to-Sleep retention. When no players are online, your server instance enters a low-resource suspended state. The moment a player connects via Zircon Launcher, the node resumes smoothly with zero data loss.</p>
-              </div>
-            </div>
-
-            <div id="cloud-connect" class="docs-step">
-              <div class="step-num">4</div>
-              <div class="step-body">
-                <h4>Share Address with Friends &amp; Connect</h4>
-                <p>Copy your dedicated cloud address (e.g. <code>mycommunity.zirconmc.net</code>). Your players paste it into the Zircon Launcher and click <strong>PLAY</strong> — the exact modpack and configurations install automatically.</p>
-              </div>
-            </div>
-
-          </section>
-
         </div>
       </div>
     </div>
@@ -316,10 +327,10 @@
     <div class="container">
       <div class="cta-band">
         <h2>Ready to get started?</h2>
-        <p>Download the free player launcher, run a self-hosted server, or deploy on Zircon Cloud.</p>
+        <p>Download the free player launcher, or get the self-hosted server manager.</p>
         <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
-          <a class="btn btn-primary btn-lg" href="downloads.html">Go to Downloads</a>
-          <a class="btn btn-cloud btn-lg" href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Launch on Zircon Cloud</a>
+          <a class="btn btn-primary btn-lg" href="downloads.html#players">Get Launcher</a>
+          <a class="btn btn-secondary btn-lg" href="downloads.html#server-owners">Get Server Manager</a>
           <a class="btn btn-ghost btn-lg" href="faq.html">View FAQ</a>
         </div>
       </div>
@@ -343,7 +354,6 @@
             <li><a href="/">Home</a></li>
             <li><a href="launcher.html">Launcher</a></li>
             <li><a href="server.html">Server Manager</a></li>
-            <li><a href="https://cloud.zirconmc.net" target="_blank" rel="noopener" style="color: var(--accent-bright); font-weight: 700;">Zircon Cloud &rarr;</a></li>
             <li><a href="docs.html" class="active">Guides &amp; Docs</a></li>
             <li><a href="faq.html">FAQ</a></li>
             <li><a href="downloads.html">Downloads</a></li>
@@ -354,13 +364,13 @@
           <ul>
             <li><a href="https://github.com/DevTheDev189/Zircon" target="_blank" rel="noopener">GitHub Repository</a></li>
             <li><a href="https://github.com/DevTheDev189/Zircon/releases" target="_blank" rel="noopener">Releases &amp; Changelogs</a></li>
-            <li><a href="https://cloud.zirconmc.net" target="_blank" rel="noopener">Zircon Cloud Console</a></li>
+            <li><a href="cloud.html" style="color: var(--muted);">Cloud (Coming Soon)</a></li>
             <li><a href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" target="_blank" rel="noopener">Business Source License 1.1</a></li>
           </ul>
         </div>
       </div>
       <div class="footer-legal">
-        <span>© Zircon contributors · v0.4.21 (active development)</span>
+        <span>© Zircon contributors · v0.5.0 (active development)</span>
         <span>Not an official Minecraft product. Not approved by or associated with Mojang Studios or Microsoft.</span>
       </div>
     </div>

@@ -250,12 +250,22 @@ pub fn render_preview_map(
             let is_reticle = (px == (image_size / 2) && (py as i32 - half_size as i32).abs() <= 5)
                 || (py == (image_size / 2) && (px as i32 - half_size as i32).abs() <= 5);
 
-            if let Some(point) = surface_map.points.get(&(world_x, world_z)) {
-                // Real generated block
-                let y = point.y;
-                let block_id = point.block_id.as_str();
-                let biome_id = point.biome_id.as_str();
+            let maybe_point = surface_map.points.get(&(world_x, world_z));
+            let syn_holder;
+            let (y, block_id, biome_id, delta_y) = if let Some(point) = maybe_point {
+                let nw_x = world_x - 1;
+                let nw_z = world_z - 1;
+                let nw_y = surface_map.points.get(&(nw_x, nw_z)).map(|p| p.y).unwrap_or(point.y);
+                (point.y, point.block_id.as_str(), point.biome_id.as_str(), point.y - nw_y)
+            } else if surface_map.points.is_empty() {
+                syn_holder = sample_synthetic_column(world_x, world_z, _seed_val);
+                let nw_syn = sample_synthetic_column(world_x - 1, world_z - 1, _seed_val);
+                (syn_holder.y, syn_holder.block_id, syn_holder.biome_id, syn_holder.y - nw_syn.y)
+            } else {
+                (-999, "", "", 0)
+            };
 
+            if y != -999 {
                 if y < actual_min_y {
                     actual_min_y = y;
                 }
@@ -265,13 +275,7 @@ pub fn render_preview_map(
 
                 biomes_set.insert(biome_id.to_string());
 
-                // Northwest hillshading from neighbor
-                let nw_x = world_x - 1;
-                let nw_z = world_z - 1;
-                let nw_y = surface_map.points.get(&(nw_x, nw_z)).map(|p| p.y).unwrap_or(point.y);
-                let delta_y = y - nw_y;
                 let shade = 1.0 + (delta_y as f32 * 0.09).clamp(-0.38, 0.38);
-
                 let base_color = get_block_color(block_id, biome_id, y);
                 let r = ((base_color[0] as f32 * shade).clamp(0.0, 255.0)) as u8;
                 let g = ((base_color[1] as f32 * shade).clamp(0.0, 255.0)) as u8;

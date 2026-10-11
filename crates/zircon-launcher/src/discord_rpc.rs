@@ -119,6 +119,36 @@ impl Activity {
         self
     }
 
+    /// Attaches 1-click Co-Op join deep-link button.
+    pub fn with_coop_join(mut self, join_code: &str) -> Self {
+        self.buttons = Some(vec![
+            ActivityButton {
+                label: "Join Co-Op via Zircon".to_string(),
+                url: format!("https://zirconmc.net/join?code={join_code}"),
+            },
+            ActivityButton {
+                label: "Get Zircon Launcher".to_string(),
+                url: "https://zirconmc.net".to_string(),
+            },
+        ]);
+        self
+    }
+
+    /// Attaches 1-click server join deep-link button.
+    pub fn with_server_join(mut self, server_address: &str) -> Self {
+        self.buttons = Some(vec![
+            ActivityButton {
+                label: "Play on this Server".to_string(),
+                url: format!("https://zirconmc.net/join?server={server_address}"),
+            },
+            ActivityButton {
+                label: "Get Zircon Launcher".to_string(),
+                url: "https://zirconmc.net".to_string(),
+            },
+        ]);
+        self
+    }
+
     /// Attaches a multiplayer party / player count.
     pub fn with_party(mut self, party_id: impl Into<String>, current: u32, max: u32) -> Self {
         self.party = Some(ActivityParty {
@@ -346,6 +376,12 @@ pub async fn update_discord_presence(
     client_slot: &tokio::sync::Mutex<Option<DiscordRpcClient>>,
     activity: Activity,
 ) {
+    let settings = crate::settings::load_settings();
+    if !settings.discord_rpc {
+        clear_discord_presence(client_slot).await;
+        return;
+    }
+
     let mut guard = client_slot.lock().await;
     if guard.is_none() {
         match DiscordRpcClient::connect(ZIRCON_DISCORD_CLIENT_ID).await {

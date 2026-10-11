@@ -1649,21 +1649,6 @@ return function render(_ctx, _cache) {
                           style: { width: "42.8%" }
                         })
                       ])
-                    ]),
-                    _createElementVNode("a", {
-                      href: "https://cloud.zirconmc.net/?ref=server_wrapper",
-                      target: "_blank",
-                      rel: "noopener",
-                      class: "block mt-3 p-2.5 rounded-xl border border-cyan-500/25 bg-gradient-to-r from-cyan-950/40 via-cyan-900/20 to-slate-900/60 hover:border-cyan-400/50 hover:bg-cyan-950/60 transition group cursor-pointer"
-                    }, [
-                      _createElementVNode("div", { class: "flex items-center justify-between" }, [
-                        _createElementVNode("div", { class: "flex items-center gap-2" }, [
-                          _createElementVNode("span", { class: "w-2 h-2 rounded-full bg-cyan-400 animate-pulse" }),
-                          _createElementVNode("span", { class: "text-xs font-bold text-white group-hover:text-cyan-300" }, "Zircon Cloud")
-                        ]),
-                        _createElementVNode("span", { class: "text-[9px] uppercase font-mono font-bold bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-400/30" }, "24/7 Hosting")
-                      ]),
-                      _createElementVNode("p", { class: "text-[10.5px] text-slate-400 mt-1 leading-tight" }, "Host servers 24/7 without keeping your PC running →")
                     ])
                   ])
                 ]),
@@ -1691,7 +1676,7 @@ return function render(_ctx, _cache) {
                                 onClick: $event => (copyServerIp(selectedInstance)),
                                 class: _normalizeClass(["z-copy-ip-btn", copiedIp ? 'copied' : ''])
                               }, [
-                                _createElementVNode("span", null, _toDisplayString(copiedIp ? '✓ Copied IP' : 'Direct IP: ' + (selectedInstance.externalPort || 25565)), 1 /* TEXT */)
+                                _createElementVNode("span", null, _toDisplayString(copiedIp ? '✓ Copied IP' : (selectedInstance.subdomain ? selectedInstance.subdomain : (selectedInstance.publicAddress ? selectedInstance.publicAddress : 'Direct IP: ' + (selectedInstance.externalPort || 25565)))), 1 /* TEXT */)
                               ], 2 /* CLASS */))
                             : _createCommentVNode("v-if", true),
                           _createCommentVNode(" User Profile Avatar Button "),
@@ -4319,6 +4304,21 @@ return function render(_ctx, _cache) {
                                       _cache[128] || (_cache[128] = _createElementVNode("p", { class: "text-[10px] text-slate-500 mt-1" }, "Player-facing port; change to free up the port for a reverse proxy.", -1 /* CACHED */))
                                     ]),
                                     _createElementVNode("div", null, [
+                                      _createElementVNode("label", { class: "block text-xs font-semibold text-slate-300 mb-1" }, "Server URL"),
+                                      _withDirectives(_createElementVNode("input", {
+                                        "onUpdate:modelValue": $event => { (settingsForm.subdomain = $event); (settingsForm.publicAddress = $event); },
+                                        type: "text",
+                                        placeholder: "e.g. play.zirconmc.net or mc.example.com",
+                                        class: "w-full bg-[#1e293b] border border-slate-700/80 rounded-xl px-3.5 py-2 text-sm text-white font-mono focus:border-cyan-400 focus:outline-none"
+                                      }, null, 8 /* PROPS */, ["onUpdate:modelValue"]), [
+                                        [
+                                          _vModelText,
+                                          settingsForm.subdomain
+                                        ]
+                                      ]),
+                                      _createElementVNode("p", { class: "text-[10px] text-slate-500 mt-1" }, "Domain name or subdomain used by the multiplexer to route players to this server instance.")
+                                    ]),
+                                    _createElementVNode("div", null, [
                                       _createElementVNode("label", _hoisted_438, [
                                         _withDirectives(_createElementVNode("input", {
                                           type: "checkbox",
@@ -5293,6 +5293,18 @@ return function render(_ctx, _cache) {
                       }, null, 8 /* PROPS */, ["onUpdate:modelValue"]), [
                         [_vModelText, newServerForm.name]
                       ])
+                    ]),
+                    // Server URL / Subdomain
+                    _createElementVNode("div", null, [
+                      _createElementVNode("label", { class: "block text-xs font-semibold text-slate-300 mb-1" }, "Server URL"),
+                      _withDirectives(_createElementVNode("input", {
+                        "onUpdate:modelValue": $event => ((newServerForm.subdomain) = $event),
+                        placeholder: "e.g. play.zirconmc.net or mc.example.com (optional)",
+                        class: "w-full bg-[#1e293b] border border-slate-700/80 rounded-xl px-3.5 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                      }, null, 8 /* PROPS */, ["onUpdate:modelValue"]), [
+                        [_vModelText, newServerForm.subdomain]
+                      ]),
+                      _createElementVNode("p", { class: "text-[10px] text-slate-500 mt-1" }, "Domain name used to route players to this server instance.")
                     ]),
                     // Minecraft Version
                     _createElementVNode("div", null, [

@@ -17,10 +17,10 @@
           </div>
           <div>
             <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
-              Host for Friends
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">P2P Co-Op</span>
+              {{ $t('coop_host.title') }}
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{{ $t('coop_host.p2p_badge') }}</span>
             </h2>
-            <p class="text-xs text-slate-400">Share your world with friends using a lightweight Join Code</p>
+            <p class="text-xs text-slate-400">{{ $t('coop_host.subtitle') }}</p>
           </div>
         </div>
         <button
@@ -38,15 +38,15 @@
         <!-- Instance & World Info -->
         <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 space-y-3">
           <div class="flex items-center justify-between text-xs">
-            <span class="text-slate-400">Target Instance:</span>
+            <span class="text-slate-400">{{ $t('coop_host.target_instance') }}</span>
             <span class="font-semibold text-slate-200">{{ instance?.name }}</span>
           </div>
 
           <div v-if="!activeSession">
-            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Select World to Host</label>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">{{ $t('coop_host.select_world_label') }}</label>
             <div v-if="loadingWorlds" class="text-xs text-slate-500 py-2 flex items-center gap-2">
               <span class="w-3 h-3 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin"></span>
-              Loading saves...
+              {{ $t('coop_host.loading_saves') }}
             </div>
             <select
               v-else-if="worlds.length > 0"
@@ -58,12 +58,12 @@
               </option>
             </select>
             <p v-else class="text-xs text-amber-400/90 py-1">
-              No single-player worlds found in this instance. Launch the instance first to create a world!
+              {{ $t('coop_host.no_worlds_warning') }}
             </p>
           </div>
 
           <div v-else class="flex items-center justify-between text-xs">
-            <span class="text-slate-400">Hosted World:</span>
+            <span class="text-slate-400">{{ $t('coop_host.hosted_world') }}</span>
             <span class="font-semibold text-cyan-300">{{ activeSession.worldName }}</span>
           </div>
         </div>
@@ -72,11 +72,11 @@
         <div v-if="activeSession" class="bg-gradient-to-br from-cyan-950/40 via-slate-900/80 to-slate-900/90 border border-cyan-500/30 rounded-2xl p-5 text-center space-y-4 shadow-lg shadow-cyan-950/20">
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-medium">
             <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            Hosting Live &amp; P2P Ready
+            {{ $t('coop_host.hosting_live_badge') }}
           </div>
 
           <div>
-            <div class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold mb-1">Your 6-Character Join Code</div>
+            <div class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold mb-1">{{ $t('coop_host.join_code_label') }}</div>
             <div class="flex items-center justify-center gap-3">
               <span class="font-mono text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-300 select-all">
                 {{ activeSession.joinCode }}
@@ -84,7 +84,7 @@
               <button
                 type="button"
                 class="p-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-all hover:scale-105 active:scale-95"
-                title="Copy Join Code"
+                :title="$t('coop_host.copy_code_tooltip')"
                 @click="copyCode"
               >
                 <svg v-if="!copied" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,17 +96,17 @@
               </button>
             </div>
             <p v-if="copied" class="text-[11px] text-emerald-400 font-medium mt-1 animate-in fade-in">
-              Copied to clipboard! Send this code to your friend.
+              {{ $t('coop_host.copied_feedback') }}
             </p>
           </div>
 
           <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-[11px]">
             <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-800/60">
-              <span class="text-slate-500 block">Game Port</span>
+              <span class="text-slate-500 block">{{ $t('coop_host.game_port') }}</span>
               <span class="font-mono font-bold text-slate-300">{{ activeSession.gamePort }}</span>
             </div>
             <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-800/60">
-              <span class="text-slate-500 block">P2P Mod Sync Port</span>
+              <span class="text-slate-500 block">{{ $t('coop_host.sync_port') }}</span>
               <span class="font-mono font-bold text-cyan-400">{{ activeSession.p2pPort }}</span>
             </div>
           </div>
@@ -128,10 +128,10 @@
                     : 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]'"
                 ></span>
                 <span v-if="activeSession.upnp.available && activeSession.upnp.gamePortMapped && activeSession.upnp.p2pPortMapped">
-                  UPnP Active · Zero-Config Ready
+                  {{ $t('coop_host.upnp_active') }}
                 </span>
                 <span v-else>
-                  UPnP Not Available
+                  {{ $t('coop_host.upnp_unavailable') }}
                 </span>
               </div>
               <span
@@ -140,21 +140,21 @@
                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                   : 'bg-amber-500/10 text-amber-400 border-amber-500/20'"
               >
-                {{ (activeSession.upnp.available && activeSession.upnp.gamePortMapped && activeSession.upnp.p2pPortMapped) ? 'Auto-Forwarded' : 'LAN / Manual' }}
+                {{ (activeSession.upnp.available && activeSession.upnp.gamePortMapped && activeSession.upnp.p2pPortMapped) ? $t('coop_host.auto_forwarded') : $t('coop_host.lan_manual') }}
               </span>
             </div>
 
             <p class="text-[11px] leading-relaxed text-slate-300">
               <span v-if="activeSession.upnp.available && activeSession.upnp.gamePortMapped && activeSession.upnp.p2pPortMapped">
-                Ports {{ activeSession.gamePort }} &amp; {{ activeSession.p2pPort }} opened automatically on your router. Friends can join seamlessly!
+                {{ $t('coop_host.upnp_active_desc', { game: activeSession.gamePort, p2p: activeSession.p2pPort }) }}
               </span>
               <span v-else>
-                UPnP is disabled on this router. Local friends can join via LAN, but internet friends may require manual router port forwarding.
+                {{ $t('coop_host.upnp_unavailable_desc') }}
               </span>
             </p>
 
             <div v-if="activeSession.upnp.externalIp" class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span class="text-slate-400">Detected External IP:</span>
+              <span class="text-slate-400">{{ $t('coop_host.detected_ip') }}</span>
               <span class="font-mono font-bold text-cyan-300 select-all">{{ activeSession.upnp.externalIp }}</span>
             </div>
           </div>
@@ -166,10 +166,10 @@
             <svg class="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            How it Works
+            {{ $t('coop_host.how_it_works_title') }}
           </p>
           <p>
-            When you click Start Hosting, Zircon creates a temporary session with a direct P2P HTTP server. Friends can enter your Join Code to automatically stream any missing mods and connect directly.
+            {{ $t('coop_host.how_it_works_desc') }}
           </p>
         </div>
 
@@ -185,7 +185,7 @@
           class="z-btn-ghost text-xs px-4 py-2 rounded-xl"
           @click="handleClose"
         >
-          Close
+          {{ $t('common.close') }}
         </button>
 
         <div class="flex items-center gap-2">
@@ -196,8 +196,8 @@
             :disabled="busy"
             @click="stopHosting"
           >
-            <span v-if="busy">Stopping...</span>
-            <span v-else>Stop Hosting</span>
+            <span v-if="busy">{{ $t('coop.stopping') }}</span>
+            <span v-else>{{ $t('coop_host.stop_hosting') }}</span>
           </button>
 
           <button
@@ -208,7 +208,7 @@
             @click="startHosting"
           >
             <span v-if="busy" class="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
-            <span>{{ busy ? 'Starting P2P Server...' : 'Start Hosting' }}</span>
+            <span>{{ busy ? $t('coop_host.starting_p2p') : $t('coop_host.start_hosting') }}</span>
           </button>
         </div>
       </div>

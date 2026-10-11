@@ -26,6 +26,8 @@ pub struct LauncherSettings {
     pub memory_gb: u32,
     /// Whether Discord Rich Presence is enabled.
     pub discord_rpc: bool,
+    /// Discord privacy mode: "public" (shows join button), "presence_only" (shows server without join button), or "incognito" (generic Playing Minecraft).
+    pub discord_rpc_mode: String,
     /// Preferred graphics processor on hybrid GPU systems (dedicated, integrated, system).
     pub gpu_preference: GpuPreference,
     /// Custom JVM arguments (e.g. GC flags like Shenandoah, ZGC, Aikar's flags).
@@ -60,6 +62,20 @@ pub struct LauncherSettings {
     pub button_style: String,
     /// Glassmorphism & transparency style ("standard", "frosted", "solid").
     pub glass_effect: String,
+    /// Accessibility: typography preference ("default", "open-dyslexic", "lexend").
+    pub font_family: String,
+    /// Accessibility: UI scale factor (1.0, 1.15, 1.25, 1.4).
+    pub ui_scale: f32,
+    /// Accessibility: disable ambient animations and motion effects.
+    pub reduce_motion: bool,
+    /// Accessibility: high contrast solid card surfaces and borders.
+    pub high_contrast: bool,
+    /// Accessibility: dual-encoded status badges for colorblindness.
+    pub colorblind_badges: bool,
+    /// Accessibility: audio chimes for completed actions.
+    pub sound_cues: bool,
+    /// Preferred UI language code ("en", "es", "pt-BR", etc.).
+    pub preferred_locale: String,
 }
 
 impl Default for LauncherSettings {
@@ -67,6 +83,7 @@ impl Default for LauncherSettings {
         Self {
             memory_gb: DEFAULT_MEMORY_GB,
             discord_rpc: true,
+            discord_rpc_mode: "public".to_string(),
             gpu_preference: GpuPreference::Dedicated,
             custom_jvm_args: None,
             java_path_override: None,
@@ -81,6 +98,13 @@ impl Default for LauncherSettings {
             custom_card_bg: None,
             button_style: "rounded".to_string(),
             glass_effect: "standard".to_string(),
+            font_family: "default".to_string(),
+            ui_scale: 1.0,
+            reduce_motion: false,
+            high_contrast: false,
+            colorblind_badges: false,
+            sound_cues: true,
+            preferred_locale: "en".to_string(),
         }
     }
 }
@@ -240,6 +264,7 @@ mod tests {
         let original = LauncherSettings {
             memory_gb: 6,
             discord_rpc: true,
+            discord_rpc_mode: "presence_only".to_string(),
             gpu_preference: GpuPreference::Dedicated,
             custom_jvm_args: Some("-XX:+UseZGC -XX:+ZGenerational".to_string()),
             java_path_override: Some("C:\\Java\\bin\\java.exe".to_string()),
@@ -254,6 +279,13 @@ mod tests {
             custom_card_bg: Some("#0c1830".to_string()),
             button_style: "pill".to_string(),
             glass_effect: "frosted".to_string(),
+            font_family: "lexend".to_string(),
+            ui_scale: 1.15,
+            reduce_motion: true,
+            high_contrast: true,
+            colorblind_badges: true,
+            sound_cues: true,
+            preferred_locale: "en".to_string(),
         };
         save_to(&file, &original);
         let loaded = load_from(&file);

@@ -10,7 +10,7 @@
           :class="{ 'active': activeTab === 'saved' }"
           @click="activeTab = 'saved'"
         >
-          Saved Skins ({{ skins.length }})
+          {{ $t('skins.tab_saved', { count: skins.length }) }}
         </button>
         <button
           type="button"
@@ -18,7 +18,7 @@
           :class="{ 'active': activeTab === 'library' }"
           @click="onSelectLibraryTab"
         >
-          Browse Library
+          {{ $t('skins.tab_library') }}
         </button>
         <button
           type="button"
@@ -26,7 +26,7 @@
           :class="{ 'active': activeTab === 'studio' }"
           @click="openStudio(selectedSkin)"
         >
-          Paint Studio
+          {{ $t('skins.tab_studio') }}
         </button>
         <button
           v-if="ENABLE_AI_STUDIO"
@@ -35,7 +35,7 @@
           :class="{ 'active': activeTab === 'ai' }"
           @click="activeTab = 'ai'"
         >
-          AI Skin Studio
+          {{ $t('skins.tab_ai') }}
         </button>
       </div>
 
@@ -48,7 +48,7 @@
           <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Create in Studio
+          {{ $t('skins.create_studio') }}
         </button>
 
         <button
@@ -60,13 +60,13 @@
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          Import PNG
+          {{ $t('skins.import_png') }}
         </button>
 
         <button
           v-if="activeTab === 'saved' || activeTab === 'library'"
           class="z-btn-ghost text-xs px-2.5 py-1.5 rounded-xl font-semibold"
-          :title="activeTab === 'saved' ? 'Refresh saved skins' : 'Refresh library'"
+          :title="activeTab === 'saved' ? $t('skins.refresh_saved_tooltip') : $t('skins.refresh_library_tooltip')"
           @click="activeTab === 'saved' ? refreshGallery() : reloadCurrentCommunityPage()"
         >
           <svg class="w-3.5 h-3.5 text-slate-400 hover:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -101,13 +101,13 @@
       <div class="w-[340px] min-w-[310px] z-card flex flex-col p-3.5 bg-[#0e1622]/90 border border-slate-800/80 rounded-2xl shrink-0">
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">3D Player Preview</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">{{ $t('skins.preview_title') }}</span>
           </div>
           <span
             v-if="selectedSkin?.isActive"
             class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-[0_0_8px_rgba(71,210,201,0.25)] shrink-0"
           >
-            Active Skin
+            {{ $t('skins.active_badge') }}
           </span>
         </div>
 
@@ -119,14 +119,14 @@
         <!-- Controls below Preview -->
         <div class="mt-3 flex flex-col gap-2.5">
           <div class="flex items-center justify-between gap-3 bg-[#0a0f16] p-2.5 rounded-xl border border-slate-800/70">
-            <span class="text-xs font-semibold text-slate-300">Model Type:</span>
+            <span class="text-xs font-semibold text-slate-300">{{ $t('skins.model_type') }}</span>
             <select
               v-model="variant"
               class="z-input !w-auto text-xs font-semibold py-1 px-2.5 bg-[#121c27] border-slate-700 rounded-lg"
               @change="onVariantChange"
             >
-              <option value="classic">Classic (Steve / 4px arms)</option>
-              <option value="slim">Slim (Alex / 3px arms)</option>
+              <option value="classic">{{ $t('skins.model_classic') }}</option>
+              <option value="slim">{{ $t('skins.model_slim') }}</option>
             </select>
           </div>
 
@@ -142,10 +142,10 @@
             <span v-if="saving" class="inline-block w-3.5 h-3.5 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
             {{
               saving
-                ? (session?.username ? 'Applying & Syncing…' : 'Applying…')
+                ? (session?.username ? $t('skins.applying_sync') : $t('skins.applying'))
                 : (selectedSkin?.isActive
-                    ? (session?.username ? 'Update & Sync to Minecraft' : 'Update Model Variant')
-                    : (session?.username ? 'Apply & Sync to Minecraft' : 'Apply & Set as Active'))
+                    ? (session?.username ? $t('skins.update_sync') : $t('skins.update_sync'))
+                    : (session?.username ? $t('skins.apply_sync') : $t('skins.apply_active')))
             }}
           </button>
 
@@ -157,7 +157,7 @@
             <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
             </svg>
-            Edit in Paint Studio
+            {{ $t('skins.edit_studio') }}
           </button>
 
           <!-- Save Library/Cloned Skin to Gallery Button -->
@@ -171,7 +171,7 @@
               <polyline points="17 21 17 13 7 13 7 21" />
               <polyline points="7 3 7 8 15 8" />
             </svg>
-            Save to My Skins
+            {{ $t('skins.save_my_skins') }}
           </button>
 
           <!-- Delete History Skin Button -->
@@ -180,7 +180,7 @@
             class="z-btn-danger w-full py-1.5 px-3 text-xs font-semibold rounded-xl"
             @click="deleteAction"
           >
-            Delete from Saved Skins
+            {{ $t('skins.delete_saved') }}
           </button>
         </div>
 
@@ -199,7 +199,7 @@
           <!-- Add Skin Tile -->
           <button
             class="zircon-drop-zone p-5 text-center transition-all flex flex-col items-center justify-center min-h-[220px] gap-3 cursor-pointer group rounded-2xl"
-            title="Import a custom Minecraft skin (.png)"
+            :title="$t('skins.import_tooltip')"
             @click="addSkin"
           >
             <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shadow-[0_0_16px_rgba(71,210,201,0.18)]">
@@ -208,8 +208,8 @@
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </div>
-            <div class="text-xs font-bold text-cyan-300">Import Custom Skin</div>
-            <span class="text-[10px] text-slate-500 font-mono">64x64 PNG file</span>
+            <div class="text-xs font-bold text-cyan-300">{{ $t('skins.import_custom_skin') }}</div>
+            <span class="text-[10px] text-slate-500 font-mono">{{ $t('skins.png_dimensions') }}</span>
           </button>
 
           <!-- Skin Tiles with 3D Isometric Previews -->
@@ -230,13 +230,13 @@
                 v-if="skin.isActive"
                 class="text-[9px] font-black text-accent-ink bg-gradient-to-r from-accent-bright to-accent rounded px-2 py-0.5 shadow-[0_0_8px_var(--color-accent-glow)]"
               >
-                ACTIVE
+                {{ $t('skins.badge_active') }}
               </span>
               <span
                 v-else-if="skin.isPreset"
                 class="text-[9px] font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-500/40 rounded px-1.5 py-0.5"
               >
-                DEFAULT
+                {{ $t('skins.badge_default') }}
               </span>
               <span
                 v-else
@@ -248,7 +248,7 @@
               <div class="flex items-center gap-1">
                 <button
                   class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyan-300 p-0.5 rounded transition-opacity"
-                  title="Edit in Paint Studio"
+                  :title="$t('skins.edit_studio')"
                   @click.stop="openStudio(skin)"
                 >
                   <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -259,7 +259,7 @@
                 <button
                   v-if="!skin.isActive && skin.filename"
                   class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-0.5 rounded transition-opacity"
-                  title="Delete this skin"
+                  :title="$t('skins.delete_skin_tooltip')"
                   @click.stop="deleteSingleSkin(skin)"
                 >
                   <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -311,7 +311,7 @@
                 <button
                   v-if="!skin.isPreset"
                   class="opacity-0 group-hover/name:opacity-100 text-slate-400 hover:text-cyan-300 p-0.5 rounded transition-opacity shrink-0"
-                  title="Rename filename"
+                  :title="$t('skins.rename_tooltip')"
                 >
                   <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -329,9 +329,9 @@
               <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />
             </svg>
           </div>
-          <div class="text-white font-bold text-sm">No custom skins saved yet</div>
+          <div class="text-white font-bold text-sm">{{ $t('skins.no_saved_title') }}</div>
           <div class="text-slate-400 text-xs max-w-xs">
-            Import a PNG skin file or select from the Browse Library tab above.
+            {{ $t('skins.no_saved_desc') }}
           </div>
         </div>
       </div>
@@ -340,15 +340,15 @@
       <div v-else-if="activeTab === 'library'" class="flex-1 min-h-0 overflow-y-auto pr-2 pb-2 flex flex-col gap-5">
         <!-- 1. Clone by Minecraft Username -->
         <div class="bg-[#070b10] border border-slate-800/90 rounded-2xl p-5 shadow-inner">
-          <div class="z-section mb-1 text-white font-bold text-sm">Clone Player Skin by Username</div>
+          <div class="z-section mb-1 text-white font-bold text-sm">{{ $t('skins.clone_title') }}</div>
           <p class="text-xs text-slate-400 mb-3.5 leading-relaxed">
-            Enter any Minecraft player or creator's username to look up and clone their active skin directly.
+            {{ $t('skins.clone_desc') }}
           </p>
           <div class="flex gap-3">
             <input
               v-model="cloneUsername"
               class="z-input flex-1 text-xs py-2 px-3"
-              placeholder="e.g. Notch, Jeb_, Technoblade, MumboJumbo..."
+              :placeholder="$t('skins.clone_placeholder')"
               @keydown.enter="cloneSkinByUsername"
             />
             <button
@@ -358,9 +358,9 @@
             >
               <span v-if="cloning" class="inline-flex items-center gap-1.5">
                 <span class="inline-block w-3 h-3 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
-                Fetching…
+                {{ $t('skins.fetching') }}
               </span>
-              <span v-else>Grab Skin</span>
+              <span v-else>{{ $t('skins.grab_skin') }}</span>
             </button>
           </div>
         </div>
@@ -369,8 +369,8 @@
         <div class="bg-[#070b10] border border-slate-800/90 rounded-2xl p-5 shadow-inner">
           <div class="flex items-center justify-between mb-4 flex-wrap gap-2.5">
             <div>
-              <div class="z-section text-white font-bold text-sm">Community Skin Library</div>
-              <p class="text-xs text-slate-400 mt-0.5">Explore live public Minecraft community skins.</p>
+              <div class="z-section text-white font-bold text-sm">{{ $t('skins.community_title') }}</div>
+              <p class="text-xs text-slate-400 mt-0.5">{{ $t('skins.community_desc') }}</p>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -378,17 +378,17 @@
                 :disabled="communityLoading || currentPageIndex <= 0"
                 @click="onPrevPage"
               >
-                ← Prev
+                {{ $t('skins.prev_page') }}
               </button>
               <span class="text-xs font-mono text-cyan-300 font-bold bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-800">
-                Page {{ currentPageIndex + 1 }}
+                {{ $t('skins.page_indicator', { page: currentPageIndex + 1 }) }}
               </span>
               <button
                 class="z-btn-ghost text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1"
                 :disabled="communityLoading || !nextCursor"
                 @click="onNextPage"
               >
-                Next →
+                {{ $t('skins.next_page') }}
               </button>
             </div>
           </div>
@@ -396,12 +396,12 @@
           <!-- Loading State -->
           <div v-if="communityLoading" class="py-16 text-center text-slate-400 text-xs flex flex-col items-center gap-3">
             <span class="inline-block w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
-            <span>Loading community skins…</span>
+            <span>{{ $t('skins.loading_community') }}</span>
           </div>
 
           <!-- Error / Empty State -->
           <div v-else-if="communitySkins.length === 0" class="py-12 text-center text-slate-400 text-xs leading-relaxed">
-            No community skins available right now. You can clone any skin above by typing a player username!
+            {{ $t('skins.no_community') }}
           </div>
 
           <!-- Community Grid with 3D Isometric Previews (2 at default window, 3-4 when fullscreen/wide) -->
@@ -443,7 +443,7 @@
                     class="z-btn-ghost text-xs px-2.5 py-1.5 rounded-xl font-bold hover:text-cyan-300"
                     @click.stop="selectCommunitySkin(skin)"
                   >
-                    Preview
+                    {{ $t('common.preview') }}
                   </button>
                   <button
                     class="z-btn-ghost text-xs px-2.5 py-1.5 rounded-xl font-bold text-cyan-300 hover:text-white border border-cyan-500/40 hover:border-cyan-400 flex items-center gap-1"
@@ -453,7 +453,7 @@
                     <svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                     </svg>
-                    Edit
+                    {{ $t('common.edit') }}
                   </button>
                 </div>
               </div>

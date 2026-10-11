@@ -1,6 +1,21 @@
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import { listen as tauriListen } from '@tauri-apps/api/event';
 import * as THREE from 'three';
+import { isMockMode, handleMockInvoke } from './mockApi';
+
+function invoke(cmd, args = {}) {
+  if (isMockMode) {
+    return handleMockInvoke(cmd, args);
+  }
+  return tauriInvoke(cmd, args);
+}
+
+function listen(event, callback) {
+  if (isMockMode) {
+    return Promise.resolve(() => {});
+  }
+  return tauriListen(event, callback);
+}
 
 const ACTIVE_SKIN_CACHE_KEY = 'zircon_active_skin_cache';
 
@@ -29,6 +44,7 @@ export function setCachedActiveSkin(skin) {
 
 export const api = {
   // Auth
+  login: () => invoke('login_microsoft'),
   loginMicrosoft: () => invoke('login_microsoft'),
   getCachedSession: () => invoke('get_cached_session'),
   getSession: () => invoke('get_session'),
@@ -128,12 +144,24 @@ export const api = {
     invoke('install_modrinth_modpack', { projectId, versionId, customName }),
   importLocalMrpack: (filePath, customName = null) =>
     invoke('import_local_mrpack', { filePath, customName }),
+  inspectLocalModpack: (filePath) =>
+    invoke('inspect_local_modpack', { filePath }),
+  importMrpackFromUrl: (url, customName = null) =>
+    invoke('import_mrpack_from_url', { url, customName }),
   exportOfflineInstanceMrpack: (instanceId, exportPath) =>
     invoke('export_offline_instance_mrpack', { instanceId, exportPath }),
   exportToZirconServer: (instanceId, worldFolder, exportPath) =>
     invoke('export_to_zircon_server', { instanceId, worldFolder, exportPath }),
   exportServerInstanceToZip: (address, exportPath) =>
     invoke('export_server_instance_to_zip', { address, exportPath }),
+
+  // Universal Launcher Migration
+  scanInstalledLaunchers: (customPaths = null) =>
+    invoke('scan_installed_launchers', { customPaths }),
+  importDiscoveredInstances: (instances, strategy = 'hardlink_with_fallback') =>
+    invoke('import_discovered_instances', { instances, strategy }),
+  onMigrationProgress: (callback) =>
+    listen('migration-progress', (event) => callback(event.payload)),
 
   // Mod Metadata Export, Social Sharing, Snapshots & Repair
   exportInstanceSetup: (instanceId, format = 'share_code', customTitle = null) =>
@@ -157,6 +185,16 @@ export const api = {
 
   // Worlds, Backups & Screenshots
   listInstanceWorlds: (instanceId) => invoke('list_instance_worlds', { instanceId }),
+  getWorldSeedRadarPreview: (instanceId, worldFolder = null, seed = null, centerX = 0, centerZ = 0, radiusBlocks = 384, zoom = 1.0) =>
+    invoke('get_world_seed_radar_preview', {
+      instanceId,
+      worldFolder,
+      seed,
+      centerX,
+      centerZ,
+      radiusBlocks,
+      zoom,
+    }),
   backupInstanceWorld: (instanceId, worldFolder) =>
     invoke('backup_instance_world', { instanceId, worldFolder }),
   listInstanceWorldBackups: (instanceId) => invoke('list_instance_world_backups', { instanceId }),
@@ -167,6 +205,13 @@ export const api = {
   listInstanceScreenshots: (instanceId) => invoke('list_instance_screenshots', { instanceId }),
   deleteInstanceScreenshot: (instanceId, filename) =>
     invoke('delete_instance_screenshot', { instanceId, filename }),
+  getInstanceArtwork: (instanceId) => invoke('get_instance_artwork', { instanceId }),
+
+  // OneDrive Cloud Sync
+  getCloudSyncStatus: () => invoke('get_cloud_sync_status'),
+  listCloudBackups: () => invoke('list_cloud_backups'),
+  triggerCloudBackup: () => invoke('trigger_cloud_backup'),
+  restoreFromCloudBackup: (backupFilename) => invoke('restore_from_cloud_backup', { backupFilename }),
 
   // Tier 2: Co-Op Session (Host for Friends) & P2P Mod Sync
   startCoopSession: (instanceId, worldName, preferredP2pPort = null) =>
@@ -323,7 +368,17 @@ export const api = {
     invoke('check_instance_mod_updates', { instanceId }),
   updateInstanceMods: (instanceId, updates) =>
     invoke('update_instance_mods', { instanceId, updates }),
+  rollbackModUpdate: (instanceId, snapshotFilename) =>
+    invoke('rollback_mod_update', { instanceId, snapshotFilename }),
+  applyCinematicGraphicsPreset: (instanceId) =>
+    invoke('apply_cinematic_graphics_preset', { instanceId }),
   listMinecraftVersions: () => invoke('list_minecraft_versions'),
+
+  // Couch Co-Op Split-Screen
+  launchCouchCoopSession: (request) => invoke('launch_couch_coop_session', { request }),
+  stopCouchCoopSession: () => invoke('stop_couch_coop_session'),
+  getCouchCoopStatus: () => invoke('get_couch_coop_status'),
+  getCouchCoopScreenResolution: () => invoke('get_couch_coop_screen_resolution'),
 
   getMinecraftVersions: (snapshots = false) => invoke('get_minecraft_versions', { snapshots }),
   listLoaderTypes: () => invoke('list_loader_types'),
@@ -350,7 +405,16 @@ export const api = {
   getLastMcLog: () => invoke('get_last_instance_log'),
   clearLastInstanceLog: () => invoke('clear_last_instance_log'),
   clearLastMcLog: () => invoke('clear_last_instance_log'),
-  checkGameCrash: (gameDir) => invoke('check_game_crash', { gameDir }),
+  checkGameCrash: (gameDir, instanceId = null) => invoke('check_game_crash', { gameDir, instanceId }),
+  executeCrashRemediation: (instanceId, action) => invoke('execute_crash_remediation', { instanceId, action }),
+
+  // Mission Control HUD & Live Telemetry
+  getMissionControlTelemetry: () => invoke('get_mission_control_telemetry'),
+  getGamepadTelemetry: () => invoke('get_gamepad_telemetry'),
+
+  // LAN Discovery & Beacons
+  getDiscoveredLanServers: () => invoke('get_discovered_lan_servers'),
+  broadcastLanBeacon: (payload) => invoke('broadcast_lan_beacon', { payload }),
 };
 
 // Launch-flow events emitted from Rust while a game is being prepared/run.
@@ -361,6 +425,8 @@ export const onGameStatus = (cb) => listen('game-status', (e) => cb(e.payload));
 export const onGameCrashed = (cb) => listen('game-crashed', (e) => cb(e.payload));
 export const onGameWindowReady = (cb) => listen('game-window-ready', (e) => cb(e.payload));
 export const onModpackProgress = (cb) => listen('modpack-progress', (e) => cb(e.payload));
+export const onMissionControlTelemetry = (cb) => listen('mission-control-telemetry', (e) => cb(e.payload));
+export const onLanServersChanged = (cb) => listen('lan-servers-changed', (e) => cb(e.payload));
 
 // Emitted by Rust whenever the active skin changes (save, add, boot fetch,
 // remove) so the sidebar avatar can refresh.
@@ -722,5 +788,9 @@ export function onDeepLinkJoin(cb) {
 
 export function onDeepLinkAddServer(cb) {
   return listen('deep-link-add-server', (e) => cb(e.payload));
+}
+
+export function onDeepLinkJoinRequest(cb) {
+  return listen('deep-link-join-request', (e) => cb(e.payload));
 }
 

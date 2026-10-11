@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+  <link rel="canonical" href="https://zirconmc.net/fr/launcher.html">
+  <link rel="alternate" hreflang="x-default" href="https://zirconmc.net/launcher.html">
+  <link rel="alternate" hreflang="en" href="https://zirconmc.net/launcher.html">
+  <link rel="alternate" hreflang="es" href="https://zirconmc.net/es/launcher.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://zirconmc.net/pt-br/launcher.html">
+  <link rel="alternate" hreflang="pt-PT" href="https://zirconmc.net/pt-pt/launcher.html">
+  <link rel="alternate" hreflang="de" href="https://zirconmc.net/de/launcher.html">
+  <link rel="alternate" hreflang="fr" href="https://zirconmc.net/fr/launcher.html">
+  <link rel="alternate" hreflang="it" href="https://zirconmc.net/it/launcher.html">
+  <link rel="alternate" hreflang="ru" href="https://zirconmc.net/ru/launcher.html">
+  <link rel="alternate" hreflang="pl" href="https://zirconmc.net/pl/launcher.html">
+  <link rel="alternate" hreflang="nl" href="https://zirconmc.net/nl/launcher.html">
+  <link rel="alternate" hreflang="tr" href="https://zirconmc.net/tr/launcher.html">
+  <link rel="alternate" hreflang="sv" href="https://zirconmc.net/sv/launcher.html">
+  <link rel="alternate" hreflang="uk" href="https://zirconmc.net/uk/launcher.html">
+  <link rel="alternate" hreflang="cs" href="https://zirconmc.net/cs/launcher.html">
+  <link rel="alternate" hreflang="fi" href="https://zirconmc.net/fi/launcher.html">
+  <link rel="alternate" hreflang="da" href="https://zirconmc.net/da/launcher.html">
+  <link rel="alternate" hreflang="no" href="https://zirconmc.net/no/launcher.html">
+  <link rel="alternate" hreflang="hu" href="https://zirconmc.net/hu/launcher.html">
+  <link rel="alternate" hreflang="ro" href="https://zirconmc.net/ro/launcher.html">
+  <link rel="alternate" hreflang="el" href="https://zirconmc.net/el/launcher.html">
+  <link rel="alternate" hreflang="bg" href="https://zirconmc.net/bg/launcher.html">
+  <link rel="alternate" hreflang="sk" href="https://zirconmc.net/sk/launcher.html">
+  <link rel="alternate" hreflang="hr" href="https://zirconmc.net/hr/launcher.html">
+  <link rel="alternate" hreflang="sr" href="https://zirconmc.net/sr/launcher.html">
+  <link rel="alternate" hreflang="sl" href="https://zirconmc.net/sl/launcher.html">
+  <link rel="alternate" hreflang="lt" href="https://zirconmc.net/lt/launcher.html">
+  <link rel="alternate" hreflang="lv" href="https://zirconmc.net/lv/launcher.html">
+  <link rel="alternate" hreflang="et" href="https://zirconmc.net/et/launcher.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://zirconmc.net/zh-cn/launcher.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://zirconmc.net/zh-tw/launcher.html">
+  <link rel="alternate" hreflang="ja" href="https://zirconmc.net/ja/launcher.html">
+  <link rel="alternate" hreflang="ko" href="https://zirconmc.net/ko/launcher.html">
+  <link rel="alternate" hreflang="id" href="https://zirconmc.net/id/launcher.html">
+  <link rel="alternate" hreflang="vi" href="https://zirconmc.net/vi/launcher.html">
+  <link rel="alternate" hreflang="th" href="https://zirconmc.net/th/launcher.html">
+  <link rel="alternate" hreflang="ms" href="https://zirconmc.net/ms/launcher.html">
+  <link rel="alternate" hreflang="fil" href="https://zirconmc.net/fil/launcher.html">
+  <link rel="alternate" hreflang="hi" href="https://zirconmc.net/hi/launcher.html">
+  <link rel="alternate" hreflang="ar" href="https://zirconmc.net/ar/launcher.html">
+  <link rel="alternate" hreflang="he" href="https://zirconmc.net/he/launcher.html">
+  <link rel="alternate" hreflang="fa" href="https://zirconmc.net/fa/launcher.html">
+
+<!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+<script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zircon Launcher — Automatic Mod Sync &amp; Modded Minecraft for Players</title>
+<meta content="Download Zircon Launcher for players. Official Microsoft sign-in, automatic mod synchronization from Modrinth &amp; CurseForge, 3D skin editor, community skin library, and single-click server joining." name="description"/>
+<meta content="zircon launcher, minecraft modded launcher, automatic mod sync, curseforge modrinth launcher, fabric forge neoforge launcher" name="keywords"/>
+<meta content="Zircon Contributors" name="author"/>
+<meta content="index, follow" name="robots"/>
+<meta content="#0d1117" name="theme-color"/>
+<!-- Canonical URL -->
+<link href="https://zirconmc.net/launcher.html" rel="canonical"/>
+<!-- Open Graph / Social Sharing -->
+<meta content="Zircon" property="og:site_name"/>
+<meta content="https://zirconmc.net/launcher.html" property="og:url"/>
+<meta content="Zircon Launcher — Automatic Mod Sync for Players" property="og:title"/>
+<meta content="Sign in with Microsoft, pick a server, hit PLAY — mods sync automatically verified against Modrinth &amp; CurseForge." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://zirconmc.net/assets/img/locales/fr/main_launcher.png" property="og:image"/>
+<meta content="en_US" property="og:locale"/>
+<!-- Favicons & Manifest -->
+<link href="../assets/img/favicon.png" rel="icon" type="image/png"/>
+<link href="../assets/img/favicon.png" rel="apple-touch-icon"/>
+<link href="../site.webmanifest" rel="manifest"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+</head>
+<body>
+<!-- Animated Procedural Background Elements -->
+<div class="z-bg-dots"></div>
+<div class="z-orb z-orb-1"></div>
+<div class="z-orb z-orb-2"></div>
+<div class="z-orb z-orb-3"></div>
+<div class="z-orb z-orb-4"></div>
+<div class="z-particle z-particle-1"></div>
+<div class="z-particle z-particle-2"></div>
+<div class="z-particle z-particle-3"></div>
+<div class="z-particle z-particle-4"></div>
+<div class="z-particle z-particle-5"></div>
+<div class="z-particle z-particle-6"></div>
+<!-- ================= NAV ================= -->
+<header class="site-nav">
+<div class="container">
+<a aria-label="Zircon home" class="brand" href="./">
+<img alt="Zircon" class="brand-text" height="28" src="../assets/img/zircon-title.svg" width="130"/>
+</a>
+<button aria-expanded="false" aria-label="Toggle navigation" class="nav-toggle">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"></path>
+</svg>
+</button>
+<ul class="nav-links">
+<li data-i18n="launcher.home"><a data-i18n="launcher.home_1" href="/">Accueil</a></li>
+<li data-i18n="launcher.launcher"><a class="active" data-i18n="launcher.launcher_1" href="launcher.html">Launcher</a></li>
+<li data-i18n="launcher.server_manager"><a data-i18n="launcher.server_manager_1" href="server.html">Gestionnaire de serveur</a></li>
+<li data-i18n="launcher.guides"><a data-i18n="launcher.guides_1" href="docs.html">Guides</a></li>
+<li data-i18n="launcher.faq"><a data-i18n="launcher.faq_1" href="faq.html">FAQ</a></li>
+<li data-i18n="launcher.downloads"><a data-i18n="launcher.downloads_1" href="downloads.html">Téléchargements</a></li>
+<li data-i18n="launcher.github"><a aria-label="GitHub Repository" class="nav-github-link" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg viewbox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+<span data-i18n="launcher.github_1">GitHub</span>
+</a></li>
+<li data-i18n="launcher.get_launcher"><a class="nav-cta" data-i18n="launcher.get_launcher_1" href="downloads.html#players">Obtenir le Launcher</a></li>
+</ul>
+</div>
+</header>
+<!-- ================= HERO ================= -->
+<section class="page-hero">
+<div class="container">
+<span class="eyebrow" data-i18n="launcher.for_minecraft_players">Pour les joueurs Minecraft</span>
+<h1 data-i18n="launcher.one_click_exact_modsstraight">Un clic. Mods exacts.<br/><span class="hl" data-i18n="launcher.straight_into_the_game">Directement dans le jeu.</span></h1>
+<p data-i18n="launcher.the_zircon_launcher_handles">Le Zircon Launcher gère automatiquement les environnements Java, les chargeurs de mods Fabric/Forge/NeoForge et la synchronisation des mods. De plus : migration en 1 clic depuis CurseForge & Prism, co-op canapé à 4 joueurs et découverte automatique LAN.</p>
+<div class="hero-actions-stacked" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 12px;">
+<div data-i18n="launcher.download_for_windows_exestar" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><a class="btn btn-primary btn-xl" data-i18n="launcher.download_for_windows_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe" id="hero-primary-download">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+<span class="download-label" data-i18n="launcher.download_for_windows_exe_1">Télécharger pour Windows (.exe)</span>
+</a>
+<a class="btn btn-secondary btn-xl" data-i18n="launcher.star_on_github" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg fill="currentColor" height="20" viewbox="0 0 24 24" width="20"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+            Étoile sur GitHub
+          </a></div>
+<div class="hero-sublinks-row" data-i18n="launcher.also_onmacos_dmglinux_appimagezero" style="color: var(--muted); font-size: 0.9rem; margin-top: 4px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><span data-i18n="launcher.also_onmacos_dmglinux_appimage">Aussi disponible sur <a data-i18n="launcher.macos_dmg" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">macOS (.dmg)</a> &amp; <a data-i18n="launcher.linux_appimage" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">Linux (.AppImage)</a></span>
+<span>·</span>
+<span data-i18n="launcher.zero_telemetry_100_free">Zéro télémétrie · 100% Gratuit & Open Source</span></div>
+</div>
+</div>
+</section>
+<!-- ================= INTERACTIVE LAUNCHER CAROUSEL ================= -->
+<section class="section" style="padding-top: 0;">
+<div class="container">
+<div class="carousel">
+<div class="carousel-track">
+<!-- Slide 1: Main Launcher -->
+<div class="carousel-slide active">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.zircon_launcher_oneclick_play"><span data-i18n="launcher.zircon_launcher_oneclick_play_1">Zircon Launcher — Jeu en un clic</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Zircon Launcher Main Screen" height="600" loading="eager" src="../assets/img/locales/fr/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="launcher.server_dashboardpick_any_server"><b data-i18n="launcher.server_dashboard">Tableau de bord du serveur :</b> Choisissez n'importe quel serveur, consultez le nombre de joueurs et cliquez sur JOUER pour une synchronisation instantanée des mods.</div>
+</div>
+<!-- Slide 2: Universal Migration -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.universal_migration_importer"><span data-i18n="launcher.universal_migration_importer_1">Importateur de migration universel</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Universal Migration Importer" height="600" loading="lazy" src="../assets/img/locales/fr/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="launcher.universal_importer1click_import_from"><b data-i18n="launcher.universal_importer">Importateur universel :</b> Importation en 1 clic depuis CurseForge, Prism Launcher, Modrinth et ATLauncher sans aucune perte de données.</div>
+</div>
+<!-- Slide 3: 4-Player Couch Co-op -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.4player_couch_coop_setup"><span data-i18n="launcher.4player_couch_coop_setup_1">Configuration Co-op Canapé à 4 Joueurs</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="4-Player Couch Co-op Gamepad Setup" height="600" loading="lazy" src="../assets/img/locales/fr/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="launcher.couch_coopconnect_up_to"><b data-i18n="launcher.couch_coop">Co-op Canapé :</b> Connectez jusqu'à 4 manettes pour jouer en écran partagé (édition Java) sur votre moniteur ou TV du salon.</div>
+</div>
+<!-- Slide 4: 3D Skin Selector -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.saved_skin_selector_3d"><span data-i18n="launcher.saved_skin_selector_3d_1">Sélecteur de skins sauvegardées & Aperçu 3D</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="Saved Skin Selector &amp; 3D Studio" height="600" loading="lazy" src="../assets/img/locales/fr/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="launcher.saved_skin_selectorselect_saved"><b data-i18n="launcher.saved_skin_selector">Sélecteur de skins sauvegardées :</b> Sélectionnez vos skins enregistrées ou téléchargez des PNG personnalisés avec un aperçu 3D rotatif et synchronisation cloud Mojang.</div>
+</div>
+<!-- Slide 5: LAN Auto-Discovery & UPnP -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.lan_autodiscovery_nearby_friends"><span data-i18n="launcher.lan_autodiscovery_nearby_friends_1">Découverte automatique LAN & Amis proches</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="LAN Auto-Discovery" height="600" loading="lazy" src="../assets/img/locales/fr/lan_nearby_friends.png" onerror="this.onerror=null; this.src='../assets/img/lan_nearby_friends.png';" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="launcher.lan_autodiscoverydiscovers_nearby_zircon"><b data-i18n="launcher.lan_autodiscovery">Découverte automatique LAN :</b> Détecte les parties Zircon proches via Wi-Fi local sans redirection de ports, ou rejoignez avec des codes à 6 chiffres.</div>
+</div>
+<!-- Slide 6: 2048 & Discord Rich Presence -->
+<div class="carousel-slide">
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.2048_while_you_wait"><span data-i18n="launcher.2048_while_you_wait_1">2048 pendant l'attente & Présence Discord</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
+</div>
+<img alt="2048 and Discord Presence in Zircon" height="600" loading="lazy" src="../assets/img/locales/fr/settings_launcher.png" onerror="this.onerror=null; this.src='../assets/img/settings_launcher.png';" width="1000"/>
+</div>
+<div class="carousel-caption" data-i18n="launcher.2048_discordplay_builtin_2048"><b data-i18n="launcher.2048_discord">2048 & Discord :</b> Jouez au 2048 intégré pendant que les gros modpacks s'initialisent ; la présence riche diffuse en direct votre modpack et serveur à vos amis.</div>
+</div>
+<!-- Floating On-Image Navigation Controls -->
+<button aria-label="Previous screenshot" class="carousel-btn carousel-prev">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+</button>
+<button aria-label="Next screenshot" class="carousel-btn carousel-next">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+</button>
+</div>
+<!-- Carousel Navigation Controls -->
+<div class="carousel-nav">
+<div class="carousel-dots">
+<button aria-label="Slide 1" class="carousel-dot active"></button>
+<button aria-label="Slide 2" class="carousel-dot"></button>
+<button aria-label="Slide 3" class="carousel-dot"></button>
+<button aria-label="Slide 4" class="carousel-dot"></button>
+<button aria-label="Slide 5" class="carousel-dot"></button>
+<button aria-label="Slide 6" class="carousel-dot"></button>
+</div>
+</div>
+<!-- Carousel Thumbnails -->
+<div class="carousel-thumbs">
+<button aria-label="View Main Launcher" class="carousel-thumb active"><img alt="Main Launcher" src="../assets/img/locales/fr/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';"/></button>
+<button aria-label="View Universal Importer" class="carousel-thumb"><img alt="Migration" src="../assets/img/locales/fr/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';"/></button>
+<button aria-label="View Couch Co-op" class="carousel-thumb"><img alt="Co-op" src="../assets/img/locales/fr/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';"/></button>
+<button aria-label="View Skin Selector" class="carousel-thumb"><img alt="Skin Selector" src="../assets/img/locales/fr/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';"/></button>
+<button aria-label="View LAN Auto-Discovery" class="carousel-thumb"><img alt="LAN Friends" src="../assets/img/locales/fr/lan_nearby_friends.png" onerror="this.onerror=null; this.src='../assets/img/lan_nearby_friends.png';"/></button>
+<button aria-label="View 2048 &amp; Discord" class="carousel-thumb"><img alt="2048 &amp; Discord" src="../assets/img/locales/fr/settings_launcher.png" onerror="this.onerror=null; this.src='../assets/img/settings_launcher.png';"/></button>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SPOTLIGHT 1: UNIVERSAL MIGRATION ================= -->
+<section class="section">
+<div class="container">
+<div class="feature-split">
+<div class="feature-split-text">
+<h2 data-i18n="launcher.universal_1click_migration">Migration universelle en 1 clic</h2>
+<p data-i18n="launcher.switching_from_curseforge_prism">Vous passez de CurseForge, Prism Launcher, Modrinth App ou ATLauncher ? Zircon détecte automatiquement vos profils de launcher installés sur le disque. Sélectionnez vos instances et importez-les sans perte dans des bacs isolés en moins de 2 secondes.</p>
+<ul class="spec-list">
+<li data-i18n="launcher.lossless_preservationkeeps_optionstxt_keybindings"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.lossless_preservationkeeps_optionstxt_keybindings_1"><b data-i18n="launcher.lossless_preservation">Préservation sans perte :</b> Conserve options.txt, raccourcis clavier, mondes et textures personnalisées.</span></li>
+<li data-i18n="launcher.100_local_privateno_external"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.100_local_privateno_external_1"><b data-i18n="launcher.100_local_private">100% Local & Privé :</b> Aucune conversion cloud externe ; fonctionne entièrement sur votre PC.</span></li>
+<li data-i18n="launcher.instant_playautomatically_assigns_optimal"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.instant_playautomatically_assigns_optimal_1"><b data-i18n="launcher.instant_play">Jeu instantané :</b> Attribue automatiquement les environnements Java optimaux et les flags mémoire.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.universal_launcher_importer"><span data-i18n="launcher.universal_launcher_importer_1">Importateur de launcher universel</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="Universal Migration Importer" height="500" loading="lazy" src="../assets/img/locales/fr/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SPOTLIGHT 2: 4-PLAYER COUCH CO-OP ================= -->
+<section class="section">
+<div class="container">
+<div class="feature-split reverse">
+<div class="feature-split-text">
+<h2 data-i18n="launcher.4player_couch_coop_with">Co-op Canapé à 4 Joueurs avec Manettes</h2>
+<p data-i18n="launcher.turn_your_pc_or">Transformez votre PC ou la TV de votre salon en console de jeu en écran partagé. Connectez jusqu'à 4 manettes (Xbox, PlayStation ou Bluetooth génériques) et jouez à l'édition Java côte à côte avec vos amis et votre famille.</p>
+<ul class="spec-list">
+<li data-i18n="launcher.native_gamepad_inputsmooth_analog"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.native_gamepad_inputsmooth_analog_1"><b data-i18n="launcher.native_gamepad_input">Entrée manette native :</b> Mouvement fluide des sticks analogiques, gâchettes et support de vibration.</span></li>
+<li data-i18n="launcher.automated_grid_arrangementclean_2player"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.automated_grid_arrangementclean_2player_1"><b data-i18n="launcher.automated_grid_arrangement">Agencement automatique en grille :</b> Mosaïque propre des fenêtres pour 2 ou 4 joueurs.</span></li>
+<li data-i18n="launcher.independent_profileseach_quadrant_loads"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.independent_profileseach_quadrant_loads_1"><b data-i18n="launcher.independent_profiles">Profils indépendants :</b> Chaque quadrant charge sa propre skin de personnage et son inventaire.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.4player_couch_coop_controller"><span data-i18n="launcher.4player_couch_coop_controller_1">Configuration des manettes Co-op Canapé à 4 Joueurs</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="4-Player Couch Co-op" height="500" loading="lazy" src="../assets/img/locales/fr/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SPOTLIGHT 3: 3D SKIN STUDIO & COMMUNITY SKINS ================= -->
+<section class="section">
+<div class="container">
+<div class="feature-split">
+<div class="feature-split-text">
+<h2 data-i18n="launcher.saved_skin_selector_community">Sélecteur de skins sauvegardées & Bibliothèque communautaire</h2>
+<p data-i18n="launcher.choose_from_your_saved">Choisissez parmi vos skins de personnages sauvegardées ou téléchargez des PNG personnalisés avec un aperçu 3D rotatif en temps réel. Besoin d'inspiration ? Parcourez des milliers de skins communautaires tendance récupérées directement via API et appliquez-les en un clic.</p>
+<ul class="spec-list">
+<li data-i18n="launcher.live_3d_viewportpreview_classic"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.live_3d_viewportpreview_classic_1"><b data-i18n="launcher.live_3d_viewport">Aperçu 3D en direct :</b> Prévisualisez les géométries classiques Steve et slim Alex en 3D.</span></li>
+<li data-i18n="launcher.community_api_librarysearch_thousands"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.community_api_librarysearch_thousands_1"><b data-i18n="launcher.community_api_library">Bibliothèque API communautaire :</b> Recherchez des milliers de skins communautaires tendance en direct.</span></li>
+<li data-i18n="launcher.mojang_account_syncone_click"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.mojang_account_syncone_click_1"><b data-i18n="launcher.mojang_account_sync">Synchronisation compte Mojang :</b> Un clic pousse votre skin vers les serveurs officiels Minecraft.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.skin_customizer"><span data-i18n="launcher.skin_customizer_1">Personnalisateur de skins</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="3D Skin Studio" height="500" loading="lazy" src="../assets/img/locales/fr/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SPOTLIGHT 4: LAN AUTO-DISCOVERY & SETTINGS ================= -->
+<section class="section">
+<div class="container">
+<div class="feature-split reverse">
+<div class="feature-split-text">
+<h2 data-i18n="launcher.lan_autodiscovery_offline_worlds">Découverte automatique LAN & Mondes hors ligne</h2>
+<p data-i18n="launcher.playing_with_roommates_or">Vous jouez avec des colocataires ou des amis sur le même Wi-Fi ? Zircon découvre automatiquement les serveurs locaux sans saisir d'adresses IP ni rediriger les ports du routeur. De plus, créez des instances solo hors ligne isolées avec allocation de RAM dédiée.</p>
+<ul class="spec-list">
+<li data-i18n="launcher.lan_autodiscoveryfinds_nearby_games"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.lan_autodiscoveryfinds_nearby_games_1"><b data-i18n="launcher.lan_autodiscovery_1">Découverte automatique LAN :</b> Trouve les parties proches et les latences ping sur votre réseau domestique.</span></li>
+<li data-i18n="launcher.adaptive_memory_sliderallocate_2"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.adaptive_memory_sliderallocate_2_1"><b data-i18n="launcher.adaptive_memory_slider">Curseur de mémoire adaptatif :</b> Allouez facilement de 2 Go à 32 Go de RAM par instance.</span></li>
+<li data-i18n="launcher.automatic_java_resolverfetches_verified"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>
+<span data-i18n="launcher.automatic_java_resolverfetches_verified_1"><b data-i18n="launcher.automatic_java_resolver">Résolveur Java automatique :</b> Récupère les JDK Eclipse Temurin vérifiés sans configuration manuelle de chemin.</span></li>
+</ul>
+</div>
+<div class="app-frame">
+<div aria-hidden="true" class="frame-bar">
+<div class="frame-dots"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span></div>
+<div class="frame-title" data-i18n="launcher.lan_autodiscovery_engine_settings"><span data-i18n="launcher.lan_autodiscovery_engine_settings_1">Découverte automatique LAN & Paramètres du moteur</span></div>
+<div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
+</div>
+<img alt="LAN Auto-Discovery &amp; Settings" height="500" loading="lazy" src="../assets/img/locales/fr/lan_nearby_friends.png" onerror="this.onerror=null; this.src='../assets/img/lan_nearby_friends.png';" width="800"/>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= CORE FEATURES GRID ================= -->
+<section class="section">
+<div class="container">
+<div class="section-head">
+<h2 data-i18n="launcher.engineered_for_seamless_modded">Conçu pour un jeu moddé sans couture</h2>
+<p data-i18n="launcher.no_more_hunting_zip">Fini la chasse aux fichiers zip, les conflits de versions ou les heures passées à déboguer les logs de crash.</p>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg></span>
+<h3 data-i18n="launcher.1click_modded_play">Jeu moddé en 1 clic</h3>
+<p data-i18n="launcher.hit_play_zircon_connects">Cliquez sur JOUER. Zircon se connecte à votre serveur, compare les manifestes de mods, vérifie les hachages via Modrinth & CurseForge et ne télécharge que les fichiers manquants en parallèle.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="7" rx="1.5" width="7" x="3" y="3"></rect><rect height="7" rx="1.5" width="7" x="14" y="3"></rect><rect height="7" rx="1.5" width="7" x="14" y="14"></rect><rect height="7" rx="1.5" width="7" x="3" y="14"></rect></svg></span>
+<h3 data-i18n="launcher.2048_discord_presence">2048 & Présence Discord</h3>
+<p data-i18n="launcher.play_builtin_2048_while">Jouez au 2048 intégré pendant que les packs massifs de 300 mods se chargent. La présence riche Discord diffuse automatiquement votre modpack actif et votre serveur à vos amis.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
+<h3 data-i18n="launcher.3d_skin_studio_library">Studio & Bibliothèque de skins 3D</h3>
+<p data-i18n="launcher.saved_skin_selector_with">Sélecteur de skins sauvegardées avec aperçu 3D en direct, synchronisation officielle du compte Mojang et explorateur de skins communautaire in-app récupérant les skins tendance en direct via API.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></span>
+<h3 data-i18n="launcher.ui_customization_themes">Personnalisation UI & Thèmes</h3>
+<p data-i18n="launcher.personalize_the_launcher_look">Personnalisez l'apparence du launcher avec des accents de couleur personnalisés, des palettes sombres élégantes et une densité de vue configurable pour correspondre à votre setup de battlestation.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg></span>
+<h3 data-i18n="launcher.offline_instances_world_import">Instances hors ligne & Import de monde</h3>
+<p data-i18n="launcher.import_singleplayer_worlds_and">Importez des mondes solo et jouez complètement hors ligne sans internet. Définissez une allocation de RAM personnalisée par instance et isolez les modpacks dans des bacs séparés.</p>
+</div>
+<div class="card">
+<span class="card-icon"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
+<h3 data-i18n="launcher.clientside_server_tweaks">Ajustements côté client du serveur</h3>
+<p data-i18n="launcher.add_optional_performance_mods">Ajoutez des mods de performance optionnels, des shaders, des raccourcis clavier et des minimaps à n'importe quel profil de serveur sans casser la synchronisation cryptographique des manifestes.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= CTA ================= -->
+<section class="section" style="padding-top: 40px;">
+<div class="container">
+<div class="cta-band">
+<h2 data-i18n="launcher.download_the_zircon_launcher">Télécharger le Zircon Launcher</h2>
+<p data-i18n="launcher.free_and_open_source">Gratuit et open source. Connectez-vous avec Microsoft et plongez directement dans votre serveur préféré.</p>
+<a class="btn btn-white btn-lg" data-i18n="launcher.download_zircon_launcher_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_x64-setup.exe"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+          Télécharger Zircon Launcher (.exe)</a>
+<a class="btn btn-ghost btn-lg" data-i18n="launcher.all_platforms_macos_linux" href="downloads.html#players">Toutes les plateformes (macOS & Linux)</a>
+</div>
+</div>
+</section>
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+<div class="container">
+<div class="footer-grid">
+<div class="footer-brand">
+<a class="brand" href="./" style="display: inline-block; margin-bottom: 14px; text-decoration: none;">
+<img alt="Zircon" class="brand-text" height="26" src="../assets/img/zircon-title.svg"/>
+</a>
+<p data-i18n="launcher.a_free_opensource_launcher">Un launcher et gestionnaire de serveur gratuit et open source pour Minecraft moddé. Synchronisation exacte des mods vérifiée à chaque lancement contre Modrinth & CurseForge.</p>
+<a class="pill pill-accent" data-i18n="launcher.sourceavailable_bsl_11" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">Source-Available (BSL 1.1)</a>
+</div>
+<div class="footer-col">
+<h4 data-i18n="launcher.pages">Pages</h4>
+<ul>
+<li data-i18n="launcher.home_2"><a data-i18n="launcher.home_3" href="/">Accueil</a></li>
+<li data-i18n="launcher.launcher_2"><a data-i18n="launcher.launcher_3" href="launcher.html">Launcher</a></li>
+<li data-i18n="launcher.server_manager_2"><a data-i18n="launcher.server_manager_3" href="server.html">Gestionnaire de serveur</a></li>
+<li data-i18n="launcher.guides_docs"><a data-i18n="launcher.guides_docs_1" href="docs.html">Guides & Docs</a></li>
+<li data-i18n="launcher.faq_2"><a data-i18n="launcher.faq_3" href="faq.html">FAQ</a></li>
+<li data-i18n="launcher.downloads_2"><a data-i18n="launcher.downloads_3" href="downloads.html">Téléchargements</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<h4 data-i18n="launcher.project_community">Projet & Communauté</h4>
+<ul>
+<li data-i18n="launcher.github_repository"><a data-i18n="launcher.github_repository_1" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">Dépôt GitHub</a></li>
+<li data-i18n="launcher.releases_changelogs"><a data-i18n="launcher.releases_changelogs_1" href="https://github.com/DevTheDev189/Zircon/releases" rel="noopener" target="_blank">Versions & Changelogs</a></li>
+<li data-i18n="launcher.business_source_license_11"><a data-i18n="launcher.business_source_license_11_1" href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" rel="noopener" target="_blank">Business Source License 1.1</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-legal" data-i18n="launcher.zircon_contributors_v0421_active"><span data-i18n="launcher.zircon_contributors_v0421_active_1">© Contributeurs Zircon · v0.4.21 (développement actif)</span>
+<span data-i18n="launcher.not_an_official_minecraft">Ce produit n'est pas un produit officiel Minecraft. Il n'est ni approuvé ni associé à Mojang Studios ou Microsoft.</span></div>
+</div>
+</footer>
+<script src="../assets/js/main.js?v=2"></script>
+</body>
+</html>

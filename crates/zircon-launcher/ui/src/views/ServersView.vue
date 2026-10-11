@@ -4,7 +4,7 @@
     <div class="flex-1 flex flex-col min-w-0">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2.5">
-          <span class="z-section text-white font-bold text-base">Your Servers</span>
+          <span class="z-section text-white font-bold text-base">{{ $t('servers.your_servers') }}</span>
           <span
             v-if="servers.length > 0"
             class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-accent/15 text-accent-bright border border-accent/30 font-mono shadow-[0_0_8px_var(--color-accent-glow)]"
@@ -16,12 +16,12 @@
           <button
             class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold bg-accent/15 text-accent-bright border border-accent/30 hover:bg-accent/25 transition-all shadow-sm"
             @click="showJoinCodeModal = true"
-            title="Connect directly using a 6-character Join Code from a friend"
+            :title="$t('servers.join_code_tooltip')"
           >
             <svg class="w-3.5 h-3.5 text-accent-bright" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
-            <span>Join via Code</span>
+            <span>{{ $t('servers.join_code_btn') }}</span>
           </button>
           <button
             class="z-btn-ghost text-xs flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-accent-bright border border-slate-700/80 hover:border-accent/50 hover:bg-accent/10 transition-all shadow-sm"
@@ -31,13 +31,16 @@
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Add Server
+            {{ $t('servers.add_server_btn') }}
           </button>
         </div>
 
       </div>
 
       <div class="flex-1 min-h-0 overflow-y-auto pr-1">
+        <!-- Local Wi-Fi / Multicast Discovered Games & Nearby Friends -->
+        <NearbyFriendsCard @join="onJoinLanServer" />
+
         <div
           v-if="servers.length === 0"
           class="flex flex-col items-center justify-center p-8 bg-[#0a0f14]/60 border border-dashed border-slate-800 rounded-2xl text-center my-4"
@@ -50,12 +53,12 @@
               <line x1="6" y1="18" x2="6.01" y2="18" />
             </svg>
           </div>
-          <div class="text-white font-bold text-sm mb-1">No saved servers yet</div>
+          <div class="text-white font-bold text-sm mb-1">{{ $t('servers.no_servers_title') }}</div>
           <div class="text-slate-400 text-xs max-w-xs mb-4">
-            Enter a server address to auto-detect its modpack and jump right into the game.
+            {{ $t('servers.no_servers_desc') }}
           </div>
           <button class="z-btn-accent text-xs font-bold px-4 py-2 rounded-xl" @click="openAddDialog">
-            + Add Your First Server
+            {{ $t('servers.add_first_server') }}
           </button>
         </div>
 
@@ -114,7 +117,7 @@
               <span
                 v-if="isThisServerRunning(server.address)"
                 class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#4ade80] ring-2 ring-[#070b0f] animate-pulse shadow-[0_0_6px_#4ade80]"
-                title="Game is running"
+                :title="$t('servers.game_running_tooltip')"
               ></span>
             </div>
 
@@ -124,7 +127,7 @@
                 <span
                   v-if="server.useHttps"
                   class="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30"
-                  title="HTTPS Secure"
+                  :title="$t('servers.https_secure')"
                 >
                   HTTPS
                 </span>
@@ -136,17 +139,17 @@
                   v-if="statusView(server.address).state === 'checking'"
                   class="shrink-0 text-cyan-300/80 flex items-center gap-1.5"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full bg-accent animate-ping"></span> checking…
+                  <span class="w-1.5 h-1.5 rounded-full bg-accent animate-ping"></span> {{ $t('servers.status_checking') }}
                 </span>
                 <span
                   v-else-if="statusView(server.address).state === 'waking'"
                   class="shrink-0 text-amber-300 flex items-center gap-1.5 font-medium"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span> waking up…
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span> {{ $t('servers.status_waking') }}
                 </span>
                 <template v-else-if="statusView(server.address).state === 'online'">
                   <span class="shrink-0 font-medium text-[#4ade80]">
-                    {{ statusView(server.address).online }}/{{ statusView(server.address).max }} online
+                    {{ statusView(server.address).online }}/{{ statusView(server.address).max }} {{ $t('servers.status.online').toLowerCase() }}
                   </span>
                   <span
                     class="shrink-0 text-[10px] px-1.5 py-0.2 rounded-md font-mono font-semibold"
@@ -158,12 +161,12 @@
                 <span
                   v-else-if="statusView(server.address).state === 'asleep'"
                   class="shrink-0 font-medium text-amber-400 flex items-center gap-1.5"
-                  title="Server is asleep (idle shutdown) — PLAY will wake it automatically"
+                  :title="$t('servers.status_asleep_tooltip')"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> asleep (auto-wake)
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> {{ $t('servers.status_asleep') }}
                 </span>
                 <span v-else class="shrink-0 text-slate-500 flex items-center gap-1.5">
-                  <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> offline
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> {{ $t('servers.status_offline') }}
                 </span>
               </div>
             </div>
@@ -175,7 +178,7 @@
                 disabled
               >
                 <span class="inline-block w-3.5 h-3.5 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
-                LAUNCHING
+                {{ $t('servers.btn_launching') }}
               </button>
               <button
                 v-else-if="gameRunning"
@@ -183,7 +186,7 @@
                 :disabled="!isThisServerRunning(server.address)"
                 @click="stopGame"
               >
-                {{ isThisServerRunning(server.address) ? 'STOP' : 'PLAY' }}
+                {{ isThisServerRunning(server.address) ? $t('servers.btn_stop') : $t('servers.btn_play') }}
               </button>
               <button
                 v-else
@@ -193,14 +196,14 @@
                 <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
                 </svg>
-                PLAY
+                {{ $t('servers.btn_play') }}
               </button>
               <button
                 class="text-slate-400 hover:text-[#f87171] transition-colors p-2 rounded-xl hover:bg-red-500/10 shrink-0"
                 :disabled="isLaunching(server.address)"
                 :title="isThisServerRunning(server.address)
-                  ? 'Stop the game before removing this server'
-                  : 'Remove server and delete its local instance files'"
+                  ? $t('servers.remove_running_tooltip')
+                  : $t('servers.remove_tooltip')"
                 @click="removeServer(server)"
               >
                 <svg
@@ -224,55 +227,38 @@
           <div class="relative z-10 flex items-center justify-between px-4 pb-2 pt-1 border-t border-white/[0.04] bg-black/20">
             <div class="text-[10px] text-slate-500 font-mono tracking-tight flex items-center gap-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-cyan-400/50"></span>
-              Instance Customization
+              {{ $t('servers.instance_customization') }}
             </div>
-            <button
-              class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md hover:bg-slate-800/80 text-slate-400 hover:text-cyan-300 transition-colors text-xs font-bold group/btn"
-              title="Configure mods, shaders & resource packs"
-              @click.stop="openConfigModal(server)"
-            >
-              <span class="tracking-widest text-slate-400 group-hover/btn:text-cyan-300">•••</span>
-              <span class="text-[10px] font-semibold tracking-wide">Configure</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Zircon Cloud In-App Banner -->
-        <div class="my-3 p-3.5 rounded-2xl border border-accent/30 bg-gradient-to-r from-well/90 via-card/85 to-well/90 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-9 h-9 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center shrink-0 shadow-[0_0_12px_var(--color-accent-glow)]">
-              <svg class="w-4 h-4 text-accent-bright" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
-              </svg>
-            </div>
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="text-white text-xs font-bold tracking-tight">Host Your Own 24/7 Minecraft Server</span>
-                <span class="text-[9px] font-mono font-bold uppercase bg-accent/20 text-accent-bright px-1.5 py-0.2 rounded border border-accent/30">Zircon Cloud</span>
-              </div>
-              <p class="text-slate-400 text-[10.5px] truncate mt-0.5">
-                Zero port-forwarding, instant player mod sync, and automated NVMe snapshots.
-              </p>
+            <div class="flex items-center gap-2">
+              <button
+                class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md hover:bg-accent/20 text-accent-bright hover:text-white transition-colors text-xs font-semibold cursor-pointer border border-accent/25 hover:border-accent/40 shadow-sm"
+                :title="$t('servers.split_screen_title')"
+                @click.stop="openCouchCoop(server)"
+              >
+                <svg class="w-3.5 h-3.5 text-accent-bright" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                </svg>
+                <span class="text-[10px] font-semibold tracking-wide">{{ $t('servers.split_screen') }}</span>
+              </button>
+              <button
+                class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md hover:bg-slate-800/80 text-slate-400 hover:text-cyan-300 transition-colors text-xs font-bold group/btn"
+                :title="$t('servers.configure_title')"
+                @click.stop="openConfigModal(server)"
+              >
+                <span class="tracking-widest text-slate-400 group-hover/btn:text-cyan-300">•••</span>
+                <span class="text-[10px] font-semibold tracking-wide">{{ $t('servers.configure') }}</span>
+              </button>
             </div>
           </div>
-          <button
-            @click="openDeployCloud"
-            class="shrink-0 text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-r from-accent to-accent-deep text-accent-ink hover:brightness-110 shadow-[0_0_12px_var(--color-accent-glow)] transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <span>Deploy</span>
-            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
-          </button>
         </div>
       </div>
 
-      <div class="z-section mt-4 mb-2.5 flex items-center justify-between text-white font-bold">
+      <div class="z-section mt-4 mb-2.5 flex items-center justify-between text-white font-bold shrink-0">
         <div class="flex items-center gap-2">
-          <span>Featured &amp; Recommended</span>
-          <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-accent/15 text-accent-bright border border-accent/30">Official</span>
+          <span>{{ $t('servers.featured_title') }}</span>
+          <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-accent/15 text-accent-bright border border-accent/30">{{ $t('servers.featured_official') }}</span>
         </div>
-        <span class="text-[10px] text-slate-500 font-mono font-medium">Public Server</span>
+        <span class="text-[10px] text-slate-500 font-mono font-medium">{{ $t('servers.featured_public') }}</span>
       </div>
 
       <!-- Flashy Featured Server Showcase (Takes up the space of two server entries) -->
@@ -305,10 +291,10 @@
         <div class="relative z-10 flex items-center justify-between gap-3 mb-2">
           <div class="flex items-center gap-2">
             <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-accent/25 to-accent-deep/25 border border-accent/40 text-accent-bright shadow-[0_0_12px_var(--color-accent-glow)]">
-              <svg class="w-3 h-3 text-accent-bright fill-accent-bright" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5 text-accent-bright fill-accent-bright" viewBox="0 0 24 24">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
-              <span>Featured Community</span>
+              <span>{{ $t('servers.featured_community') }}</span>
             </span>
             <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-black/50 border border-slate-700/60 text-slate-300 shadow-sm">
               {{ rec.address }}
@@ -316,7 +302,7 @@
             <span
               v-if="rec.useHttps"
               class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-400/30"
-              title="HTTPS Secure"
+              :title="$t('servers.https_tooltip')"
             >
               HTTPS
             </span>
@@ -328,18 +314,18 @@
               v-if="statusView(rec.address).state === 'checking'"
               class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 border border-cyan-500/20 text-cyan-300"
             >
-              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span> checking…
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span> {{ $t('servers.status_checking') }}
             </span>
             <span
               v-else-if="statusView(rec.address).state === 'waking'"
               class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300"
             >
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span> waking up…
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span> {{ $t('servers.status_waking') }}
             </span>
             <template v-else-if="statusView(rec.address).state === 'online'">
               <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.2)]">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#4ade80]"></span>
-                {{ statusView(rec.address).online }}{{ statusView(rec.address).max ? '/' + statusView(rec.address).max : '' }} online
+                {{ statusView(rec.address).online }}{{ statusView(rec.address).max ? '/' + statusView(rec.address).max : '' }} {{ $t('servers.status.online').toLowerCase() }}
               </span>
               <span
                 v-if="statusView(rec.address).pingMs"
@@ -352,12 +338,12 @@
             <span
               v-else-if="statusView(rec.address).state === 'asleep'"
               class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400"
-              title="Server is asleep (idle shutdown) — PLAY will wake it automatically"
+              :title="$t('servers.status_asleep_tooltip')"
             >
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> asleep (auto-wake)
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> {{ $t('servers.status_asleep') }}
             </span>
             <span v-else class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800/80 border border-slate-700/60 text-slate-400">
-              <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> offline
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> {{ $t('servers.status_offline') }}
             </span>
           </div>
         </div>
@@ -384,7 +370,7 @@
             <span
               v-if="isThisServerRunning(rec.address)"
               class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#4ade80] ring-2 ring-[#070b0f] animate-pulse shadow-[0_0_6px_#4ade80]"
-              title="Game is running"
+              :title="$t('servers.game_running_tooltip')"
             ></span>
           </div>
 
@@ -406,21 +392,21 @@
               disabled
             >
               <span class="inline-block w-4 h-4 border-2 border-[#022623] border-t-transparent rounded-full animate-spin"></span>
-              LAUNCHING
+              {{ $t('servers.btn_launching') }}
             </button>
             <button
               v-else-if="gameRunning && isThisServerRunning(rec.address)"
               class="z-btn-ghost font-bold px-5 py-2 rounded-xl border border-emerald-500/40 text-emerald-300 bg-emerald-500/10"
               @click="stopGame"
             >
-              STOP
+              {{ $t('servers.btn_stop') }}
             </button>
             <button
               v-else-if="gameRunning"
               class="z-btn-ghost font-bold px-5 py-2 rounded-xl"
               disabled
             >
-              PLAY
+              {{ $t('servers.btn_play') }}
             </button>
             <button
               v-else
@@ -430,7 +416,7 @@
               <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
               </svg>
-              PLAY NOW
+              {{ $t('servers.btn_play') }}
             </button>
           </div>
         </div>
@@ -439,15 +425,15 @@
         <div class="relative z-10 flex items-center justify-between px-2 pt-2 border-t border-white/[0.04]">
           <div class="text-[10px] text-slate-500 font-mono tracking-tight flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-accent/50"></span>
-            Instance Customization
+            {{ $t('servers.instance_customization') }}
           </div>
           <button
             class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md hover:bg-slate-800/80 text-slate-400 hover:text-accent-bright transition-colors text-xs font-bold group/btn"
-            title="Configure mods, shaders & resource packs"
+            :title="$t('servers.configure_title')"
             @click.stop="openConfigModal(rec)"
           >
             <span class="tracking-widest text-slate-400 group-hover/btn:text-accent-bright">•••</span>
-            <span class="text-[10px] font-semibold tracking-wide">Configure</span>
+            <span class="text-[10px] font-semibold tracking-wide">{{ $t('servers.configure') }}</span>
           </button>
         </div>
       </div>
@@ -455,7 +441,7 @@
 
     <!-- Right: 3D player preview -->
     <div class="w-[420px] min-w-[340px] z-card flex flex-col p-4 bg-[#0e1622]/90 border border-slate-800/80">
-      <span class="z-label mb-2 text-center font-bold tracking-wider uppercase text-[10px] text-accent/80">3D Player Preview</span>
+      <span class="z-label mb-2 text-center font-bold tracking-wider uppercase text-[10px] text-accent/80">{{ $t('servers.player_preview_title') }}</span>
       <div class="flex-1 min-h-0 rounded-xl overflow-hidden bg-[#070b10] border border-slate-800/80 relative shadow-inner">
         <Player3DPreview :image-uri="previewSkin" :variant="previewVariant" />
       </div>
@@ -470,9 +456,9 @@
       <div class="z-card w-full max-w-lg p-6 overflow-hidden shadow-2xl relative border border-slate-700/60 rounded-2xl bg-[#0e1622]">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h3 class="text-white font-bold text-base">Add Server</h3>
+            <h3 class="text-white font-bold text-base">{{ $t('servers.add_dialog_title') }}</h3>
             <p class="text-slate-400 text-xs mt-0.5">
-              Enter the server address. Server name, modpack, and HTTPS are discovered automatically.
+              {{ $t('servers.add_dialog_desc') }}
             </p>
           </div>
           <button
@@ -486,38 +472,34 @@
           </button>
         </div>
 
-        <!-- Zircon Cloud Instant Server CTA Banner -->
-        <div class="mb-4 p-3 rounded-xl bg-gradient-to-r from-cyan-950/40 via-cyan-900/20 to-slate-900/60 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-md">
+        <!-- Discord Rich Presence Deep Link Badge Banner -->
+        <div
+          v-if="isDeepLinkInvite"
+          class="mb-4 p-3 rounded-xl bg-gradient-to-r from-[#5865F2]/25 via-slate-900/60 to-slate-950/80 border border-[#5865F2]/40 flex items-center justify-between gap-3 shadow-md"
+        >
           <div class="flex items-center gap-2.5 min-w-0">
-            <div class="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-300 shrink-0">
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+            <div class="w-8 h-8 rounded-lg bg-[#5865F2]/20 border border-[#5865F2]/30 flex items-center justify-center text-[#5865F2] shrink-0">
+              <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
               </svg>
             </div>
             <div class="min-w-0">
               <div class="text-xs font-bold text-white flex items-center gap-1.5">
-                <span>Deploy Private Cloud Server</span>
-                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">$5.99/mo</span>
+                <span>{{ $t('servers.discord_invite_title') }}</span>
+                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#5865F2]/20 text-indigo-300 border border-[#5865F2]/40">{{ $t('servers.one_click_join') }}</span>
               </div>
-              <div class="text-[10px] text-slate-400 truncate">1-click provisioning, auto-sleep &amp; modpack sync</div>
+              <div class="text-[10px] text-slate-400 truncate">{{ $t('servers.connecting_friend_server') }}</div>
             </div>
           </div>
-          <button
-            type="button"
-            class="z-btn-accent text-[11px] font-black px-3 py-1.5 rounded-lg shrink-0 whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all"
-            @click="openDeployCloud"
-          >
-            Deploy
-          </button>
         </div>
 
         <!-- Address Input -->
         <div class="mb-4">
           <label class="z-label flex items-center justify-between mb-1">
-            <span class="font-semibold text-slate-300">Server Address</span>
+            <span class="font-semibold text-slate-300">{{ $t('servers.address_label') }}</span>
             <span v-if="isProbing" class="text-accent text-[11px] font-normal flex items-center gap-1.5">
               <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
-              Probing BOM &amp; Status…
+              {{ $t('servers.probing_bom') }}
             </span>
           </label>
           <div class="relative">
@@ -525,7 +507,7 @@
               ref="addressInputRef"
               v-model="newServerAddress"
               class="z-input pr-9 font-mono text-sm focus:border-accent"
-              placeholder="e.g. mc.zircon.example.com:25565 or localhost:25565"
+              :placeholder="$t('servers.address_placeholder')"
               autofocus
               @input="onAddressInput"
               @keydown.enter.prevent="onEnterKey"
@@ -551,8 +533,8 @@
               <span class="inline-block w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="text-xs font-bold text-white">Connecting to server…</div>
-              <div class="text-[11px] text-slate-400">Reading server title &amp; discovering modpack</div>
+              <div class="text-xs font-bold text-white">{{ $t('servers.connecting_server') }}</div>
+              <div class="text-[11px] text-slate-400">{{ $t('servers.reading_title') }}</div>
             </div>
           </div>
 
@@ -593,7 +575,7 @@
                     v-if="isEditingName"
                     v-model="customServerName"
                     class="z-input py-0.5 px-2 text-xs font-bold text-white bg-slate-900 border-accent"
-                    placeholder="Server Name"
+                    :placeholder="$t('servers.server_name_placeholder')"
                     @blur="isEditingName = false"
                     @keydown.enter="isEditingName = false"
                   />
@@ -601,7 +583,7 @@
                     <span class="truncate">{{ displayServerName }}</span>
                     <button
                       class="text-slate-400 hover:text-accent text-[11px] p-0.5 rounded transition-colors"
-                      title="Edit custom name"
+                      :title="$t('servers.edit_name_tooltip')"
                       @click="startEditName"
                     >
                       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -613,7 +595,7 @@
                 </div>
                 <div class="text-[11px] text-slate-400 truncate mt-0.5">
                   <span v-if="probeResult.isZircon" class="text-cyan-300 font-semibold flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> BOM verified
+                    <span class="w-1.5 h-1.5 rounded-full bg-accent"></span> {{ $t('servers.bom_verified') }}
                   </span>
                   <span v-else-if="probeResult.motd" class="truncate">{{ probeResult.motd }}</span>
                   <span v-else class="truncate">{{ probeResult.address }}</span>
@@ -631,21 +613,21 @@
                 <svg class="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                 </svg>
-                Zircon Modpack
+                {{ $t('servers.zircon_modpack') }}
                 <span v-if="probeResult.modCount > 0" class="opacity-90">• {{ probeResult.modCount }} mods</span>
               </span>
               <span
                 v-else
                 class="px-2.5 py-0.5 rounded-lg text-[10px] font-medium bg-slate-900 text-slate-400 border border-slate-800"
               >
-                Standard Server
+                {{ $t('servers.standard_server') }}
               </span>
 
               <!-- HTTPS Badge -->
               <span
                 v-if="probeResult.useHttps"
                 class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-400/20"
-                title="HTTPS configured automatically"
+                :title="$t('servers.https_tooltip')"
               >
                 HTTPS
               </span>
@@ -662,19 +644,19 @@
                 class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-emerald-500/15 text-[#4ade80] border border-emerald-400/30 flex items-center gap-1"
               >
                 <span class="w-1.5 h-1.5 rounded-full bg-[#4ade80]"></span>
-                {{ probeResult.online }}/{{ probeResult.max }} online • {{ probeResult.pingMs }}ms
+                {{ probeResult.online }}/{{ probeResult.max }} {{ $t('servers.status.online').toLowerCase() }} • {{ probeResult.pingMs }}ms
               </span>
               <span
                 v-else-if="probeResult.wakeable"
                 class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-400/30 flex items-center gap-1.5"
               >
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Asleep (Auto-wake on Play)
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> {{ $t('servers.status_asleep') }}
               </span>
               <span
                 v-else
                 class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-900 text-slate-500 border border-slate-800 flex items-center gap-1.5"
               >
-                <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> Offline
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> {{ $t('servers.status_offline') }}
               </span>
 
               <!-- Version / Loader -->
@@ -694,7 +676,7 @@
             class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold border border-slate-700/80 hover:border-slate-600 hover:text-white"
             @click="closeAddDialog"
           >
-            Cancel
+            {{ $t('common.cancel') }}
           </button>
           <div class="flex items-center gap-2.5">
             <button
@@ -702,7 +684,7 @@
               :disabled="!newServerAddress.trim()"
               @click="saveServerOnly"
             >
-              Add to List
+              {{ $t('servers.add_to_list') }}
             </button>
             <button
               class="z-btn-accent text-xs font-bold px-5 py-2 flex items-center gap-1.5 shadow-md hover:shadow-accent/30 transition-all rounded-xl"
@@ -712,7 +694,7 @@
               <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
               </svg>
-              PLAY NOW
+              {{ $t('servers.add_and_play') }}
             </button>
           </div>
         </div>
@@ -734,11 +716,11 @@
     >
       <div class="z-card w-full max-w-sm flex flex-col p-6 shadow-2xl relative border border-cyan-500/40 rounded-2xl bg-[#0e1622]">
         <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
-          <h3 class="text-white font-bold text-base">Join via Code</h3>
+          <h3 class="text-white font-bold text-base">{{ $t('join_by_code.title') }}</h3>
           <button class="text-slate-400 hover:text-white text-lg leading-none" @click="showJoinCodeModal = false">✕</button>
         </div>
         <p class="text-xs text-slate-300 mb-4">
-          Enter the 6-character Join Code (e.g. <code class="text-cyan-300 font-mono font-bold">ZK-8821</code>) shared by your friend:
+          {{ $t('servers.join_code_desc', { example: 'ZK-8821' }) }}
         </p>
 
         <div class="mb-4">
@@ -751,17 +733,25 @@
           />
         </div>
         <div class="flex justify-end gap-2.5 pt-3 border-t border-slate-800/80">
-          <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold" @click="showJoinCodeModal = false">Cancel</button>
+          <button class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold" @click="showJoinCodeModal = false">{{ $t('common.cancel') }}</button>
           <button
             class="z-btn-accent text-xs font-bold px-5 py-2 rounded-xl shadow-md hover:shadow-cyan-500/25"
             :disabled="!joinCodeInput.trim()"
             @click="submitJoinCode"
           >
-            Connect & Play
+            {{ $t('servers.connect_and_play') }}
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Couch Co-Op Modal for Online Servers -->
+    <CouchCoopModal
+      :is-open="showCouchCoopModal"
+      :instance="{ id: couchCoopServer?.address || 'server', name: couchCoopServer?.name || couchCoopServer?.address || 'Online Server' }"
+      :server-address="couchCoopServer?.address || ''"
+      @close="showCouchCoopModal = false"
+    />
   </div>
 </template>
 
@@ -769,6 +759,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Player3DPreview from '../components/Player3DPreview.vue';
 import ServerConfigModal from '../components/ServerConfigModal.vue';
+import CouchCoopModal from '../components/CouchCoopModal.vue';
+import NearbyFriendsCard from '../components/NearbyFriendsCard.vue';
 import { api, getCachedActiveSkin, onSkinUpdated } from '../lib/api';
 
 const emit = defineEmits(['launching', 'stopped', 'error']);
@@ -779,6 +771,17 @@ const props = defineProps({
   deepLinkAddress: { type: String, default: '' },
   deepLinkServer: { type: Object, default: null },
 });
+
+async function onJoinLanServer(lanServer) {
+  const hostLabel = lanServer.hostUsername
+    ? `${lanServer.hostUsername}'s World`
+    : (lanServer.motd || 'Local LAN Game');
+  await playServer({
+    name: hostLabel,
+    address: lanServer.address,
+    useHttps: false,
+  });
+}
 
 // Join via Code state
 const showJoinCodeModal = ref(false);
@@ -805,6 +808,7 @@ const launchingAddress = ref(null);
 
 // Add Server dialog state
 const showAddDialog = ref(false);
+const isDeepLinkInvite = ref(false);
 const addressInputRef = ref(null);
 const newServerAddress = ref('');
 const customServerName = ref('');
@@ -818,6 +822,15 @@ let pingInterval = null;
 
 // Server Configuration Modal state
 const configModalServer = ref(null);
+
+// Couch Co-Op state
+const couchCoopServer = ref(null);
+const showCouchCoopModal = ref(false);
+
+function openCouchCoop(server) {
+  couchCoopServer.value = server;
+  showCouchCoopModal.value = true;
+}
 const showConfigModal = ref(false);
 
 function openConfigModal(server) {
@@ -834,9 +847,9 @@ const statusCache = ref({});
 
 const recommended = [
   {
-    name: 'Winslow Plus',
-    desc: 'Official Winslow Server • Custom Modpack & High Performance SMP',
-    address: 'mc.winslow.plus',
+    name: 'ZirconSMP',
+    desc: 'Official ZirconSMP Server • Community Adventure & Modpack',
+    address: 'play.zirconmc.net',
     useHttps: true,
   },
 ];
@@ -871,7 +884,7 @@ watch(
   ([newAddr, newServer]) => {
     const addr = (newServer && newServer.address) || newAddr;
     if (addr && typeof addr === 'string' && addr.trim()) {
-      openAddDialog(addr.trim());
+      openAddDialog(addr.trim(), true);
       if (newServer && newServer.name) {
         customServerName.value = newServer.name;
         isEditingName.value = true;
@@ -991,7 +1004,7 @@ function onBannerLoad(event, address) {
 
 function resolveAssetUrl(url, server) {
   if (!url || typeof url !== 'string') return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('/')) return url;
   const isHttps = server?.useHttps ?? false;
   const cleanAddr = (server?.address || '').trim().replace(/^https?:\/\//i, '');
   if (!cleanAddr) return url;
@@ -1112,11 +1125,8 @@ async function removeServer(server) {
 // Add Server Dialog logic
 // -------------------------------------------------------------
 
-function openDeployCloud() {
-  api.openBrowserUrl('https://cloud.zirconmc.net/?ref=launcher').catch(() => {});
-}
-
-function openAddDialog(initialAddress = '') {
+function openAddDialog(initialAddress = '', fromDeepLink = false) {
+  isDeepLinkInvite.value = !!fromDeepLink;
   newServerAddress.value = typeof initialAddress === 'string' ? initialAddress : '';
   customServerName.value = '';
   isEditingName.value = false;
@@ -1131,18 +1141,9 @@ function openAddDialog(initialAddress = '') {
   });
 }
 
-watch(
-  () => props.deepLinkAddress,
-  (addr) => {
-    if (addr && addr.trim()) {
-      openAddDialog(addr.trim());
-    }
-  },
-  { immediate: true }
-);
-
 function closeAddDialog() {
   showAddDialog.value = false;
+  isDeepLinkInvite.value = false;
   if (probeTimer) clearTimeout(probeTimer);
 }
 

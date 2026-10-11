@@ -4,6 +4,7 @@
 
 pub mod limits; // Archive safety and decompression limits
 pub mod lz4_tar; // Tar and LZ4 archive handling
+pub mod mrpack; // Spec-compliant Modrinth .mrpack parsing and extraction
 pub mod zip; // ZIP extraction and structural validation
 //
 // Re-export archive limits, guard types, and error definitions.
@@ -32,3 +33,11 @@ pub use self::zip::{
     validate_zip_structure,
     ZipExtractOptions, // Deven Winslow clean-room zip exports
 }; // End archive re-exports
+//
+// Re-export Modrinth .mrpack helpers.
+pub use self::mrpack::{
+    extract_mrpack_overrides,
+    filter_mrpack_files,
+    parse_mrpack_metadata,
+    MrpackMetadata,
+};

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+<head>
+  <link rel="canonical" href="https://zirconmc.net/zh-tw/cloud.html">
+  <link rel="alternate" hreflang="x-default" href="https://zirconmc.net/cloud.html">
+  <link rel="alternate" hreflang="en" href="https://zirconmc.net/cloud.html">
+  <link rel="alternate" hreflang="es" href="https://zirconmc.net/es/cloud.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://zirconmc.net/pt-br/cloud.html">
+  <link rel="alternate" hreflang="pt-PT" href="https://zirconmc.net/pt-pt/cloud.html">
+  <link rel="alternate" hreflang="de" href="https://zirconmc.net/de/cloud.html">
+  <link rel="alternate" hreflang="fr" href="https://zirconmc.net/fr/cloud.html">
+  <link rel="alternate" hreflang="it" href="https://zirconmc.net/it/cloud.html">
+  <link rel="alternate" hreflang="ru" href="https://zirconmc.net/ru/cloud.html">
+  <link rel="alternate" hreflang="pl" href="https://zirconmc.net/pl/cloud.html">
+  <link rel="alternate" hreflang="nl" href="https://zirconmc.net/nl/cloud.html">
+  <link rel="alternate" hreflang="tr" href="https://zirconmc.net/tr/cloud.html">
+  <link rel="alternate" hreflang="sv" href="https://zirconmc.net/sv/cloud.html">
+  <link rel="alternate" hreflang="uk" href="https://zirconmc.net/uk/cloud.html">
+  <link rel="alternate" hreflang="cs" href="https://zirconmc.net/cs/cloud.html">
+  <link rel="alternate" hreflang="fi" href="https://zirconmc.net/fi/cloud.html">
+  <link rel="alternate" hreflang="da" href="https://zirconmc.net/da/cloud.html">
+  <link rel="alternate" hreflang="no" href="https://zirconmc.net/no/cloud.html">
+  <link rel="alternate" hreflang="hu" href="https://zirconmc.net/hu/cloud.html">
+  <link rel="alternate" hreflang="ro" href="https://zirconmc.net/ro/cloud.html">
+  <link rel="alternate" hreflang="el" href="https://zirconmc.net/el/cloud.html">
+  <link rel="alternate" hreflang="bg" href="https://zirconmc.net/bg/cloud.html">
+  <link rel="alternate" hreflang="sk" href="https://zirconmc.net/sk/cloud.html">
+  <link rel="alternate" hreflang="hr" href="https://zirconmc.net/hr/cloud.html">
+  <link rel="alternate" hreflang="sr" href="https://zirconmc.net/sr/cloud.html">
+  <link rel="alternate" hreflang="sl" href="https://zirconmc.net/sl/cloud.html">
+  <link rel="alternate" hreflang="lt" href="https://zirconmc.net/lt/cloud.html">
+  <link rel="alternate" hreflang="lv" href="https://zirconmc.net/lv/cloud.html">
+  <link rel="alternate" hreflang="et" href="https://zirconmc.net/et/cloud.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://zirconmc.net/zh-cn/cloud.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://zirconmc.net/zh-tw/cloud.html">
+  <link rel="alternate" hreflang="ja" href="https://zirconmc.net/ja/cloud.html">
+  <link rel="alternate" hreflang="ko" href="https://zirconmc.net/ko/cloud.html">
+  <link rel="alternate" hreflang="id" href="https://zirconmc.net/id/cloud.html">
+  <link rel="alternate" hreflang="vi" href="https://zirconmc.net/vi/cloud.html">
+  <link rel="alternate" hreflang="th" href="https://zirconmc.net/th/cloud.html">
+  <link rel="alternate" hreflang="ms" href="https://zirconmc.net/ms/cloud.html">
+  <link rel="alternate" hreflang="fil" href="https://zirconmc.net/fil/cloud.html">
+  <link rel="alternate" hreflang="hi" href="https://zirconmc.net/hi/cloud.html">
+  <link rel="alternate" hreflang="ar" href="https://zirconmc.net/ar/cloud.html">
+  <link rel="alternate" hreflang="he" href="https://zirconmc.net/he/cloud.html">
+  <link rel="alternate" hreflang="fa" href="https://zirconmc.net/fa/cloud.html">
+
+<!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+<script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zircon Cloud — Managed Modded Minecraft Server Hosting</title>
+<meta content="Turnkey modded Minecraft server hosting with proprietary Pause-to-Sleep retention, Zirky AI crash diagnostics, 1-click Modrinth and CurseForge installs, and seamless Zircon Launcher sync." name="description"/>
+<meta content="#070b0f" name="theme-color"/>
+<link href="../assets/img/zircon-icon.svg" rel="icon" type="image/svg+xml"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+<style>
+    .cloud-hero-shot {
+      margin-top: 40px;
+      position: relative;
+    }
+    .cloud-metric-card {
+      background: linear-gradient(145deg, rgba(14, 22, 34, 0.88), rgba(7, 12, 19, 0.95));
+      border: 1px solid rgba(71, 210, 201, 0.3);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(71, 210, 201, 0.14);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      text-align: center;
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      transition: all 0.25s ease;
+    }
+    .cloud-metric-card:hover {
+      border-color: rgba(71, 210, 201, 0.55);
+      transform: translateY(-4px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 28px 65px rgba(0, 0, 0, 0.85), 0 0 45px rgba(71, 210, 201, 0.25);
+    }
+    .metric-val {
+      font-size: clamp(34px, 4vw, 48px);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 0%, var(--accent-bright) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .metric-label {
+      color: var(--muted);
+      font-size: 14.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+<!-- Ambient Procedural Background Layers (Cloud Login Parity) -->
+<div aria-hidden="true" class="z-bg-dots"></div>
+<div aria-hidden="true" class="z-orb z-orb-1"></div>
+<div aria-hidden="true" class="z-orb z-orb-2"></div>
+<div aria-hidden="true" class="z-orb z-orb-3"></div>
+<div aria-hidden="true" class="z-orb z-orb-4"></div>
+<div aria-hidden="true" class="z-particle z-particle-1"></div>
+<div aria-hidden="true" class="z-particle z-particle-2"></div>
+<div aria-hidden="true" class="z-particle z-particle-3"></div>
+<div aria-hidden="true" class="z-particle z-particle-4"></div>
+<div aria-hidden="true" class="z-particle z-particle-5"></div>
+<div aria-hidden="true" class="z-particle z-particle-6"></div>
+<!-- ================= NAV ================= -->
+<header class="site-nav">
+<div class="container">
+<a aria-label="Zircon home" class="brand" href="./">
+<img alt="Zircon" class="brand-text" height="28" src="../assets/img/zircon-title.svg" width="130"/>
+</a>
+<button aria-expanded="false" aria-label="Toggle navigation" class="nav-toggle">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"></path>
+</svg>
+</button>
+<ul class="nav-links">
+<li data-i18n="cloud.home"><a data-i18n="cloud.home_1" href="/">首頁</a></li>
+<li data-i18n="cloud.launcher"><a data-i18n="cloud.launcher_1" href="launcher.html">啟動器</a></li>
+<li data-i18n="cloud.server_manager"><a data-i18n="cloud.server_manager_1" href="server.html">伺服器管理器</a></li>
+<li data-i18n="cloud.cloud"><a class="active" data-i18n="cloud.cloud_1" href="cloud.html">雲端服務</a></li>
+<li data-i18n="cloud.guides"><a data-i18n="cloud.guides_1" href="docs.html">指南</a></li>
+<li data-i18n="cloud.faq"><a data-i18n="cloud.faq_1" href="faq.html">常見問題</a></li>
+<li data-i18n="cloud.downloads"><a data-i18n="cloud.downloads_1" href="downloads.html">下載</a></li>
+<li data-i18n="cloud.github"><a aria-label="GitHub Repository" class="nav-github-link" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg viewbox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+<span data-i18n="cloud.github_1">GitHub</span>
+</a></li>
+<li data-i18n="cloud.get_server_manager"><a class="nav-cta" data-i18n="cloud.get_server_manager_1" href="downloads.html#server-owners">取得伺服器管理器</a></li>
+</ul>
+</div>
+</header>
+<!-- ================= HERO ================= -->
+<section class="hero" style="padding-bottom: 32px;">
+<div class="container">
+<span class="eyebrow" data-i18n="cloud.future_roadmap_architecture_preview">未來路線圖與架構預覽 · 即將推出</span>
+<h1 data-i18n="cloud.zircon_cloud_iscoming_soon" style="font-size: clamp(34px, 5.2vw, 56px); margin-bottom: 20px;">Zircon Cloud <span class="hl" data-i18n="cloud.coming_soon">即將推出。</span></h1>
+<p class="lede" data-i18n="cloud.we_are_focused_100" style="max-width: 740px;">我們目前 100% 專注於為 v1 版本提供免費、開源的 Zircon Launcher 和 Server Manager。未來，<strong data-i18n="cloud.zircon_cloud">Zircon Cloud</strong> 將提供無需硬體的一站式託管服務，並具備專有的 <strong data-i18n="cloud.pausetosleep">Pause-to-Sleep</strong> 保留技術及 AI 診斷功能。</p>
+<div class="hero-actions" data-i18n="cloud.selfhost_server_manager_todaypreview" style="margin-top: 28px;"><a class="btn btn-primary btn-xl" data-i18n="cloud.selfhost_server_manager_today" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+          立即自建伺服器管理器
+        </a>
+<a class="btn btn-secondary btn-xl" data-i18n="cloud.preview_architecture" href="#features">
+          預覽架構 ↓
+        </a></div>
+<div class="hero-foot" data-i18n="cloud.automated_ssl_reverse_proxypausetosleep" style="margin-top: 32px;"><span data-i18n="cloud.automated_ssl_reverse_proxy"><i class="dot"></i> 自動化 SSL 與反向代理</span>
+<span data-i18n="cloud.pausetosleep_zero_idle_billing"><i class="dot"></i> Pause-to-Sleep（閒置零計費）</span>
+<span data-i18n="cloud.deepseekv4_ai_diagnostics"><i class="dot"></i> DeepSeek-V4 AI 診斷</span>
+<span data-i18n="cloud.1click_modrinth_curseforge"><i class="dot"></i> Modrinth &amp; CurseForge 一鍵安裝</span></div>
+</div>
+</section>
+<!-- ================= METRICS STRIP ================= -->
+<section class="section" style="padding: 20px 0 60px;">
+<div class="container">
+<div class="grid grid-3">
+<div class="cloud-metric-card">
+<div class="metric-val">100%</div>
+<div class="metric-label" data-i18n="cloud.configuration_freedom">配置自由</div>
+<p data-i18n="cloud.pick_fabric_forge_neoforge" style="color: var(--muted); font-size: 14px; margin-top: 8px;">選擇 Fabric、Forge、NeoForge 或 Quilt — 輕鬆配置模組、設定檔與 JVM 參數。</p>
+</div>
+<div class="cloud-metric-card">
+<div class="metric-val">0%</div>
+<div class="metric-label" data-i18n="cloud.idle_cpu_ram_waste">閒置 CPU 與 RAM 浪費</div>
+<p data-i18n="cloud.servers_suspend_gracefully_when" style="color: var(--muted); font-size: 14px; margin-top: 8px;">當伺服器無人時會優雅地暫停，並在玩家連線時立即喚醒。</p>
+</div>
+<div class="cloud-metric-card">
+<div class="metric-val">100%</div>
+<div class="metric-label" data-i18n="cloud.client_sync_parity">客戶端同步一致性</div>
+<p data-i18n="cloud.every_mod_shader_and" style="color: var(--muted); font-size: 14px; margin-top: 8px;">每個模組、著色器和配置的變更都會自動更新給連線中的玩家。</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= CORE FEATURES GRID ================= -->
+<section class="section" id="features">
+<div class="container">
+<div class="section-head">
+<div class="section-kicker" data-i18n="cloud.architecture_features">架構與功能</div>
+<h2 data-i18n="cloud.engineered_for_seamless_multiplayer">為無縫多人遊戲而設計</h2>
+<p data-i18n="cloud.everything_required_to_run">運行高效能模組化社群所需的一切，無需 Linux 系統管理技能。</p>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" x2="12" y1="2" y2="12"></line></svg>
+</span>
+<h3 data-i18n="cloud.pausetosleep_retention">Pause-to-Sleep 狀態保留</h3>
+<p data-i18n="cloud.traditional_hosts_burn_money">傳統主機在空世界 24/7 運行時燒錢。Zircon Cloud 會在線上玩家為 0 時暫停遊戲迴圈，並在玩家連線時順暢恢復，確保 100% 的區塊資料完整無缺。</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg>
+</span>
+<h3 data-i18n="cloud.zirky_ai_crash_diagnostics">Zirky AI 崩潰診斷</h3>
+<p data-i18n="cloud.powered_by_deepseekv4flash_when">由 DeepSeek-V4-Flash 驅動。當伺服器因不相容的模組或缺少函式庫而崩潰時，Zirky 會解析堆疊追蹤記錄，並在你的主控台中生成一鍵修復卡片。</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" x2="12" y1="22.08" y2="12"></line></svg>
+</span>
+<h3 data-i18n="cloud.modrinth_curseforge_inbrowser">瀏覽器內整合 Modrinth & CurseForge</h3>
+<p data-i18n="cloud.search_and_install_over">直接在您的網頁控制面板中搜尋並安裝超過 100,000 個模組、模組包、著色器和資源包。無需手動 FTP 檔案傳輸或尋找 JAR 檔。</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+</span>
+<h3 data-i18n="cloud.enterprise_ddos_edge_scrubbing">企業級 DDoS 邊緣清洗</h3>
+<p data-i18n="cloud.all_incoming_minecraft_traffic">所有進來的 Minecraft 流量和網路遙測數據都通過冗餘的邊緣清洗節點路由，在攻擊到達您的世界容器之前過濾體積型攻擊和惡意封包。</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M4 4h16v4H4z"></path><path d="M4 10h16v4H4z"></path><path d="M4 16h16v4H4z"></path><path d="M7 6h.01M7 12h.01M7 18h.01"></path></svg>
+</span>
+<h3 data-i18n="cloud.singleport_multiplexing">單埠多工處理</h3>
+<p data-i18n="cloud.minecraft_gameplay_25565_and">Minecraft 遊戲內容 (25565) 和 REST manifest API 共用完全相同的埠號。玩家只需連接到乾淨的網域，例如 <code>yourserver.zirconmc.net</code>，無需輸入任何埠號。</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+</span>
+<h3 data-i18n="cloud.automated_lz4_cloud_snapshots">自動化 LZ4 雲端快照</h3>
+<p data-i18n="cloud.highspeed_lz4_compressed_world">高速 LZ4 壓縮的世界備份按計劃執行，不會造成遊戲卡頓。若發生災難，可透過一鍵點擊還原先前的檢查點。</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= ZIRKY SPOTLIGHT ================= -->
+<section class="section">
+<div class="container">
+<div class="zirky-spotlight">
+<div class="zirky-avatar-wrap" data-i18n="cloud.ai_diagnostics"><img alt="Zirky AI Assistant" class="zirky-avatar" height="84" src="assets/img/zirky.svg" width="84"/>
+<span class="zirky-tag" data-i18n="cloud.ai_diagnostics_1">AI 診斷</span></div>
+<div>
+<span class="cloud-badge" data-i18n="cloud.powered_by_deepseekv4" style="margin-bottom: 8px;"><svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg>
+            由 DeepSeek-V4 驅動</span>
+<h3 data-i18n="cloud.never_decipher_a_300line" style="font-size: clamp(22px, 2.6vw, 30px); color: var(--white); margin: 0 0 10px; font-weight: 800;">再也不用 decipher 300 行的 Java 崩潰日誌了。</h3>
+<p data-i18n="cloud.modded_minecraft_is_notorious" style="color: var(--muted); font-size: 15.5px; line-height: 1.6; margin: 0 0 16px;">模組化的 Minecraft 以晦澀難懂的崩潰迴圈和缺少函式庫依賴而臭名昭著。當問題發生時，<strong data-i18n="cloud.zirky_ai">Zirky AI</strong> 會自動消化崩潰堆疊追蹤記錄， pinpoint 衝突的模組 JAR，並直接在您的網頁主控台提供一個可執行的 <strong data-i18n="cloud.1click_remediation_card">一鍵修復卡片</strong>。</p>
+<div data-i18n="cloud.automatic_stack_trace_parsingmissing" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;"><span data-i18n="cloud.automatic_stack_trace_parsing" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+<svg fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              自動解析堆疊追蹤記錄
+            </span>
+<span data-i18n="cloud.missing_mod_autodetection" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+<svg fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              自動偵測缺失模組
+            </span>
+<span data-i18n="cloud.1click_fix_delivery" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+<svg fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              一鍵交付修復方案
+            </span></div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= COMPARISON MATRIX ================= -->
+<section class="section">
+<div class="container">
+<div style="text-align: center; max-width: 680px; margin: 0 auto 32px;">
+<span class="eyebrow" data-i18n="cloud.why_communities_switch" style="color: var(--accent); font-weight: 700; text-transform: uppercase; font-size: 12px; letter-spacing: 0.08em;">為什麼社群選擇轉換</span>
+<h2 data-i18n="cloud.traditional_hosts_vszircon_cloud" style="font-size: clamp(26px, 3.4vw, 36px); color: var(--white); margin: 6px 0 12px; font-weight: 800;">傳統主機 vs. <span class="hl" data-i18n="cloud.zircon_cloud_1">Zircon Cloud</span></h2>
+<p data-i18n="cloud.stop_paying_247_flat" style="color: var(--muted); font-size: 16px; margin: 0;">停止為每週五天空置的伺服器支付 24/7 固定費用。</p>
+</div>
+<div class="compare-table-wrapper" data-i18n="cloud.featuretraditional_hosts_apex_shockbyte"><table class="compare-table">
+<thead>
+<tr>
+<th class="col-feature">功能</th>
+<th class="col-traditional">傳統主機 (Apex, Shockbyte 等)</th>
+<th class="col-cloud">
+<span data-i18n="cloud.cloud_2" style="display: inline-flex; align-items: center; gap: 6px;">
+<img alt="Zircon" height="18" src="assets/img/zircon-title.svg" style="filter: drop-shadow(0 0 6px var(--accent));" width="80"/>
+                  雲端服務
+                </span>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="col-feature-cell">閒置成本 (線上玩家為 0 時)</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.full_247_billing_1535mo"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> 全額 24/7 計費 ($15–$35/月)</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.zero_wastesleeps_on_idle"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.zero_waste">零浪費：</strong> 閒置時睡眠，加入時喚醒</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">向朋友同步模組包</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.send_2gb_zips_or"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> 發送 2GB ZIP 檔或 Google Drive 連結</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.instant1click_autosync_via_zircon"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.instant">即時：</strong> 透過 Zircon Launcher 一鍵自動同步</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">模組 &amp; 模組包安裝</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.slow_ftp_uploads_manual"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> 緩慢的 FTP 上傳 &amp; 手動版本匹配</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.integratedcurseforge_modrinth_1click_installs"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.integrated">整合：</strong> CurseForge &amp; Modrinth 一鍵安裝</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">崩潰 &amp; 不相容性診斷</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.unreadable_300line_java_stack"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> 難以閱讀的 300 行 Java 堆疊追蹤記錄</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.zirky_aiautodiagnosis_1click_fixes"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.zirky_ai_1">Zirky AI：</strong> 自動診斷 &amp; 一鍵修復</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">網域、SSL &amp; 網路保護</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.awkward_nonstandard_ports_or"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> 尷尬的非標準埠號或額外附加費用</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.includedautomated_ssl_subdomains_ddos"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.included">包含：</strong> 自動化 SSL、子網域 &amp; DDoS 邊緣防護</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">世界備份 &amp; 快照</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.limited_backup_slots_or"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> 有限的備份槽位或手動 tarball</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.highspeedlz4_snapshots_with_1click"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.highspeed">高速：</strong> LZ4 快照搭配一鍵回滾</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+<div data-i18n="cloud.get_free_selfhosted_server" style="text-align: center; margin-top: 36px;"><a class="btn btn-primary btn-xl" data-i18n="cloud.get_free_selfhosted_server_1" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+          取得免費自建伺服器管理器 →
+        </a></div>
+</div>
+</section>
+<!-- ================= CLOUD FAQ ================= -->
+<section class="section" id="faq">
+<div class="container">
+<div class="section-head">
+<div class="section-kicker" data-i18n="cloud.got_questions">有疑問嗎？</div>
+<h2 data-i18n="cloud.zircon_cloud_faq">Zircon Cloud 常見問題</h2>
+<p data-i18n="cloud.frequently_asked_questions_about">關於 Zircon 託管服務的常見問題。</p>
+</div>
+<div class="faq-list">
+<details class="faq-item" open="">
+<summary class="faq-question" data-i18n="cloud.how_does_pausetosleep_retention">Pause-to-Sleep 狀態保留是如何運作的？</summary>
+<div class="faq-answer">
+<p data-i18n="cloud.when_the_last_player">當最後一位玩家從您的伺服器斷線時，Zircon Cloud 會啟動 15 分鐘的優雅閒置倒數計時。如果沒有玩家加入，遊戲容器將被暫停 (Pause-to-Sleep)。所有區塊狀態、實體和物品欄都會刷新並保存到磁碟。當玩家在 Zircon Launcher 中點擊 PLAY 時，我們的邊緣代理會為您的玩家無縫喚醒實例。</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="cloud.do_my_friends_have">我的朋友需要付費才能連線嗎？</summary>
+<div class="faq-answer">
+<p data-i18n="cloud.no_connecting_to_a">不需要。使用 Zircon Launcher 連線到 Zircon Cloud 伺服器永遠是 100% 免費的。玩家下載客戶端啟動器，使用他們的官方 Microsoft 帳號登入，然後點擊加入。</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="cloud.can_i_upload_my">我可以上傳我現有的世界或模組包嗎？</summary>
+<div class="faq-answer">
+<p data-i18n="cloud.yes_zircon_cloud_features">可以！Zircon Cloud 擁有整合的網頁檔案管理器和 zip 上傳器。您可以拖放現有的世界存檔，匯入 CurseForge/Modrinth 模組包 zip，或透過一鍵點擊直接從本地自建的 Zircon 伺服器遷移。</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="cloud.what_loaders_and_minecraft">支援哪些載入器和 Minecraft 版本？</summary>
+<div class="faq-answer">
+<p data-i18n="cloud.zircon_cloud_supports_fabric">Zircon Cloud 支援從 Minecraft 1.7 到最新現代版本的 Fabric、Quilt、NeoForge 和 Forge。純 Vanilla 和 Paper/Purpur 實例也完全受支援。</p>
+</div>
+</details>
+</div>
+</div>
+</section>
+<!-- ================= CTA ================= -->
+<section class="section" style="padding-top: 0;">
+<div class="container">
+<div class="cta-band">
+<h2 data-i18n="cloud.start_selfhosting_for_free">今天開始免費自建</h2>
+<p data-i18n="cloud.run_zircon_server_manager">在您的 PC 或 VPS 上執行 Zircon Server Manager，具備自動模組同步和 Modrinth/CurseForge 驗證功能。</p>
+<div data-i18n="cloud.get_server_managerdownload_launcher" style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;"><a class="btn btn-primary btn-lg" data-i18n="cloud.get_server_manager_2" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+            取得伺服器管理器
+          </a>
+<a class="btn btn-ghost btn-lg" data-i18n="cloud.download_launcher_for_players" href="downloads.html#players">下載玩家啟動器</a></div>
+</div>
+</div>
+</section>
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+<div class="container">
+<div class="footer-grid">
+<div class="footer-brand">
+<a class="brand" href="./" style="display: inline-block; margin-bottom: 14px; text-decoration: none;">
+<img alt="Zircon" class="brand-text" height="26" src="../assets/img/zircon-title.svg"/>
+</a>
+<p data-i18n="cloud.a_free_opensource_launcher">一款免費、開源的模組化 Minecraft 啟動器和伺服器管理器。
+          玩家點擊 PLAY 即可獲得伺服器運行的確切模組 — 每次啟動時
+          都會針對 Modrinth & CurseForge 進行驗證。</p>
+<a class="pill pill-accent" data-i18n="cloud.open_source_bsl_11" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank"><svg aria-hidden="true" fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.14c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"></path></svg>
+            開源 (BSL 1.1)</a>
+</div>
+<div class="footer-col">
+<h4 data-i18n="cloud.pages">頁面</h4>
+<ul>
+<li data-i18n="cloud.home_2"><a data-i18n="cloud.home_3" href="/">首頁</a></li>
+<li data-i18n="cloud.launcher_2"><a data-i18n="cloud.launcher_3" href="launcher.html">啟動器</a></li>
+<li data-i18n="cloud.server_manager_2"><a data-i18n="cloud.server_manager_3" href="server.html">伺服器管理器</a></li>
+<li data-i18n="cloud.guides_docs"><a data-i18n="cloud.guides_docs_1" href="docs.html">指南 &amp; 文件</a></li>
+<li data-i18n="cloud.faq_2"><a data-i18n="cloud.faq_3" href="faq.html">常見問題</a></li>
+<li data-i18n="cloud.downloads_2"><a data-i18n="cloud.downloads_3" href="downloads.html">下載</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<h4 data-i18n="cloud.project_community">專案與社群</h4>
+<ul>
+<li data-i18n="cloud.github_repository"><a data-i18n="cloud.github_repository_1" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">GitHub 儲存庫</a></li>
+<li data-i18n="cloud.releases_changelogs"><a data-i18n="cloud.releases_changelogs_1" href="https://github.com/DevTheDev189/Zircon/releases" rel="noopener" target="_blank">發布版本 &amp; 變更日誌</a></li>
+<li data-i18n="cloud.cloud_coming_soon"><a data-i18n="cloud.cloud_coming_soon_1" href="cloud.html" style="color: var(--muted);">雲端服務 (即將推出)</a></li>
+<li data-i18n="cloud.business_source_license_11"><a data-i18n="cloud.business_source_license_11_1" href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" rel="noopener" target="_blank">Business Source License 1.1</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-legal" data-i18n="cloud.zircon_contributors_v0421_active"><span data-i18n="cloud.zircon_contributors_v0421_active_1">© Zircon 貢獻者 · v0.4.21 (積極開發中)</span>
+<span data-i18n="cloud.not_an_official_minecraft">非官方 Minecraft 產品。未經 Mojang Studios 或 Microsoft 批准或關聯。</span></div>
+</div>
+</footer>
+<script src="../assets/js/main.js?v=2"></script>
+</body>
+</html>

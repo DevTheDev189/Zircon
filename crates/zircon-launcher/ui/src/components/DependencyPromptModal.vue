@@ -11,16 +11,16 @@
       <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-4">
         <div>
           <h3 class="text-white font-extrabold text-base flex items-center gap-2">
-            <span>Additional Mods Required</span>
+            <span>{{ $t('dependencies.additional_mods_required') }}</span>
           </h3>
           <div class="text-xs text-slate-400 mt-0.5">
-            <span class="text-cyan-300 font-semibold">{{ dependencyData?.targetProjectTitle || 'This mod' }}</span>
-            requires extra dependencies to run properly without crashing.
+            <span class="text-cyan-300 font-semibold">{{ dependencyData?.targetProjectTitle || $t('dependencies.this_mod') }}</span>
+            {{ $t('dependencies.mod_requires_deps') }}
           </div>
         </div>
         <button
           class="text-slate-400 hover:text-white p-1.5 rounded-lg transition-colors hover:bg-slate-800/80"
-          title="Cancel"
+          :title="$t('common.cancel')"
           @click="emit('close')"
         >
           ✕
@@ -38,10 +38,10 @@
           <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
         <div>
-          <span class="font-bold text-red-300">Conflict Detected:</span>
-          The following incompatible mods are already in your instance:
+          <span class="font-bold text-red-300">{{ $t('dependencies.conflict_detected') }}</span>
+          {{ $t('dependencies.conflict_desc_1') }}
           <span class="font-semibold text-white">{{ dependencyData.incompatibleInstalled.join(', ') }}</span>.
-          Launching with both may cause game crashes.
+          {{ $t('dependencies.conflict_desc_2') }}
         </div>
       </div>
 
@@ -50,7 +50,7 @@
         <!-- Required Dependencies -->
         <div v-if="dependencyData?.requiredMissing && dependencyData.requiredMissing.length > 0">
           <div class="text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-1.5">
-            <span>Required Dependencies ({{ dependencyData.requiredMissing.length }})</span>
+            <span>{{ $t('dependencies.required_dependencies', { count: dependencyData.requiredMissing.length }) }}</span>
           </div>
           <div class="flex flex-col gap-1.5">
             <label
@@ -73,10 +73,10 @@
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-xs font-semibold text-white truncate">{{ dep.projectTitle }}</div>
-                <div class="text-[10px] text-slate-400 font-mono truncate">{{ dep.filename || 'Compatible version' }}</div>
+                <div class="text-[10px] text-slate-400 font-mono truncate">{{ dep.filename || $t('dependencies.compatible_version') }}</div>
               </div>
               <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                Required
+                {{ $t('dependencies.required_badge') }}
               </span>
             </label>
           </div>
@@ -85,7 +85,7 @@
         <!-- Optional / Recommended Dependencies -->
         <div v-if="dependencyData?.optionalMissing && dependencyData.optionalMissing.length > 0">
           <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-            <span>Recommended / Optional ({{ dependencyData.optionalMissing.length }})</span>
+            <span>{{ $t('dependencies.recommended_optional', { count: dependencyData.optionalMissing.length }) }}</span>
           </div>
           <div class="flex flex-col gap-1.5">
             <label
@@ -108,10 +108,10 @@
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-xs font-semibold text-white truncate">{{ dep.projectTitle }}</div>
-                <div class="text-[10px] text-slate-400 font-mono truncate">{{ dep.filename || 'Compatible version' }}</div>
+                <div class="text-[10px] text-slate-400 font-mono truncate">{{ dep.filename || $t('dependencies.compatible_version') }}</div>
               </div>
               <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
-                Optional
+                {{ $t('dependencies.optional_badge') }}
               </span>
             </label>
           </div>
@@ -122,7 +122,7 @@
           v-if="dependencyData?.alreadyInstalled && dependencyData.alreadyInstalled.length > 0"
           class="text-[11px] text-slate-400 px-1 pt-1"
         >
-          <span class="text-emerald-400 font-semibold">Already installed:</span>
+          <span class="text-emerald-400 font-semibold">{{ $t('dependencies.already_installed') }}</span>
           {{ dependencyData.alreadyInstalled.join(', ') }}
         </div>
       </div>
@@ -134,7 +134,7 @@
           class="z-btn-ghost text-xs px-3 py-1.5 rounded-xl text-slate-400 hover:text-white"
           @click="emit('skip')"
         >
-          Skip Dependencies
+          {{ $t('dependencies.skip_dependencies') }}
         </button>
 
         <div class="flex items-center gap-2">
@@ -143,14 +143,14 @@
             class="z-btn-ghost text-xs px-3 py-1.5 rounded-xl border border-slate-700 hover:border-slate-600 hover:text-white"
             @click="emit('close')"
           >
-            Cancel
+            {{ $t('common.cancel') }}
           </button>
           <button
             type="button"
             class="z-btn text-xs px-4 py-1.5 rounded-xl font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/30"
             @click="onConfirm"
           >
-            Install Selected &amp; Continue
+            {{ $t('dependencies.install_selected') }}
           </button>
         </div>
       </div>

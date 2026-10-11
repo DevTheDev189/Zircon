@@ -17,10 +17,10 @@
           </div>
           <div>
             <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
-              Join via Code
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">P2P Sync</span>
+              {{ $t('join_by_code.title') }}
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{{ $t('join_by_code.p2p_sync') }}</span>
             </h2>
-            <p class="text-xs text-slate-400">Connect to a friend's hosted world with automatic delta sync</p>
+            <p class="text-xs text-slate-400">{{ $t('join_by_code.subtitle') }}</p>
           </div>
         </div>
         <button
@@ -39,14 +39,14 @@
         <div class="space-y-4">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1.5">
-              Enter 6-Character Join Code or Direct Address
+              {{ $t('join_by_code.input_label') }}
             </label>
             <div class="flex gap-2">
               <input
                 v-model="joinInput"
                 type="text"
                 class="z-input flex-1 font-mono uppercase text-sm tracking-widest px-3 py-2 placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-600"
-                placeholder="e.g. ZK-7492 or 192.168.1.100:25565"
+                :placeholder="$t('join_by_code.input_placeholder')"
                 :disabled="resolving || syncing"
                 @keyup.enter="handleResolve"
               />
@@ -57,14 +57,14 @@
                 @click="handleResolve"
               >
                 <span v-if="resolving" class="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
-                <span>{{ resolving ? 'Checking...' : 'Check World' }}</span>
+                <span>{{ resolving ? $t('join_by_code.checking') : $t('join_by_code.check_world') }}</span>
               </button>
             </div>
           </div>
 
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1.5">
-              Use Instance
+              {{ $t('join_by_code.use_instance') }}
             </label>
             <select
               v-model="selectedInstanceId"
@@ -83,19 +83,19 @@
           <!-- Session summary card -->
           <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 space-y-2.5">
             <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-400">Host World:</span>
+              <span class="text-slate-400">{{ $t('join_by_code.host_world') }}</span>
               <span class="font-bold text-slate-200">{{ preflight.manifest.instanceName }}</span>
             </div>
             <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-400">Environment:</span>
+              <span class="text-slate-400">{{ $t('join_by_code.environment') }}</span>
               <span class="font-mono text-cyan-300">MC {{ preflight.manifest.mcVersion }} ({{ preflight.manifest.loaderType }})</span>
             </div>
             <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-800/60">
-              <span class="text-slate-400">Total Mods on Host:</span>
-              <span class="font-semibold text-slate-300">{{ preflight.manifest.mods.length }} mods</span>
+              <span class="text-slate-400">{{ $t('join_by_code.total_mods') }}</span>
+              <span class="font-semibold text-slate-300">{{ $t('join_by_code.mods_count', { count: preflight.manifest.mods.length }) }}</span>
             </div>
             <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-400">Missing Delta to Stream:</span>
+              <span class="text-slate-400">{{ $t('join_by_code.missing_delta') }}</span>
               <span class="font-bold text-cyan-400">
                 {{ preflight.missingMods.length }} mods ({{ formatBytes(preflight.totalDownloadBytes) }})
               </span>
@@ -113,11 +113,10 @@
                 <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                Security Gate: Unverified Custom Mods
+                {{ $t('join_by_code.sec_unverified_title') }}
               </div>
               <p class="text-slate-300 leading-relaxed">
-                The host includes <span class="text-amber-300 font-semibold">{{ preflight.customMods.length }} custom mod(s)</span>
-                not cataloged on Modrinth or CurseForge. For your protection against malware, automatic network streaming of unverified JARs is disabled by default.
+                {{ $t('join_by_code.sec_unverified_desc', { count: preflight.customMods.length }) }}
               </p>
               <ul class="list-disc list-inside text-slate-400 text-[11px] space-y-0.5 pl-1">
                 <li v-for="m in preflight.customMods" :key="m.sha1" class="font-mono">
@@ -125,7 +124,7 @@
                 </li>
               </ul>
               <p class="text-slate-400 text-[11px] pt-1">
-                You can still stream all verified catalog mods, or enable Developer Mode in Settings if you explicitly trust this friend.
+                {{ $t('join_by_code.sec_unverified_hint') }}
               </p>
             </div>
 
@@ -138,10 +137,10 @@
                 <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                Developer Mode: Custom Mod Approval
+                {{ $t('join_by_code.sec_dev_title') }}
               </div>
               <p class="text-slate-300 leading-relaxed">
-                The host has included executable mod JARs not verified by Modrinth/CurseForge. Inspect the hashes below:
+                {{ $t('join_by_code.sec_dev_desc') }}
               </p>
               <div class="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                 <div
@@ -160,7 +159,7 @@
                   class="zircon-check mt-0.5"
                 />
                 <span class="text-slate-200 font-medium">
-                  I trust this friend and approve downloading these {{ preflight.customMods.length }} custom mod(s).
+                  {{ $t('join_by_code.approve_checkbox', { count: preflight.customMods.length }) }}
                 </span>
               </label>
             </div>
@@ -169,7 +168,7 @@
           <!-- Progress / Sync Status -->
           <div v-if="syncing" class="bg-slate-900/70 border border-slate-800 rounded-xl p-4 space-y-2">
             <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-300 font-medium">{{ syncStatus || 'Streaming mods from friend...' }}</span>
+              <span class="text-slate-300 font-medium">{{ syncStatus || $t('join_by_code.streaming_default') }}</span>
               <span class="text-cyan-400 font-mono font-bold">{{ syncPercent }}%</span>
             </div>
             <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
@@ -194,7 +193,7 @@
           :disabled="syncing"
           @click="handleClose"
         >
-          Cancel
+          {{ $t('common.cancel') }}
         </button>
 
         <div class="flex items-center gap-2">
@@ -206,7 +205,7 @@
             @click="handleSyncAndPlay"
           >
             <span v-if="syncing" class="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
-            <span>{{ syncing ? 'Streaming Delta...' : 'Stream Delta & Play' }}</span>
+            <span>{{ syncing ? $t('join_by_code.streaming_delta') : $t('join_by_code.stream_delta_play') }}</span>
           </button>
         </div>
       </div>
@@ -222,6 +221,7 @@ const props = defineProps({
   open: { type: Boolean, default: false },
   instances: { type: Array, default: () => [] },
   defaultInstanceId: { type: String, default: '' },
+  initialCode: { type: String, default: '' },
 });
 
 const emit = defineEmits(['close', 'joined']);
@@ -249,6 +249,12 @@ watch(
         selectedInstanceId.value = props.defaultInstanceId;
       } else if (props.instances.length > 0) {
         selectedInstanceId.value = props.instances[0].id;
+      }
+      if (props.initialCode) {
+        joinInput.value = props.initialCode;
+        setTimeout(() => {
+          handleResolve();
+        }, 120);
       }
     }
   }

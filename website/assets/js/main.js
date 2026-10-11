@@ -38,6 +38,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
+  // 1c. Hero Direct Download 1-Click Router
+  // ---------------------------------------------------------------------------
+  const heroPrimaryBtn = document.getElementById('hero-primary-download');
+  if (heroPrimaryBtn) {
+    if (detectedOS === 'macos') {
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_aarch64.dmg';
+      const label = heroPrimaryBtn.querySelector('.download-label');
+      if (label) label.textContent = 'Download for macOS (.dmg)';
+    } else if (detectedOS === 'linux') {
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_amd64.AppImage';
+      const label = heroPrimaryBtn.querySelector('.download-label');
+      if (label) label.textContent = 'Download for Linux (.AppImage)';
+    } else {
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_x64-setup.exe';
+      const label = heroPrimaryBtn.querySelector('.download-label');
+      if (label) label.textContent = 'Download for Windows (.exe)';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // 2. Mobile nav toggle
   // ---------------------------------------------------------------------------
   const toggle = document.querySelector('.nav-toggle');
@@ -290,6 +310,80 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // 6b. Delight Features Slideshow Handler
+  // ---------------------------------------------------------------------------
+  const delightSlideshow = document.querySelector('.delight-slideshow');
+  if (delightSlideshow) {
+    const navBtns = delightSlideshow.querySelectorAll('.delight-nav-btn');
+    const slides = delightSlideshow.querySelectorAll('.delight-slide');
+    const dots = delightSlideshow.querySelectorAll('.delight-dot');
+    const prevBtn = delightSlideshow.querySelector('.delight-prev');
+    const nextBtn = delightSlideshow.querySelector('.delight-next');
+    let currentIndex = 0;
+    let timer = null;
+
+    const showSlide = (idx) => {
+      currentIndex = (idx + slides.length) % slides.length;
+      slides.forEach((s, i) => s.classList.toggle('active', i === currentIndex));
+      navBtns.forEach((b, i) => b.classList.toggle('active', i === currentIndex));
+      dots.forEach((d, i) => d.classList.toggle('active', i === currentIndex));
+    };
+
+    navBtns.forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        showSlide(i);
+        resetTimer();
+      });
+    });
+
+    dots.forEach((dot, i) => {
+      dot.addEventListener('click', () => {
+        showSlide(i);
+        resetTimer();
+      });
+    });
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSlide(currentIndex - 1);
+        resetTimer();
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSlide(currentIndex + 1);
+        resetTimer();
+      });
+    }
+
+    const startTimer = () => {
+      stopTimer();
+      timer = setInterval(() => {
+        showSlide(currentIndex + 1);
+      }, 6000);
+    };
+
+    const stopTimer = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const resetTimer = () => {
+      stopTimer();
+      startTimer();
+    };
+
+    delightSlideshow.addEventListener('mouseenter', stopTimer);
+    delightSlideshow.addEventListener('mouseleave', startTimer);
+    startTimer();
+  }
+
+  // ---------------------------------------------------------------------------
   // 7. Docs Category Switcher (Docs Page Tabs)
   // ---------------------------------------------------------------------------
   const docPills = document.querySelectorAll('.docs-pill');
@@ -448,4 +542,32 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // 12. Manual Language Selection & Override Persistence
+  // ---------------------------------------------------------------------------
+  window.setZirconLocale = function(lang) {
+    if (!lang) return;
+    localStorage.setItem('zircon_locale_override', lang);
+    var p = window.location.pathname;
+    var segments = p.split('/').filter(Boolean);
+    var supported = [
+      'es', 'pt-br', 'pt-pt', 'de', 'fr', 'it', 'ru', 'pl', 'nl', 'tr',
+      'sv', 'uk', 'cs', 'fi', 'da', 'no', 'hu', 'ro', 'el', 'bg', 'sk',
+      'hr', 'sr', 'sl', 'lt', 'lv', 'et', 'zh-cn', 'zh-tw', 'ja', 'ko',
+      'id', 'vi', 'th', 'ms', 'fil', 'hi', 'ar', 'he', 'fa'
+    ];
+    if (segments.length > 0 && supported.indexOf(segments[0]) !== -1) {
+      if (lang === 'en') {
+        segments.shift();
+        p = '/' + segments.join('/') + (window.location.pathname.endsWith('/') && segments.length > 0 ? '/' : '');
+      } else {
+        segments[0] = lang;
+        p = '/' + segments.join('/') + (window.location.pathname.endsWith('/') ? '/' : '');
+      }
+    } else if (lang !== 'en') {
+      p = '/' + lang + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+    }
+    window.location.href = p + window.location.search + window.location.hash;
+  };
 });

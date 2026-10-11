@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+
+<html lang="sk">
+<head>
+  <link rel="canonical" href="https://zirconmc.net/sk/cloud.html">
+  <link rel="alternate" hreflang="x-default" href="https://zirconmc.net/cloud.html">
+  <link rel="alternate" hreflang="en" href="https://zirconmc.net/cloud.html">
+  <link rel="alternate" hreflang="es" href="https://zirconmc.net/es/cloud.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://zirconmc.net/pt-br/cloud.html">
+  <link rel="alternate" hreflang="pt-PT" href="https://zirconmc.net/pt-pt/cloud.html">
+  <link rel="alternate" hreflang="de" href="https://zirconmc.net/de/cloud.html">
+  <link rel="alternate" hreflang="fr" href="https://zirconmc.net/fr/cloud.html">
+  <link rel="alternate" hreflang="it" href="https://zirconmc.net/it/cloud.html">
+  <link rel="alternate" hreflang="ru" href="https://zirconmc.net/ru/cloud.html">
+  <link rel="alternate" hreflang="pl" href="https://zirconmc.net/pl/cloud.html">
+  <link rel="alternate" hreflang="nl" href="https://zirconmc.net/nl/cloud.html">
+  <link rel="alternate" hreflang="tr" href="https://zirconmc.net/tr/cloud.html">
+  <link rel="alternate" hreflang="sv" href="https://zirconmc.net/sv/cloud.html">
+  <link rel="alternate" hreflang="uk" href="https://zirconmc.net/uk/cloud.html">
+  <link rel="alternate" hreflang="cs" href="https://zirconmc.net/cs/cloud.html">
+  <link rel="alternate" hreflang="fi" href="https://zirconmc.net/fi/cloud.html">
+  <link rel="alternate" hreflang="da" href="https://zirconmc.net/da/cloud.html">
+  <link rel="alternate" hreflang="no" href="https://zirconmc.net/no/cloud.html">
+  <link rel="alternate" hreflang="hu" href="https://zirconmc.net/hu/cloud.html">
+  <link rel="alternate" hreflang="ro" href="https://zirconmc.net/ro/cloud.html">
+  <link rel="alternate" hreflang="el" href="https://zirconmc.net/el/cloud.html">
+  <link rel="alternate" hreflang="bg" href="https://zirconmc.net/bg/cloud.html">
+  <link rel="alternate" hreflang="sk" href="https://zirconmc.net/sk/cloud.html">
+  <link rel="alternate" hreflang="hr" href="https://zirconmc.net/hr/cloud.html">
+  <link rel="alternate" hreflang="sr" href="https://zirconmc.net/sr/cloud.html">
+  <link rel="alternate" hreflang="sl" href="https://zirconmc.net/sl/cloud.html">
+  <link rel="alternate" hreflang="lt" href="https://zirconmc.net/lt/cloud.html">
+  <link rel="alternate" hreflang="lv" href="https://zirconmc.net/lv/cloud.html">
+  <link rel="alternate" hreflang="et" href="https://zirconmc.net/et/cloud.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://zirconmc.net/zh-cn/cloud.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://zirconmc.net/zh-tw/cloud.html">
+  <link rel="alternate" hreflang="ja" href="https://zirconmc.net/ja/cloud.html">
+  <link rel="alternate" hreflang="ko" href="https://zirconmc.net/ko/cloud.html">
+  <link rel="alternate" hreflang="id" href="https://zirconmc.net/id/cloud.html">
+  <link rel="alternate" hreflang="vi" href="https://zirconmc.net/vi/cloud.html">
+  <link rel="alternate" hreflang="th" href="https://zirconmc.net/th/cloud.html">
+  <link rel="alternate" hreflang="ms" href="https://zirconmc.net/ms/cloud.html">
+  <link rel="alternate" hreflang="fil" href="https://zirconmc.net/fil/cloud.html">
+  <link rel="alternate" hreflang="hi" href="https://zirconmc.net/hi/cloud.html">
+  <link rel="alternate" hreflang="ar" href="https://zirconmc.net/ar/cloud.html">
+  <link rel="alternate" hreflang="he" href="https://zirconmc.net/he/cloud.html">
+  <link rel="alternate" hreflang="fa" href="https://zirconmc.net/fa/cloud.html">
+
+<!-- Fast Inline Locale Auto-Router: seamlessly directs visitors to native language based on browser preference -->
+<script>
+  (function() {
+    try {
+      var ua = (navigator.userAgent || '').toLowerCase();
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      var override = localStorage.getItem('zircon_locale_override');
+      if (override) return;
+      var SUPPORTED = {
+        'es': 'es', 'pt': 'pt-br', 'pt-br': 'pt-br', 'pt-pt': 'pt-pt', 'de': 'de',
+        'fr': 'fr', 'it': 'it', 'ru': 'ru', 'pl': 'pl', 'nl': 'nl',
+        'tr': 'tr', 'sv': 'sv', 'uk': 'uk', 'cs': 'cs', 'fi': 'fi',
+        'da': 'da', 'no': 'no', 'hu': 'hu', 'ro': 'ro', 'el': 'el',
+        'bg': 'bg', 'sk': 'sk', 'hr': 'hr', 'sr': 'sr', 'sl': 'sl',
+        'lt': 'lt', 'lv': 'lv', 'et': 'et', 'zh': 'zh-cn', 'zh-cn': 'zh-cn',
+        'zh-tw': 'zh-tw', 'ja': 'ja', 'ko': 'ko', 'id': 'id', 'vi': 'vi',
+        'th': 'th', 'ms': 'ms', 'fil': 'fil', 'hi': 'hi', 'ar': 'ar',
+        'he': 'he', 'fa': 'fa'
+      };
+      var pageLang = (document.documentElement.lang || 'en').toLowerCase();
+      var userLangs = navigator.languages || [navigator.language || 'en'];
+      var target = null;
+      for (var i = 0; i < userLangs.length; i++) {
+        var raw = (userLangs[i] || '').toLowerCase().trim();
+        if (!raw) continue;
+        if (raw === 'en' || raw.startsWith('en-')) { target = 'en'; break; }
+        if (SUPPORTED[raw]) { target = SUPPORTED[raw]; break; }
+        var base = raw.split('-')[0];
+        if (SUPPORTED[base]) { target = SUPPORTED[base]; break; }
+      }
+      if (!target) target = 'en';
+
+      if (target !== pageLang) {
+        var p = window.location.pathname;
+        var newPath = p;
+        var segments = p.split('/').filter(Boolean);
+        if (segments.length > 0 && SUPPORTED[segments[0]]) {
+          if (target === 'en') {
+            segments.shift();
+            newPath = '/' + segments.join('/') + (p.endsWith('/') && segments.length > 0 ? '/' : '');
+          } else {
+            segments[0] = target;
+            newPath = '/' + segments.join('/') + (p.endsWith('/') ? '/' : '');
+          }
+        } else {
+          if (target !== 'en') {
+            newPath = '/' + target + (p === '/' ? '/' : (p.startsWith('/') ? p : '/' + p));
+          }
+        }
+        if (newPath !== p) {
+          window.location.replace(newPath + window.location.search + window.location.hash);
+        }
+      }
+    } catch (e) {}
+  })();
+  </script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zircon Cloud — Managed Modded Minecraft Server Hosting</title>
+<meta content="Turnkey modded Minecraft server hosting with proprietary Pause-to-Sleep retention, Zirky AI crash diagnostics, 1-click Modrinth and CurseForge installs, and seamless Zircon Launcher sync." name="description"/>
+<meta content="#070b0f" name="theme-color"/>
+<link href="../assets/img/zircon-icon.svg" rel="icon" type="image/svg+xml"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+<style>
+    .cloud-hero-shot {
+      margin-top: 40px;
+      position: relative;
+    }
+    .cloud-metric-card {
+      background: linear-gradient(145deg, rgba(14, 22, 34, 0.88), rgba(7, 12, 19, 0.95));
+      border: 1px solid rgba(71, 210, 201, 0.3);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(71, 210, 201, 0.14);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      text-align: center;
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      transition: all 0.25s ease;
+    }
+    .cloud-metric-card:hover {
+      border-color: rgba(71, 210, 201, 0.55);
+      transform: translateY(-4px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 28px 65px rgba(0, 0, 0, 0.85), 0 0 45px rgba(71, 210, 201, 0.25);
+    }
+    .metric-val {
+      font-size: clamp(34px, 4vw, 48px);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 0%, var(--accent-bright) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .metric-label {
+      color: var(--muted);
+      font-size: 14.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+<!-- Ambient Procedural Background Layers (Cloud Login Parity) -->
+<div aria-hidden="true" class="z-bg-dots"></div>
+<div aria-hidden="true" class="z-orb z-orb-1"></div>
+<div aria-hidden="true" class="z-orb z-orb-2"></div>
+<div aria-hidden="true" class="z-orb z-orb-3"></div>
+<div aria-hidden="true" class="z-orb z-orb-4"></div>
+<div aria-hidden="true" class="z-particle z-particle-1"></div>
+<div aria-hidden="true" class="z-particle z-particle-2"></div>
+<div aria-hidden="true" class="z-particle z-particle-3"></div>
+<div aria-hidden="true" class="z-particle z-particle-4"></div>
+<div aria-hidden="true" class="z-particle z-particle-5"></div>
+<div aria-hidden="true" class="z-particle z-particle-6"></div>
+<!-- ================= NAV ================= -->
+<header class="site-nav">
+<div class="container">
+<a aria-label="Zircon home" class="brand" href="./">
+<img alt="Zircon" class="brand-text" height="28" src="../assets/img/zircon-title.svg" width="130"/>
+</a>
+<button aria-expanded="false" aria-label="Toggle navigation" class="nav-toggle">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"></path>
+</svg>
+</button>
+<ul class="nav-links">
+<li data-i18n="cloud.home"><a data-i18n="cloud.home_1" href="/">Domov</a></li>
+<li data-i18n="cloud.launcher"><a data-i18n="cloud.launcher_1" href="launcher.html">Spúšťač</a></li>
+<li data-i18n="cloud.server_manager"><a data-i18n="cloud.server_manager_1" href="server.html">Správca servera</a></li>
+<li data-i18n="cloud.cloud"><a class="active" data-i18n="cloud.cloud_1" href="cloud.html">Cloud</a></li>
+<li data-i18n="cloud.guides"><a data-i18n="cloud.guides_1" href="docs.html">Návody</a></li>
+<li data-i18n="cloud.faq"><a data-i18n="cloud.faq_1" href="faq.html">FAQ</a></li>
+<li data-i18n="cloud.downloads"><a data-i18n="cloud.downloads_1" href="downloads.html">Stiahnutia</a></li>
+<li data-i18n="cloud.github"><a aria-label="GitHub Repository" class="nav-github-link" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">
+<svg viewbox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+<span data-i18n="cloud.github_1">GitHub</span>
+</a></li>
+<li data-i18n="cloud.get_server_manager"><a class="nav-cta" data-i18n="cloud.get_server_manager_1" href="downloads.html#server-owners">Získať Správcu servera</a></li>
+</ul>
+</div>
+</header>
+<!-- ================= HERO ================= -->
+<section class="hero" style="padding-bottom: 32px;">
+<div class="container">
+<span class="eyebrow" data-i18n="cloud.future_roadmap_architecture_preview">Budúca mapa cesty & náhľad architektúry · Čoskoro</span>
+<h1 data-i18n="cloud.zircon_cloud_iscoming_soon" style="font-size: clamp(34px, 5.2vw, 56px); margin-bottom: 20px;">Zircon Cloud <span class="hl" data-i18n="cloud.coming_soon">príde čoskoro.</span></h1>
+<p class="lede" data-i18n="cloud.we_are_focused_100" style="max-width: 740px;">Sme na 100 % zameraní na dodanie bezplatného, open-source Zircon Spúšťača a Správcu servera pre verziu 1. V budúcnosti bude <strong data-i18n="cloud.zircon_cloud">Zircon Cloud</strong> ponúkať kompletné hostingové riešenie bez hardvéru s proprietárnou funkciou <strong data-i18n="cloud.pausetosleep">Pause-to-Sleep</strong> a AI diagnostikou.</p>
+<div class="hero-actions" data-i18n="cloud.selfhost_server_manager_todaypreview" style="margin-top: 28px;"><a class="btn btn-primary btn-xl" data-i18n="cloud.selfhost_server_manager_today" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+          Nainštalujte si Správcu servera ešte dnes
+        </a>
+<a class="btn btn-secondary btn-xl" data-i18n="cloud.preview_architecture" href="#features">
+          Náhľad architektúry ↓
+        </a></div>
+<div class="hero-foot" data-i18n="cloud.automated_ssl_reverse_proxypausetosleep" style="margin-top: 32px;"><span data-i18n="cloud.automated_ssl_reverse_proxy"><i class="dot"></i> Automatizovaný SSL &amp; Reverse Proxy</span>
+<span data-i18n="cloud.pausetosleep_zero_idle_billing"><i class="dot"></i> Pause-to-Sleep (nulová fakturácia pri nečinnosti)</span>
+<span data-i18n="cloud.deepseekv4_ai_diagnostics"><i class="dot"></i> DeepSeek-V4 AI Diagnostika</span>
+<span data-i18n="cloud.1click_modrinth_curseforge"><i class="dot"></i> 1-klik Modrinth &amp; CurseForge</span></div>
+</div>
+</section>
+<!-- ================= METRICS STRIP ================= -->
+<section class="section" style="padding: 20px 0 60px;">
+<div class="container">
+<div class="grid grid-3">
+<div class="cloud-metric-card">
+<div class="metric-val">100%</div>
+<div class="metric-label" data-i18n="cloud.configuration_freedom">Sloboda konfigurácie</div>
+<p data-i18n="cloud.pick_fabric_forge_neoforge" style="color: var(--muted); font-size: 14px; margin-top: 8px;">Vyberte Fabric, Forge, NeoForge alebo Quilt — ľahko konfigurovať mody, nastavenia a JVM flagy.</p>
+</div>
+<div class="cloud-metric-card">
+<div class="metric-val">0%</div>
+<div class="metric-label" data-i18n="cloud.idle_cpu_ram_waste">Plývanie CPU & RAM pri nečinnosti</div>
+<p data-i18n="cloud.servers_suspend_gracefully_when" style="color: var(--muted); font-size: 14px; margin-top: 8px;">Servery sa jemne pozastavia, keď sú prázdne, a okamžite sa prebudia, keď sa pripoja hráči.</p>
+</div>
+<div class="cloud-metric-card">
+<div class="metric-val">100%</div>
+<div class="metric-label" data-i18n="cloud.client_sync_parity">Parita synchronizácie klienta</div>
+<p data-i18n="cloud.every_mod_shader_and" style="color: var(--muted); font-size: 14px; margin-top: 8px;">Každá zmena modu, shaderu alebo nastavenia sa automaticky aktualizuje u pripojených hráčov.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= CORE FEATURES GRID ================= -->
+<section class="section" id="features">
+<div class="container">
+<div class="section-head">
+<div class="section-kicker" data-i18n="cloud.architecture_features">Architektúra & Funkcie</div>
+<h2 data-i18n="cloud.engineered_for_seamless_multiplayer">Navrhnuté pre bezproblémový multiplayer</h2>
+<p data-i18n="cloud.everything_required_to_run">Všetko potrebné na prevádzku vysoko výkonného komunity s modmi bez znalostí Linux sysadmin.</p>
+</div>
+<div class="grid grid-3">
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" x2="12" y1="2" y2="12"></line></svg>
+</span>
+<h3 data-i18n="cloud.pausetosleep_retention">Uchovanie stavu pomocou Pause-to-Sleep</h3>
+<p data-i18n="cloud.traditional_hosts_burn_money">Tradiční hostitelia plytvajú peniazmi behom prázdnych svetov 24/7. Zircon Cloud pozastaví hernú slučku, keď je online 0 hráčov, a plynulo ju obnoví po pripojení hráča so 100 % zachovanými dátami chunkov.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg>
+</span>
+<h3 data-i18n="cloud.zirky_ai_crash_diagnostics">Zirky AI Diagnostika pádov</h3>
+<p data-i18n="cloud.powered_by_deepseekv4flash_when">Poháňané DeepSeek-V4-Flash. Keď server spadne kvôli nekompatibilnému modu alebo chýbajúcej knižnici, Zirky analyzuje stack trace a vygeneruje kartu s opravou na 1 klik priamo vo vašej konzole.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" x2="12" y1="22.08" y2="12"></line></svg>
+</span>
+<h3 data-i18n="cloud.modrinth_curseforge_inbrowser">Modrinth & CurseForge v prehliadači</h3>
+<p data-i18n="cloud.search_and_install_over">Hľadajte a inštalujte viac ako 100 000 modov, modpackov, shaderov a resource packov priamo vo vašom webovom ovládacom paneli. Žiadne ručné FTP prenosy súborov ani hľadanie jarov.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+</span>
+<h3 data-i18n="cloud.enterprise_ddos_edge_scrubbing">Enterprise DDoS Edge Scrubbing</h3>
+<p data-i18n="cloud.all_incoming_minecraft_traffic">Všetka prichádzajúca Minecraft premávka a webová telemetria smerujú cez redundantné edge scrubbing uzly, ktoré filtrujú objemové útoky a zlomyseľné pakety skôr, než dosiahnu kontajner vášho sveta.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M4 4h16v4H4z"></path><path d="M4 10h16v4H4z"></path><path d="M4 16h16v4H4z"></path><path d="M7 6h.01M7 12h.01M7 18h.01"></path></svg>
+</span>
+<h3 data-i18n="cloud.singleport_multiplexing">Single-Port Multiplexing</h3>
+<p data-i18n="cloud.minecraft_gameplay_25565_and">Minecraft gameplay (25565) a REST manifest API zdieľajú presne rovnaký port. Hráči sa pripájajú k čistým doménam ako <code>yourserver.zirconmc.net</code> bez nutnosti zadávať číslo portu.</p>
+</div>
+<div class="card">
+<span class="card-icon">
+<svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+</span>
+<h3 data-i18n="cloud.automated_lz4_cloud_snapshots">Automatizované LZ4 Cloud Snapshoty</h3>
+<p data-i18n="cloud.highspeed_lz4_compressed_world">Vysokorýchlostné LZ4 komprimované zálohy sveta bežia podľa plánu bez zaseknutia hry. Obnovte predchádzajúce kontrolné body jedným klikom, ak dôjde k katastrofe.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= ZIRKY SPOTLIGHT ================= -->
+<section class="section">
+<div class="container">
+<div class="zirky-spotlight">
+<div class="zirky-avatar-wrap" data-i18n="cloud.ai_diagnostics"><img alt="Zirky AI Assistant" class="zirky-avatar" height="84" src="assets/img/zirky.svg" width="84"/>
+<span class="zirky-tag" data-i18n="cloud.ai_diagnostics_1">AI Diagnostika</span></div>
+<div>
+<span class="cloud-badge" data-i18n="cloud.powered_by_deepseekv4" style="margin-bottom: 8px;"><svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg>
+            Poháňané DeepSeek-V4</span>
+<h3 data-i18n="cloud.never_decipher_a_300line" style="font-size: clamp(22px, 2.6vw, 30px); color: var(--white); margin: 0 0 10px; font-weight: 800;">Nikdy viac nemusíte dešifrovať 300-riadkový Java crash log.</h3>
+<p data-i18n="cloud.modded_minecraft_is_notorious" style="color: var(--muted); font-size: 15.5px; line-height: 1.6; margin: 0 0 16px;">Modded Minecraft je známy svojimi kryptickými crash loopmi a chýbajúcimi závislosťami knižníc. Keď nastane problém, <strong data-i18n="cloud.zirky_ai">Zirky AI</strong> automaticky spracuje stack trace pádu, identifikuje konfliktný mod JAR a poskytne akčnú <strong data-i18n="cloud.1click_remediation_card">kartu s opravou na 1 klik</strong> priamo vo vašej webovej konzole.</p>
+<div data-i18n="cloud.automatic_stack_trace_parsingmissing" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;"><span data-i18n="cloud.automatic_stack_trace_parsing" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+<svg fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Automatické parsovanie Stack Trace
+            </span>
+<span data-i18n="cloud.missing_mod_autodetection" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+<svg fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Automatická detekcia chýbajúceho modu
+            </span>
+<span data-i18n="cloud.1click_fix_delivery" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--accent); font-weight: 600;">
+<svg fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Dodanie opravy na 1 klik
+            </span></div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= COMPARISON MATRIX ================= -->
+<section class="section">
+<div class="container">
+<div style="text-align: center; max-width: 680px; margin: 0 auto 32px;">
+<span class="eyebrow" data-i18n="cloud.why_communities_switch" style="color: var(--accent); font-weight: 700; text-transform: uppercase; font-size: 12px; letter-spacing: 0.08em;">Prečo komunity prechádzajú</span>
+<h2 data-i18n="cloud.traditional_hosts_vszircon_cloud" style="font-size: clamp(26px, 3.4vw, 36px); color: var(--white); margin: 6px 0 12px; font-weight: 800;">Tradiční hostitelia vs. <span class="hl" data-i18n="cloud.zircon_cloud_1">Zircon Cloud</span></h2>
+<p data-i18n="cloud.stop_paying_247_flat" style="color: var(--muted); font-size: 16px; margin: 0;">Prestaňte platiť paušálne sadzby 24/7 za servery, ktoré sedia prázdne päť dní v týždni.</p>
+</div>
+<div class="compare-table-wrapper" data-i18n="cloud.featuretraditional_hosts_apex_shockbyte"><table class="compare-table">
+<thead>
+<tr>
+<th class="col-feature">Funkcia</th>
+<th class="col-traditional">Tradiční hostitelia (Apex, Shockbyte atď.)</th>
+<th class="col-cloud">
+<span data-i18n="cloud.cloud_2" style="display: inline-flex; align-items: center; gap: 6px;">
+<img alt="Zircon" height="18" src="assets/img/zircon-title.svg" style="filter: drop-shadow(0 0 6px var(--accent));" width="80"/>
+                  Cloud
+                </span>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="col-feature-cell">Náklady pri nečinnosti (keď je online 0 hráčov)</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.full_247_billing_1535mo"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> Plná fakturácia 24/7 ($15–$35/mes.)</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.zero_wastesleeps_on_idle"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.zero_waste">Nulové plývanie:</strong> Usína pri nečinnosti, budí sa pri pripojení</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">Synchronizácia modpackov s priateľmi</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.send_2gb_zips_or"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> Posielanie 2GB ZIPov alebo odkazov na Google Drive</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.instant1click_autosync_via_zircon"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.instant">Okamžité:</strong> Auto-sync na 1 klik cez Zircon Spúšťač</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">Inštalácia modov &amp; modpackov</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.slow_ftp_uploads_manual"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> Pomalé FTP nahrávania &amp; ručné párovanie verzií</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.integratedcurseforge_modrinth_1click_installs"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.integrated">Integrované:</strong> Inštalácie na 1 klik z CurseForge &amp; Modrinth</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">Diagnostika pádov &amp; nekompatibilit</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.unreadable_300line_java_stack"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> Nečitateľné 300-riadkové Java stack traces</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.zirky_aiautodiagnosis_1click_fixes"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.zirky_ai_1">Zirky AI:</strong> Auto-diagnóza &amp; opravy na 1 klik</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">Ochrana domény, SSL &amp; siete</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.awkward_nonstandard_ports_or"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> Trápne nestandardné porty alebo dodatočné poplatky</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.includedautomated_ssl_subdomains_ddos"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.included">Zahrnuté:</strong> Automatizovaný SSL, subdomény &amp; DDoS edge</span>
+</td>
+</tr>
+<tr>
+<td class="col-feature-cell">Zálohy sveta &amp; snapshoty</td>
+<td class="col-traditional-cell">
+<span class="badge-cross" data-i18n="cloud.limited_backup_slots_or"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg> Obmedzené sloty na zálohy alebo manuálne tarbally</span>
+</td>
+<td class="col-cloud-cell">
+<span class="badge-check" data-i18n="cloud.highspeedlz4_snapshots_with_1click"><svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="15"><polyline points="20 6 9 17 4 12"></polyline></svg> <strong data-i18n="cloud.highspeed">Vysokorýchlostné:</strong> LZ4 snapshoty s rollbackom na 1 klik</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+<div data-i18n="cloud.get_free_selfhosted_server" style="text-align: center; margin-top: 36px;"><a class="btn btn-primary btn-xl" data-i18n="cloud.get_free_selfhosted_server_1" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+          Získajte bezplatného self-hosted Správcu servera →
+        </a></div>
+</div>
+</section>
+<!-- ================= CLOUD FAQ ================= -->
+<section class="section" id="faq">
+<div class="container">
+<div class="section-head">
+<div class="section-kicker" data-i18n="cloud.got_questions">Máte otázky?</div>
+<h2 data-i18n="cloud.zircon_cloud_faq">Zircon Cloud FAQ</h2>
+<p data-i18n="cloud.frequently_asked_questions_about">Často kladené otázky o spravovanom Zircon hostingu.</p>
+</div>
+<div class="faq-list">
+<details class="faq-item" open="">
+<summary class="faq-question" data-i18n="cloud.how_does_pausetosleep_retention">Ako funguje uchovanie stavu pomocou Pause-to-Sleep?</summary>
+<div class="faq-answer">
+<p data-i18n="cloud.when_the_last_player">Keď posledný hráč odpojí od vášho servera, Zircon Cloud spustí jemný 15-minútový odpočet nečinnosti. Ak sa nikto nepridá, herný kontajner sa pozastaví (Pause-to-Sleep). Všetky stavy chunkov, entity a inventáre sa uložia na disk. Keď hráč klikne na PLAY v Zircon Spúšťači, náš edge proxy plynulo prebudí inštanciu pre vašich hráčov.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="cloud.do_my_friends_have">Musia moji priatelia platiť za pripojenie?</summary>
+<div class="faq-answer">
+<p data-i18n="cloud.no_connecting_to_a">Nie. Pripojenie k serveru Zircon Cloud pomocou Zircon Spúšťača je navždy 100 % zadarmo. Hráči stiahnú klientský spúšťač, prihlásia sa svojim oficiálnym Microsoft účtom a kliknú na pripojiť.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="cloud.can_i_upload_my">Môžem nahrať svoj existujúci svet alebo modpack?</summary>
+<div class="faq-answer">
+<p data-i18n="cloud.yes_zircon_cloud_features">Áno! Zircon Cloud má integrovaný webový správca súborov a uploader zipov. Môžete vložiť existujúcu zálohu sveta, importovať modpack zip z CurseForge/Modrinth alebo migrovať priamo z lokálneho self-hosted Zircon servera na 1 klik.</p>
+</div>
+</details>
+<details class="faq-item">
+<summary class="faq-question" data-i18n="cloud.what_loaders_and_minecraft">Aké loadery a verzie Minecraftu sú podporované?</summary>
+<div class="faq-answer">
+<p data-i18n="cloud.zircon_cloud_supports_fabric">Zircon Cloud podporuje Fabric, Quilt, NeoForge a Forge od Minecraftu 1.7 až po najnovšie moderné vydania. Čisté Vanilla a Paper/Purpur inštancie sú tiež plne podporované.</p>
+</div>
+</details>
+</div>
+</div>
+</section>
+<!-- ================= CTA ================= -->
+<section class="section" style="padding-top: 0;">
+<div class="container">
+<div class="cta-band">
+<h2 data-i18n="cloud.start_selfhosting_for_free">Začnite self-hostovať zadarmo ešte dnes</h2>
+<p data-i18n="cloud.run_zircon_server_manager">Spustite Zircon Správcu servera na svojom PC alebo VPS s automatickou synchronizáciou modov a overovaním Modrinth/CurseForge.</p>
+<div data-i18n="cloud.get_server_managerdownload_launcher" style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;"><a class="btn btn-primary btn-lg" data-i18n="cloud.get_server_manager_2" href="downloads.html#server-owners">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
+            Získať Správcu servera
+          </a>
+<a class="btn btn-ghost btn-lg" data-i18n="cloud.download_launcher_for_players" href="downloads.html#players">Stiahnuť Spúšťač pre hráčov</a></div>
+</div>
+</div>
+</section>
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+<div class="container">
+<div class="footer-grid">
+<div class="footer-brand">
+<a class="brand" href="./" style="display: inline-block; margin-bottom: 14px; text-decoration: none;">
+<img alt="Zircon" class="brand-text" height="26" src="../assets/img/zircon-title.svg"/>
+</a>
+<p data-i18n="cloud.a_free_opensource_launcher">Bezplatný, open-source spúšťač a správca servera pre modded Minecraft.
+          Hráči kliknú na PLAY a získajú presne tie isté mody, ktoré bežia na serveri — overené proti
+          Modrinth & CurseForge pri každom spustení.</p>
+<a class="pill pill-accent" data-i18n="cloud.open_source_bsl_11" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank"><svg aria-hidden="true" fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.53-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12v3.14c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"></path></svg>
+            Open Source (BSL 1.1)</a>
+</div>
+<div class="footer-col">
+<h4 data-i18n="cloud.pages">Stránky</h4>
+<ul>
+<li data-i18n="cloud.home_2"><a data-i18n="cloud.home_3" href="/">Domov</a></li>
+<li data-i18n="cloud.launcher_2"><a data-i18n="cloud.launcher_3" href="launcher.html">Spúšťač</a></li>
+<li data-i18n="cloud.server_manager_2"><a data-i18n="cloud.server_manager_3" href="server.html">Správca servera</a></li>
+<li data-i18n="cloud.guides_docs"><a data-i18n="cloud.guides_docs_1" href="docs.html">Návody &amp; Dokumentácia</a></li>
+<li data-i18n="cloud.faq_2"><a data-i18n="cloud.faq_3" href="faq.html">FAQ</a></li>
+<li data-i18n="cloud.downloads_2"><a data-i18n="cloud.downloads_3" href="downloads.html">Stiahnutia</a></li>
+</ul>
+</div>
+<div class="footer-col">
+<h4 data-i18n="cloud.project_community">Projekt & Komunita</h4>
+<ul>
+<li data-i18n="cloud.github_repository"><a data-i18n="cloud.github_repository_1" href="https://github.com/DevTheDev189/Zircon" rel="noopener" target="_blank">GitHub Repozitár</a></li>
+<li data-i18n="cloud.releases_changelogs"><a data-i18n="cloud.releases_changelogs_1" href="https://github.com/DevTheDev189/Zircon/releases" rel="noopener" target="_blank">Vydania &amp; Changelogy</a></li>
+<li data-i18n="cloud.cloud_coming_soon"><a data-i18n="cloud.cloud_coming_soon_1" href="cloud.html" style="color: var(--muted);">Cloud (Čoskoro)</a></li>
+<li data-i18n="cloud.business_source_license_11"><a data-i18n="cloud.business_source_license_11_1" href="https://github.com/DevTheDev189/Zircon/blob/main/LICENSE" rel="noopener" target="_blank">Business Source License 1.1</a></li>
+</ul>
+</div>
+</div>
+<div class="footer-legal" data-i18n="cloud.zircon_contributors_v0421_active"><span data-i18n="cloud.zircon_contributors_v0421_active_1">© Prispievatelia Zircon · v0.4.21 (aktívny vývoj)</span>
+<span data-i18n="cloud.not_an_official_minecraft">Nie je to oficiálny produkt Minecraft. Nie je schválený ani spojený s Mojang Studios alebo Microsoft.</span></div>
+</div>
+</footer>
+<script src="../assets/js/main.js?v=2"></script>
+</body>
+</html>

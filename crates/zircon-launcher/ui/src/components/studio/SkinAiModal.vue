@@ -120,11 +120,17 @@
             </span>
             <button
               type="button"
-              class="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1"
+              class="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1.5"
               @click="randomizeAllCategories"
               title="Randomize every category slot"
             >
-              <span>🎲 Shuffle All Categories</span>
+              <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                <circle cx="16" cy="16" r="1.2" fill="currentColor" />
+                <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+              </svg>
+              <span>Shuffle All Categories</span>
             </button>
           </div>
 
@@ -142,7 +148,29 @@
               @click="applyPreset(preset)"
             >
               <div class="flex items-center justify-between w-full mb-1">
-                <span class="text-base">{{ preset.icon }}</span>
+                <div class="w-6 h-6 rounded-lg bg-slate-800/60 border border-slate-700/60 flex items-center justify-center text-cyan-300 shrink-0">
+                  <svg v-if="preset.iconKey === 'cyber'" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>
+                  </svg>
+                  <svg v-else-if="preset.iconKey === 'cute'" class="w-3.5 h-3.5 text-pink-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                  </svg>
+                  <svg v-else-if="preset.iconKey === 'fantasy'" class="w-3.5 h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <svg v-else-if="preset.iconKey === 'anime'" class="w-3.5 h-3.5 text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                  <svg v-else-if="preset.iconKey === 'druid'" class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+                  </svg>
+                  <svg v-else-if="preset.iconKey === 'nether'" class="w-3.5 h-3.5 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                </div>
                 <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-300">
                   {{ preset.badge }}
                 </span>
@@ -202,11 +230,16 @@
                   <!-- Randomize this slot -->
                   <button
                     type="button"
-                    class="p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
+                    class="p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors flex items-center justify-center"
                     title="Randomize this slot"
                     @click="randomizeCategory(cat)"
                   >
-                    🎲
+                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="3" />
+                      <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                      <circle cx="16" cy="16" r="1.2" fill="currentColor" />
+                      <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+                    </svg>
                   </button>
                   <!-- Clear this slot if selected -->
                   <button
@@ -295,19 +328,27 @@
               <div class="flex items-center gap-1.5">
                 <button
                   type="button"
-                  class="px-2 py-0.5 rounded text-[11px] font-semibold transition-colors"
+                  class="px-2 py-0.5 rounded text-[11px] font-semibold transition-colors flex items-center gap-1.5"
                   :class="isRandomSeed ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400 hover:text-white'"
                   @click="isRandomSeed = true"
                 >
-                  🎲 Random Seed
+                  <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                    <path d="M16 8h.01M8 8h.01M8 16h.01M16 16h.01M12 12h.01"/>
+                  </svg>
+                  Random Seed
                 </button>
                 <button
                   type="button"
-                  class="px-2 py-0.5 rounded text-[11px] font-semibold transition-colors"
+                  class="px-2 py-0.5 rounded text-[11px] font-semibold transition-colors flex items-center gap-1.5"
                   :class="!isRandomSeed ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400 hover:text-white'"
                   @click="lockCurrentSeed"
                 >
-                  🔒 Locked
+                  <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  Locked
                 </button>
               </div>
             </div>
@@ -318,11 +359,14 @@
                 <span class="text-xs font-mono text-cyan-300 font-bold">{{ activeSeedDisplay }}</span>
                 <button
                   type="button"
-                  class="p-1 text-slate-400 hover:text-white"
+                  class="p-1 text-slate-400 hover:text-cyan-300 transition-colors"
                   title="Generate new random seed"
                   @click="shuffleBaseSeed"
                 >
-                  🎲
+                  <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                    <path d="M16 8h.01M8 8h.01M8 16h.01M16 16h.01M12 12h.01"/>
+                  </svg>
                 </button>
               </div>
 
@@ -352,8 +396,11 @@
         <!-- GENERATE ACTIONS & TELEMETRY BAR -->
         <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
           <div class="text-xs text-slate-400 flex items-center gap-2">
-            <span v-if="generationTime" class="text-cyan-300 font-semibold">
-              ⚡ Generated 4 authentic skins in {{ (generationTime / 1000).toFixed(2) }}s ({{ (generationTime / 4000).toFixed(2) }}s / skin)
+            <span v-if="generationTime" class="text-cyan-300 font-semibold flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              <span>Generated 4 authentic skins in {{ (generationTime / 1000).toFixed(2) }}s ({{ (generationTime / 4000).toFixed(2) }}s / skin)</span>
             </span>
             <span v-else class="text-slate-500">
               Ready to generate 4 distinct candidates using ONNX Flow Matching
@@ -555,20 +602,28 @@
                 <div class="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
-                    class="py-1.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-[11px] transition-colors flex items-center justify-center gap-1"
+                    class="py-1.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-[11px] transition-colors flex items-center justify-center gap-1.5"
                     title="Save to My Skins Gallery"
                     @click="quickSave(cand)"
                   >
-                    <span>💾 Save</span>
+                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                      <polyline points="17 21 17 13 7 13 7 21"/>
+                      <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    <span>Save</span>
                   </button>
 
                   <button
                     type="button"
-                    class="py-1.5 px-2 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-300 hover:text-white font-semibold text-[11px] transition-colors flex items-center justify-center gap-1"
+                    class="py-1.5 px-2 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-300 hover:text-white font-semibold text-[11px] transition-colors flex items-center justify-center gap-1.5"
                     title="Wear this skin right now"
                     @click="wearSkinNow(cand)"
                   >
-                    <span>👕 Wear</span>
+                    <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>
+                    </svg>
+                    <span>Wear</span>
                   </button>
                 </div>
               </div>
@@ -718,7 +773,7 @@ const PRESETS = [
   {
     name: 'Cyberpunk Cyborg',
     badge: 'Sci-Fi',
-    icon: '⚡',
+    iconKey: 'cyber',
     variant: 'classic',
     palette: ['#0b132b', '#00f0ff', '#ff0055'],
     slots: {
@@ -735,7 +790,7 @@ const PRESETS = [
   {
     name: 'Pastel Bunny Hoodie',
     badge: 'Cute',
-    icon: '🐰',
+    iconKey: 'cute',
     variant: 'slim',
     palette: ['#fce7f3', '#f472b6', '#a855f7'],
     slots: {
@@ -752,7 +807,7 @@ const PRESETS = [
   {
     name: 'Paladin Knight',
     badge: 'Fantasy',
-    icon: '⚔️',
+    iconKey: 'fantasy',
     variant: 'classic',
     palette: ['#1e293b', '#64748b', '#fbbf24'],
     slots: {
@@ -769,7 +824,7 @@ const PRESETS = [
   {
     name: 'Anime Cloak Rogue',
     badge: 'Anime',
-    icon: '🌌',
+    iconKey: 'anime',
     variant: 'classic',
     palette: ['#0f172a', '#1e40af', '#38bdf8'],
     slots: {
@@ -786,7 +841,7 @@ const PRESETS = [
   {
     name: 'Druid of the Forest',
     badge: 'Nature',
-    icon: '🌿',
+    iconKey: 'druid',
     variant: 'slim',
     palette: ['#064e3b', '#059669', '#34d399'],
     slots: {
@@ -803,7 +858,7 @@ const PRESETS = [
   {
     name: 'Nether Assassin',
     badge: 'Nether',
-    icon: '🔥',
+    iconKey: 'nether',
     variant: 'classic',
     palette: ['#18181b', '#991b1b', '#f97316'],
     slots: {
@@ -876,7 +931,7 @@ function generateHighEntropySeed() {
 
 const activeSeedDisplay = computed(() => {
   if (isRandomSeed.value) {
-    return '🎲 [Auto-Random]';
+    return '[Auto-Random]';
   }
   return String(currentBaseSeed.value).slice(0, 12) + '…';
 });

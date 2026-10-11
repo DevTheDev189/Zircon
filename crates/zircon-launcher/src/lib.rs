@@ -29,6 +29,11 @@ pub mod export;
 pub mod coop;
 pub mod skin_ai;
 pub mod snapshots;
+pub mod migration;
+pub mod split_screen;
+pub mod mission_control;
+pub mod lan_discovery;
+pub mod onedrive_sync;
 
 
 /// Boots the Tauri application: registers the plugins, manages the shared
@@ -49,6 +54,7 @@ pub fn run() {
         .with(logging::InMemoryLogLayer)
         .init();
     tauri::Builder::default()
+        .manage(commands::LauncherState::new())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -64,48 +70,28 @@ pub fn run() {
                 tracing::info!("Registered zircon:// deep-link protocol handler");
                 let handle = app.handle().clone();
                 app.deep_link().on_open_url(move |event| {
-                    use tauri::Emitter;
                     for url in event.urls() {
-                        tracing::info!("Deep link received: {}", url);
-                        if url.scheme() == "zircon" {
-                            if url.host_str() == Some("server") && (url.path() == "/add" || url.path().starts_with("/add")) {
-                                let mut name = "Zircon Cloud Server".to_string();
-                                let mut address = "".to_string();
-                                for (k, v) in url.query_pairs() {
-                                    if k == "name" && !v.is_empty() {
-                                        name = v.into_owned();
-                                    } else if (k == "address" || k == "host") && !v.is_empty() {
-                                        address = v.into_owned();
-                                    }
-                                }
-                                if !address.is_empty() {
-                                    let payload = serde_json::json!({
-                                        "name": name,
-                                        "address": address
-                                    });
-                                    let _ = handle.emit("deep-link-add-server", payload);
-                                    let _ = handle.emit("deep-link-join", &address);
-                                }
-                            } else {
-                                let raw_addr = if url.host_str() == Some("join") {
-                                    url.path().trim_start_matches('/').to_string()
-                                } else if let Some(host) = url.host_str() {
-                                    host.to_string()
-                                } else {
-                                    url.path().trim_start_matches('/').to_string()
-                                };
-                                let address = raw_addr.trim().to_string();
-                                if !address.is_empty() {
-                                    let _ = handle.emit("deep-link-join", &address);
-                                }
-                            }
-                        }
+                        handle_incoming_deep_link(&handle, &url);
                     }
                 });
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    for url in urls {
+                        handle_incoming_deep_link(&app.handle(), &url);
+                    }
+                }
             }
+
+            let lan_engine = crate::lan_discovery::LanDiscoveryEngine::start(app.handle().clone());
+            use tauri::Manager;
+            let state = app.state::<commands::LauncherState>();
+            state.telemetry.start(app.handle().clone());
+            let lan_slot = state.lan_discovery.clone();
+            tauri::async_runtime::spawn(async move {
+                *lan_slot.lock().await = Some(lan_engine);
+            });
+
             Ok(())
         })
-        .manage(commands::LauncherState::new())
         .invoke_handler(tauri::generate_handler![
             commands::login_microsoft,
             commands::get_cached_session,
@@ -129,9 +115,13 @@ pub fn run() {
             commands::clone_offline_instance,
             commands::delete_offline_instance,
             commands::get_offline_instance_dir,
+            commands::scan_installed_launchers,
+            commands::import_discovered_instances,
             commands::open_instance_folder,
             commands::install_modrinth_modpack,
+            commands::inspect_local_modpack,
             commands::import_local_mrpack,
+            commands::import_mrpack_from_url,
             commands::export_offline_instance_mrpack,
             commands::export_to_zircon_server,
             commands::export_server_instance_to_zip,
@@ -145,12 +135,18 @@ pub fn run() {
             commands::audit_instance_mods,
             commands::repair_instance_mods,
             commands::list_instance_worlds,
+            commands::get_world_seed_radar_preview,
             commands::backup_instance_world,
             commands::list_instance_world_backups,
             commands::restore_instance_world_backup,
             commands::delete_instance_world_backup,
+            commands::get_cloud_sync_status,
+            commands::list_cloud_backups,
+            commands::trigger_cloud_backup,
+            commands::restore_from_cloud_backup,
             commands::list_instance_screenshots,
             commands::delete_instance_screenshot,
+            commands::get_instance_artwork,
             commands::start_coop_session,
             commands::stop_coop_session,
             commands::get_coop_session_status,
@@ -215,10 +211,12 @@ pub fn run() {
             commands::search_modrinth,
             commands::list_modrinth_versions,
             commands::install_modrinth_mod,
+            commands::apply_cinematic_graphics_preset,
             commands::check_mod_dependencies,
             commands::install_mod_with_dependencies,
             commands::check_instance_mod_updates,
             commands::update_instance_mods,
+            commands::rollback_mod_update,
             commands::list_minecraft_versions,
 
             commands::get_minecraft_versions,
@@ -237,7 +235,113 @@ pub fn run() {
             commands::get_last_instance_log,
             commands::clear_last_instance_log,
             commands::check_game_crash,
+            commands::execute_crash_remediation,
+            commands::launch_couch_coop_session,
+            commands::stop_couch_coop_session,
+            commands::get_couch_coop_status,
+            commands::get_couch_coop_screen_resolution,
+            commands::get_mission_control_telemetry,
+            commands::get_gamepad_telemetry,
+            commands::get_discovered_lan_servers,
+            commands::broadcast_lan_beacon,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Zircon launcher");
 }
+
+/// Parses and dispatches incoming `zircon://` protocol deep links.
+fn handle_incoming_deep_link(handle: &tauri::AppHandle, url: &url::Url) {
+    use tauri::Emitter;
+    tracing::info!("Processing deep link: {}", url);
+    if url.scheme() != "zircon" {
+        return;
+    }
+
+    let mut join_code: Option<String> = None;
+    let mut server_address: Option<String> = None;
+    let mut server_name: Option<String> = None;
+    let mut modpack_id: Option<String> = None;
+
+    for (k, v) in url.query_pairs() {
+        match k.as_ref() {
+            "code" | "join_code" | "coop" => {
+                if !v.trim().is_empty() {
+                    join_code = Some(v.trim().to_uppercase());
+                }
+            }
+            "server" | "address" | "host" => {
+                if !v.trim().is_empty() {
+                    server_address = Some(v.trim().to_string());
+                }
+            }
+            "name" => {
+                if !v.trim().is_empty() {
+                    server_name = Some(v.trim().to_string());
+                }
+            }
+            "pack" | "recipe" | "modpack" => {
+                if !v.trim().is_empty() {
+                    modpack_id = Some(v.trim().to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if url.host_str() == Some("server") && (url.path() == "/add" || url.path().starts_with("/add")) {
+        let name = server_name.unwrap_or_else(|| "Zircon Cloud Server".to_string());
+        let address = server_address.unwrap_or_default();
+        if !address.is_empty() {
+            let payload = serde_json::json!({
+                "name": name,
+                "address": address
+            });
+            let _ = handle.emit("deep-link-add-server", payload);
+            let _ = handle.emit("deep-link-join", &address);
+        }
+        return;
+    }
+
+    if join_code.is_none() && server_address.is_none() {
+        let raw_val = if url.host_str() == Some("join") {
+            url.path().trim_start_matches('/').to_string()
+        } else if let Some(host) = url.host_str() {
+            host.to_string()
+        } else {
+            url.path().trim_start_matches('/').to_string()
+        };
+        let trimmed = raw_val.trim();
+        if !trimmed.is_empty() {
+            if trimmed.to_uppercase().starts_with("ZK-") || (trimmed.len() == 6 && trimmed.chars().all(|c| c.is_ascii_alphanumeric())) {
+                join_code = Some(trimmed.to_uppercase());
+            } else {
+                server_address = Some(trimmed.to_string());
+            }
+        }
+    }
+
+    let join_type = if join_code.is_some() {
+        "coopCode"
+    } else {
+        "directServer"
+    };
+
+    let payload = serde_json::json!({
+        "rawUrl": url.to_string(),
+        "joinType": join_type,
+        "joinCode": join_code,
+        "serverAddress": server_address,
+        "serverName": server_name,
+        "modpackId": modpack_id,
+    });
+
+    tracing::info!("Emitting deep-link-join-request: {:?}", payload);
+    let _ = handle.emit("deep-link-join-request", &payload);
+
+    if let Some(ref addr) = server_address {
+        let _ = handle.emit("deep-link-join", addr);
+    } else if let Some(ref code) = join_code {
+        let _ = handle.emit("deep-link-join", code);
+    }
+}
+

@@ -521,6 +521,31 @@ window.Zircon.mods = {
         }
     },
 
+    async exportMrpack() {
+        if (!this.selectedInstance) return;
+        const id = this.selectedInstance.id;
+        const url = `/api/instances/${id}/pack.mrpack`;
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = (this.selectedInstance.name || 'modpack').replace(/[^a-zA-Z0-9_\-]/g, '_');
+        a.download = `${safeName}.mrpack`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    },
+
+    async copyMrpackUrl() {
+        if (!this.selectedInstance) return;
+        const id = this.selectedInstance.id;
+        const url = `${window.location.origin}/api/instances/${id}/pack.mrpack`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+            alert(`✓ Copied .mrpack URL to clipboard!\n\n${url}\n\nUniversal URL for Prism Launcher, Modrinth App, and other launchers.`);
+        } else {
+            window.prompt('Copy Universal .mrpack URL:', url);
+        }
+    },
+
     async importSetupPrompt() {
         if (!this.selectedInstance) return;
         const input = window.prompt('Paste a 1-line Share Code (zircon://setup/...) or JSON BOM manifest:');
