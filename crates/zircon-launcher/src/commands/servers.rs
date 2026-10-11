@@ -59,11 +59,20 @@ pub(crate) fn server_base_url(host: &str, port: u16, use_https: bool) -> Result<
 /// Generates fallback candidate base URLs for probing and status calls.
 pub(crate) fn candidate_base_urls(host: &str, port: u16, use_https: bool) -> Vec<String> {
     let mut urls = Vec::new();
-    if let Ok(url) = server_base_url(host, port, use_https) {
-        urls.push(url);
-    }
     if use_https {
+        // When connecting over HTTPS with the default Minecraft port (25565),
+        // prioritize the root virtual host (e.g. `https://mc.winslow.plus`) so that
+        // subdomain routing and reverse-proxied Host headers take precedence over
+        // path-segment port fallback (`https://mc.winslow.plus/25565`).
         let root = format!("https://{host}");
+        if port == 25565 {
+            urls.push(root.clone());
+        }
+        if let Ok(url) = server_base_url(host, port, use_https) {
+            if !urls.contains(&url) {
+                urls.push(url);
+            }
+        }
         if !urls.contains(&root) {
             urls.push(root);
         }
@@ -73,6 +82,8 @@ pub(crate) fn candidate_base_urls(host: &str, port: u16, use_https: bool) -> Vec
                 urls.push(direct_port);
             }
         }
+    } else if let Ok(url) = server_base_url(host, port, use_https) {
+        urls.push(url);
     }
     urls
 }
@@ -317,7 +328,7 @@ pub async fn probe_server(
                 }
             }
         }
-        (None, None, !is_local || is_explicit_https)
+        (None, None, is_explicit_https)
     };
 
     let (ping_res, (bom, wrapper, use_https)) = tokio::join!(ping_fut, probe_zircon_fut);

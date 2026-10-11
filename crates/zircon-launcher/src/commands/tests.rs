@@ -193,6 +193,20 @@ use crate::pack_selection::PackSelection;
     }
 
     #[test]
+    fn candidate_base_urls_prioritizes_root_domain_when_port_is_25565() {
+        // Default port 25565 over HTTPS prioritizes the root virtual host domain
+        // so that subdomain virtual hosting (Host: mc.winslow.plus) takes precedence.
+        let urls = candidate_base_urls("mc.winslow.plus", 25565, true);
+        assert_eq!(urls[0], "https://mc.winslow.plus");
+        assert!(urls.contains(&"https://mc.winslow.plus/25565".to_string()));
+
+        // Explicit custom port over HTTPS prioritizes the explicit port path segment.
+        let urls_custom = candidate_base_urls("mc.winslow.plus", 25566, true);
+        assert_eq!(urls_custom[0], "https://mc.winslow.plus/25566");
+        assert!(urls_custom.contains(&"https://mc.winslow.plus".to_string()));
+    }
+
+    #[test]
     fn apply_shader_choice_enables_first_pack_and_disables_cleanly() {
         let mut bom = BillOfMaterials::default();
         bom.shaderpacks = vec![

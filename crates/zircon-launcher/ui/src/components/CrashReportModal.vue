@@ -156,21 +156,37 @@
               </div>
               <span class="text-xs font-semibold text-slate-300 ml-1">{{ $t('crash_dialog.crash_log_trace') }}</span>
             </div>
-            <button
-              class="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 transition"
-              @click="toggleFullLog"
-            >
-              <span>{{ showFullLog ? $t('crash_dialog.show_snippet') : $t('crash_dialog.show_full_log') }}</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                class="text-[10px] px-2 py-0.5 rounded border transition flex items-center gap-1"
+                :class="isDyslexic ? 'bg-accent/20 text-accent-bright border-accent/40 font-bold' : 'text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'"
+                :title="'Toggle OpenDyslexic font for crash log'"
+                @click="dyslexicMode = !dyslexicMode"
+              >
+                <span :class="{ 'font-dyslexic': isDyslexic }">OpenDyslexic</span>
+              </button>
+              <button
+                class="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 transition"
+                @click="toggleFullLog"
+              >
+                <span>{{ showFullLog ? $t('crash_dialog.show_snippet') : $t('crash_dialog.show_full_log') }}</span>
+              </button>
+            </div>
           </div>
 
           <!-- Trace Viewer -->
-          <div class="bg-[#05070d]/90 border border-slate-800 rounded-xl p-3.5 font-mono text-[11px] text-slate-300 overflow-x-auto flex-1 min-h-[220px] max-h-[380px] select-text shadow-inner">
+          <div
+            class="bg-[#05070d]/90 border border-slate-800 rounded-xl p-3.5 text-[11px] text-slate-300 overflow-x-auto flex-1 min-h-[220px] max-h-[380px] select-text shadow-inner"
+            :class="isDyslexic ? 'font-dyslexic leading-loose tracking-wide' : 'font-mono'"
+          >
             <div
               v-for="(line, idx) in displayedLogLines"
               :key="idx"
-              class="leading-relaxed py-0.5 font-mono"
-              :class="isErrorLine(line) ? 'text-rose-400 font-semibold' : 'text-slate-400'"
+              class="py-0.5"
+              :class="[
+                isDyslexic ? 'leading-loose font-dyslexic' : 'leading-relaxed font-mono',
+                isErrorLine(line) ? 'text-rose-400 font-semibold' : 'text-slate-400',
+              ]"
             >
               {{ line }}
             </div>
@@ -231,6 +247,13 @@ const copied = ref(false);
 const remediating = ref(false);
 const remediationResult = ref(null);
 const showFullLog = ref(false);
+const dyslexicMode = ref(false);
+const isDyslexic = computed(() => {
+  if (typeof document !== 'undefined' && document.documentElement.classList.contains('font-dyslexic')) {
+    return true;
+  }
+  return dyslexicMode.value;
+});
 
 const primaryAction = computed(() => props.crashData?.analysis?.primaryAction || null);
 const secondaryActions = computed(() => props.crashData?.analysis?.secondaryActions || []);

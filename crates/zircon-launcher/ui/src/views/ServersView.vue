@@ -290,12 +290,6 @@
         <!-- Top Header Bar inside Card -->
         <div class="relative z-10 flex items-center justify-between gap-3 mb-2">
           <div class="flex items-center gap-2">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-accent/25 to-accent-deep/25 border border-accent/40 text-accent-bright shadow-[0_0_12px_var(--color-accent-glow)]">
-              <svg class="w-3.5 h-3.5 text-accent-bright fill-accent-bright" viewBox="0 0 24 24">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-              <span>{{ $t('servers.featured_community') }}</span>
-            </span>
             <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-black/50 border border-slate-700/60 text-slate-300 shadow-sm">
               {{ rec.address }}
             </span>

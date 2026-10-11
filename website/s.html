@@ -353,7 +353,7 @@
                 <span class="step-tag">First Time</span>
               </div>
               <p class="step-desc">Free, lightweight 15MB app built in Rust. Auto-syncs all mods, configs, and Java runtimes.</p>
-              <a id="btnDownloadLauncher" class="btn-step-download" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_x64-setup.exe">
+              <a id="btnDownloadLauncher" class="btn-step-download" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.1_x64-setup.exe">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                 <span id="downloadBtnText">Download for Windows (.exe)</span>
               </a>
@@ -421,13 +421,13 @@
     const downloadBtnText = document.getElementById('downloadBtnText');
 
     if (/macintosh|mac os x/.test(ua)) {
-      downloadBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_aarch64.dmg';
+      downloadBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.1_aarch64.dmg';
       downloadBtnText.textContent = 'Download for macOS (.dmg)';
     } else if (/linux/.test(ua) && !/android/.test(ua)) {
-      downloadBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_amd64.AppImage';
+      downloadBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.1_amd64.AppImage';
       downloadBtnText.textContent = 'Download for Linux (.AppImage)';
     } else {
-      downloadBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.0_x64-setup.exe';
+      downloadBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.5.1_x64-setup.exe';
       downloadBtnText.textContent = 'Download for Windows (.exe)';
     }
 

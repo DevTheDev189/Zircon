@@ -261,17 +261,20 @@
             </p>
             <div class="flex items-center gap-3 justify-center">
               <button
-                class="z-btn-accent text-xs font-bold py-2.5 px-4 rounded-xl shadow-lg hover:shadow-cyan-500/25 flex items-center gap-2"
+                class="z-btn-accent text-xs font-bold py-2.5 px-4 rounded-xl shadow-lg hover:shadow-cyan-500/25 flex items-center gap-2 cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                 @click="openNewInstance('scratch')"
               >
                 <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 <span>Create Clean Instance</span>
               </button>
               <button
-                class="z-btn-ghost text-xs font-semibold py-2.5 px-4 rounded-xl border border-slate-700/80 text-slate-300 hover:text-white"
+                class="rounded-xl border border-cyan-500/30 bg-cyan-950/30 hover:bg-cyan-500/15 hover:border-cyan-400/60 text-cyan-300 text-xs font-bold py-2.5 px-4 flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(71,210,201,0.12)] cursor-pointer active:scale-95"
                 @click="showMigrationModal = true"
               >
-                <span>Migrate Launchers</span>
+                <svg class="w-4 h-4 stroke-current fill-none" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span>Migrate From Other Launchers</span>
               </button>
             </div>
           </div>

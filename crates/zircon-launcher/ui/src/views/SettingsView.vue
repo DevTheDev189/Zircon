@@ -1410,6 +1410,7 @@ import { api, onGameOutput, pickFile, EXE_FILTER, fmtBytes } from '../lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { THEME_PRESETS, BG_THEME_PRESETS, BUTTON_STYLES, GLASS_EFFECTS, CURATED_THEMES, detectCuratedTheme, applyTheme } from '../lib/theme';
+import { applyAccessibilitySettings as applyAccessibilityHelper } from '../lib/accessibility';
 import { t, currentLocale, setLocale, AVAILABLE_LOCALES } from '../lib/i18n';
 
 // OneDrive Cloud Sync state & helpers
@@ -1593,45 +1594,7 @@ function setUiScale(scale) {
 }
 
 function applyAccessibilitySettings() {
-  if (typeof document === 'undefined') return;
-  const root = document.documentElement;
-
-  // Font
-  root.classList.remove('font-dyslexic', 'font-lexend');
-  if (settings.value.fontFamily === 'open-dyslexic') {
-    root.classList.add('font-dyslexic');
-  } else if (settings.value.fontFamily === 'lexend') {
-    root.classList.add('font-lexend');
-  }
-  localStorage.setItem('zircon_font', settings.value.fontFamily);
-
-  // UI Scale
-  if (settings.value.uiScale && settings.value.uiScale !== 1.0) {
-    root.setAttribute('data-ui-scale', String(settings.value.uiScale));
-  } else {
-    root.removeAttribute('data-ui-scale');
-  }
-  localStorage.setItem('zircon_ui_scale', String(settings.value.uiScale));
-
-  // Reduce Motion
-  if (settings.value.reduceMotion) {
-    root.classList.add('reduce-motion');
-  } else {
-    root.classList.remove('reduce-motion');
-  }
-  localStorage.setItem('zircon_reduce_motion', String(settings.value.reduceMotion));
-
-  // High Contrast
-  if (settings.value.highContrast) {
-    root.classList.add('high-contrast');
-  } else {
-    root.classList.remove('high-contrast');
-  }
-  localStorage.setItem('zircon_high_contrast', String(settings.value.highContrast));
-
-  // Colorblind & Sound Cues
-  localStorage.setItem('zircon_colorblind', String(settings.value.colorblindBadges));
-  localStorage.setItem('zircon_sound_cues', String(settings.value.soundCues));
+  applyAccessibilityHelper(settings.value);
 }
 
 function selectTheme(themeId) {

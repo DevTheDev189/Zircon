@@ -57,13 +57,11 @@ impl SavedServer {
         } else {
             format!("{host}:{port}")
         };
-        let is_local = is_loopback_host(&host);
-
         Self {
             name: name.into(),
             address: clean_addr,
             last_played,
-            use_https: is_https || !is_local, // HTTPS by default for remote hosts or if specified
+            use_https: is_https,
             pinned_public_key: None,
             icon_url: None,
             banner_url: None,
@@ -442,15 +440,18 @@ mod tests {
     }
 
     #[test]
-    fn new_servers_default_to_https_unless_loopback() {
-        // Remote hosts default to HTTPS so BOM/mod downloads are never sent
-        // over plaintext HTTP to an on-path attacker.
-        assert!(SavedServer::new("Remote", "play.myserver.com", 1).use_https);
-        assert!(SavedServer::new("Remote Port", "play.myserver.com:25565", 1).use_https);
-        assert!(SavedServer::new("IPv4", "203.0.113.10", 1).use_https);
-        assert!(SavedServer::new("IPv6", "[2001:db8::1]", 1).use_https);
+    fn new_servers_default_to_http_unless_explicitly_configured() {
+        // Servers default to use_https = false unless explicitly prepended with https:// or configured with .with_https(true)
+        assert!(!SavedServer::new("Remote", "play.myserver.com", 1).use_https);
+        assert!(!SavedServer::new("Remote Port", "play.myserver.com:25565", 1).use_https);
+        assert!(!SavedServer::new("IPv4", "203.0.113.10", 1).use_https);
+        assert!(!SavedServer::new("IPv6", "[2001:db8::1]", 1).use_https);
 
-        // Loopback keeps plaintext HTTP for local dev/test servers.
+        // Explicit https:// prefix enables use_https
+        assert!(SavedServer::new("Secure", "https://play.myserver.com", 1).use_https);
+        assert!(SavedServer::new("Secure Port", "https://play.myserver.com:25565", 1).use_https);
+
+        // Loopback servers also default to false
         assert!(!SavedServer::new("Local", "localhost", 1).use_https);
         assert!(!SavedServer::new("Local Host", "localhost:25565", 1).use_https);
         assert!(!SavedServer::new("Loopback v4", "127.0.0.1", 1).use_https);

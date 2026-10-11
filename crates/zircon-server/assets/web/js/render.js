@@ -11,6 +11,7 @@ const _hoisted_1 = {
   class: "fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4"
 }
 const _hoisted_2 = { class: "zircon-glass-card p-8 rounded-2xl w-full max-w-md shadow-2xl relative border border-slate-700/60" }
+const _hoisted_insecure_warning = /*#__PURE__*/_createStaticVNode("<div class=\"bg-amber-950/40 border border-amber-500/40 rounded-xl p-3.5 mb-5 text-left text-xs shadow-lg shadow-amber-950/20 backdrop-blur-sm\"><div class=\"flex items-center gap-2 text-amber-300 font-semibold mb-1\"><svg class=\"w-4 h-4 text-amber-400 shrink-0\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z\" clip-rule=\"evenodd\"/></svg><span>Unencrypted Connection (HTTP)</span></div><p class=\"text-[11px] text-amber-200/80 leading-relaxed\">Administrator credentials travel unencrypted over this network. Only log in if you are on a trusted local network or behind a secure VPN (such as WireGuard or Tailscale).</p><div class=\"mt-2.5 pt-2 border-t border-amber-500/20 flex items-center justify-between text-[11px]\"><span class=\"text-amber-300/70\">Hosting on a custom domain?</span><a href=\"https://caddyserver.com\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-cyan-400 hover:text-cyan-300 font-medium underline underline-offset-2 flex items-center gap-1 transition-colors\"><span>Set up Caddy SSL</span><svg class=\"w-3 h-3 inline-block opacity-80\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14\"></path></svg></a></div></div>", 1)
 const _hoisted_3 = ["onSubmit"]
 const _hoisted_4 = ["onUpdate:modelValue"]
 const _hoisted_5 = ["onUpdate:modelValue"]
@@ -1362,6 +1363,9 @@ return function render(_ctx, _cache) {
                 class: "h-9 w-auto block mx-auto mb-4 drop-shadow-[0_0_18px_rgba(71,210,201,0.35)]"
               }, null, -1 /* CACHED */)),
               _cache[4] || (_cache[4] = _createElementVNode("p", { class: "text-xs text-slate-400 mb-6 text-center" }, "Enter administrator credentials printed to stdout on startup.", -1 /* CACHED */)),
+              (isHttpInsecure)
+                ? _hoisted_insecure_warning
+                : _createCommentVNode("v-if", true),
               _createElementVNode("form", {
                 onSubmit: _withModifiers(login, ["prevent"]),
                 class: "space-y-4"

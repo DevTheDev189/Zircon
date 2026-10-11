@@ -72,9 +72,37 @@ html.font-dyslexic {
   letter-spacing: 0.02em !important;
 }
 
+html.font-dyslexic,
+html.font-dyslexic body,
+html.font-dyslexic button,
+html.font-dyslexic input,
+html.font-dyslexic select,
+html.font-dyslexic textarea,
+html.font-dyslexic pre,
+html.font-dyslexic code,
+html.font-dyslexic kbd,
+html.font-dyslexic samp,
+html.font-dyslexic .font-mono,
+html.font-dyslexic .font-sans,
+.font-dyslexic,
+.font-dyslexic .font-mono,
+.font-dyslexic .font-sans {
+  font-family: 'OpenDyslexic', 'Segoe UI', system-ui, -apple-system, monospace, sans-serif !important;
+}
+
 html.font-lexend {
   --font-family-base: 'Lexend', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
   letter-spacing: 0.01em !important;
+}
+
+html.font-lexend,
+html.font-lexend body,
+html.font-lexend button,
+html.font-lexend input,
+html.font-lexend select,
+html.font-lexend textarea,
+html.font-lexend .font-sans {
+  font-family: 'Lexend', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
 }
 
 /* UI Scale Zooms */

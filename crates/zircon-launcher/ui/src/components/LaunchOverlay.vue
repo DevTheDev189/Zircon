@@ -102,7 +102,7 @@
                 </span>
               </div>
               <h2 id="launch-dialog-title" class="mt-1 text-lg font-extrabold tracking-tight text-white truncate">
-                {{ server?.name || (running ? $t('overlay.game_running') : $t('overlay.starting_minecraft')) }}
+                {{ server?.name || (running ? $t('overlay.game_running') : $t('overlay.starting_mc')) }}
               </h2>
               <p v-if="server?.address" class="text-[11px] font-mono text-teal-400/85 truncate">
                 {{ server.address }}
@@ -119,7 +119,7 @@
               :class="show2048
                 ? 'border-teal-400/60 bg-teal-500/20 text-teal-200 shadow-[0_0_14px_rgba(71,210,201,0.35)]'
                 : 'border-white/10 bg-white/5 text-slate-300 hover:border-teal-500/40 hover:text-teal-200 hover:bg-teal-500/10'"
-              :title="show2048 ? $t('overlay.minigame_hide_tooltip') : $t('overlay.minigame_play_tooltip')"
+              :title="show2048 ? $t('overlay.minigame_title_show') : $t('overlay.minigame_title_play')"
               @click="toggle2048"
             >
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -131,7 +131,7 @@
                 v-if="!show2048"
                 class="hidden sm:inline-block rounded-full bg-teal-400/20 px-1.5 py-0.2 text-[9px] font-black text-teal-300 border border-teal-400/30 uppercase"
               >
-                {{ $t('overlay.minigame_play') }}
+                {{ $t('overlay.play_badge') }}
               </span>
             </button>
 
@@ -163,7 +163,7 @@
             <button
               type="button"
               class="group inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-300 transition-all hover:border-rose-500/60 hover:bg-rose-500/20 active:scale-95 shadow-sm"
-              :title="$t('overlay.stop_tooltip')"
+              :title="$t('overlay.cancel_tooltip')"
               :disabled="stopping"
               @click="cancelLaunch"
             >
@@ -225,10 +225,10 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </span>
-                  <span>{{ $t('overlay.shader_engine_recommended') }}</span>
+                  <span>{{ $t('overlay.shader_recommended') }}</span>
                 </div>
                 <span class="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] font-extrabold text-amber-300 uppercase">
-                  {{ $t('overlay.shader_iris_oculus') }}
+                  {{ $t('overlay.iris_oculus') }}
                 </span>
               </div>
 
@@ -238,11 +238,11 @@
                     {{ shaderPrompt.shaderName || $t('overlay.iris_recommended_shaders') }}
                   </span>
                   <span v-if="shaderPrompt.shaderAuthor" class="text-[10px] text-amber-300/80 font-medium">
-                    {{ $t('overlay.by_author', { author: shaderPrompt.shaderAuthor }) }}
+                    {{ $t('mods.by_author', { author: shaderPrompt.shaderAuthor }) }}
                   </span>
                 </div>
                 <p class="mt-1.5 text-[11px] text-amber-100/80 leading-relaxed">
-                  {{ $t('overlay.shader_description') }}
+                  {{ $t('overlay.shader_desc') }}
                 </p>
               </div>
 
@@ -253,7 +253,7 @@
                   v-model="rememberShaders"
                   class="rounded border-amber-500/40 bg-amber-950/50 text-amber-400 focus:ring-0 focus:ring-offset-0 cursor-pointer h-4 w-4"
                 />
-                <span class="font-medium text-[11px]">{{ $t('overlay.remember_preference') }}</span>
+                <span class="font-medium text-[11px]">{{ $t('overlay.remember_shaders') }}</span>
               </label>
 
               <!-- Actions: Skip or Enable (Clean SVG icons, no emojis) -->
@@ -368,13 +368,13 @@
                 <div class="flex items-center justify-between text-xs font-semibold">
                   <span class="truncate text-slate-200 pr-2 flex items-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-teal-400" :class="{ 'animate-ping': !running }" />
-                    <span class="truncate">{{ status || (running ? $t('overlay.minecraft_active') : $t('overlay.preparing_launch')) }}</span>
+                    <span class="truncate">{{ status || (running ? $t('overlay.mc_active') : $t('overlay.preparing_env')) }}</span>
                   </span>
                   <span v-if="progress !== null" class="shrink-0 font-mono font-black text-teal-300 text-sm">
                     {{ Math.round(progress * 100) }}%
                   </span>
                   <span v-else class="shrink-0 text-teal-400/80 animate-pulse font-mono text-[11px] font-bold">
-                    {{ running ? $t('overlay.active_badge') : $t('overlay.syncing_badge') }}
+                    {{ running ? $t('overlay.status_active') : $t('overlay.status_syncing') }}
                   </span>
                 </div>
 
@@ -402,8 +402,8 @@
                   </svg>
                 </div>
                 <div>
-                  <div class="text-xs font-bold text-white">{{ $t('overlay.teaser_2048_title') }}</div>
-                  <div class="text-[10px] text-slate-400">{{ $t('overlay.teaser_2048_subtitle') }}</div>
+                  <div class="text-xs font-bold text-white">{{ $t('overlay.play_2048_teaser') }}</div>
+                  <div class="text-[10px] text-slate-400">{{ $t('overlay.play_2048_desc') }}</div>
                 </div>
               </div>
               <button
@@ -431,8 +431,8 @@
                   </svg>
                 </div>
                 <div>
-                  <div class="text-xs font-bold text-white">{{ $t('overlay.teaser_forge_title') }}</div>
-                  <div class="text-[10px] text-slate-400">{{ $t('overlay.teaser_forge_subtitle') }}</div>
+                  <div class="text-xs font-bold text-white">{{ $t('overlay.forge_teaser') }}</div>
+                  <div class="text-[10px] text-slate-400">{{ $t('overlay.forge_desc') }}</div>
                 </div>
               </div>
               <button
@@ -545,20 +545,20 @@ const stages = [
 
 const tips = [
   {
-    headlineKey: 'overlay.tip_1_headline',
-    messageKey: 'overlay.tip_1_message',
+    headlineKey: 'overlay.tip1_head',
+    messageKey: 'overlay.tip1_body',
   },
   {
-    headlineKey: 'overlay.tip_2_headline',
-    messageKey: 'overlay.tip_2_message',
+    headlineKey: 'overlay.tip2_head',
+    messageKey: 'overlay.tip2_body',
   },
   {
-    headlineKey: 'overlay.tip_3_headline',
-    messageKey: 'overlay.tip_3_message',
+    headlineKey: 'overlay.tip3_head',
+    messageKey: 'overlay.tip3_body',
   },
   {
-    headlineKey: 'overlay.tip_4_headline',
-    messageKey: 'overlay.tip_4_message',
+    headlineKey: 'overlay.tip4_head',
+    messageKey: 'overlay.tip4_body',
   },
 ];
 

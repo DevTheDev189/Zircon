@@ -16,6 +16,7 @@ createApp({
             // the login overlay vs. dashboard so neither flashes prematurely.
             sessionRestoring: true,
             loginForm: { username: 'admin', password: '' },
+            isHttpInsecure: typeof window !== 'undefined' && window.location.protocol === 'http:' && !['localhost', '127.0.0.1', '::1', '[::1]'].includes(window.location.hostname),
             currentUser: { username: 'admin', icon: 'emerald' },
             jwtToken: '',
             instances: [],

@@ -2,6 +2,22 @@
   <div class="relative h-full flex flex-col bg-bg text-text">
     <!-- Microsoft login overlay (visible only when signed out) -->
     <LoginOverlay :visible="!authChecking && !session" @logged-in="onLoggedIn" />
+    <!-- First-Login Onboarding Instance Migration Welcome Dialog -->
+    <OnboardingWelcomeModal
+      :open="showOnboardingWelcomeModal"
+      :session="session"
+      :avatar-url="avatarUrl"
+      :scan-results="onboardingScanResults"
+      @review="onReviewOnboardingMigration"
+      @skip="showOnboardingWelcomeModal = false"
+    />
+    <!-- Top-Level Launcher Migration Modal -->
+    <LauncherMigrationModal
+      :open="showAppMigrationModal"
+      :initial-scan-results="onboardingScanResults"
+      @close="showAppMigrationModal = false"
+      @imported="onAppInstancesMigrated"
+    />
     <!-- Active Minecraft launch lifecycle modal -->
     <LaunchOverlay
       :visible="launchModalActive"
@@ -253,6 +269,8 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import LoginOverlay from './components/LoginOverlay.vue';
+import OnboardingWelcomeModal from './components/OnboardingWelcomeModal.vue';
+import LauncherMigrationModal from './components/LauncherMigrationModal.vue';
 import LaunchOverlay from './components/LaunchOverlay.vue'; // Modern launch progress overlay
 import CrashReportModal from './components/CrashReportModal.vue';
 import StatusBar from './components/StatusBar.vue';
@@ -327,7 +345,7 @@ const navItems = [
 const queryView = typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined'
   ? new URLSearchParams(window.location.search).get('view')
   : null;
-const view = ref(queryView || 'offline');
+const view = ref(queryView || 'servers');
 const session = ref(null);
 const authChecking = ref(true);
 const avatarUrl = ref('');
@@ -347,6 +365,9 @@ const deepLinkServer = ref(null);
 const deepLinkCode = ref('');
 const crashReportData = ref(null);
 const showCrashReportModal = ref(false);
+const showOnboardingWelcomeModal = ref(false);
+const showAppMigrationModal = ref(false);
+const onboardingScanResults = ref([]);
 
 let unlisten = [];
 
@@ -378,6 +399,7 @@ onMounted(async () => {
   refreshAvatar();
   refreshMojangSkin();
   loadAccounts();
+  checkOnboardingMigration();
   window.addEventListener('click', onWindowClick);
   try {
 
@@ -659,12 +681,42 @@ async function refreshMojangSkin() {
   }
 }
 
+async function checkOnboardingMigration() {
+  if (!session.value) return;
+  if (localStorage.getItem('zircon_migration_onboarding_shown')) return;
+  localStorage.setItem('zircon_migration_onboarding_shown', 'true');
+  try {
+    const results = await api.scanInstalledLaunchers();
+    const total = (results || []).reduce(
+      (acc, r) => acc + (r.instances?.length || 0),
+      0
+    );
+    if (total > 0) {
+      onboardingScanResults.value = results;
+      showOnboardingWelcomeModal.value = true;
+    }
+  } catch (err) {
+    console.warn('Background launcher scan error:', err);
+  }
+}
+
+function onReviewOnboardingMigration() {
+  showOnboardingWelcomeModal.value = false;
+  showAppMigrationModal.value = true;
+}
+
+function onAppInstancesMigrated() {
+  showAppMigrationModal.value = false;
+  view.value = 'offline';
+}
+
 function onLoggedIn(loggedInSession) {
   session.value = loggedInSession;
   statusText.value = 'Signed in.';
   refreshAvatar();
   refreshMojangSkin();
   loadAccounts();
+  checkOnboardingMigration();
 }
 
 async function onLogout() {

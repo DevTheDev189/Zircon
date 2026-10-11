@@ -192,16 +192,25 @@ pub(crate) fn resolve_instance_for_host(
     state: &AppState,
     host: Option<&str>,
 ) -> Option<InstanceConfig> {
+    let public_port = state.config.get_config().public_port;
+    resolve_instance_for_host_from_managers(&state.instances, public_port, host)
+}
+
+pub(crate) fn resolve_instance_for_host_from_managers(
+    instances: &ServerInstanceManager,
+    public_port: i32,
+    host: Option<&str>,
+) -> Option<InstanceConfig> {
     let host_str = host?.trim();
     if host_str.is_empty() {
-        return state.instances.get_active_instance();
+        return instances.get_active_instance();
     }
 
     if let Some(port) = ModServiceResolver::host_port(Some(host_str)) {
-        if let Some(cfg) = state.instances.find_by_external_port(port) {
+        if let Some(cfg) = instances.find_by_external_port(port) {
             return Some(cfg);
         }
-        if let Some(cfg) = state.instances.find_by_internal_port(port as u16) {
+        if let Some(cfg) = instances.find_by_internal_port(port as u16) {
             return Some(cfg);
         }
     }
@@ -218,16 +227,15 @@ pub(crate) fn resolve_instance_for_host(
         host_str
     };
 
-    if let Some(cfg) = state.instances.find_by_hostname(bare_host) {
+    if let Some(cfg) = instances.find_by_hostname(bare_host) {
         return Some(cfg);
     }
 
-    let public_port = state.config.get_config().public_port;
-    if let Some(cfg) = state.instances.find_by_external_port(public_port) {
+    if let Some(cfg) = instances.find_by_external_port(public_port) {
         return Some(cfg);
     }
 
-    state.instances.get_active_instance()
+    instances.get_active_instance()
 }
 
 /// Resolves an instance for a path-based `:port`/instance-id reference.
@@ -235,22 +243,75 @@ pub(crate) fn resolve_instance_for_ref(
     state: &AppState,
     port_or_id: &str,
 ) -> Option<InstanceConfig> {
+    resolve_instance_for_ref_with_host(state, port_or_id, None)
+}
+
+/// Resolves an instance for a path-based `:port`/instance-id reference with optional
+/// `Host` header awareness. When `port_or_id` is the default Minecraft port 25565,
+/// a specific hostname match from the `Host` header takes precedence so that virtual-hosted
+/// subdomains (e.g. `mc.winslow.plus`) resolve to their dedicated instance instead of the
+/// default port 25565 owner.
+pub(crate) fn resolve_instance_for_ref_with_host(
+    state: &AppState,
+    port_or_id: &str,
+    host: Option<&str>,
+) -> Option<InstanceConfig> {
+    let public_port = state.config.get_config().public_port;
+    resolve_instance_for_ref_from_managers(&state.instances, public_port, port_or_id, host)
+}
+
+pub(crate) fn resolve_instance_for_ref_from_managers(
+    instances: &ServerInstanceManager,
+    public_port: i32,
+    port_or_id: &str,
+    host: Option<&str>,
+) -> Option<InstanceConfig> {
     let clean = port_or_id.trim();
+
+    // If the path port is default 25565, check if the Host header specifically matches
+    // an instance's subdomain or hostname before defaulting to the 25565 external port.
+    if clean == "25565" {
+        if let Some(host_str) = host {
+            let host_clean = host_str.trim();
+            let bare_host = if host_clean.starts_with('[') {
+                if let Some(end) = host_clean.find(']') {
+                    &host_clean[1..end]
+                } else {
+                    host_clean
+                }
+            } else if let Some(idx) = host_clean.rfind(':') {
+                &host_clean[..idx]
+            } else {
+                host_clean
+            };
+            if !bare_host.is_empty() {
+                if let Some(cfg) = instances.find_by_hostname(bare_host) {
+                    return Some(cfg);
+                }
+            }
+        }
+    }
+
     if let Ok(port) = clean.parse::<i32>() {
-        if let Some(cfg) = state.instances.find_by_external_port(port) {
+        if let Some(cfg) = instances.find_by_external_port(port) {
             return Some(cfg);
         }
-        if let Some(cfg) = state.instances.find_by_internal_port(port as u16) {
+        if let Some(cfg) = instances.find_by_internal_port(port as u16) {
             return Some(cfg);
         }
     }
-    if let Ok(cfg) = state.instances.get_instance(clean) {
+    if let Ok(cfg) = instances.get_instance(clean) {
         return Some(cfg);
     }
-    if let Some(cfg) = state.instances.find_by_hostname(clean) {
+    if let Some(cfg) = instances.find_by_hostname(clean) {
         return Some(cfg);
     }
-    state.instances.get_active_instance()
+    if let Some(host_str) = host {
+        if let Some(cfg) = resolve_instance_for_host_from_managers(instances, public_port, Some(host_str)) {
+            return Some(cfg);
+        }
+    }
+    instances.get_active_instance()
 }
 
 fn instance_status(state: &AppState, instance: Option<&InstanceConfig>) -> serde_json::Value {
@@ -574,6 +635,40 @@ mod tests {
         // Empty hostname is treated as absent.
         let hit = resolve_wake_target(&manager, primary.external_mc_port, Some("  "), None);
         assert_eq!(Some(primary.id), hit.map(|c| c.id));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolve_instance_for_ref_with_host_prioritizes_host_for_port_25565() {
+        let dir = temp_dir();
+        let console = Arc::new(crate::process::console::ConsoleStreamHandler::new());
+        let manager = ServerInstanceManager::new(&dir, console).unwrap();
+
+        let primary = manager
+            .create_instance("Primary", "1.20.4", "vanilla", "")
+            .unwrap();
+        let secondary = manager
+            .create_instance("Secondary", "1.20.4", "vanilla", "")
+            .unwrap();
+
+        // When ref is "25565" but Host is "secondary", host match takes precedence over port 25565!
+        let resolved = resolve_instance_for_ref_from_managers(
+            &manager,
+            primary.external_mc_port,
+            "25565",
+            Some("secondary"),
+        );
+        assert_eq!(Some(secondary.id.clone()), resolved.map(|c| c.id));
+
+        // When ref is "25565" with no host, port 25565 resolves to Primary!
+        let resolved_default = resolve_instance_for_ref_from_managers(
+            &manager,
+            primary.external_mc_port,
+            "25565",
+            None,
+        );
+        assert_eq!(Some(primary.id.clone()), resolved_default.map(|c| c.id));
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
