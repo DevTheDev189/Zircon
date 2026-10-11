@@ -157,10 +157,10 @@
         <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">↓</kbd>
         <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">←</kbd>
         <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-teal-300 font-sans font-bold text-[9px]">→</kbd>
-        <span class="ml-1 text-slate-500">{{ $t('game_2048.or_wasd') }}</span>
+        <span class="ml-1 text-slate-500">{{ $t('game_2048.wasd_hint') || $t('game_2048.or_wasd') }}</span>
       </span>
       <span class="text-slate-500 hover:text-slate-300 cursor-pointer transition-colors" @click="$emit('close')">
-        ✕ {{ $t('game_2048.hide') }}
+        {{ $t('game_2048.hide') }}
       </span>
     </div>
   </div>

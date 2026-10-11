@@ -276,7 +276,12 @@ impl MinecraftProcessManager {
             ServerProperties::default()
         };
         props.set("server-port", &self.context.mc_port.to_string());
-        props.set("server-ip", "127.0.0.1");
+        // Default server-ip to 0.0.0.0 to prevent Windows loopback isolation drops, support dual-stack
+        // IPv4/IPv6, and ensure container and LAN compatibility. Automatically upgrade 127.0.0.1 bindings to 0.0.0.0.
+        let current_ip = props.get("server-ip", "0.0.0.0");
+        if current_ip == "127.0.0.1" || !props.as_map().contains_key("server-ip") {
+            props.set("server-ip", "0.0.0.0");
+        }
         props.save(&props_file)?;
 
         if let Some(driver) = &self.driver {

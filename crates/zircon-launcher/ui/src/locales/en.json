@@ -865,6 +865,7 @@
     "keep_going": "Keep Going",
     "new_game": "New Game",
     "wasd_hint": "or WASD",
+    "or_wasd": "or WASD",
     "hide": "✕ Hide"
   },
   "auth": {

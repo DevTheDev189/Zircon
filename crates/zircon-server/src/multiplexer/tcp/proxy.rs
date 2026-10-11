@@ -161,15 +161,7 @@ impl TcpMultiplexer {
                                 ip_conns,
                             };
                             if let Err(e) = this.handle_connection(socket, fixed).await {
-                                if e.kind() == std::io::ErrorKind::ConnectionRefused {
-                                    // When a client probes/pings an instance that is currently stopped or sleeping,
-                                    // connection refused to the backend Minecraft port is normal and expected.
-                                    tracing::debug!("Backend server for port {port} is not running (connection refused): {e}");
-                                } else {
-                                    // Visible at the default log level: an unexpected dropped connection
-                                    // or backend failure.
-                                    tracing::warn!("Connection error on port {port}: {e}");
-                                }
+                                tracing::warn!("Multiplexer connection error on port {port} -> backend: {e}");
                             }
                         });
                     }
