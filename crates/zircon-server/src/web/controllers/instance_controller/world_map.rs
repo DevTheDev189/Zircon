@@ -361,10 +361,10 @@ pub async fn boot_and_explore_instance(
         let _ = std::fs::write(&eula_path, "eula=true\n");
     }
 
-    // 2. Write level-seed if provided
+    // 2. Write level-seed if provided (without overwriting other live server properties)
     if let Some(seed) = req.seed.as_deref().filter(|s| !s.trim().is_empty()) {
         let props_path = src_root.join("server.properties");
-        let _ = crate::services::preview::WorldPreviewService::prepare_server_properties(&props_path, seed, 25565);
+        let _ = crate::services::preview::WorldPreviewService::ensure_server_seed(&props_path, seed);
     }
 
     // 3. If already running, return status immediately

@@ -124,12 +124,14 @@ pub(crate) async fn run_online_flow(
         ));
     }
 
-    // --- server + game dir ---
     let (host, port) = servers::parse_server_address(address);
     // IPv6 literals need square brackets in URLs and quick-play targets.
     let url_host = servers::format_host(&host);
-    let mut base_url = server_base_url(&url_host, port, use_https)?;
     let candidates = candidate_base_urls(&url_host, port, use_https);
+    let mut base_url = candidates
+        .first()
+        .cloned()
+        .unwrap_or_else(|| server_base_url(&url_host, port, use_https).unwrap_or_default());
     for candidate in &candidates {
         if fetch_wrapper_status(&state.http, candidate).await.is_some() {
             base_url = candidate.clone();

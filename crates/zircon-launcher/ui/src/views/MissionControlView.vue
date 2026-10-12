@@ -397,17 +397,27 @@
 
         <!-- Search & Control Buttons -->
         <div class="flex items-center gap-2" :class="{ 'pointer-events-none opacity-40': !isGameRunning }">
-          <div class="relative">
+          <div class="relative w-48 sm:w-56">
+            <svg class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none select-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
             <input
               v-model="logSearch"
               type="text"
-              class="z-input text-xs py-1 px-2.5 pl-7 w-48 placeholder:text-slate-600 rounded-xl"
+              class="z-input text-xs py-1.5 pr-7 placeholder:text-slate-600 rounded-xl w-full"
+              style="padding-left: 2.15rem !important;"
               :placeholder="$t('mission_control.search_output_placeholder')"
               :disabled="!isGameRunning"
             />
-            <svg class="w-3.5 h-3.5 text-slate-500 absolute left-2 top-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <button
+              v-if="logSearch"
+              type="button"
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs cursor-pointer select-none transition-colors"
+              @click="logSearch = ''"
+              title="Clear search"
+            >
+              ✕
+            </button>
           </div>
 
           <button

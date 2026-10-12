@@ -111,6 +111,26 @@ impl TcpMultiplexer {
                                         );
                                         let packet = disconnect::create_status_response_packet(&wake_status);
                                         let _ = client.write_all(&packet).await;
+                                        let _ = client.flush().await;
+
+                                        // A real Minecraft client sends a Ping packet (id 0x01 with 8-byte timestamp)
+                                        // immediately after receiving the Status Response. We must answer with a matching Pong packet
+                                        // (id 0x01 with the same 8 bytes), otherwise Minecraft's Netty client triggers an
+                                        // IOException (channel closed) and overwrites the MOTD with "Can't connect to server".
+                                        let mut ping_buf = [0u8; 64];
+                                        while let Ok(Ok(n)) = tokio::time::timeout(Duration::from_millis(400), client.read(&mut ping_buf)).await {
+                                            if n == 0 {
+                                                break;
+                                            }
+                                            // If it's an interleaved Status Request frame ([0x01, 0x00]), keep waiting for the Ping packet
+                                            if n == 2 && ping_buf[0] == 0x01 && ping_buf[1] == 0x00 {
+                                                continue;
+                                            }
+                                            // Echo the Ping packet back as Pong (exact same frame: [VarInt len][VarInt 0x01][8-byte payload])
+                                            let _ = client.write_all(&ping_buf[..n]).await;
+                                            let _ = client.flush().await;
+                                            break;
+                                        }
                                         let _ = client.shutdown().await;
                                         return Ok(None);
                                     }

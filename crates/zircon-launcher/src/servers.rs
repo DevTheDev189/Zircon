@@ -50,8 +50,17 @@ impl SavedServer {
     /// [`with_https`](Self::with_https) to override.
     pub fn new(name: impl Into<String>, address: impl Into<String>, last_played: i64) -> Self {
         let raw_addr = address.into();
-        let is_https = raw_addr.trim().to_lowercase().starts_with("https://");
         let (host, port) = parse_server_address(&raw_addr);
+        let is_explicit_http = raw_addr.trim().to_lowercase().starts_with("http://");
+        let is_explicit_https = raw_addr.trim().to_lowercase().starts_with("https://");
+        let is_local = is_loopback_host(&host);
+        let is_https = if is_explicit_https {
+            true
+        } else if is_explicit_http {
+            false
+        } else {
+            !is_local
+        };
         let clean_addr = if port == 25565 {
             host.clone()
         } else {
@@ -440,18 +449,22 @@ mod tests {
     }
 
     #[test]
-    fn new_servers_default_to_http_unless_explicitly_configured() {
-        // Servers default to use_https = false unless explicitly prepended with https:// or configured with .with_https(true)
-        assert!(!SavedServer::new("Remote", "play.myserver.com", 1).use_https);
-        assert!(!SavedServer::new("Remote Port", "play.myserver.com:25565", 1).use_https);
-        assert!(!SavedServer::new("IPv4", "203.0.113.10", 1).use_https);
-        assert!(!SavedServer::new("IPv6", "[2001:db8::1]", 1).use_https);
+    fn new_servers_scheme_defaults() {
+        // Remote servers default to use_https = true unless explicitly prepended with http://
+        assert!(SavedServer::new("Remote", "play.myserver.com", 1).use_https);
+        assert!(SavedServer::new("Remote Port", "play.myserver.com:25565", 1).use_https);
+        assert!(SavedServer::new("IPv4", "203.0.113.10", 1).use_https);
+        assert!(SavedServer::new("IPv6", "[2001:db8::1]", 1).use_https);
+
+        // Explicit http:// prefix forces use_https = false
+        assert!(!SavedServer::new("Explicit HTTP", "http://play.myserver.com", 1).use_https);
+        assert!(!SavedServer::new("Explicit HTTP Port", "http://play.myserver.com:25565", 1).use_https);
 
         // Explicit https:// prefix enables use_https
         assert!(SavedServer::new("Secure", "https://play.myserver.com", 1).use_https);
         assert!(SavedServer::new("Secure Port", "https://play.myserver.com:25565", 1).use_https);
 
-        // Loopback servers also default to false
+        // Loopback servers default to false
         assert!(!SavedServer::new("Local", "localhost", 1).use_https);
         assert!(!SavedServer::new("Local Host", "localhost:25565", 1).use_https);
         assert!(!SavedServer::new("Loopback v4", "127.0.0.1", 1).use_https);

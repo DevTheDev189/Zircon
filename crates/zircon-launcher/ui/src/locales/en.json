@@ -871,11 +871,25 @@
   "auth": {
     "title": "Sign in with Microsoft",
     "desc": "Sign in to launch and play on Zircon servers. Your Minecraft profile, skins and saved servers are stored locally.",
+    "sign_in_title": "Sign in with Microsoft",
+    "sign_in_description": "Sign in to launch and play on Zircon servers. Your Minecraft profile, skins and saved servers are stored locally.",
     "opening_browser": "Opening browser…",
     "continue_ms": "Continue with Microsoft",
+    "continue_with_microsoft": "Continue with Microsoft",
+    "manual_browser_title": "Action Required: Complete Sign-In",
+    "manual_browser_desc": "Could not open your default browser automatically. Click Open in Browser or copy the link below into any browser to finish logging in.",
+    "browser_opened_title": "Browser Opened",
+    "browser_opened_desc": "Finish sign-in in your web browser. If your browser didn't open, use the link below.",
+    "open_in_browser": "Open in Browser",
+    "copy_link": "Copy Link",
+    "copied": "Copied!",
+    "waiting_for_browser": "Waiting for browser sign-in…",
     "ownership_title": "Minecraft Java Edition Required",
     "ownership_desc": "This Microsoft account does not own Minecraft Java Edition. You must purchase Minecraft Java Edition to play on Zircon.",
-    "buy_btn": "Buy Minecraft Java Edition"
+    "minecraft_required_title": "Minecraft Java Edition Required",
+    "minecraft_required_description": "This Microsoft account does not own Minecraft Java Edition. You must purchase Minecraft Java Edition to play on Zircon.",
+    "buy_btn": "Buy Minecraft Java Edition",
+    "buy_minecraft_button": "Buy Minecraft Java Edition"
   },
   "crash_dialog": {
     "default_title": "Minecraft Crashed Unexpectedly",

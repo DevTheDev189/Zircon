@@ -37,9 +37,73 @@
         <span v-else>{{ $t('auth.continue_with_microsoft') }}</span>
       </button>
 
-      <p v-if="status" class="text-xs text-cyan-300/90 font-medium mt-4 whitespace-pre-line">
+      <p v-if="status && !manualAuthUrl" class="text-xs text-cyan-300/90 font-medium mt-4 whitespace-pre-line">
         {{ status }}
       </p>
+
+      <!-- Manual Browser Fallback Card (for Linux, minimal WMs, or when browser fails to launch) -->
+      <div
+        v-if="manualAuthUrl"
+        class="mt-4 p-4 rounded-2xl bg-slate-900/95 border border-cyan-500/40 text-left shadow-xl shadow-cyan-950/30 animate-fadeIn"
+      >
+        <div class="flex items-start gap-3 mb-3">
+          <div
+            class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border"
+            :class="!autoOpened ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400'"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-bold text-white tracking-wide">
+              {{ !autoOpened ? $t('auth.manual_browser_title') : $t('auth.browser_opened_title') }}
+            </p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+              {{ !autoOpened ? $t('auth.manual_browser_desc') : $t('auth.browser_opened_desc') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-2 mt-3.5">
+          <button
+            type="button"
+            class="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            @click="openManualAuthUrl"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            <span>{{ $t('auth.open_in_browser') }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="py-2 px-3 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            @click="copyManualAuthUrl"
+          >
+            <svg v-if="!copied" class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <svg v-else class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{{ copied ? $t('auth.copied') : $t('auth.copy_link') }}</span>
+          </button>
+        </div>
+
+        <!-- URL Preview Snippet -->
+        <div class="mt-2.5 bg-[#05080e] p-2 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-400 truncate select-all">
+          {{ manualAuthUrl }}
+        </div>
+
+        <!-- Listening status pill -->
+        <div class="mt-2.5 flex items-center gap-2 text-[10px] text-cyan-300 font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+          <span>{{ $t('auth.waiting_for_browser') }}</span>
+        </div>
+      </div>
 
       <!-- Ownership required card -->
       <div
@@ -105,8 +169,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { api } from '../lib/api';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { api, onAuthManualUrl } from '../lib/api';
 import zirconTitle from '../assets/zircon-title.svg';
 
 const MINECRAFT_BUY_URL = 'https://www.minecraft.net/store/minecraft-java-bedrock-edition-pc';
@@ -120,6 +184,29 @@ const props = defineProps({
 const busy = ref(false);
 const status = ref('');
 const error = ref('');
+const manualAuthUrl = ref('');
+const autoOpened = ref(true);
+const copied = ref(false);
+let unlistenAuthUrl = null;
+
+onMounted(async () => {
+  try {
+    unlistenAuthUrl = await onAuthManualUrl((payload) => {
+      if (payload && payload.url) {
+        manualAuthUrl.value = payload.url;
+        autoOpened.value = payload.browser_opened;
+      }
+    });
+  } catch (err) {
+    console.warn('Failed to listen to auth-manual-url:', err);
+  }
+});
+
+onUnmounted(() => {
+  if (unlistenAuthUrl) {
+    unlistenAuthUrl();
+  }
+});
 
 const isOwnershipError = computed(() => {
   if (!error.value) return false;
@@ -137,12 +224,33 @@ function openBuyPage() {
   });
 }
 
+function openManualAuthUrl() {
+  if (!manualAuthUrl.value) return;
+  api.openBrowserUrl(manualAuthUrl.value).catch(() => {
+    window.open(manualAuthUrl.value, '_blank', 'noopener,noreferrer');
+  });
+}
+
+function copyManualAuthUrl() {
+  if (!manualAuthUrl.value) return;
+  navigator.clipboard.writeText(manualAuthUrl.value).then(() => {
+    copied.value = true;
+    setTimeout(() => {
+      copied.value = false;
+    }, 2500);
+  }).catch(() => {});
+}
+
 async function onLogin() {
   busy.value = true;
   error.value = '';
+  manualAuthUrl.value = '';
+  copied.value = false;
+  autoOpened.value = true;
   status.value = 'Opening browser for Microsoft login…';
   try {
     const session = await api.loginMicrosoft();
+    manualAuthUrl.value = '';
     status.value = `Signed in as ${session.username}`;
     emit('logged-in', session);
   } catch (e) {

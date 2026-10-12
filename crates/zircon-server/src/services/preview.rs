@@ -236,7 +236,33 @@ impl WorldPreviewService {
     }
 
     pub fn ensure_server_seed(server_props_path: &Path, seed: &str) -> io::Result<()> {
-        Self::prepare_server_properties(server_props_path, seed, 25565)
+        if !server_props_path.exists() {
+            let content = format!("level-seed={}\nlevel-name=world\nmax-players=20\n", seed.trim());
+            return fs::write(server_props_path, content);
+        }
+        let content = fs::read_to_string(server_props_path).unwrap_or_default();
+        let mut lines: Vec<String> = Vec::new();
+        let mut found_seed = false;
+        let mut found_level = false;
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("level-seed=") {
+                lines.push(format!("level-seed={}", seed.trim()));
+                found_seed = true;
+            } else if trimmed.starts_with("level-name=") {
+                lines.push(line.to_string());
+                found_level = true;
+            } else {
+                lines.push(line.to_string());
+            }
+        }
+        if !found_seed {
+            lines.push(format!("level-seed={}", seed.trim()));
+        }
+        if !found_level {
+            lines.push("level-name=world".to_string());
+        }
+        fs::write(server_props_path, lines.join("\n"))
     }
 
     pub fn prepare_server_properties(server_props_path: &Path, seed: &str, port: u16) -> io::Result<()> {

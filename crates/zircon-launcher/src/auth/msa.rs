@@ -116,6 +116,18 @@ impl MicrosoftAuthService {
     /// session. Uses PKCE (S256) with a dynamically selected localhost port so
     /// concurrent launchers never fight over a fixed callback port.
     pub async fn login(&self) -> Result<SessionData, LauncherError> {
+        self.login_with_notifier(|_, _| {}).await
+    }
+
+    /// Runs the interactive browser flow, invoking `on_url_ready(url, browser_opened)`
+    /// once the callback server is bound and the authorize URL is prepared.
+    /// If automatic browser opening fails (such as on minimal Linux/Arch without xdg-utils),
+    /// the callback server remains active and continues waiting for the user to complete
+    /// authentication manually.
+    pub async fn login_with_notifier<F>(&self, on_url_ready: F) -> Result<SessionData, LauncherError>
+    where
+        F: FnOnce(&str, bool),
+    {
         if self.client_id == DEFAULT_CLIENT_ID {
             return Err(LauncherError::Auth(format!(
                 "Microsoft client id not configured (resolved to the \
@@ -145,11 +157,18 @@ impl MicrosoftAuthService {
             redirect_uri
         );
         tracing::debug!("Authorize URL: {authorize_url}");
-        if let Err(e) = open::that(&authorize_url) {
-            return Err(LauncherError::Auth(format!(
-                "Could not open the browser automatically; open this URL manually:\n{authorize_url}\n({e})"
-            )));
-        }
+
+        let browser_opened = match open::that(&authorize_url) {
+            Ok(_) => true,
+            Err(e) => {
+                tracing::warn!(
+                    "Could not open browser automatically: {e}. Keeping callback server alive for manual browser sign-in."
+                );
+                false
+            }
+        };
+
+        on_url_ready(&authorize_url, browser_opened);
 
         let code = server
             .await_code(Duration::from_secs(5 * 60), &state)

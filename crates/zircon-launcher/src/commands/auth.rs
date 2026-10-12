@@ -7,13 +7,36 @@ use crate::auth::session::SessionData;
 use super::*;
 
 // ---------------------------------------------------------------------------
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct AuthUrlPayload {
+    pub url: String,
+    pub browser_opened: bool,
+}
+
+// ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 
 /// Runs the interactive Microsoft OAuth PKCE login (opens the browser).
 #[tauri::command]
-pub async fn login_microsoft(state: State<'_, LauncherState>) -> Result<SessionData, String> {
-    let session = state.auth.login().await.map_err(err_string)?;
+pub async fn login_microsoft(
+    app: tauri::AppHandle,
+    state: State<'_, LauncherState>,
+) -> Result<SessionData, String> {
+    use tauri::Emitter;
+    let session = state
+        .auth
+        .login_with_notifier(|url, browser_opened| {
+            let _ = app.emit(
+                "auth-manual-url",
+                &AuthUrlPayload {
+                    url: url.to_string(),
+                    browser_opened,
+                },
+            );
+        })
+        .await
+        .map_err(err_string)?;
     let _ = state.accounts.register_active_account(&session, None);
     *state.session.lock().await = Some(session.clone());
     Ok(session)

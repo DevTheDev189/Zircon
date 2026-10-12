@@ -46,6 +46,7 @@ export const api = {
   // Auth
   login: () => invoke('login_microsoft'),
   loginMicrosoft: () => invoke('login_microsoft'),
+  onAuthManualUrl: (cb) => listen('auth-manual-url', (e) => cb(e.payload)),
   getCachedSession: () => invoke('get_cached_session'),
   getSession: () => invoke('get_session'),
   logout: () => invoke('logout'),
@@ -427,6 +428,9 @@ export const onGameWindowReady = (cb) => listen('game-window-ready', (e) => cb(e
 export const onModpackProgress = (cb) => listen('modpack-progress', (e) => cb(e.payload));
 export const onMissionControlTelemetry = (cb) => listen('mission-control-telemetry', (e) => cb(e.payload));
 export const onLanServersChanged = (cb) => listen('lan-servers-changed', (e) => cb(e.payload));
+
+// Emitted by Rust during interactive Microsoft OAuth login with the authorize URL.
+export const onAuthManualUrl = (cb) => listen('auth-manual-url', (e) => cb(e.payload));
 
 // Emitted by Rust whenever the active skin changes (save, add, boot fetch,
 // remove) so the sidebar avatar can refresh.

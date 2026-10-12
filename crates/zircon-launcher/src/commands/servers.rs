@@ -59,13 +59,14 @@ pub(crate) fn server_base_url(host: &str, port: u16, use_https: bool) -> Result<
 /// Generates fallback candidate base URLs for probing and status calls.
 pub(crate) fn candidate_base_urls(host: &str, port: u16, use_https: bool) -> Vec<String> {
     let mut urls = Vec::new();
+    let is_local = servers::is_loopback_host(host);
     if use_https {
         // When connecting over HTTPS with the default Minecraft port (25565),
         // prioritize the root virtual host (e.g. `https://mc.winslow.plus`) so that
         // subdomain routing and reverse-proxied Host headers take precedence over
         // path-segment port fallback (`https://mc.winslow.plus/25565`).
         let root = format!("https://{host}");
-        if port == 25565 {
+        if port == 25565 || port == 443 {
             urls.push(root.clone());
         }
         if let Ok(url) = server_base_url(host, port, use_https) {
@@ -82,8 +83,33 @@ pub(crate) fn candidate_base_urls(host: &str, port: u16, use_https: bool) -> Vec
                 urls.push(direct_port);
             }
         }
-    } else if let Ok(url) = server_base_url(host, port, use_https) {
-        urls.push(url);
+        if let Ok(url) = server_base_url(host, port, false) {
+            if !urls.contains(&url) {
+                urls.push(url);
+            }
+        }
+    } else {
+        if let Ok(url) = server_base_url(host, port, use_https) {
+            urls.push(url);
+        }
+        // If HTTP was requested or defaulted on a remote host, add HTTPS candidates as fallbacks
+        // so client launch doesn't crash when hitting a Minecraft TCP game port (e.g. 25565).
+        if !is_local {
+            let root = format!("https://{host}");
+            if port == 25565 || port == 443 {
+                if !urls.contains(&root) {
+                    urls.push(root.clone());
+                }
+            }
+            if let Ok(url) = server_base_url(host, port, true) {
+                if !urls.contains(&url) {
+                    urls.push(url);
+                }
+            }
+            if !urls.contains(&root) {
+                urls.push(root);
+            }
+        }
     }
     urls
 }

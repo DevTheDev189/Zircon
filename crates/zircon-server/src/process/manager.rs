@@ -282,6 +282,12 @@ impl MinecraftProcessManager {
         if current_ip == "127.0.0.1" || !props.as_map().contains_key("server-ip") {
             props.set("server-ip", "0.0.0.0");
         }
+        // Automatically repair max-players if corrupted (e.g. set to 0 by world preview generation) or missing.
+        let current_max_players = props.get("max-players", "20");
+        if current_max_players == "0" || current_max_players.trim().is_empty() {
+            tracing::info!("Repairing max-players from '{current_max_players}' to '20' in server.properties");
+            props.set("max-players", "20");
+        }
         props.save(&props_file)?;
 
         if let Some(driver) = &self.driver {
