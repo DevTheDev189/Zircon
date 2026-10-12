@@ -567,7 +567,19 @@ pub(crate) async fn wake_if_needed(
     cancel.guard_active()?;
     let wrapper = fetch_wrapper_status(http, base_url).await;
     let wrapper_present = wrapper.is_some();
-    let ping_ok = crate::status::ping_status(host, port).await.is_ok();
+    let mut ping_ok = crate::status::ping_status(host, port).await.is_ok();
+    if !ping_ok {
+        // Fallback: If full SLP status ping failed (e.g. enable-status=false in server.properties,
+        // or SLP response was suppressed), verify if TCP port is actually open to avoid false-positive
+        // PortUnreachable errors when router/firewall port-forwarding is functional.
+        if tokio::time::timeout(Duration::from_millis(1500), tokio::net::TcpStream::connect((host, port)))
+            .await
+            .map(|r| r.is_ok())
+            .unwrap_or(false)
+        {
+            ping_ok = true;
+        }
+    }
 
     match wake_decision(wrapper, ping_ok) {
         WakeDecision::PassThrough => Ok(WakeOutcome {

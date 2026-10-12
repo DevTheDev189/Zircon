@@ -326,17 +326,31 @@ impl WorldPreviewService {
         }
         let content = fs::read_to_string(server_props_path).unwrap_or_default();
         let mut lines: Vec<String> = Vec::new();
-        let mut updated = false;
+        let mut updated_port = false;
+        let mut updated_max = false;
+        let mut updated_status = false;
         for line in content.lines() {
             if line.starts_with("server-port=") {
                 lines.push(format!("server-port={port}"));
-                updated = true;
+                updated_port = true;
+            } else if line.starts_with("max-players=") {
+                lines.push("max-players=20".to_string());
+                updated_max = true;
+            } else if line.starts_with("enable-status=") {
+                lines.push("enable-status=true".to_string());
+                updated_status = true;
             } else {
                 lines.push(line.to_string());
             }
         }
-        if !updated {
+        if !updated_port {
             lines.push(format!("server-port={port}"));
+        }
+        if !updated_max {
+            lines.push("max-players=20".to_string());
+        }
+        if !updated_status {
+            lines.push("enable-status=true".to_string());
         }
         fs::write(server_props_path, lines.join("\n") + "\n")
     }

@@ -288,6 +288,12 @@ impl MinecraftProcessManager {
             tracing::info!("Repairing max-players from '{current_max_players}' to '20' in server.properties");
             props.set("max-players", "20");
         }
+        // Automatically repair enable-status if corrupted (e.g. set to false by world preview generation) or missing.
+        let current_status = props.get("enable-status", "true");
+        if current_status == "false" || current_status.trim().is_empty() {
+            tracing::info!("Repairing enable-status from '{current_status}' to 'true' in server.properties");
+            props.set("enable-status", "true");
+        }
         props.save(&props_file)?;
 
         if let Some(driver) = &self.driver {
