@@ -217,10 +217,11 @@ impl ForgeLaunchResolver {
         // --- 6. arguments ---
         let tokens = build_tokens(&libraries_dir, natives_dir, &root.id);
         let mut jvm_args = profile::resolve_jvm_arguments(&chain, &tokens);
-        // The vanilla profile contributes "-cp ${classpath}"; the launcher
-        // injects the classpath itself (the runner adds -cp uniformly for every
-        // loader), so drop the template pair to avoid a duplicate -cp.
+        // The vanilla profile contributes "-cp ${classpath}" and "-Djava.library.path=${natives_directory}";
+        // the launcher injects classpath and natives_dir uniformly for every loader, so drop them here to
+        // avoid duplicates and prevent validation rejections.
         remove_classpath_pair(&mut jvm_args);
+        jvm_args.retain(|arg| !arg.trim().to_ascii_lowercase().starts_with("-djava.library.path="));
 
         // This launcher always auto-connects the player to a server, so the
         // "is_quick_play_multiplayer" feature is enabled (the game arg template

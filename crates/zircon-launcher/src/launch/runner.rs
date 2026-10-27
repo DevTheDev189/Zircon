@@ -376,6 +376,9 @@ fn build_online_command(
     // -p module path, --add-modules/--add-opens/--add-exports, -D system
     // properties such as -DlibraryDirectory and -DignoreList.
     for arg in &data.jvm_args {
+        if arg.trim().to_ascii_lowercase().starts_with("-djava.library.path=") {
+            continue;
+        }
         validate_profile_jvm_arg(arg)?;
         command.push(arg.clone());
     }
@@ -495,6 +498,9 @@ fn build_offline_command(
         command.push("-XstartOnFirstThread".to_string());
     }
     for arg in &data.jvm_args {
+        if arg.trim().to_ascii_lowercase().starts_with("-djava.library.path=") {
+            continue;
+        }
         validate_profile_jvm_arg(arg)?;
         command.push(arg.clone());
     }
@@ -1442,6 +1448,33 @@ mod tests {
             None,
         );
         assert!(res.is_err(), "Malformed UUID must be rejected");
+    }
+
+    #[test]
+    fn profile_java_library_path_is_tolerated_and_deduplicated() {
+        let mut data = launch_data();
+        data.jvm_args = vec![
+            "-Djava.library.path=C:\\Users\\Fake\\.mcmanager\\launcher\\natives\\1.21.1-neoforge".to_string(),
+            "-DlibraryDirectory=C:\\Users\\Fake\\.mcmanager\\launcher\\libraries".to_string(),
+        ];
+        let game_dir = Path::new("/game");
+        let session = session("msa", "tok123");
+
+        let res = MinecraftRunner::build_launch_command(
+            &data,
+            Some(&session),
+            None,
+            None,
+            game_dir,
+            Some("mc.example.com"),
+            Some(25565),
+        );
+        assert!(res.is_ok(), "Profile java.library.path must not cause launch to fail");
+        let cmd = res.unwrap();
+        // Ensure authoritative natives_dir is present and profile duplicate is not
+        let lib_path_count = cmd.iter().filter(|arg| arg.starts_with("-Djava.library.path=")).count();
+        assert_eq!(lib_path_count, 1, "There must be exactly one -Djava.library.path flag");
+        assert!(cmd.contains(&format!("-Djava.library.path={}", data.natives_dir.display())));
     }
 }
 

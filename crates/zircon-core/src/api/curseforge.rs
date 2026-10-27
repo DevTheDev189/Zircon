@@ -76,7 +76,7 @@ impl CurseForgeApiClient {
         }
         let body = serde_json::json!({ "fingerprints": fingerprint_list });
         let text = self
-            .post_json(&format!("{BASE_URL}/fingerprints"), &body)
+            .post_json(&format!("{BASE_URL}/fingerprints/{MINECRAFT_GAME_ID}"), &body)
             .await?;
 
         let root: serde_json::Value = serde_json::from_str(&text)?;

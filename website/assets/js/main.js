@@ -43,15 +43,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const heroPrimaryBtn = document.getElementById('hero-primary-download');
   if (heroPrimaryBtn) {
     if (detectedOS === 'macos') {
-      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.0_aarch64.dmg';
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.1_aarch64.dmg';
       const label = heroPrimaryBtn.querySelector('.download-label');
       if (label) label.textContent = 'Download for macOS (.dmg)';
     } else if (detectedOS === 'linux') {
-      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.0_amd64.AppImage';
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.1_amd64.AppImage';
       const label = heroPrimaryBtn.querySelector('.download-label');
       if (label) label.textContent = 'Download for Linux (.AppImage)';
     } else {
-      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.0_x64-setup.exe';
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.1_x64-setup.exe';
       const label = heroPrimaryBtn.querySelector('.download-label');
       if (label) label.textContent = 'Download for Windows (.exe)';
     }
