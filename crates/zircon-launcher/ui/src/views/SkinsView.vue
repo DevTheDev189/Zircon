@@ -23,6 +23,14 @@
         <button
           type="button"
           class="z-segmented-pill"
+          :class="{ 'active': activeTab === 'capes' }"
+          @click="onSelectCapesTab"
+        >
+          {{ $t('skins.tab_capes') }}
+        </button>
+        <button
+          type="button"
+          class="z-segmented-pill"
           :class="{ 'active': activeTab === 'studio' }"
           @click="openStudio(selectedSkin)"
         >
@@ -113,7 +121,7 @@
 
         <!-- 3D Canvas Container -->
         <div class="flex-1 min-h-0 rounded-xl overflow-hidden bg-[#070b10] border border-slate-800/80 relative shadow-inner">
-          <Player3DPreview ref="previewRef" :image-uri="previewUrl" :variant="variant" />
+          <Player3DPreview ref="previewRef" :image-uri="previewUrl" :variant="variant" :cape-uri="activeCapeUrl" />
         </div>
 
         <!-- Controls below Preview -->
@@ -219,8 +227,8 @@
             class="relative z-card p-3.5 flex flex-col justify-between cursor-pointer transition-all duration-200 group rounded-2xl min-h-[220px]"
             :class="
               isSelected(skin)
-                ? 'border-cyan-400 ring-1 ring-cyan-400/60 shadow-[0_0_20px_rgba(71,210,201,0.25)] bg-[#111c29]'
-                : 'border-slate-800/80 bg-[#0e1722]/80 hover:border-slate-700 hover:bg-[#121d2b]'
+                ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_24px_rgba(71,210,201,0.35)]'
+                : 'border-white/10 hover:border-cyan-400/50'
             "
             @click="selectSkin(skin)"
           >
@@ -409,10 +417,12 @@
             <div
               v-for="skin in communitySkins"
               :key="skin.id"
-              class="relative z-card p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 group border-slate-800/80 bg-[#0e1722]/80 hover:border-cyan-500/60 hover:bg-[#121d2b] rounded-2xl min-h-[235px]"
-              :class="{
-                'border-cyan-400 ring-1 ring-cyan-400/60 shadow-[0_0_20px_rgba(71,210,201,0.25)] bg-[#111c29]': isSelected(skin)
-              }"
+              class="relative z-card p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 group rounded-2xl min-h-[235px]"
+              :class="
+                isSelected(skin)
+                  ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_24px_rgba(71,210,201,0.35)]'
+                  : 'border-white/10 hover:border-cyan-400/50'
+              "
               @click="selectCommunitySkin(skin)"
             >
               <div class="flex items-center justify-between mb-2.5">
@@ -461,6 +471,105 @@
           </div>
         </div>
       </div>
+
+      <!-- TAB 3: OFFICIAL MOJANG CAPES -->
+      <div v-else-if="activeTab === 'capes'" class="flex-1 min-h-0 overflow-y-auto pr-2 pb-2">
+        <div class="mb-4 p-4 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-900/60 to-transparent border border-cyan-500/30 flex items-center justify-between">
+          <div>
+            <h3 class="text-white font-extrabold text-sm flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              {{ $t('skins.capes_title') }}
+            </h3>
+            <p class="text-slate-400 text-xs mt-0.5">
+              {{ $t('skins.capes_subtitle') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="z-btn-ghost text-xs px-3 py-1.5 rounded-xl border border-slate-700 hover:border-cyan-400 text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer"
+            :disabled="loadingCapes"
+            @click="loadCapes"
+          >
+            <svg class="w-3.5 h-3.5 text-cyan-400" :class="{ 'animate-spin': loadingCapes }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>{{ $t('common.refresh') }}</span>
+          </button>
+        </div>
+
+        <div v-if="loadingCapes" class="py-16 text-center text-slate-400 text-xs flex flex-col items-center gap-3">
+          <span class="inline-block w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
+          <span>{{ $t('skins.loading_capes') }}</span>
+        </div>
+
+        <div v-else-if="capes.length === 0" class="py-16 text-center flex flex-col items-center justify-center p-6 bg-slate-900/40 rounded-2xl border border-slate-800">
+          <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-3 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h4 class="text-white font-bold text-sm mb-1">{{ $t('skins.no_capes_title') }}</h4>
+          <p class="text-slate-400 text-xs max-w-md leading-relaxed">
+            {{ $t('skins.no_capes_desc') }}
+          </p>
+        </div>
+
+        <div v-else class="grid grid-cols-2 lg:grid-cols-3 gap-5">
+          <div
+            v-for="cape in capes"
+            :key="cape.id"
+            class="z-card p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[220px]"
+            :class="cape.state === 'ACTIVE' || selectedCape?.id === cape.id
+              ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-[0_0_24px_rgba(71,210,201,0.35)]'
+              : 'border-white/10 hover:border-cyan-400/50'"
+            @click="selectCape(cape)"
+          >
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-white tracking-wide">
+                  {{ cape.alias || 'Official Cape' }}
+                </span>
+                <span
+                  v-if="cape.state === 'ACTIVE'"
+                  class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 shadow-[0_0_8px_rgba(52,211,153,0.3)]"
+                >
+                  {{ $t('skins.equipped_badge') }}
+                </span>
+              </div>
+
+              <!-- Cape Preview Viewport -->
+              <div class="bg-[#070b10] rounded-xl p-3 mb-3 border border-slate-800/80 flex items-center justify-center min-h-[120px]">
+                <img
+                  :src="cape.url"
+                  class="h-28 object-contain image-render-pixel drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+                  alt="Cape texture"
+                />
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-800/80 flex items-center gap-2">
+              <button
+                v-if="cape.state !== 'ACTIVE'"
+                type="button"
+                class="z-btn-accent flex-1 py-1.5 px-3 text-xs font-bold rounded-xl transition cursor-pointer"
+                :disabled="equippingCape"
+                @click.stop="equipCape(cape)"
+              >
+                {{ $t('skins.equip_cape') }}
+              </button>
+              <button
+                v-else
+                type="button"
+                class="z-btn-ghost flex-1 py-1.5 px-3 text-xs font-bold rounded-xl border border-rose-500/40 text-rose-300 hover:bg-rose-500/20 transition cursor-pointer"
+                :disabled="equippingCape"
+                @click.stop="unequipCapeAction()"
+              >
+                {{ $t('skins.unequip_cape') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -496,8 +605,79 @@ const variant = ref(initialSkin?.variant || 'classic');
 const selectedSkinId = ref(initialSkin ? 'active_skin' : null);
 const selectedSkin = ref(null);
 const saving = ref(false);
-const activeTab = ref('saved'); // 'saved' | 'library' | 'studio'
+const activeTab = ref('saved'); // 'saved' | 'library' | 'capes' | 'studio'
 const showAiStudioModal = ref(false);
+
+// Capes state
+const capes = ref([]);
+const selectedCape = ref(null);
+const activeCapeUrl = ref(null);
+const loadingCapes = ref(false);
+const equippingCape = ref(false);
+
+async function onSelectCapesTab() {
+  activeTab.value = 'capes';
+  await loadCapes();
+}
+
+async function loadCapes() {
+  loadingCapes.value = true;
+  try {
+    const list = await api.getUserCapes();
+    capes.value = list || [];
+    const active = capes.value.find((c) => c.state === 'ACTIVE');
+    if (active) {
+      selectedCape.value = active;
+      activeCapeUrl.value = active.url;
+    }
+  } catch (err) {
+    console.error('Failed to load user capes:', err);
+    capes.value = [];
+  } finally {
+    loadingCapes.value = false;
+  }
+}
+
+function selectCape(cape) {
+  selectedCape.value = cape;
+  activeCapeUrl.value = cape.url;
+}
+
+async function equipCape(cape) {
+  equippingCape.value = true;
+  try {
+    await api.setActiveCape(cape.id);
+    await loadCapes();
+    statusText.value = 'Cape equipped successfully!';
+    setTimeout(() => {
+      statusText.value = '';
+    }, 3000);
+  } catch (err) {
+    console.error('Failed to equip cape:', err);
+    statusText.value = `Failed to equip cape: ${err}`;
+  } finally {
+    equippingCape.value = false;
+  }
+}
+
+async function unequipCapeAction() {
+  equippingCape.value = true;
+  try {
+    await api.unequipCape();
+    activeCapeUrl.value = null;
+    selectedCape.value = null;
+    await loadCapes();
+    statusText.value = 'Cape removed.';
+    setTimeout(() => {
+      statusText.value = '';
+    }, 3000);
+  } catch (err) {
+    console.error('Failed to remove cape:', err);
+    statusText.value = `Failed to remove cape: ${err}`;
+  } finally {
+    equippingCape.value = false;
+  }
+}
 
 // Feature flag: set to true when AI studio is ready for production
 const ENABLE_AI_STUDIO = false;

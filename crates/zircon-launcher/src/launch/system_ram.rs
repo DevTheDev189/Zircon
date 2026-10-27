@@ -34,6 +34,17 @@ pub fn get_recommended_ram_gb(total_gb: u32) -> u32 {
     }
 }
 
+/// Computes safe, optimal RAM allocation considering instance modpack size:
+/// - If an instance has >= 100 mods and host has >= 12 GB RAM, scales up to at least 6 GB.
+pub fn get_recommended_ram_for_instance(total_gb: u32, mod_count: usize) -> u32 {
+    let base = get_recommended_ram_gb(total_gb);
+    if mod_count >= 100 && total_gb >= 12 {
+        base.max(6)
+    } else {
+        base
+    }
+}
+
 /// Returns the system RAM information and recommended allocation.
 pub fn get_system_ram_info() -> SystemRamInfo {
     let total = get_system_ram_gb();
@@ -55,5 +66,19 @@ mod tests {
         assert_eq!(get_recommended_ram_gb(16), 6);
         assert_eq!(get_recommended_ram_gb(32), 8);
         assert_eq!(get_recommended_ram_gb(64), 8);
+    }
+
+    #[test]
+    fn test_recommended_ram_for_instance() {
+        // Standard instances follow system RAM rules
+        assert_eq!(get_recommended_ram_for_instance(16, 20), 6);
+        assert_eq!(get_recommended_ram_for_instance(8, 20), 4);
+
+        // Heavy modpacks (>=100 mods) on machines with >= 12GB RAM ensure at least 6GB
+        assert_eq!(get_recommended_ram_for_instance(16, 150), 6);
+        assert_eq!(get_recommended_ram_for_instance(32, 200), 8);
+
+        // Constrained machines (8GB) remain capped at 4GB to prevent OS swapping even on heavy packs
+        assert_eq!(get_recommended_ram_for_instance(8, 250), 4);
     }
 }

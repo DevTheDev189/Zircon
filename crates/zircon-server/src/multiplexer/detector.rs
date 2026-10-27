@@ -54,27 +54,61 @@ pub fn is_http_method(buf: &[u8]) -> bool {
     HTTP_PREFIXES.iter().any(|prefix| buf.starts_with(prefix))
 }
 
+use crate::multiplexer::varint::{read_varint, VarIntError};
+
 /// Parses the server-list-ping handshake packet:
 /// `[VarInt length][VarInt 0x00][VarInt protocol][VarInt addrLen][addr bytes][u16 port][VarInt nextState]`.
 pub fn parse_handshake(buf: &[u8]) -> ParseResult<Handshake> {
-    let Some((length, mut offset)) = varint_at(buf, 0) else {
-        return ParseResult::Incomplete;
+    let (length, len_bytes) = match varint_at(buf, 0) {
+        Ok(v) => v,
+        Err(VarIntError::Incomplete) => return ParseResult::Incomplete,
+        Err(VarIntError::TooLong) => return ParseResult::NotMatch,
     };
-    let Some((packet_id, bytes)) = varint_at(buf, offset) else {
-        return ParseResult::Incomplete;
+    if !(4..=1024).contains(&length) {
+        return ParseResult::NotMatch;
+    }
+    let frame_end = len_bytes + length as usize;
+    let mut offset = len_bytes;
+
+    let (packet_id, bytes) = match varint_at_in(buf, offset, frame_end) {
+        Ok(v) => v,
+        Err(VarIntError::Incomplete) => {
+            return if buf.len() >= frame_end {
+                ParseResult::NotMatch
+            } else {
+                ParseResult::Incomplete
+            };
+        }
+        Err(VarIntError::TooLong) => return ParseResult::NotMatch,
     };
     if packet_id != 0 {
         return ParseResult::NotMatch;
     }
     offset += bytes;
 
-    let Some((protocol_version, bytes)) = varint_at(buf, offset) else {
-        return ParseResult::Incomplete;
+    let (protocol_version, bytes) = match varint_at_in(buf, offset, frame_end) {
+        Ok(v) => v,
+        Err(VarIntError::Incomplete) => {
+            return if buf.len() >= frame_end {
+                ParseResult::NotMatch
+            } else {
+                ParseResult::Incomplete
+            };
+        }
+        Err(VarIntError::TooLong) => return ParseResult::NotMatch,
     };
     offset += bytes;
 
-    let Some((addr_len, bytes)) = varint_at(buf, offset) else {
-        return ParseResult::Incomplete;
+    let (addr_len, bytes) = match varint_at_in(buf, offset, frame_end) {
+        Ok(v) => v,
+        Err(VarIntError::Incomplete) => {
+            return if buf.len() >= frame_end {
+                ParseResult::NotMatch
+            } else {
+                ParseResult::Incomplete
+            };
+        }
+        Err(VarIntError::TooLong) => return ParseResult::NotMatch,
     };
     if !(1..=255).contains(&addr_len) {
         return ParseResult::NotMatch;
@@ -84,7 +118,12 @@ pub fn parse_handshake(buf: &[u8]) -> ParseResult<Handshake> {
     if buf.len() < offset + addr_len as usize {
         return ParseResult::Incomplete;
     }
+    // Strip optional Forge/BungeeCord null-delimited suffixes (e.g. "\0FML2\0")
+    // before trimming so hostname lookups match configured instance names.
     let hostname = String::from_utf8_lossy(&buf[offset..offset + addr_len as usize])
+        .split('\0')
+        .next()
+        .unwrap_or("")
         .trim()
         .to_lowercase();
     offset += addr_len as usize;
@@ -95,14 +134,22 @@ pub fn parse_handshake(buf: &[u8]) -> ParseResult<Handshake> {
     }
     offset += 2;
 
-    let Some((next_state, _)) = varint_at(buf, offset) else {
-        return ParseResult::Incomplete;
+    let (next_state, state_bytes) = match varint_at_in(buf, offset, frame_end) {
+        Ok(v) => v,
+        Err(VarIntError::Incomplete) => {
+            return if buf.len() >= frame_end {
+                ParseResult::NotMatch
+            } else {
+                ParseResult::Incomplete
+            };
+        }
+        Err(VarIntError::TooLong) => return ParseResult::NotMatch,
     };
+    offset += state_bytes;
 
-    if hostname.is_empty() {
+    if offset != frame_end || !matches!(next_state, 1..=3) {
         return ParseResult::NotMatch;
     }
-    let _ = length;
     ParseResult::Matched(Handshake {
         hostname,
         protocol_version,
@@ -115,38 +162,50 @@ pub fn parse_handshake(buf: &[u8]) -> ParseResult<Handshake> {
 /// trailing UUID, 1.19+, is intentionally ignored).
 pub fn parse_login_start_username(buf: &[u8]) -> ParseResult<String> {
     // Skip the handshake frame: [VarInt length][length bytes].
-    let Some((handshake_len, mut offset)) = varint_at(buf, 0) else {
-        return ParseResult::Incomplete;
+    let (handshake_len, mut offset) = match varint_at(buf, 0) {
+        Ok(v) => v,
+        Err(VarIntError::Incomplete) => return ParseResult::Incomplete,
+        Err(VarIntError::TooLong) => return ParseResult::NotMatch,
     };
-    if handshake_len < 0 || buf.len() < offset + handshake_len as usize {
+    if !(4..=1024).contains(&handshake_len) {
+        return ParseResult::NotMatch;
+    }
+    if buf.len() < offset + handshake_len as usize {
         return ParseResult::Incomplete;
     }
     offset += handshake_len as usize;
 
     // Login Start frame: [VarInt length][VarInt 0x00][VarInt nameLen][name bytes].
-    let Some((packet_len, bytes)) = varint_at(buf, offset) else {
-        return ParseResult::Incomplete;
+    let (packet_len, bytes) = match varint_at(buf, offset) {
+        Ok(v) => v,
+        Err(VarIntError::Incomplete) => return ParseResult::Incomplete,
+        Err(VarIntError::TooLong) => return ParseResult::NotMatch,
     };
     offset += bytes;
-    if packet_len < 0 || buf.len() < offset + packet_len as usize {
+    if !(2..=512).contains(&packet_len) {
+        return ParseResult::NotMatch;
+    }
+    if buf.len() < offset + packet_len as usize {
         return ParseResult::Incomplete;
     }
     let packet_end = offset + packet_len as usize;
 
-    let Some((packet_id, bytes)) = varint_at_in(buf, offset, packet_end) else {
-        return ParseResult::Incomplete;
+    let (packet_id, bytes) = match varint_at_in(buf, offset, packet_end) {
+        Ok(v) => v,
+        Err(_) => return ParseResult::NotMatch,
     };
     offset += bytes;
     if packet_id != 0 {
         return ParseResult::NotMatch;
     }
 
-    let Some((name_len, bytes)) = varint_at_in(buf, offset, packet_end) else {
-        return ParseResult::Incomplete;
+    let (name_len, bytes) = match varint_at_in(buf, offset, packet_end) {
+        Ok(v) => v,
+        Err(_) => return ParseResult::NotMatch,
     };
     offset += bytes;
     if !(1..=16).contains(&name_len) || packet_end < offset + name_len as usize {
-        return ParseResult::Incomplete;
+        return ParseResult::NotMatch;
     }
 
     let username = String::from_utf8_lossy(&buf[offset..offset + name_len as usize])
@@ -159,18 +218,17 @@ pub fn parse_login_start_username(buf: &[u8]) -> ParseResult<String> {
 }
 
 /// Reads a VarInt at `offset`, returning `(value, bytes_read)`.
-fn varint_at(buf: &[u8], offset: usize) -> Option<(i32, usize)> {
+fn varint_at(buf: &[u8], offset: usize) -> Result<(i32, usize), VarIntError> {
     varint_at_in(buf, offset, buf.len())
 }
 
 /// Reads a VarInt at `offset` bounded by `limit`.
-fn varint_at_in(buf: &[u8], offset: usize, limit: usize) -> Option<(i32, usize)> {
-    use crate::multiplexer::varint::read_varint;
+fn varint_at_in(buf: &[u8], offset: usize, limit: usize) -> Result<(i32, usize), VarIntError> {
     let buf = &buf[..limit.min(buf.len())];
     if offset > buf.len() {
-        return None;
+        return Err(VarIntError::Incomplete);
     }
-    read_varint(buf, offset).ok()
+    read_varint(buf, offset)
 }
 
 #[cfg(test)]

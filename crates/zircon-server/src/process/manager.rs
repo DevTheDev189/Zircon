@@ -68,10 +68,11 @@ struct LaunchContext {
 /// Shared mutable process state.
 struct ProcessInner {
     running: bool,
+    pid: Option<u32>,
     stop_requested: bool,
     exit_code: i32,
     start_time: Option<std::time::SystemTime>,
-    stdin: Option<tokio::process::ChildStdin>,
+    stdin: Option<Arc<tokio::sync::Mutex<tokio::process::ChildStdin>>>,
 }
 
 /// Errors raised by process management.
@@ -196,6 +197,7 @@ impl MinecraftProcessManager {
             console,
             inner: Arc::new(Mutex::new(ProcessInner {
                 running: false,
+                pid: None,
                 stop_requested: false,
                 exit_code: -1,
                 start_time: None,
@@ -208,6 +210,15 @@ impl MinecraftProcessManager {
 
     pub fn is_running(&self) -> bool {
         self.inner.lock().unwrap().running
+    }
+
+    pub fn process_id(&self) -> Option<u32> {
+        let inner = self.inner.lock().unwrap();
+        if inner.running {
+            inner.pid
+        } else {
+            None
+        }
     }
 
     pub fn exit_code(&self) -> i32 {
@@ -276,11 +287,14 @@ impl MinecraftProcessManager {
             ServerProperties::default()
         };
         props.set("server-port", &self.context.mc_port.to_string());
-        // Default server-ip to 0.0.0.0 to prevent Windows loopback isolation drops, support dual-stack
-        // IPv4/IPv6, and ensure container and LAN compatibility. Automatically upgrade 127.0.0.1 bindings to 0.0.0.0.
-        let current_ip = props.get("server-ip", "0.0.0.0");
-        if current_ip == "127.0.0.1" || !props.as_map().contains_key("server-ip") {
+        // Inside a Docker container, 0.0.0.0 is required so Docker's 127.0.0.1 host port-forward
+        // can reach the container namespace. For native host processes, bind loopback (127.0.0.1)
+        // by default when a public multiplexer port is configured, and never overwrite an explicit 127.0.0.1.
+        if self.driver.is_some() {
             props.set("server-ip", "0.0.0.0");
+        } else if !props.as_map().contains_key("server-ip") {
+            let default_bind = if self.context.public_port > 0 { "127.0.0.1" } else { "0.0.0.0" };
+            props.set("server-ip", default_bind);
         }
         // Automatically repair max-players if corrupted (e.g. set to 0 by world preview generation) or missing.
         let current_max_players = props.get("max-players", "20");
@@ -293,6 +307,36 @@ impl MinecraftProcessManager {
         if current_status == "false" || current_status.trim().is_empty() {
             tracing::info!("Repairing enable-status from '{current_status}' to 'true' in server.properties");
             props.set("enable-status", "true");
+        }
+        // Automatically repair difficulty if corrupted by world preview generation (peaceful despawns hostile mobs on spawn).
+        let current_diff = props.get("difficulty", "normal");
+        if current_diff == "peaceful" || current_diff.trim().is_empty() {
+            tracing::info!("Repairing difficulty from '{current_diff}' to 'normal' in server.properties");
+            props.set("difficulty", "normal");
+        }
+        // Automatically repair entity spawning flags if corrupted by world preview generation.
+        let current_monsters = props.get("spawn-monsters", "true");
+        if current_monsters == "false" || current_monsters.trim().is_empty() {
+            tracing::info!("Repairing spawn-monsters from '{current_monsters}' to 'true' in server.properties");
+            props.set("spawn-monsters", "true");
+        }
+        let current_animals = props.get("spawn-animals", "true");
+        if current_animals == "false" || current_animals.trim().is_empty() {
+            tracing::info!("Repairing spawn-animals from '{current_animals}' to 'true' in server.properties");
+            props.set("spawn-animals", "true");
+        }
+        let current_npcs = props.get("spawn-npcs", "true");
+        if current_npcs == "false" || current_npcs.trim().is_empty() {
+            tracing::info!("Repairing spawn-npcs from '{current_npcs}' to 'true' in server.properties");
+            props.set("spawn-npcs", "true");
+        }
+        let current_view = props.get("view-distance", "10");
+        if current_view == "4" {
+            props.set("view-distance", "10");
+        }
+        let current_sim = props.get("simulation-distance", "10");
+        if current_sim == "3" {
+            props.set("simulation-distance", "10");
         }
         props.save(&props_file)?;
 
@@ -420,7 +464,10 @@ impl MinecraftProcessManager {
         }
 
         let java_version = detect_java_version(&self.context.minecraft_version);
-        let mut command = tokio::process::Command::new(installer::java_bin_for_version(java_version));
+        let java_bin = installer::ensure_java_installed(java_version)
+            .await
+            .map_err(|e| ProcessError::Install(e.to_string()))?;
+        let mut command = tokio::process::Command::new(&java_bin);
         // Untrusted mod code runs inside this JVM: scrub the environment so
         // host secrets (AWS_ACCESS_KEY_ID, GITHUB_TOKEN, ...) can never leak
         // into the server process. Keep only what the JVM needs to function.
@@ -432,12 +479,8 @@ impl MinecraftProcessManager {
                 "PATH" | "SYSTEMROOT" | "USERPROFILE" | "HOME" | "TMP" | "TEMP"
             )
         }));
-        let mut launch_args: Vec<String> = self
-            .context
-            .java_args
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect();
+        let mut launch_args: Vec<String> = crate::process::driver::sanitize_server_java_args(&self.context.java_args)
+            .map_err(ProcessError::Io)?;
         let loader = ModLoaderType::from_id(&self.context.loader_info.r#type) /* z0 */
             .unwrap_or(ModLoaderType::Vanilla); // z0
         if loader.is_forge_like()  { // z0
@@ -509,22 +552,33 @@ impl MinecraftProcessManager {
             .join(" ")
         );
 
-        let mut child = command.spawn()?;
+        let mut child = command.spawn().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ProcessError::Install(format!(
+                    "Java executable '{java_bin}' was not found on this system. Minecraft {} requires Java {java_version}. Please install Java from https://adoptium.net/ or configure JAVA_HOME in settings.",
+                    self.context.minecraft_version
+                ))
+            } else {
+                ProcessError::Io(e)
+            }
+        })?;
         let stdin = child
             .stdin
             .take()
             .ok_or_else(|| std::io::Error::other("failed to take child stdin"))?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
-        let exit_code = child.id().map(|_| -1).unwrap_or(-1);
+        let child_pid = child.id();
+        let exit_code = child_pid.map(|_| -1).unwrap_or(-1);
 
         {
             let mut inner = self.inner.lock().unwrap();
             inner.running = true;
+            inner.pid = child_pid;
             inner.stop_requested = false;
             inner.exit_code = exit_code;
             inner.start_time = Some(std::time::SystemTime::now());
-            inner.stdin = Some(stdin);
+            inner.stdin = Some(Arc::new(tokio::sync::Mutex::new(stdin)));
         }
 
         let public_port_text = if self.context.public_port > 0 {
@@ -605,21 +659,19 @@ impl MinecraftProcessManager {
                     };
 
                     let stdin_opt = {
-                        let mut guard = inner_telemetry.lock().unwrap();
+                        let guard = inner_telemetry.lock().unwrap();
                         if guard.running {
-                            guard.stdin.take()
+                            guard.stdin.clone()
                         } else {
                             None
                         }
                     };
 
-                    if let Some(mut stdin) = stdin_opt {
+                    if let Some(stdin_arc) = stdin_opt {
+                        let mut stdin = stdin_arc.lock().await;
                         let write_res = stdin.write_all(format!("{cmd}\n").as_bytes()).await;
                         if write_res.is_ok() {
                             let _ = stdin.flush().await;
-                        }
-                        if let Ok(mut guard) = inner_telemetry.lock() {
-                            guard.stdin = Some(stdin);
                         }
                     }
                 }
@@ -646,6 +698,7 @@ impl MinecraftProcessManager {
             let mut guard = inner.lock().unwrap();
             guard.exit_code = code;
             guard.running = false;
+            guard.pid = None;
             let stop_requested = guard.stop_requested;
             drop(guard);
             console.player_tracker().reset();
@@ -667,6 +720,12 @@ impl MinecraftProcessManager {
 
     /// Writes a command to the server's stdin (e.g. "say hello").
     pub async fn send_command(&self, command: &str) -> Result<(), ProcessError> {
+        if command.contains(['\n', '\r', '\0']) {
+            return Err(ProcessError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Server console command must not contain newline or NUL characters",
+            )));
+        }
         if let Some(driver) = &self.driver {
             return driver
                 .send_command(&self.context.instance_id, command)
@@ -674,29 +733,16 @@ impl MinecraftProcessManager {
                 .map_err(ProcessError::Io);
         }
 
-        // Take the stdin handle out of the shared state so the write can be
-        // awaited without holding the std Mutex — `MutexGuard` is `!Send`, so
-        // holding it across an await would both deadlock-risk concurrent
-        // commands and break axum's requirement that handler futures be `Send`.
-        // (Do not drop a `write_all` future un-awaited: the command would be
-        // silently discarded.)
-        let mut stdin = {
-            let mut inner = self.inner.lock().unwrap();
+        let stdin_arc = {
+            let inner = self.inner.lock().unwrap();
             if !inner.running {
                 return Err(ProcessError::NotRunning);
             }
-            inner.stdin.take().ok_or(ProcessError::NotRunning)?
+            inner.stdin.clone().ok_or(ProcessError::NotRunning)?
         };
-        let write_result = async {
-            stdin.write_all(format!("{command}\n").as_bytes()).await?;
-            stdin.flush().await
-        }
-        .await;
-        {
-            let mut inner = self.inner.lock().unwrap();
-            inner.stdin = Some(stdin);
-        }
-        write_result?;
+        let mut stdin = stdin_arc.lock().await;
+        stdin.write_all(format!("{command}\n").as_bytes()).await?;
+        stdin.flush().await?;
         tracing::debug!("Sent command: {command}");
         Ok(())
     }
@@ -785,7 +831,12 @@ fn sync_mods(
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() {
+            let file_type = entry.file_type()?;
+            if file_type.is_symlink() {
+                tracing::warn!("Refusing to sync symlink in mods directory: {:?}", path);
+                continue;
+            }
+            if file_type.is_file() {
                 if let Some(filename_os) = path.file_name() {
                     let filename = filename_os.to_string_lossy().to_string();
                     if client_only_mods.contains(&filename) {
@@ -796,12 +847,18 @@ fn sync_mods(
                     source_files.insert(filename_os.to_os_string());
                     let target_path = target_mods_dir.join(filename_os);
 
-                    let needs_copy = if !target_path.is_file() {
-                        true
-                    } else {
-                        let src_len = entry.metadata()?.len();
-                        let tgt_len = std::fs::metadata(&target_path)?.len();
-                        src_len != tgt_len
+                    if let Ok(tgt_meta) = std::fs::symlink_metadata(&target_path) {
+                        if tgt_meta.file_type().is_symlink() {
+                            std::fs::remove_file(&target_path)?;
+                        }
+                    }
+
+                    let needs_copy = match (entry.metadata(), std::fs::symlink_metadata(&target_path)) {
+                        (Ok(src_m), Ok(tgt_m)) if tgt_m.is_file() => {
+                            src_m.len() != tgt_m.len()
+                                || src_m.modified().ok() != tgt_m.modified().ok()
+                        }
+                        _ => true,
                     };
 
                     if needs_copy {
@@ -818,9 +875,10 @@ fn sync_mods(
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() {
+            let ft = entry.file_type()?;
+            if ft.is_file() || ft.is_symlink() {
                 if let Some(filename) = path.file_name() {
-                    if !source_files.contains(filename) {
+                    if !source_files.contains(filename) || ft.is_symlink() {
                         tracing::info!("Purging stale/client-only server mod file {:?}", filename);
                         std::fs::remove_file(&path)?;
                     }

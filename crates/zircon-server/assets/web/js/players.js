@@ -6,16 +6,18 @@ window.Zircon.players = {
         if (!this.selectedInstance) return;
         this.playersLoading = true;
         try {
-            const [wl, ops, bans, history] = await Promise.all([
+            const [wl, ops, bans, history, online] = await Promise.all([
                 this.api(`/api/instances/${this.selectedInstance.id}/players/whitelist`),
                 this.api(`/api/instances/${this.selectedInstance.id}/players/ops`),
                 this.api(`/api/instances/${this.selectedInstance.id}/players/bans`),
-                this.api(`/api/instances/${this.selectedInstance.id}/players/history`)
+                this.api(`/api/instances/${this.selectedInstance.id}/players/history`),
+                this.api(`/api/instances/${this.selectedInstance.id}/players/online`).catch(() => ({ players: [] }))
             ]);
             this.whitelistPlayers = wl.players || [];
             this.opPlayers = ops.players || [];
             this.bannedPlayers = bans.players || [];
             this.playerHistory = history.players || [];
+            this.onlinePlayers = (online && Array.isArray(online.players)) ? online.players : ((this.selectedInstance && Array.isArray(this.selectedInstance.onlinePlayers)) ? this.selectedInstance.onlinePlayers : []);
             this.playersLoaded = true;
         } catch (e) { /* instance may be offline / deleted */ } finally {
             this.playersLoading = false;
@@ -94,5 +96,53 @@ window.Zircon.players = {
             if (res.sent === false) alert(res.error || 'Could not unban player');
             this.loadPlayers();
         } catch (e) { alert('Unban failed: ' + e.message); }
+    },
+    async kickPlayer(name) {
+        if (!name || !this.selectedInstance) return;
+        const playerName = typeof name === 'string' ? name : (name.name || '');
+        const reason = prompt(`Kick reason for "${playerName}" (optional):`, 'Kicked by administrator');
+        if (reason === null) return;
+        try {
+            const res = await this.api(`/api/instances/${this.selectedInstance.id}/players/kick`, {
+                method: 'POST',
+                body: JSON.stringify({ name: playerName, reason: reason.trim() })
+            });
+            if (res.sent === false) alert(res.error || 'Could not kick player');
+            this.loadPlayers();
+        } catch (e) { alert('Kick failed: ' + e.message); }
+    },
+    async banOnlinePlayer(name) {
+        if (!name || !this.selectedInstance) return;
+        const playerName = typeof name === 'string' ? name : (name.name || '');
+        const reason = prompt(`Ban reason for "${playerName}" (optional):`, 'Banned by administrator');
+        if (reason === null) return;
+        try {
+            const res = await this.api(`/api/instances/${this.selectedInstance.id}/players/bans`, {
+                method: 'POST',
+                body: JSON.stringify({ name: playerName, reason: reason.trim() })
+            });
+            if (res.sent === false) alert(res.error || 'Could not ban player');
+            this.loadPlayers();
+        } catch (e) { alert('Ban failed: ' + e.message); }
+    },
+    async opPlayerDirect(name) {
+        if (!name || !this.selectedInstance) return;
+        const playerName = typeof name === 'string' ? name : (name.name || '');
+        try {
+            const res = await this.api(`/api/instances/${this.selectedInstance.id}/players/ops`, {
+                method: 'POST',
+                body: JSON.stringify({ name: playerName })
+            });
+            if (res.sent === false) alert(res.error || 'Could not op player');
+            this.loadPlayers();
+        } catch (e) { alert('Failed to op player: ' + e.message); }
+    },
+    isPlayerOp(name) {
+        if (!name || !this.opPlayers) return false;
+        const target = (typeof name === 'string' ? name : (name.name || '')).toLowerCase();
+        return this.opPlayers.some(p => {
+            const pName = (typeof p === 'string' ? p : (p.name || '')).toLowerCase();
+            return pName === target;
+        });
     },
 };

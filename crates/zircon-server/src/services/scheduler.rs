@@ -142,11 +142,16 @@ pub fn next_scheduled_slot(
 }
 
 fn advance(slot: DateTime<Local>, frequency: &str) -> DateTime<Local> {
-    match frequency {
-        zircon_core::model::instance::BACKUP_WEEKLY => slot + chrono::Duration::weeks(1),
-        zircon_core::model::instance::BACKUP_MONTHLY => slot + chrono::Duration::days(30),
-        _ => slot + chrono::Duration::days(1), // daily (and any unknown value as a safe fallback)
-    }
+    let naive = slot.naive_local();
+    let advanced_naive = match frequency {
+        zircon_core::model::instance::BACKUP_WEEKLY => naive + chrono::Duration::weeks(1),
+        zircon_core::model::instance::BACKUP_MONTHLY => naive + chrono::Duration::days(30),
+        _ => naive + chrono::Duration::days(1), // daily
+    };
+    advanced_naive
+        .and_local_timezone(Local)
+        .single()
+        .unwrap_or_else(|| slot + chrono::Duration::days(1))
 }
 
 fn parse_backup_time(time: &str) -> chrono::NaiveTime {

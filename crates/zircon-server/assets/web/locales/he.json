@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "שמור",
+    "saving": "שומר…",
+    "cancel": "ביטול",
+    "close": "סגור",
+    "refresh": "רענן",
+    "copy": "העתק",
+    "copied": "הועתק ללוח!",
+    "delete": "מחק",
+    "loading": "טוען…",
+    "apply": "החל",
+    "edit": "ערוך",
+    "search": "חיפוש…",
+    "online": "מקוון",
+    "offline": "לא מקוון",
+    "sleeping": "במצב שינה",
+    "booting": "מאתחל…",
+    "falling_asleep": "נכנס למצב שינה…",
+    "shutting_down": "מכבה…",
+    "start": "הפעל",
+    "stop": "עצור",
+    "restart": "הפעל מחדש",
+    "wake": "הער את השרת",
+    "detecting": "מזהה…"
+  },
+  "nav": {
+    "global_stats": "סטטיסטיקות גלובליות",
+    "servers": "שרתים",
+    "create_server": "צור שרת",
+    "import_server": "ייבוא שרת (.zip)",
+    "mods": "מודים",
+    "shaders": "שיידרים",
+    "files": "קבצים",
+    "console": "קונסולה",
+    "players": "שחקנים",
+    "backups": "גיבויים",
+    "world": "עולם",
+    "settings": "הגדרות",
+    "disk_storage": "אחסון דיסק",
+    "server_manager": "מנהל שרת"
+  },
+  "stats": {
+    "title": "טלמטריה ומדדי מערכת",
+    "subtitle": "פעילות CPU, זיכרון RAM של המארח, RSS של התהליך ופעילות דיסק בזמן אמת",
+    "host_ram": "זיכרון RAM של מערכת ההפעלה",
+    "process_rss": "RSS של תהליך Java",
+    "cpu_usage": "עומס CPU",
+    "disk_allocation": "הקצאת אחסון NVMe",
+    "uptime": "זמן פעילות המערכת",
+    "active_instances": "מופעים פעילים",
+    "sleeping_instances": "מופעים במצב שינה"
+  },
+  "instances": {
+    "no_servers": "אין שרתים עדיין — לחץ על 'צור שרת'.",
+    "create_title": "צור שרת Minecraft",
+    "name_label": "שם המופע",
+    "version_label": "גרסת Minecraft",
+    "loader_label": "מטעין מודים",
+    "port_label": "פורט",
+    "memory_label": "זיכרון מוקצה (GB)",
+    "start_server": "הפעל שרת",
+    "wake_server": "הער שרת",
+    "stop_server": "עצור שרת",
+    "restart_server": "הפעל מחדש את השרת",
+    "players_online": "{count} מחוברים",
+    "sleeps_in": "נרדם בעוד {time}",
+    "idle_wakes": "כיבוי בשל חוסר פעילות — מתעורר כאשר שחקן מצטרף"
+  },
+  "mods": {
+    "title": "מודים מותקנים",
+    "count": "מודים מותקנים ({count})",
+    "search_placeholder": "חיפוש מודים מותקנים…",
+    "loader_filter": "מסנן לודרים",
+    "all_loaders": "כל הלודרים",
+    "active_loader": "לודר פעיל ({loader})",
+    "export_mrpack": "ייצוא .mrpack",
+    "copy_mrpack_url": "העתקת קישור .mrpack",
+    "copy_mrpack_tooltip": "העתקת קישור הורדה ציבורי של .mrpack לשחקנים שאינם משתמשים ב-Zircon",
+    "add_mod": "הוספת מוד",
+    "install_update": "עדכון",
+    "no_mods": "עדיין לא הותקנו מודים."
+  },
+  "console": {
+    "title": "מסוף השרת וטרמינל",
+    "placeholder": "שלח פקודה (למשל /say Hello, /op Player)...",
+    "send": "שלח",
+    "clear": "נקה"
+  },
+  "players": {
+    "title": "ניהול שחקנים",
+    "online": "שחקנים מחוברים",
+    "whitelist": "רשימה לבנה",
+    "ops": "מפעילים",
+    "bans": "שחקנים חסומים",
+    "kick": "הדחה",
+    "ban": "חסימה",
+    "op": "הפיכה למפעיל",
+    "deop": "הסרת הרשאת מפעיל"
+  },
+  "backups": {
+    "title": "תמונות מצב של עולמות ומופעים",
+    "create": "צור גיבוי",
+    "restore": "שחזר",
+    "download": "הורד",
+    "delete": "מחק"
+  },
+  "security": {
+    "online_mode": "מצב מקוון (אימות Mojang)",
+    "online_mode_warning": "אזהרה: השבתת מצב מקוון מאפשרת לשחקנים לא מאומתים עם UUID מזויף להתחבר.",
+    "whitelist_enforced": "אכיפת רשימת הלבנה"
+  }
+}

@@ -99,7 +99,7 @@
     <!-- 4 High-Tech Telemetry Cards with Y-Axis Values & Spline Curves (Always visible) -->
     <div class="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-3.5 shrink-0">
       <!-- 1. CPU Dynamics (Host vs Game) -->
-      <div class="z-card bg-[#0b1019]/90 border border-slate-800 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+      <div class="z-card bg-[#0a0c10] border border-neutral-800/60 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-sans">
             <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_var(--color-accent)]"></span>
@@ -158,7 +158,7 @@
       </div>
 
       <!-- 2. Memory & Heap Dynamics (JVM Heap & System RAM) -->
-      <div class="z-card bg-[#0b1019]/90 border border-slate-800 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+      <div class="z-card bg-[#0a0c10] border border-neutral-800/60 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-sans">
             <span class="w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.6)]"></span>
@@ -214,7 +214,7 @@
       </div>
 
       <!-- 3. Network Throughput & Bandwidth (RX / TX) -->
-      <div class="z-card bg-[#0b1019]/90 border border-slate-800 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+      <div class="z-card bg-[#0a0c10] border border-neutral-800/60 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-sans">
             <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span>
@@ -267,7 +267,7 @@
       </div>
 
       <!-- 4. GPU Utilization & Tick Performance -->
-      <div class="z-card bg-[#0b1019]/90 border border-slate-800 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+      <div class="z-card bg-[#0a0c10] border border-neutral-800/60 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
         <div class="flex items-center justify-between mb-1">
           <!-- Toggle Pill: GPU Load % vs Tick MSPT -->
           <div class="flex items-center gap-1 bg-[#070b10] p-0.5 rounded-lg border border-slate-800">
@@ -365,8 +365,8 @@
 
     <!-- Center/Bottom: Real-Time Filtered Log Terminal (Greyed out when game is idle) -->
     <div
-      class="relative z-10 flex-1 min-h-0 flex flex-col z-card bg-[#090d14]/95 border rounded-2xl p-4 overflow-hidden transition-all duration-200"
-      :class="isGameRunning ? 'border-slate-800' : 'border-slate-800/60 opacity-60'"
+      class="relative z-10 flex-1 min-h-0 flex flex-col z-card bg-[#0a0c10] border rounded-2xl p-4 overflow-hidden transition-all duration-200"
+      :class="isGameRunning ? 'border-neutral-800/80' : 'border-neutral-800/40 opacity-60'"
     >
       <!-- Terminal Controls & Filters Header -->
       <div class="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-slate-800/80 shrink-0">

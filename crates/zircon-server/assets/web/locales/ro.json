@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Salvează",
+    "saving": "Se salvează…",
+    "cancel": "Anulează",
+    "close": "Închide",
+    "refresh": "Reîmprospătează",
+    "copy": "Copiază",
+    "copied": "Copiat în clipboard!",
+    "delete": "Șterge",
+    "loading": "Se încarcă…",
+    "apply": "Aplică",
+    "edit": "Editează",
+    "search": "Caută…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "În repaus",
+    "booting": "Se pornește…",
+    "falling_asleep": "Trece în repaus…",
+    "shutting_down": "Se oprește…",
+    "start": "Pornește",
+    "stop": "Oprește",
+    "restart": "Repornește",
+    "wake": "Trezește serverul",
+    "detecting": "Detectare…"
+  },
+  "nav": {
+    "global_stats": "Statistici globale",
+    "servers": "Servere",
+    "create_server": "Creează server",
+    "import_server": "Importă server (.zip)",
+    "mods": "Moduri",
+    "shaders": "Shadere",
+    "files": "Fișiere",
+    "console": "Consolă",
+    "players": "Jucători",
+    "backups": "Copii de rezervă",
+    "world": "Lume",
+    "settings": "Setări",
+    "disk_storage": "Stocare pe disc",
+    "server_manager": "Manager de server"
+  },
+  "stats": {
+    "title": "Telemetrie și metrici de sistem",
+    "subtitle": "Activitate în timp real pentru CPU, RAM gazdă, RSS proces și disc",
+    "host_ram": "RAM sistem gazdă",
+    "process_rss": "RSS proces Java",
+    "cpu_usage": "Încărcare CPU",
+    "disk_allocation": "Alocare stocare NVMe",
+    "uptime": "Timp funcționare sistem",
+    "active_instances": "Instanțe active",
+    "sleeping_instances": "Instanțe în repaus"
+  },
+  "instances": {
+    "no_servers": "Niciun server încă — apasă pe „Creează Server”.",
+    "create_title": "Creează Server Minecraft",
+    "name_label": "Nume instanță",
+    "version_label": "Versiune Minecraft",
+    "loader_label": "Încărcător de moduri",
+    "port_label": "Port",
+    "memory_label": "Memorie alocată (GB)",
+    "start_server": "Pornește serverul",
+    "wake_server": "Trezește serverul",
+    "stop_server": "Oprește serverul",
+    "restart_server": "Repornește serverul",
+    "players_online": "{count} online",
+    "sleeps_in": "Intră în repaus peste {time}",
+    "idle_wakes": "Oprire la inactivitate — se trezește când intră un jucător"
+  },
+  "mods": {
+    "title": "Moduri instalate",
+    "count": "Moduri instalate ({count})",
+    "search_placeholder": "Caută moduri instalate…",
+    "loader_filter": "Filtru loader",
+    "all_loaders": "Toate loaderele",
+    "active_loader": "Loader activ ({loader})",
+    "export_mrpack": "Exportă .mrpack",
+    "copy_mrpack_url": "Copiază URL-ul .mrpack",
+    "copy_mrpack_tooltip": "Copiază linkul public de descărcare .mrpack pentru jucătorii care nu folosesc Zircon",
+    "add_mod": "Adaugă mod",
+    "install_update": "Actualizează",
+    "no_mods": "Nu sunt instalate moduri încă."
+  },
+  "console": {
+    "title": "Consola și terminalul serverului",
+    "placeholder": "Trimite o comandă (de ex. /say Hello, /op Player)...",
+    "send": "Trimite",
+    "clear": "Șterge"
+  },
+  "players": {
+    "title": "Gestionarea jucătorilor",
+    "online": "Jucători online",
+    "whitelist": "Listă albă",
+    "ops": "Operatori",
+    "bans": "Jucători interziși",
+    "kick": "Expulzare",
+    "ban": "Interzicere",
+    "op": "Promovează la operator",
+    "deop": "Retrogradează din operator"
+  },
+  "backups": {
+    "title": "Instantanee de lume și instanțe",
+    "create": "Creează copie de rezervă",
+    "restore": "Restaurează",
+    "download": "Descarcă",
+    "delete": "Șterge"
+  },
+  "security": {
+    "online_mode": "Mod Online (Autentificare Mojang)",
+    "online_mode_warning": "Avertisment: Dezactivarea opțiunii online-mode permite jucătorilor offline/neverificați cu UUID-uri falsificate să se conecteze.",
+    "whitelist_enforced": "Aplică Lista Albă"
+  }
+}

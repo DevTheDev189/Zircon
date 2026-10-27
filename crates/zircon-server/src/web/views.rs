@@ -158,6 +158,14 @@ pub fn modrinth_hit_to_map(
     } else {
         &hit.project_id
     };
+    let known_loaders = ["fabric", "quilt", "neoforge", "forge"];
+    let mut loaders = Vec::new();
+    for c in hit.categories.iter().chain(hit.display_categories.iter()) {
+        let low = c.to_lowercase();
+        if known_loaders.contains(&low.as_str()) && !loaders.contains(&low) {
+            loaders.push(low);
+        }
+    }
     serde_json::json!({
         "id": hit.project_id,
         "projectId": hit.project_id,
@@ -170,6 +178,7 @@ pub fn modrinth_hit_to_map(
         "versions": hit.versions,
         "projectUrl": format!("https://modrinth.com/project/{slug_or_id}"),
         "origin": "modrinth",
+        "loaders": loaders,
     })
 }
 
@@ -207,6 +216,18 @@ pub fn curseforge_mod_to_map(
         .flat_map(|f| f.game_versions.clone())
         .collect();
 
+    let mut loaders_set = std::collections::HashSet::new();
+    for f in &mod_entry.latest_files {
+        for gv in &f.game_versions {
+            let low = gv.to_lowercase();
+            if low == "fabric" || low == "quilt" || low == "forge" || low == "neoforge" {
+                loaders_set.insert(low);
+            }
+        }
+    }
+    let mut loaders: Vec<String> = loaders_set.into_iter().collect();
+    loaders.sort();
+
     serde_json::json!({
         "id": mod_entry.id,
         "projectId": mod_entry.id.to_string(),
@@ -222,6 +243,7 @@ pub fn curseforge_mod_to_map(
         "websiteUrl": website_url,
         "projectUrl": website_url,
         "origin": "curseforge",
+        "loaders": loaders,
     })
 }
 
@@ -229,6 +251,14 @@ pub fn curseforge_mod_to_map(
 pub fn curseforge_file_to_map(
     file: &zircon_core::api::curseforge::CurseForgeFile,
 ) -> serde_json::Value {
+    let known_loaders = ["fabric", "quilt", "neoforge", "forge"];
+    let mut loaders = Vec::new();
+    for gv in &file.game_versions {
+        let low = gv.to_lowercase();
+        if known_loaders.contains(&low.as_str()) && !loaders.contains(&low) {
+            loaders.push(low);
+        }
+    }
     serde_json::json!({
         "id": file.id.to_string(),
         "fileId": file.id,
@@ -239,6 +269,8 @@ pub fn curseforge_file_to_map(
         "downloadUrl": file.download_url,
         "fileFingerprint": file.file_fingerprint,
         "length": file.length,
+        "loaders": loaders,
+        "gameVersions": file.game_versions,
     })
 }
 

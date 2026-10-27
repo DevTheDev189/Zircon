@@ -16,6 +16,12 @@ window.Zircon.instances = {
     },
     selectInstance(inst) {
         this.selectedInstance = inst;
+        if (inst && inst.id) {
+            this.statsSelectedInstanceId = inst.id;
+            if (this.activeTab === 'stats') {
+                this.loadStats(inst.id);
+            }
+        }
         const parsed = this.parseJavaArgs(inst.javaArgs);
         this.settingsForm = {
             name: inst.name,
@@ -494,6 +500,8 @@ window.Zircon.instances = {
             if ((e.message || '').toLowerCase().includes('eula')) {
                 this.eulaInstance = inst;
                 this.showEulaModal = true;
+            } else if ((e.message || '').toLowerCase().includes('program not found')) {
+                alert('Start failed: Java was not found on this system (program not found). Please check your internet connection so Zircon can automatically install Eclipse Adoptium Temurin, or install Java manually from https://adoptium.net/.');
             } else {
                 alert('Start failed: ' + e.message);
             }
@@ -562,6 +570,7 @@ window.Zircon.instances = {
                 this.opPlayers = [];
                 this.bannedPlayers = [];
                 this.playerHistory = [];
+                this.onlinePlayers = [];
                 this.serverProps = {};
                 this.whitelistEnabled = false;
             }

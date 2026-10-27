@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "저장",
+    "saving": "저장 중…",
+    "cancel": "취소",
+    "close": "닫기",
+    "refresh": "새로 고침",
+    "copy": "복사",
+    "copied": "클립보드에 복사되었습니다!",
+    "delete": "삭제",
+    "loading": "불러오는 중…",
+    "apply": "적용",
+    "edit": "편집",
+    "search": "검색…",
+    "online": "온라인",
+    "offline": "오프라인",
+    "sleeping": "절전 모드",
+    "booting": "부팅 중…",
+    "falling_asleep": "절전 모드로 전환 중…",
+    "shutting_down": "종료 중…",
+    "start": "시작",
+    "stop": "중지",
+    "restart": "재시작",
+    "wake": "서버 깨우기",
+    "detecting": "감지 중…"
+  },
+  "nav": {
+    "global_stats": "전체 통계",
+    "servers": "서버",
+    "create_server": "서버 생성",
+    "import_server": "서버 가져오기 (.zip)",
+    "mods": "모드",
+    "shaders": "셰이더",
+    "files": "파일",
+    "console": "콘솔",
+    "players": "플레이어",
+    "backups": "백업",
+    "world": "월드",
+    "settings": "설정",
+    "disk_storage": "디스크 저장소",
+    "server_manager": "서버 관리자"
+  },
+  "stats": {
+    "title": "시스템 텔레메트리 및 지표",
+    "subtitle": "실시간 CPU, 호스트 RAM, 프로세스 RSS 및 디스크 활동",
+    "host_ram": "호스트 OS RAM",
+    "process_rss": "Java 프로세스 RSS",
+    "cpu_usage": "CPU 부하",
+    "disk_allocation": "NVMe 저장소 할당",
+    "uptime": "시스템 가동 시간",
+    "active_instances": "실행 중인 인스턴스",
+    "sleeping_instances": "대기 중인 인스턴스"
+  },
+  "instances": {
+    "no_servers": "아직 서버가 없습니다 — '서버 생성'을 클릭하세요.",
+    "create_title": "Minecraft 서버 생성",
+    "name_label": "인스턴스 이름",
+    "version_label": "Minecraft 버전",
+    "loader_label": "모드 로더",
+    "port_label": "포트",
+    "memory_label": "할당된 메모리 (GB)",
+    "start_server": "서버 시작",
+    "wake_server": "서버 깨우기",
+    "stop_server": "서버 중지",
+    "restart_server": "서버 재시작",
+    "players_online": "{count}명 접속 중",
+    "sleeps_in": "{time} 후 절전 모드 진입",
+    "idle_wakes": "유휴 상태 종료됨 — 플레이어 접속 시 자동 복구"
+  },
+  "mods": {
+    "title": "설치된 모드",
+    "count": "설치된 모드 ({count})",
+    "search_placeholder": "설치된 모드 검색…",
+    "loader_filter": "로더 필터",
+    "all_loaders": "모든 로더",
+    "active_loader": "활성 로더 ({loader})",
+    "export_mrpack": ".mrpack 내보내기",
+    "copy_mrpack_url": ".mrpack URL 복사",
+    "copy_mrpack_tooltip": "Zircon을 사용하지 않는 플레이어를 위한 공개 .mrpack 다운로드 링크 복사",
+    "add_mod": "모드 추가",
+    "install_update": "업데이트",
+    "no_mods": "아직 설치된 모드가 없습니다."
+  },
+  "console": {
+    "title": "서버 콘솔 및 터미널",
+    "placeholder": "명령어 입력 (예: /say Hello, /op Player)...",
+    "send": "전송",
+    "clear": "지우기"
+  },
+  "players": {
+    "title": "플레이어 관리",
+    "online": "접속한 플레이어",
+    "whitelist": "화이트리스트",
+    "ops": "관리자",
+    "bans": "차단된 플레이어",
+    "kick": "추방",
+    "ban": "차단",
+    "op": "관리자로 지정",
+    "deop": "관리자 해제"
+  },
+  "backups": {
+    "title": "월드 및 인스턴스 스냅샷",
+    "create": "백업 생성",
+    "restore": "복원",
+    "download": "다운로드",
+    "delete": "삭제"
+  },
+  "security": {
+    "online_mode": "온라인 모드 (Mojang 인증)",
+    "online_mode_warning": "경고: online-mode를 비활성화하면 위조된 UUID를 사용하는 오프라인/미인증 플레이어가 접속할 수 있습니다.",
+    "whitelist_enforced": "화이트리스트 강제 적용"
+  }
+}

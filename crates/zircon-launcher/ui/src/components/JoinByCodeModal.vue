@@ -5,7 +5,7 @@
     @click.self="handleClose"
   >
     <div
-      class="w-full max-w-xl bg-[#0b0f17]/95 border border-slate-800/90 rounded-2xl shadow-2xl shadow-cyan-950/30 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]"
+      class="w-full max-w-xl bg-[#0c0d12] border border-neutral-800 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]"
     >
       <!-- Header -->
       <div class="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between bg-gradient-to-r from-slate-900/90 via-slate-900/50 to-cyan-950/20">

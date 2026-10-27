@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use super::nbt::{read_level_dat, LevelDatInfo};
 
 /// World inspection statistics summary for pre-flight display.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorldSummary {
     /// Name of the primary world directory (e.g. "world").

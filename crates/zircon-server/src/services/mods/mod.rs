@@ -9,16 +9,13 @@ pub mod resolver;
 #[cfg(test)]
 mod tests;
 
-pub use cache::*;
-pub use installer::*;
-pub use resolver::*;
 
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use uuid::Uuid;
-use zircon_core::api::curseforge::CurseForgeApiClient;
+use zircon_core::api::curseforge::{embedded_curseforge_key, CurseForgeApiClient};
 use zircon_core::api::modrinth::ModrinthApiClient;
 
 use super::bom::BomService;
@@ -85,13 +82,16 @@ pub struct ModManagementService {
 
 impl ModManagementService {
     pub fn new(bom_service: Arc<BomService>, mods_dir: PathBuf, curse_forge_api_key: &str) -> Self {
-        let key = curse_forge_api_key.to_string();
+        let mut cleaned_key = curse_forge_api_key.trim().trim_matches('"').trim_matches('\'').to_string();
+        if cleaned_key.is_empty() {
+            cleaned_key = embedded_curseforge_key();
+        }
         Self {
             bom_service,
             mods_dir,
-            curse_forge_api_key: key.clone(),
+            curse_forge_api_key: cleaned_key.clone(),
             modrinth: ModrinthApiClient::new(),
-            curse_forge: CurseForgeApiClient::new(key),
+            curse_forge: CurseForgeApiClient::new(cleaned_key),
         }
     }
 
@@ -148,19 +148,35 @@ pub fn sanitize_filename(filename: &str) -> Result<String, ModError> {
             }
         })
         .collect();
-    let mut base = if sanitized.trim().is_empty() {
+    // Collapse consecutive dots ("..") and strip leading/trailing dots
+    let mut collapsed = String::with_capacity(sanitized.len());
+    let mut prev_dot = false;
+    for c in sanitized.trim_matches('.').chars() {
+        if c == '.' {
+            if !prev_dot {
+                collapsed.push(c);
+            }
+            prev_dot = true;
+        } else {
+            prev_dot = false;
+            collapsed.push(c);
+        }
+    }
+    let mut base = if collapsed.trim().is_empty() || collapsed.eq_ignore_ascii_case("jar") {
         format!("mod-{}.jar", &Uuid::new_v4().simple().to_string()[..8])
     } else {
-        sanitized
+        collapsed
     };
     if !base.to_lowercase().ends_with(".jar") {
         base = format!("{base}.jar");
     }
 
     // Windows reserved device names, regardless of extension casing.
+    // Windows treats the segment before the first '.' as the device name (e.g. CON.txt.jar).
     let upper = base.to_ascii_uppercase();
     let stem = upper.strip_suffix(".JAR").unwrap_or(&upper).to_string();
-    if WINDOWS_RESERVED.contains(&stem.as_str()) {
+    let first_segment = stem.split('.').next().unwrap_or(&stem);
+    if WINDOWS_RESERVED.contains(&stem.as_str()) || WINDOWS_RESERVED.contains(&first_segment) {
         base = format!("file_{base}");
     }
     Ok(base)

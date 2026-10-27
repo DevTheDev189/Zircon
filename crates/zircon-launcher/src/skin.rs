@@ -502,6 +502,17 @@ fn extract_timestamp_prefix(filename: &str) -> Option<&str> {
 
 const PROFILE_URL: &str = "https://sessionserver.mojang.com/session/minecraft/profile/";
 const UPLOAD_URL: &str = "https://api.minecraftservices.com/minecraft/profile/skins";
+const MOJANG_SERVICES_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
+const MOJANG_CAPES_ACTIVE_URL: &str = "https://api.minecraftservices.com/minecraft/profile/capes/active";
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MojangCape {
+    pub id: String,
+    pub state: String, // "ACTIVE" | "INACTIVE"
+    pub url: String,
+    pub alias: Option<String>,
+}
 
 /// Mojang Minecraft skin integration: downloads a player's current skin (by
 /// UUID) and uploads a new skin (with the Minecraft access token).
@@ -715,6 +726,87 @@ impl MojangSkinService {
             });
         }
         debug!("Uploaded skin to Mojang ({variant})");
+        Ok(())
+    }
+
+    /// Fetches all capes owned by the authenticated player via Mojang's official Minecraft Services API.
+    pub async fn get_capes(&self, access_token: &str) -> Result<Vec<MojangCape>, LauncherError> {
+        let response = self
+            .http
+            .get(MOJANG_SERVICES_PROFILE_URL)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {access_token}"),
+            )
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        if status != 200 {
+            let body = truncate(&response.text().await.unwrap_or_default(), 200);
+            return Err(LauncherError::Http {
+                status,
+                url: format!("{MOJANG_SERVICES_PROFILE_URL} {body}"),
+            });
+        }
+        let profile: serde_json::Value = response.json().await?;
+        let capes_val = profile.get("capes").and_then(|c| c.as_array());
+        let capes: Vec<MojangCape> = match capes_val {
+            Some(arr) => arr
+                .iter()
+                .filter_map(|item| serde_json::from_value::<MojangCape>(item.clone()).ok())
+                .collect(),
+            None => Vec::new(),
+        };
+        Ok(capes)
+    }
+
+    /// Sets the active cape on the player's Mojang account.
+    pub async fn set_active_cape(&self, access_token: &str, cape_id: &str) -> Result<(), LauncherError> {
+        let payload = serde_json::json!({
+            "capeId": cape_id
+        });
+        let response = self
+            .http
+            .put(MOJANG_CAPES_ACTIVE_URL)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {access_token}"),
+            )
+            .json(&payload)
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        if !(200..300).contains(&status) {
+            let body = truncate(&response.text().await.unwrap_or_default(), 200);
+            return Err(LauncherError::Http {
+                status,
+                url: format!("{MOJANG_CAPES_ACTIVE_URL} {body}"),
+            });
+        }
+        debug!("Equipped Mojang cape '{cape_id}'");
+        Ok(())
+    }
+
+    /// Unequips any currently active cape on the player's Mojang account.
+    pub async fn remove_active_cape(&self, access_token: &str) -> Result<(), LauncherError> {
+        let response = self
+            .http
+            .delete(MOJANG_CAPES_ACTIVE_URL)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {access_token}"),
+            )
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        if !(200..300).contains(&status) {
+            let body = truncate(&response.text().await.unwrap_or_default(), 200);
+            return Err(LauncherError::Http {
+                status,
+                url: format!("{MOJANG_CAPES_ACTIVE_URL} {body}"),
+            });
+        }
+        debug!("Unequipped active Mojang cape");
         Ok(())
     }
 

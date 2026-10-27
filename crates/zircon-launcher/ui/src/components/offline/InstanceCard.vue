@@ -73,7 +73,7 @@
         <transition name="dropdown-pop">
           <div
             v-if="activeDropdown"
-            class="absolute right-0 top-full mt-1.5 w-52 bg-[#0c1322] border border-white/15 ring-1 ring-cyan-500/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_25px_rgba(71,210,201,0.2)] p-1.5 z-50 text-xs text-slate-200"
+            class="absolute right-0 top-full mt-1.5 w-52 bg-neutral-900/95 backdrop-blur-lg border border-neutral-700/50 ring-1 ring-cyan-500/20 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_20px_rgba(71,210,201,0.15)] p-1.5 z-50 text-xs text-slate-200"
           >
             <!-- Ambient Top Accent Glow -->
             <div class="absolute top-0 inset-x-3 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent pointer-events-none"></div>
@@ -112,19 +112,6 @@
                 </svg>
               </div>
               <span class="font-semibold text-white group-hover:text-cyan-200 transition-colors">{{ $t('instance_card.export_mrpack') }}</span>
-            </button>
-
-            <button
-              class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-amber-500/15 border border-transparent hover:border-amber-500/30 flex items-center gap-2.5 cursor-pointer transition-all duration-150 group"
-              :title="$t('instance_card.cinematic_tooltip')"
-              @click="$emit('installCinematic', instance)"
-            >
-              <div class="w-6 h-6 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 group-hover:text-amber-300 group-hover:bg-amber-500/20 group-hover:scale-105 transition-all shrink-0">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
-              </div>
-              <span class="font-semibold text-white group-hover:text-amber-200 transition-colors">{{ $t('instance_card.cinematic_shaders') }}</span>
             </button>
 
             <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-1 mx-2"></div>

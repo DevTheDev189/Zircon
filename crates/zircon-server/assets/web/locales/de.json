@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Speichern",
+    "saving": "Wird gespeichert…",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "refresh": "Aktualisieren",
+    "copy": "Kopieren",
+    "copied": "In die Zwischenablage kopiert!",
+    "delete": "Löschen",
+    "loading": "Wird geladen…",
+    "apply": "Anwenden",
+    "edit": "Bearbeiten",
+    "search": "Suchen…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Ruhemodus",
+    "booting": "Wird gestartet…",
+    "falling_asleep": "Geht in den Ruhemodus…",
+    "shutting_down": "Wird heruntergefahren…",
+    "start": "Starten",
+    "stop": "Beenden",
+    "restart": "Neu starten",
+    "wake": "Server aufwecken",
+    "detecting": "Wird erkannt…"
+  },
+  "nav": {
+    "global_stats": "Globale Statistiken",
+    "servers": "Server",
+    "create_server": "Server erstellen",
+    "import_server": "Server importieren (.zip)",
+    "mods": "Mods",
+    "shaders": "Shaders",
+    "files": "Dateien",
+    "console": "Konsole",
+    "players": "Spieler",
+    "backups": "Backups",
+    "world": "Welt",
+    "settings": "Einstellungen",
+    "disk_storage": "Speicherplatz",
+    "server_manager": "Server-Manager"
+  },
+  "stats": {
+    "title": "System-Telemetrie & Metriken",
+    "subtitle": "CPU-Auslastung, Host-RAM, Prozess-RSS und Festplattenaktivität in Echtzeit",
+    "host_ram": "Host-Betriebssystem-RAM",
+    "process_rss": "Java-Prozess-RSS",
+    "cpu_usage": "CPU-Auslastung",
+    "disk_allocation": "NVMe-Speicherzuweisung",
+    "uptime": "Systemlaufzeit",
+    "active_instances": "Aktive Instanzen",
+    "sleeping_instances": "Inaktive Instanzen"
+  },
+  "instances": {
+    "no_servers": "Noch keine Server vorhanden — klicke auf „Server erstellen“.",
+    "create_title": "Minecraft-Server erstellen",
+    "name_label": "Instanzname",
+    "version_label": "Minecraft-Version",
+    "loader_label": "Mod-Loader",
+    "port_label": "Port",
+    "memory_label": "Zugewiesener Speicher (GB)",
+    "start_server": "Server starten",
+    "wake_server": "Server wecken",
+    "stop_server": "Server stoppen",
+    "restart_server": "Server neu starten",
+    "players_online": "{count} online",
+    "sleeps_in": "Geht in {time} in den Ruhezustand",
+    "idle_wakes": "Leerlauf-Abschaltung — wird beim Beitritt eines Spielers geweckt"
+  },
+  "mods": {
+    "title": "Installierte Mods",
+    "count": "Installierte Mods ({count})",
+    "search_placeholder": "Installierte Mods durchsuchen…",
+    "loader_filter": "Loader-Filter",
+    "all_loaders": "Alle Loader",
+    "active_loader": "Aktiver Loader ({loader})",
+    "export_mrpack": ".mrpack exportieren",
+    "copy_mrpack_url": ".mrpack-URL kopieren",
+    "copy_mrpack_tooltip": "Öffentlichen .mrpack-Download-Link für Nicht-Zircon-Spieler kopieren",
+    "add_mod": "Mod hinzufügen",
+    "install_update": "Aktualisieren",
+    "no_mods": "Noch keine Mods installiert."
+  },
+  "console": {
+    "title": "Server-Konsole & Terminal",
+    "placeholder": "Befehl senden (z. B. /say Hallo, /op Spieler)...",
+    "send": "Senden",
+    "clear": "Löschen"
+  },
+  "players": {
+    "title": "Spieler-Verwaltung",
+    "online": "Aktive Spieler",
+    "whitelist": "Whitelist",
+    "ops": "Operatoren",
+    "bans": "Gesperrte Spieler",
+    "kick": "Kicken",
+    "ban": "Sperren",
+    "op": "Zum Operator machen",
+    "deop": "Operator-Rechte entziehen"
+  },
+  "backups": {
+    "title": "Welt- & Instanz-Snapshots",
+    "create": "Backup erstellen",
+    "restore": "Wiederherstellen",
+    "download": "Herunterladen",
+    "delete": "Löschen"
+  },
+  "security": {
+    "online_mode": "Online-Modus (Mojang-Authentifizierung)",
+    "online_mode_warning": "Warnung: Wenn der Online-Modus deaktiviert ist, können sich Offline-/unverifizierte Spieler mit gefälschten UUIDs verbinden.",
+    "whitelist_enforced": "Whitelist erzwingen"
+  }
+}

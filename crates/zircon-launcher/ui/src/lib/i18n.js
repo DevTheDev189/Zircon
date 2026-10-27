@@ -1,20 +1,27 @@
 import { ref, shallowReactive, computed } from 'vue';
 import en from '../locales/en.json';
 
-// Eagerly discover all compiled locale JSON files in ../locales/
-const localeFiles = import.meta.glob('../locales/*.json', { eager: true });
+// Lazy loader map for all compiled language JSON files (ignoring English which is statically bundled and hidden cache files)
+const localeLoaders = import.meta.glob(['../locales/[a-zA-Z]*.json', '!../locales/en.json']);
 
-// Reactive dictionary of loaded locales
+// Reactive dictionary of loaded locales, pre-seeded with English
 export const locales = shallowReactive({
   en
 });
 
-// Populate discovered locales
-for (const [filePath, mod] of Object.entries(localeFiles)) {
-  const match = filePath.match(/\/([^/]+)\.json$/);
-  if (match) {
-    const code = match[1];
-    locales[code] = mod.default || mod;
+// Helper to asynchronously load a locale
+export async function loadLocale(code) {
+  if (!code || locales[code]) return locales[code];
+  const loader = localeLoaders[`../locales/${code}.json`];
+  if (!loader) return null;
+  try {
+    const mod = await loader();
+    const data = mod.default || mod;
+    locales[code] = data;
+    return data;
+  } catch (err) {
+    console.warn(`Failed to lazy load locale '${code}':`, err);
+    return null;
   }
 }
 
@@ -63,11 +70,11 @@ export const ALL_LOCALE_METADATA = {
   fa: { name: 'Persian', native: 'فارسی', flag: '🇮🇷' }
 };
 
-// Available Locales Catalog computed from currently loaded bundles
+// Available Locales Catalog computed from full metadata catalog
 export const AVAILABLE_LOCALES = computed(() => {
-  return Object.keys(locales).map(code => ({
+  return Object.keys(ALL_LOCALE_METADATA).map(code => ({
     code,
-    ...(ALL_LOCALE_METADATA[code] || { name: code, native: code, flag: '🌐' })
+    ...ALL_LOCALE_METADATA[code]
   }));
 });
 
@@ -76,7 +83,7 @@ const RTL_LOCALES = new Set(['ar', 'he', 'fa']);
 /**
  * Detects the best matching locale from the operating system / browser preferences.
  */
-function detectSystemLocale(loadedLocales) {
+function detectSystemLocale(supportedLocales) {
   if (typeof navigator === 'undefined') return 'en';
 
   const userLanguages = navigator.languages && navigator.languages.length
@@ -88,12 +95,12 @@ function detectSystemLocale(loadedLocales) {
     const cleanLang = lang.trim();
 
     // 1. Direct exact match (e.g. 'pt-BR', 'zh-CN', 'es')
-    if (loadedLocales[cleanLang]) {
+    if (supportedLocales[cleanLang]) {
       return cleanLang;
     }
 
     // 2. Case-insensitive match (e.g. 'pt-br' -> 'pt-BR')
-    const caseMatch = Object.keys(loadedLocales).find(
+    const caseMatch = Object.keys(supportedLocales).find(
       code => code.toLowerCase() === cleanLang.toLowerCase()
     );
     if (caseMatch) {
@@ -101,18 +108,18 @@ function detectSystemLocale(loadedLocales) {
     }
 
     // 3. Script normalization (e.g. 'zh-Hans' -> 'zh-CN', 'zh-Hant' -> 'zh-TW')
-    if (cleanLang.startsWith('zh-Hans') && loadedLocales['zh-CN']) return 'zh-CN';
-    if (cleanLang.startsWith('zh-Hant') && loadedLocales['zh-TW']) return 'zh-TW';
+    if (cleanLang.startsWith('zh-Hans') && supportedLocales['zh-CN']) return 'zh-CN';
+    if (cleanLang.startsWith('zh-Hant') && supportedLocales['zh-TW']) return 'zh-TW';
 
     // 4. Primary language prefix match (e.g. 'es-MX' -> 'es', 'de-AT' -> 'de', 'fr-FR' -> 'fr')
     const primary = cleanLang.split(/[-_]/)[0];
-    if (loadedLocales[primary]) {
+    if (supportedLocales[primary]) {
       return primary;
     }
 
     // 5. Default dialect variants
-    if (primary === 'pt' && loadedLocales['pt-BR']) return 'pt-BR';
-    if (primary === 'zh' && loadedLocales['zh-CN']) return 'zh-CN';
+    if (primary === 'pt' && supportedLocales['pt-BR']) return 'pt-BR';
+    if (primary === 'zh' && supportedLocales['zh-CN']) return 'zh-CN';
   }
 
   return 'en';
@@ -122,22 +129,25 @@ function getInitialLocale() {
   if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
     const queryLang = params.get('lang');
-    if (queryLang && (locales[queryLang] || queryLang === 'en')) {
+    if (queryLang && (ALL_LOCALE_METADATA[queryLang] || queryLang === 'en')) {
       return queryLang;
     }
   }
   if (typeof localStorage !== 'undefined') {
     const saved = localStorage.getItem('zircon_locale');
-    if (saved && (locales[saved] || saved === 'en')) {
+    if (saved && (ALL_LOCALE_METADATA[saved] || saved === 'en')) {
       return saved;
     }
   }
-  return detectSystemLocale(locales);
+  return detectSystemLocale(ALL_LOCALE_METADATA);
 }
 
 // Reactive State
 const initialCode = getInitialLocale();
 export const currentLocale = ref(initialCode);
+if (initialCode !== 'en') {
+  loadLocale(initialCode);
+}
 
 // Apply initial document direction & lang
 if (typeof document !== 'undefined') {
@@ -187,19 +197,18 @@ export function t(key, vars = {}) {
 /**
  * Switch active locale dynamically
  */
-export function setLocale(code) {
-  if (locales[code] || code === 'en') {
-    currentLocale.value = code;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('zircon_locale', code);
-    }
-    if (typeof document !== 'undefined') {
-      document.documentElement.lang = code;
-      document.documentElement.dir = RTL_LOCALES.has(code) ? 'rtl' : 'ltr';
-    }
-  } else {
-    console.warn(`Locale ${code} not yet loaded, falling back to English.`);
-    currentLocale.value = 'en';
+export async function setLocale(code) {
+  if (!code) return;
+  if (!locales[code] && code !== 'en') {
+    await loadLocale(code);
+  }
+  currentLocale.value = code;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('zircon_locale', code);
+  }
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = code;
+    document.documentElement.dir = RTL_LOCALES.has(code) ? 'rtl' : 'ltr';
   }
 }
 

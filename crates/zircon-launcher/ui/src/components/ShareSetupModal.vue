@@ -33,6 +33,27 @@
         </button>
       </div>
 
+      <!-- Target Version Banner & Change Version Quick Action -->
+      <div class="px-6 py-2.5 bg-slate-900/60 border-b border-slate-800/80 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2 font-mono">
+          <span class="text-slate-400">Target:</span>
+          <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 font-bold">MC {{ instance?.minecraftVersion || instance?.minecraft_version }}</span>
+          <span class="px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 capitalize">
+            {{ instance?.modLoader?.type || instance?.mod_loader?.type || 'vanilla' }} {{ instance?.modLoader?.version || instance?.mod_loader?.version || '' }}
+          </span>
+        </div>
+        <button
+          type="button"
+          class="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold underline flex items-center gap-1 cursor-pointer"
+          @click="$emit('editVersion')"
+        >
+          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+          <span>Change Version</span>
+        </button>
+      </div>
+
       <!-- Navigation Tabs -->
       <div class="px-6 pt-3 border-b border-slate-800/60 flex gap-2 bg-slate-950/40">
         <button
@@ -185,7 +206,7 @@ const props = defineProps({
   modCount: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'editVersion']);
 
 const activeTab = ref('share_code');
 const shareCode = ref('');

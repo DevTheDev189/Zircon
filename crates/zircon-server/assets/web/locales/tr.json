@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Kaydet",
+    "saving": "Kaydediliyor…",
+    "cancel": "İptal",
+    "close": "Kapat",
+    "refresh": "Yenile",
+    "copy": "Kopyala",
+    "copied": "Panoya kopyalandı!",
+    "delete": "Sil",
+    "loading": "Yükleniyor…",
+    "apply": "Uygula",
+    "edit": "Düzenle",
+    "search": "Ara…",
+    "online": "Çevrimiçi",
+    "offline": "Çevrimdışı",
+    "sleeping": "Uyku modunda",
+    "booting": "Başlatılıyor…",
+    "falling_asleep": "Uykuya dalıyor…",
+    "shutting_down": "Kapatılıyor…",
+    "start": "Başlat",
+    "stop": "Durdur",
+    "restart": "Yeniden Başlat",
+    "wake": "Sunucuyu Uyandır",
+    "detecting": "Algılanıyor…"
+  },
+  "nav": {
+    "global_stats": "Genel İstatistikler",
+    "servers": "Sunucular",
+    "create_server": "Sunucu Oluştur",
+    "import_server": "Sunucu İçe Aktar (.zip)",
+    "mods": "Modlar",
+    "shaders": "Shader'lar",
+    "files": "Dosyalar",
+    "console": "Konsol",
+    "players": "Oyuncular",
+    "backups": "Yedekler",
+    "world": "Dünya",
+    "settings": "Ayarlar",
+    "disk_storage": "Disk Depolama",
+    "server_manager": "Sunucu Yöneticisi"
+  },
+  "stats": {
+    "title": "Sistem Telemetrisi ve Metrikler",
+    "subtitle": "Gerçek zamanlı CPU, Ana Sistem RAM, İşlem RSS ve Disk etkinliği",
+    "host_ram": "Ana İşletim Sistemi RAM",
+    "process_rss": "Java İşlemi RSS",
+    "cpu_usage": "CPU Yükü",
+    "disk_allocation": "NVMe Depolama Tahsisi",
+    "uptime": "Sistem Çalışma Süresi",
+    "active_instances": "Çalışan Örnekler",
+    "sleeping_instances": "Uyuyan Örnekler"
+  },
+  "instances": {
+    "no_servers": "Henüz sunucu yok — Sunucu Oluştur'a tıklayın.",
+    "create_title": "Minecraft Sunucusu Oluştur",
+    "name_label": "Örnek Adı",
+    "version_label": "Minecraft Sürümü",
+    "loader_label": "Mod Yükleyici",
+    "port_label": "Port",
+    "memory_label": "Ayrılan Bellek (GB)",
+    "start_server": "Sunucuyu Başlat",
+    "wake_server": "Sunucuyu Uyandır",
+    "stop_server": "Sunucuyu Durdur",
+    "restart_server": "Sunucuyu Yeniden Başlat",
+    "players_online": "{count} çevrimiçi",
+    "sleeps_in": "{time} içinde uyuyor",
+    "idle_wakes": "Boşta kapatma — oyuncu katıldığında uyanır"
+  },
+  "mods": {
+    "title": "Yüklü Modlar",
+    "count": "Yüklü Modlar ({count})",
+    "search_placeholder": "Yüklü modlarda ara…",
+    "loader_filter": "Loader Filtresi",
+    "all_loaders": "Tüm Loader'lar",
+    "active_loader": "Aktif Loader ({loader})",
+    "export_mrpack": ".mrpack Dışa Aktar",
+    "copy_mrpack_url": ".mrpack URL'sini Kopyala",
+    "copy_mrpack_tooltip": "Zircon dışı oyuncular için genel .mrpack indirme bağlantısını kopyala",
+    "add_mod": "Mod Ekle",
+    "install_update": "Güncelle",
+    "no_mods": "Henüz yüklü mod yok."
+  },
+  "console": {
+    "title": "Sunucu Konsolu ve Terminal",
+    "placeholder": "Bir komut gönder (örn. /say Merhaba, /op Oyuncu)...",
+    "send": "Gönder",
+    "clear": "Temizle"
+  },
+  "players": {
+    "title": "Oyuncu Yönetimi",
+    "online": "Çevrimiçi Oyuncular",
+    "whitelist": "Beyaz Liste",
+    "ops": "Operatörler",
+    "bans": "Yasaklı Oyuncular",
+    "kick": "At",
+    "ban": "Yasakla",
+    "op": "Op Yap",
+    "deop": "Op Yetkisini Al"
+  },
+  "backups": {
+    "title": "Dünya ve Sunucu Anlık Görüntüleri",
+    "create": "Yedek Oluştur",
+    "restore": "Geri Yükle",
+    "download": "İndir",
+    "delete": "Sil"
+  },
+  "security": {
+    "online_mode": "Çevrimiçi Mod (Mojang Doğrulaması)",
+    "online_mode_warning": "Uyarı: online-mode seçeneğini devre dışı bırakmak, sahte UUID'lere sahip doğrulanmamış/çevrimdışı oyuncuların sunucuya bağlanmasına izin verir.",
+    "whitelist_enforced": "Beyaz Listeyi Zorunlu Kıl"
+  }
+}

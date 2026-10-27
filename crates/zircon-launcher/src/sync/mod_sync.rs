@@ -24,12 +24,19 @@ use sha2::Sha256;
 use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
 
+use zircon_core::api::curseforge::CurseForgeApiClient;
 use zircon_core::api::modrinth::ModrinthApiClient;
 use zircon_core::api::ApiError;
 use zircon_core::metadata::extractor::validate_mod_jar_structure;
 use zircon_core::model::{BillOfMaterials, ModEntry, PackEntry};
+use zircon_core::security::ssrf;
 
 use crate::error::LauncherError;
+
+/// Maximum permitted BOM JSON payload size (16 MiB).
+const MAX_BOM_JSON_BYTES: usize = 16 * 1024 * 1024;
+/// Hard ceiling on a single downloaded mod JAR (512 MiB).
+const MAX_MOD_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // HashVerifier
@@ -102,12 +109,19 @@ impl HashVerifier {
         if !file.is_file() {
             return false;
         }
+        let mut verified_any = false;
+
         // Verify SHA-256 first if pinned in BOM
         if let Some(sha256) = entry.sha256.as_deref().filter(|s| !s.trim().is_empty()) {
+            let sha256 = sha256.trim();
+            if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return false;
+            }
             if let Ok(actual) = Self::sha256_file(file) {
                 if !sha256.eq_ignore_ascii_case(&actual) {
                     return false;
                 }
+                verified_any = true;
             } else {
                 return false;
             }
@@ -117,7 +131,7 @@ impl HashVerifier {
             return matches_inner(file, Some(sha1));
         }
         // At least one hash must have been present and verified
-        entry.sha256.is_some()
+        verified_any
     }
 
     /// Same check as [`matches`](Self::matches), for a [`PackEntry`].
@@ -132,7 +146,7 @@ fn matches_inner(file: &Path, sha1: Option<&str>) -> bool {
     }
     // SHA-1 is mandatory: a file whose entry pins no cryptographic digest
     // never matches (the caller decides — strict mode aborts).
-    let Some(sha1) = sha1.filter(|s| !s.trim().is_empty()) else {
+    let Some(sha1) = sha1.map(str::trim).filter(|s| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit())) else {
         return false;
     };
     let Ok(actual) = HashVerifier::sha1_file(file) else {
@@ -236,7 +250,27 @@ impl ModSyncEngine {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(15))
-            .redirect(reqwest::redirect::Policy::limited(10))
+            .timeout(std::time::Duration::from_secs(300))
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                if attempt.previous().len() >= 5 {
+                    return attempt.error("too many redirects");
+                }
+                let target = attempt.url();
+                // Only allow redirects to strict CDN URLs or non-private HTTPS/HTTP public hosts
+                // that match the original request origin.
+                if ssrf::is_safe_cdn_url(target.as_str()) {
+                    return attempt.follow();
+                }
+                if let Some(first) = attempt.previous().first() {
+                    if first.scheme() == target.scheme()
+                        && first.host_str() == target.host_str()
+                        && first.port_or_known_default() == target.port_or_known_default()
+                    {
+                        return attempt.follow();
+                    }
+                }
+                attempt.error("blocked cross-origin or non-CDN redirect (SSRF protection)")
+            }))
             .build()
             .expect("failed to build reqwest client");
         Self { http }
@@ -333,15 +367,24 @@ impl ModSyncEngine {
 
             let server_url = format!("{base}/files/mods/{}", url_encode(&mod_entry.filename));
             let url = if let Some(direct_url) = &mod_entry.download_url {
-                if direct_url.starts_with("http://") || direct_url.starts_with("https://") {
+                if ssrf::is_safe_cdn_url(direct_url) {
                     // Self-hosted wrapper check: if the server base is NOT a zirconmc.net cloud domain,
                     // any cdn.zirconmc.net download URLs are invalid / unconfigured artifacts.
-                    if direct_url.contains("cdn.zirconmc.net") && !base.contains("zirconmc.net") {
+                    let is_zircon_cdn = reqwest::Url::parse(direct_url)
+                        .ok()
+                        .and_then(|u| u.host_str().map(|h| h.eq_ignore_ascii_case("cdn.zirconmc.net")))
+                        .unwrap_or(false);
+                    let base_is_zircon = reqwest::Url::parse(&base)
+                        .ok()
+                        .and_then(|u| u.host_str().map(|h| h.eq_ignore_ascii_case("zirconmc.net") || h.ends_with(".zirconmc.net")))
+                        .unwrap_or(false);
+                    if is_zircon_cdn && !base_is_zircon {
                         server_url.clone()
                     } else {
                         direct_url.clone()
                     }
                 } else {
+                    warn!("Rejected unsafe direct download_url in BOM for {}: {}", mod_entry.filename, direct_url);
                     server_url.clone()
                 }
             } else {
@@ -473,20 +516,26 @@ impl ModSyncEngine {
 /// "provider unreachable" as verified and trusted `direct` mods when the
 /// (removed) setting was enabled — both fail-open behaviors are gone.
 async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
-    // Gather every pinned SHA-1 for Modrinth-origin mods for batch lookup.
-    // Modrinth's public API only indexes Modrinth files, so CurseForge mods
-    // are verified by the server-pinned SHA-1 in the attested BOM.
     let mut modrinth_sha1s: Vec<String> = Vec::new();
+    let mut curseforge_fps: Vec<u64> = Vec::new();
     for mod_entry in mods {
-        if mod_entry.origin.as_deref() == Some("modrinth") {
-            if let Some(sha1) = mod_entry
-                .sha1
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-            {
-                modrinth_sha1s.push(sha1.to_string());
+        match mod_entry.origin.as_deref().map(|o| o.to_ascii_lowercase()).as_deref() {
+            Some("modrinth") => {
+                if let Some(sha1) = mod_entry
+                    .sha1
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| is_valid_sha1_hex(s))
+                {
+                    modrinth_sha1s.push(sha1.to_ascii_lowercase());
+                }
             }
+            Some("curseforge") => {
+                if mod_entry.murmur3 > 0 {
+                    curseforge_fps.push(mod_entry.murmur3);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -495,10 +544,28 @@ async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
         let modrinth = ModrinthApiClient::new();
         match modrinth.verify_hashes(&modrinth_sha1s).await {
             Ok(found) => {
-                verified_sha1s.extend(found.into_keys());
+                verified_sha1s.extend(found.into_keys().map(|k| k.to_ascii_lowercase()));
             }
             Err(e) => warn!(
                 "Modrinth hash verification unavailable: {} — Modrinth mods will block launch",
+                map_api_error(e)
+            ),
+        }
+    }
+
+    let mut verified_cf_sha1s: HashSet<String> = HashSet::new();
+    if !curseforge_fps.is_empty() {
+        let cf = CurseForgeApiClient::new("");
+        match cf.verify_fingerprints(&curseforge_fps).await {
+            Ok(files) => {
+                for file in files {
+                    if let Some(sha1) = file.sha1().map(str::trim).filter(|s| is_valid_sha1_hex(s)) {
+                        verified_cf_sha1s.insert(sha1.to_ascii_lowercase());
+                    }
+                }
+            }
+            Err(e) => warn!(
+                "CurseForge hash verification unavailable: {} — CurseForge mods will block launch",
                 map_api_error(e)
             ),
         }
@@ -509,6 +576,7 @@ async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
             mod_entry.origin.as_deref(),
             mod_entry.sha1.as_deref(),
             &verified_sha1s,
+            &verified_cf_sha1s,
         );
         if !verified {
             result.unverified.push(mod_entry.filename.clone());
@@ -528,9 +596,8 @@ async fn verify_against_providers(mods: &[ModEntry], result: &mut SyncResult) {
 ///
 /// * **Modrinth** — the public hash API must confirm the SHA-1 (fail-closed:
 ///   an unreachable API leaves Modrinth mods unverified).
-/// * **CurseForge** — verified by the official SHA-1 pinned into the BOM at
-///   install time by the server (which verified the CurseForge file against
-///   CurseForge's API). A non-empty SHA-1 is mandatory.
+/// * **CurseForge** — the official SHA-1 returned by CurseForge's API for the
+///   file's fingerprint must match the SHA-1 pinned in the BOM (fail-closed).
 /// * **anything else** (`direct`/unknown) — never trusted.
 ///
 /// Pure so the security decision is unit-testable without network access.
@@ -538,15 +605,21 @@ fn is_mod_verified(
     origin: Option<&str>,
     sha1: Option<&str>,
     verified_sha1s: &HashSet<String>,
+    verified_cf_sha1s: &HashSet<String>,
 ) -> bool {
-    let Some(sha1) = sha1.map(str::trim).filter(|s| !s.is_empty()) else {
+    let Some(sha1) = sha1.map(str::trim).filter(|s| is_valid_sha1_hex(s)) else {
         return false;
     };
-    match origin {
-        Some("modrinth") => verified_sha1s.contains(sha1),
-        Some("curseforge") => true,
+    let sha1_lower = sha1.to_ascii_lowercase();
+    match origin.map(|o| o.to_ascii_lowercase()).as_deref() {
+        Some("modrinth") => verified_sha1s.contains(&sha1_lower),
+        Some("curseforge") => verified_cf_sha1s.contains(&sha1_lower),
         _ => false,
     }
+}
+
+fn is_valid_sha1_hex(s: &str) -> bool {
+    s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Best-effort mapping of a provider [`ApiError`] into a [`LauncherError`].
@@ -639,8 +712,20 @@ pub(crate) fn reconcile_atomic(
 
         if !staged_file.is_file() {
             if target_dest.is_file() {
+                if !HashVerifier::matches(target_dest, mod_entry) {
+                    let _ = std::fs::remove_file(target_dest);
+                    return Err(LauncherError::InvalidInput(format!(
+                        "Existing mod file failed hash verification: {filename}"
+                    )));
+                }
                 kept.push(filename.to_owned());
             } else if opposite_dest.is_file() {
+                if !HashVerifier::matches(opposite_dest, mod_entry) {
+                    let _ = std::fs::remove_file(opposite_dest);
+                    return Err(LauncherError::InvalidInput(format!(
+                        "Existing toggled mod file failed hash verification: {filename}"
+                    )));
+                }
                 std::fs::rename(opposite_dest, target_dest)?;
                 info!("Updated active/disabled state for {filename} without downloading");
                 kept.push(filename.to_owned());
@@ -651,20 +736,11 @@ pub(crate) fn reconcile_atomic(
         }
 
         std::fs::copy(&staged_file, &temp_write_path)?;
-        let Ok(computed_hash) = HashVerifier::sha1_file(&temp_write_path) else {
+        if !HashVerifier::matches(&temp_write_path, mod_entry) {
             let _ = std::fs::remove_file(&temp_write_path);
             return Err(LauncherError::InvalidInput(format!(
-                "Failed to read destination file: {filename}"
+                "TOCTOU violation detected: hash mismatch on final target block for {filename}"
             )));
-        };
-
-        if let Some(expected_hash) = &mod_entry.sha1 {
-            if !expected_hash.eq_ignore_ascii_case(&computed_hash) {
-                let _ = std::fs::remove_file(&temp_write_path);
-                return Err(LauncherError::InvalidInput(format!(
-                    "TOCTOU violation detected: hash mismatch on final target block for {filename}"
-                )));
-            }
         }
 
         std::fs::rename(&temp_write_path, target_dest)?;
@@ -723,18 +799,92 @@ impl ModSyncEngine {
             .send()
             .await?;
         let status = response.status();
-        let body = response.text().await?;
         if !status.is_success() {
             return Err(LauncherError::Http {
                 status: status.as_u16(),
                 url: url.to_string(),
             });
         }
-        Ok(body)
+        if let Some(len) = response.content_length() {
+            if len > MAX_BOM_JSON_BYTES as u64 {
+                return Err(LauncherError::InvalidInput(format!(
+                    "Response Content-Length ({len} bytes) exceeds maximum limit ({MAX_BOM_JSON_BYTES} bytes)"
+                )));
+            }
+        }
+        let mut bytes = Vec::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            if bytes.len().saturating_add(chunk.len()) > MAX_BOM_JSON_BYTES {
+                return Err(LauncherError::InvalidInput(format!(
+                    "Response body exceeded maximum limit ({MAX_BOM_JSON_BYTES} bytes)"
+                )));
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        String::from_utf8(bytes)
+            .map_err(|e| LauncherError::InvalidInput(format!("Invalid UTF-8 in response: {e}")))
     }
 
     /// Streams a file download to `target`, returning the byte count written.
+    /// Retries up to 3 times with exponential backoff on transient HTTP/network failures.
     async fn download(&self, url: &str, target: &Path) -> Result<u64, LauncherError> {
+        const MAX_RETRIES: usize = 3;
+        let mut attempt = 0;
+        let mut last_error: Option<LauncherError> = None;
+
+        while attempt <= MAX_RETRIES {
+            if attempt > 0 {
+                let base_delay_ms = 400u64.saturating_mul(1 << (attempt - 1));
+                // Decorrelated per-instance jitter using UUID v4 CSPRNG entropy scaled to base_delay_ms
+                let rand_u64 = (uuid::Uuid::new_v4().as_u128() as u64) % base_delay_ms.max(1);
+                let delay_ms = (base_delay_ms / 2).saturating_add(rand_u64);
+                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            }
+
+            match self.download_attempt(url, target).await {
+                Ok(written) => return Ok(written),
+                Err(err) => {
+                    let is_transient = match &err {
+                        LauncherError::Http { status, .. } => {
+                            matches!(*status, 429 | 500 | 502 | 503 | 504)
+                        }
+                        LauncherError::Network(_) => true,
+                        LauncherError::Io(io_err) => matches!(
+                            io_err.kind(),
+                            std::io::ErrorKind::TimedOut
+                                | std::io::ErrorKind::Interrupted
+                                | std::io::ErrorKind::ConnectionReset
+                                | std::io::ErrorKind::UnexpectedEof
+                        ),
+                        _ => false,
+                    };
+
+                    if is_transient && attempt < MAX_RETRIES {
+                        warn!(
+                            "Download attempt {}/{} failed for {url} ({err}); retrying...",
+                            attempt + 1,
+                            MAX_RETRIES + 1
+                        );
+                        let _ = tokio::fs::remove_file(target).await;
+                        attempt += 1;
+                        last_error = Some(err);
+                    } else {
+                        let _ = tokio::fs::remove_file(target).await;
+                        return Err(err);
+                    }
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| {
+            LauncherError::Network(format!("Download failed after {MAX_RETRIES} retries: {url}"))
+        }))
+    }
+
+    /// Single attempt to stream a file download to `target`.
+    async fn download_attempt(&self, url: &str, target: &Path) -> Result<u64, LauncherError> {
         let response = self.http.get(url).send().await?;
         let status = response.status();
         if !status.is_success() {
@@ -743,14 +893,29 @@ impl ModSyncEngine {
                 url: url.to_string(),
             });
         }
+        if let Some(len) = response.content_length() {
+            if len > MAX_MOD_DOWNLOAD_BYTES {
+                return Err(LauncherError::InvalidInput(format!(
+                    "Download Content-Length ({len} bytes) exceeds maximum allowed mod size ({MAX_MOD_DOWNLOAD_BYTES} bytes)"
+                )));
+            }
+        }
         let mut out = tokio::fs::File::create(target).await?;
         let mut written: u64 = 0;
         let mut stream = response.bytes_stream();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
+            written = written.saturating_add(chunk.len() as u64);
+            if written > MAX_MOD_DOWNLOAD_BYTES {
+                drop(out);
+                let _ = tokio::fs::remove_file(target).await;
+                return Err(LauncherError::InvalidInput(format!(
+                    "Aborted download from {url}: stream exceeded {MAX_MOD_DOWNLOAD_BYTES} bytes"
+                )));
+            }
             out.write_all(&chunk).await?;
-            written += chunk.len() as u64;
         }
+        out.flush().await?;
         Ok(written)
     }
 }
@@ -775,6 +940,7 @@ pub(crate) fn validate_entry_filename(filename: &str) -> Result<(), String> {
         return Err("Filename cannot be empty".to_string());
     }
     if filename.starts_with('.')
+        || filename.ends_with('.')
         || filename.contains('/')
         || filename.contains('\\')
         || filename.contains("..")
@@ -788,6 +954,9 @@ pub(crate) fn validate_entry_filename(filename: &str) -> Result<(), String> {
         .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' || c == '+');
     if !is_valid {
         return Err(format!("Disallowed characters in filename: {filename:?}"));
+    }
+    if zircon_core::security::path_validator::is_forbidden_segment(filename) {
+        return Err(format!("Forbidden or reserved OS filename: {filename:?}"));
     }
     Ok(())
 }
@@ -1040,56 +1209,64 @@ mod tests {
 
     #[test]
     fn verified_only_when_the_pinned_hash_is_confirmed() {
-        let confirmed = HashSet::from(["good-sha1".to_string()]);
+        let good_sha1 = "0123456789abcdef0123456789abcdef01234567";
+        let evil_sha1 = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+        let cf_sha1 = "fedcba9876543210fedcba9876543210fedcba98";
+
+        let confirmed = HashSet::from([good_sha1.to_string()]);
+        let cf_confirmed = HashSet::from([cf_sha1.to_string()]);
 
         // Modrinth: hash confirmed by the public API -> verified.
         assert!(is_mod_verified(
             Some("modrinth"),
-            Some("good-sha1"),
-            &confirmed
+            Some(good_sha1),
+            &confirmed,
+            &cf_confirmed,
         ));
         // Modrinth: hash not confirmed (tampered, or the API is unreachable)
         // -> NOT verified (fail-closed).
         assert!(!is_mod_verified(
             Some("modrinth"),
-            Some("evil-sha1"),
-            &confirmed
+            Some(evil_sha1),
+            &confirmed,
+            &cf_confirmed,
         ));
         // Modrinth: no pinned hash -> NOT verified.
-        assert!(!is_mod_verified(Some("modrinth"), None, &confirmed));
+        assert!(!is_mod_verified(Some("modrinth"), None, &confirmed, &cf_confirmed));
 
-        // CurseForge: valid SHA-1 pinned in the BOM -> verified.
-        // CurseForge files are validated by the server at install time and pinned
-        // into the attested BOM.
+        // CurseForge: verified against CurseForge API returned SHA-1s.
         assert!(is_mod_verified(
             Some("curseforge"),
-            Some("good-sha1"),
-            &confirmed
+            Some(cf_sha1),
+            &confirmed,
+            &cf_confirmed,
         ));
-        assert!(is_mod_verified(
+        // CurseForge: hash not confirmed by CurseForge API -> NOT verified.
+        assert!(!is_mod_verified(
             Some("curseforge"),
-            Some("cf-specific-sha1"),
-            &confirmed
+            Some(evil_sha1),
+            &confirmed,
+            &cf_confirmed,
         ));
         // CurseForge: empty, whitespace-padded or missing SHA-1 -> NOT verified
-        // (SHA-1 mandatory; the 32-bit fingerprint alone can be spoofed via a
-        // preimage collision).
-        assert!(!is_mod_verified(Some("curseforge"), Some(""), &confirmed));
+        assert!(!is_mod_verified(Some("curseforge"), Some(""), &confirmed, &cf_confirmed));
         assert!(!is_mod_verified(
             Some("curseforge"),
             Some("   "),
-            &confirmed
+            &confirmed,
+            &cf_confirmed,
         ));
-        assert!(!is_mod_verified(Some("curseforge"), None, &confirmed));
+        assert!(!is_mod_verified(Some("curseforge"), None, &confirmed, &cf_confirmed));
 
         // Direct / unknown origin is never trusted, even with a confirmed hash.
         assert!(!is_mod_verified(
             Some("direct"),
-            Some("good-sha1"),
-            &confirmed
+            Some(good_sha1),
+            &confirmed,
+            &cf_confirmed,
         ));
-        assert!(!is_mod_verified(None, Some("good-sha1"), &confirmed));
-        assert!(!is_mod_verified(None, None, &confirmed));
+        assert!(!is_mod_verified(None, Some(good_sha1), &confirmed, &cf_confirmed));
+        assert!(!is_mod_verified(None, None, &confirmed, &cf_confirmed));
     }
 
     // ------------------------------------------------------------------
@@ -1213,8 +1390,9 @@ mod tests {
 
         let initial_payload = b"existing-installed-mod";
         std::fs::write(mods_path.join("toggle.jar"), initial_payload).unwrap();
+        let digest = HashVerifier::sha1_file(&mods_path.join("toggle.jar")).unwrap();
 
-        let mut mod_item = ModEntry::new(None, "toggle.jar", Some("dummy".into()), 0, Some("direct".into()), None, 0);
+        let mut mod_item = ModEntry::new(None, "toggle.jar", Some(digest), 0, Some("direct".into()), None, 0);
         mod_item.enabled = false;
 
         // Transition from enabled -> disabled without staging file

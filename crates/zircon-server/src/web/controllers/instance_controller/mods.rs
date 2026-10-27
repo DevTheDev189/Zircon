@@ -1,31 +1,15 @@
-use std::sync::Arc;
 
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 
-use serde::{Deserialize, Serialize};
-use tokio::time::Duration;
-use zircon_core::model::{BillOfMaterials, InstanceConfig, ModLoaderType};
 
-use crate::web::controllers::config_helpers::{
-    command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
-    PlayerActionRequest,
-};
-use crate::web::controllers::vanilla_player_files;
 use crate::web::controllers::mod_controller;
-use crate::instance::ModSyncSummary;
-use crate::services::bom::BomService;
-use crate::services::mods::ModManagementService;
-use crate::services::packs::PackManagementService;
-use crate::tickets::TICKET_TTL_SECONDS;
-use crate::web::app::{ApiError, AppState, RealIp};
-use crate::web::config_routes::resolve_wake_target;
+use crate::web::app::{ApiError, AppState};
 use crate::web::views;
 
 use super::helpers::*;
-use super::*;
 pub async fn list_mods(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -47,7 +31,28 @@ pub async fn upload_mod(
             "No file uploaded (form field 'file')".to_string(),
         ));
     };
+
     let mods = mods_for(&state, &id)?;
+
+    let is_archive = filename.to_ascii_lowercase().ends_with(".zip")
+        || filename.to_ascii_lowercase().ends_with(".mrpack");
+    if is_archive {
+        let unbundled = mods.unbundle_modpack_archive(&bytes, &filename).await?;
+        if let Some(first) = unbundled.first() {
+            let mut map = views::mod_entry_to_map(first);
+            if let Some(obj) = map.as_object_mut() {
+                obj.insert("unbundled".to_string(), serde_json::Value::Bool(true));
+                obj.insert("unbundledCount".to_string(), serde_json::json!(unbundled.len()));
+            }
+            return Ok((StatusCode::CREATED, Json(map)));
+        } else {
+            return Ok((StatusCode::OK, Json(serde_json::json!({
+                "unbundled": true,
+                "unbundledCount": 0,
+                "message": format!("Extracted archive '{}', but no mod JARs were found inside.", filename)
+            }))));
+        }
+    }
     if params.server_only == Some(true)
         || params.origin.as_deref() == Some(crate::services::mods::ORIGIN_SERVER_CUSTOM)
     {
@@ -166,12 +171,17 @@ pub async fn search_mods(
             );
             return Ok(Json(serde_json::Value::Object(result)));
         }
+        let loader_param = match params.loader.as_deref() {
+            Some("all") => None,
+            Some(s) if !s.trim().is_empty() => Some(s.trim()),
+            _ => None,
+        };
         let hits = mods
             .curse_forge()
             .search_mods_with_type(
                 &query,
                 params.mc_version.as_deref(),
-                params.loader.as_deref(),
+                loader_param,
                 params.project_type.as_deref(),
             )
             .await
@@ -183,7 +193,7 @@ pub async fn search_mods(
             "CurseForge search query='{}', mc_version={:?}, loader={:?}, type={:?} -> returned {} hit(s)",
             query,
             params.mc_version,
-            params.loader,
+            loader_param,
             params.project_type,
             hits.len()
         );
@@ -196,12 +206,17 @@ pub async fn search_mods(
             serde_json::Value::Array(hits.iter().map(views::curseforge_mod_to_map).collect()),
         );
     } else {
+        let loader_param = match params.loader.as_deref() {
+            Some("all") => None,
+            Some(s) if !s.trim().is_empty() => Some(s.trim()),
+            _ => None,
+        };
         let hits = mods
             .modrinth()
             .search_mods_with_type(
                 &query,
                 params.mc_version.as_deref(),
-                params.loader.as_deref(),
+                loader_param,
                 params.project_type.as_deref(),
             )
             .await

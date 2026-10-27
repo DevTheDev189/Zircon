@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Opslaan",
+    "saving": "Bezig met opslaan…",
+    "cancel": "Annuleren",
+    "close": "Sluiten",
+    "refresh": "Vernieuwen",
+    "copy": "Kopiëren",
+    "copied": "Gekopieerd naar klembord!",
+    "delete": "Verwijderen",
+    "loading": "Bezig met laden…",
+    "apply": "Toepassen",
+    "edit": "Bewerken",
+    "search": "Zoeken…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Slaapstand",
+    "booting": "Bezig met starten…",
+    "falling_asleep": "Bezig met in slaap vallen…",
+    "shutting_down": "Bezig met afsluiten…",
+    "start": "Starten",
+    "stop": "Stoppen",
+    "restart": "Herstarten",
+    "wake": "Server activeren",
+    "detecting": "Bezig met detecteren…"
+  },
+  "nav": {
+    "global_stats": "Globale statistieken",
+    "servers": "Servers",
+    "create_server": "Server aanmaken",
+    "import_server": "Server importeren (.zip)",
+    "mods": "Mods",
+    "shaders": "Shaders",
+    "files": "Bestanden",
+    "console": "Console",
+    "players": "Spelers",
+    "backups": "Back-ups",
+    "world": "Wereld",
+    "settings": "Instellingen",
+    "disk_storage": "Schijfruimte",
+    "server_manager": "Serverbeheer"
+  },
+  "stats": {
+    "title": "Systeemtelemetrie & Statistieken",
+    "subtitle": "Realtime CPU-, host-RAM-, proces-RSS- en schijfactiviteit",
+    "host_ram": "Host OS RAM",
+    "process_rss": "Java-proces RSS",
+    "cpu_usage": "CPU-belasting",
+    "disk_allocation": "NVMe-opslagtoewijzing",
+    "uptime": "Systeem uptime",
+    "active_instances": "Actieve instanties",
+    "sleeping_instances": "Slapende instanties"
+  },
+  "instances": {
+    "no_servers": "Nog geen servers — klik op Server aanmaken.",
+    "create_title": "Minecraft-server aanmaken",
+    "name_label": "Instantienaam",
+    "version_label": "Minecraft-versie",
+    "loader_label": "Mod-loader",
+    "port_label": "Poort",
+    "memory_label": "Toegewezen geheugen (GB)",
+    "start_server": "Server starten",
+    "wake_server": "Server wakker maken",
+    "stop_server": "Server stoppen",
+    "restart_server": "Server herstarten",
+    "players_online": "{count} online",
+    "sleeps_in": "Gaat in slaap over {time}",
+    "idle_wakes": "Inactief afsluiten — wordt wakker bij spelersjoin"
+  },
+  "mods": {
+    "title": "Geïnstalleerde mods",
+    "count": "Geïnstalleerde mods ({count})",
+    "search_placeholder": "Zoek geïnstalleerde mods…",
+    "loader_filter": "Loader-filter",
+    "all_loaders": "Alle loaders",
+    "active_loader": "Actieve loader ({loader})",
+    "export_mrpack": ".mrpack exporteren",
+    "copy_mrpack_url": ".mrpack-URL kopiëren",
+    "copy_mrpack_tooltip": "Kopieer de openbare .mrpack-downloadlink voor spelers die Zircon niet gebruiken",
+    "add_mod": "Mod toevoegen",
+    "install_update": "Bijwerken",
+    "no_mods": "Nog geen mods geïnstalleerd."
+  },
+  "console": {
+    "title": "Serverconsole & Terminal",
+    "placeholder": "Verzend een commando (bijv. /say Hello, /op Player)...",
+    "send": "Verzenden",
+    "clear": "Wissen"
+  },
+  "players": {
+    "title": "Spelerbeheer",
+    "online": "Online spelers",
+    "whitelist": "Witte lijst",
+    "ops": "Operators",
+    "bans": "Verbannen spelers",
+    "kick": "Verwijderen",
+    "ban": "Verbannen",
+    "op": "Maak operator",
+    "deop": "Operator verwijderen"
+  },
+  "backups": {
+    "title": "Wereld- & instantieback-ups",
+    "create": "Back-up maken",
+    "restore": "Herstellen",
+    "download": "Downloaden",
+    "delete": "Verwijderen"
+  },
+  "security": {
+    "online_mode": "Online-modus (Mojang-authenticatie)",
+    "online_mode_warning": "Waarschuwing: Als je online-mode uitschakelt, kunnen offline/niet-geverifieerde spelers met gespoofde UUID's verbinding maken.",
+    "whitelist_enforced": "Whitelist afdwingen"
+  }
+}

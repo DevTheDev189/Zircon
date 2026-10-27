@@ -16,5 +16,24 @@ export default defineConfig({
     target: 'es2021',
     outDir: 'dist',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('three') || id.includes('skinview3d')) {
+              return 'vendor-three';
+            }
+            if (id.includes('@tauri-apps')) {
+              return 'vendor-tauri';
+            }
+            if (id.includes('vue')) {
+              return 'vendor-vue';
+            }
+            return 'vendor-common';
+          }
+        },
+      },
+    },
   },
 });

@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "儲存",
+    "saving": "正在儲存…",
+    "cancel": "取消",
+    "close": "關閉",
+    "refresh": "重新整理",
+    "copy": "複製",
+    "copied": "已複製到剪貼簿！",
+    "delete": "刪除",
+    "loading": "載入中…",
+    "apply": "套用",
+    "edit": "編輯",
+    "search": "搜尋…",
+    "online": "線上",
+    "offline": "離線",
+    "sleeping": "睡眠中",
+    "booting": "啟動中…",
+    "falling_asleep": "進入睡眠中…",
+    "shutting_down": "關機中…",
+    "start": "啟動",
+    "stop": "停止",
+    "restart": "重新啟動",
+    "wake": "喚醒伺服器",
+    "detecting": "偵測中…"
+  },
+  "nav": {
+    "global_stats": "全域統計",
+    "servers": "伺服器",
+    "create_server": "建立伺服器",
+    "import_server": "匯入伺服器 (.zip)",
+    "mods": "模組",
+    "shaders": "著色器",
+    "files": "檔案",
+    "console": "主控台",
+    "players": "玩家",
+    "backups": "備份",
+    "world": "世界",
+    "settings": "設定",
+    "disk_storage": "磁碟儲存空間",
+    "server_manager": "伺服器管理員"
+  },
+  "stats": {
+    "title": "系統遙測與指標",
+    "subtitle": "即時 CPU、主機 RAM、程序 RSS 及磁碟活動",
+    "host_ram": "主機作業系統 RAM",
+    "process_rss": "Java 程序 RSS",
+    "cpu_usage": "CPU 負載",
+    "disk_allocation": "NVMe 儲存空間配置",
+    "uptime": "系統運行時間",
+    "active_instances": "執行中的實例",
+    "sleeping_instances": "休眠中的實例"
+  },
+  "instances": {
+    "no_servers": "目前尚無伺服器 — 請點擊「建立伺服器」。",
+    "create_title": "建立 Minecraft 伺服器",
+    "name_label": "實例名稱",
+    "version_label": "Minecraft 版本",
+    "loader_label": "模組載入器",
+    "port_label": "連接埠",
+    "memory_label": "分配記憶體 (GB)",
+    "start_server": "啟動伺服器",
+    "wake_server": "喚醒伺服器",
+    "stop_server": "停止伺服器",
+    "restart_server": "重新啟動伺服器",
+    "players_online": "{count} 線上玩家",
+    "sleeps_in": "{time} 後進入休眠",
+    "idle_wakes": "閒置自動關閉 — 玩家加入時將自動喚醒"
+  },
+  "mods": {
+    "title": "已安裝的模組",
+    "count": "已安裝的模組 ({count})",
+    "search_placeholder": "搜尋已安裝的模組…",
+    "loader_filter": "載入器篩選",
+    "all_loaders": "所有載入器",
+    "active_loader": "目前使用的載入器 ({loader})",
+    "export_mrpack": "匯出 .mrpack",
+    "copy_mrpack_url": "複製 .mrpack URL",
+    "copy_mrpack_tooltip": "複製公開的 .mrpack 下載連結，供非 Zircon 玩家使用",
+    "add_mod": "新增模組",
+    "install_update": "更新",
+    "no_mods": "尚未安裝任何模組。"
+  },
+  "console": {
+    "title": "伺服器控制台與終端機",
+    "placeholder": "輸入指令（例如 /say Hello, /op Player）...",
+    "send": "傳送",
+    "clear": "清除"
+  },
+  "players": {
+    "title": "玩家管理",
+    "online": "線上玩家",
+    "whitelist": "白名單",
+    "ops": "管理員",
+    "bans": "封鎖玩家",
+    "kick": "踢出",
+    "ban": "封鎖",
+    "op": "設為管理員",
+    "deop": "移除管理員權限"
+  },
+  "backups": {
+    "title": "世界與實例快照",
+    "create": "建立備份",
+    "restore": "還原",
+    "download": "下載",
+    "delete": "刪除"
+  },
+  "security": {
+    "online_mode": "線上模式（Mojang 驗證）",
+    "online_mode_warning": "警告：停用 online-mode 將允許使用偽造 UUID 的離線／未驗證玩家連線。",
+    "whitelist_enforced": "強制執行白名單"
+  }
+}

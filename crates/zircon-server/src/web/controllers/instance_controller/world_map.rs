@@ -1,30 +1,14 @@
-use std::sync::Arc;
 
-use axum::extract::{Multipart, Path, Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 
 use serde::{Deserialize, Serialize};
-use tokio::time::Duration;
-use zircon_core::model::{BillOfMaterials, InstanceConfig, ModLoaderType};
 
-use crate::web::controllers::config_helpers::{
-    command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
-    PlayerActionRequest,
-};
-use crate::web::controllers::vanilla_player_files;
-use crate::instance::ModSyncSummary;
-use crate::services::bom::BomService;
-use crate::services::mods::ModManagementService;
-use crate::services::packs::PackManagementService;
-use crate::tickets::TICKET_TTL_SECONDS;
-use crate::web::app::{ApiError, AppState, RealIp};
-use crate::web::config_routes::resolve_wake_target;
-use crate::web::views;
+use crate::web::app::{ApiError, AppState};
 
 use super::helpers::*;
-use super::*;
 pub async fn list_instance_terrain_mods(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -123,9 +107,11 @@ pub struct TileQueryParams {
     pub force: bool,
     #[serde(default)]
     pub seed: Option<String>,
+    #[serde(default)]
+    pub dimension: Option<zircon_core::world::Dimension>,
 }
 
-/// GET /api/instances/{id}/world-map/tile?rx={rx}&rz={rz}&force={force}&seed={seed}
+/// GET /api/instances/{id}/world-map/tile?rx={rx}&rz={rz}&force={force}&seed={seed}&dimension={dimension}
 pub async fn get_world_map_tile(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -134,6 +120,7 @@ pub async fn get_world_map_tile(
     // Keep server awake while admin is actively inspecting or streaming world tiles
     state.instances.defer_idle_shutdown(&id);
 
+    let dim = params.dimension.unwrap_or(zircon_core::world::Dimension::Overworld);
     let instance_dir = state.instances.get_instance_dir(&id);
     let server_dir = instance_dir.join("server");
     let src_root = if server_dir.exists() {
@@ -145,7 +132,7 @@ pub async fn get_world_map_tile(
     let mca_name = format!("r.{}.{}.mca", params.rx, params.rz);
 
     // 1. Check active server world first (real live server)
-    let mut region_dir_opt = if let Some(r_dir) = crate::services::preview::WorldPreviewService::find_region_dir(&instance_dir, &src_root) {
+    let mut region_dir_opt = if let Some(r_dir) = crate::services::preview::WorldPreviewService::find_region_dir(&instance_dir, &src_root, dim) {
         if r_dir.join(&mca_name).exists() {
             Some(r_dir)
         } else {
@@ -159,7 +146,7 @@ pub async fn get_world_map_tile(
     if region_dir_opt.is_none() {
         if let Some(ref s) = params.seed.as_deref().filter(|s| !s.trim().is_empty()) {
             let seed_cache_dir = instance_dir.join(".cache").join("world-seeds").join(s.trim());
-            if let Some(r_dir) = crate::services::preview::WorldPreviewService::find_region_dir(&seed_cache_dir, &seed_cache_dir) {
+            if let Some(r_dir) = crate::services::preview::WorldPreviewService::find_region_dir(&seed_cache_dir, &seed_cache_dir, dim) {
                 if r_dir.join(&mca_name).exists() {
                     region_dir_opt = Some(r_dir);
                 }
@@ -170,7 +157,7 @@ pub async fn get_world_map_tile(
     // 3. Check default cached world (used by warm headless session when seed is blank)
     if region_dir_opt.is_none() {
         let default_cache_dir = instance_dir.join(".cache").join("world-seeds").join("default");
-        if let Some(r_dir) = crate::services::preview::WorldPreviewService::find_region_dir(&default_cache_dir, &default_cache_dir) {
+        if let Some(r_dir) = crate::services::preview::WorldPreviewService::find_region_dir(&default_cache_dir, &default_cache_dir, dim) {
             if r_dir.join(&mca_name).exists() {
                 region_dir_opt = Some(r_dir);
             }
@@ -184,7 +171,7 @@ pub async fn get_world_map_tile(
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.is_dir() {
-                    if let Some(r_dir) = crate::services::preview::WorldPreviewService::find_region_dir(&p, &p) {
+                    if let Some(r_dir) = crate::services::preview::WorldPreviewService::find_region_dir(&p, &p, dim) {
                         if r_dir.join(&mca_name).exists() {
                             region_dir_opt = Some(r_dir);
                             break;
@@ -207,12 +194,17 @@ pub async fn get_world_map_tile(
     }
 
     // Disk cache location:
-    // With seed: <instance_dir>/.cache/world-tiles/{seed}/r.{rx}.{rz}.png
-    // Without:   <instance_dir>/.cache/world-tiles/r.{rx}.{rz}.png
+    // With seed: <instance_dir>/.cache/world-tiles/{seed}/{dim}/r.{rx}.{rz}.png
+    // Without:   <instance_dir>/.cache/world-tiles/{dim}/r.{rx}.{rz}.png
+    let dim_slug = match dim {
+        zircon_core::world::Dimension::Overworld => "overworld",
+        zircon_core::world::Dimension::TheNether => "nether",
+        zircon_core::world::Dimension::TheEnd => "end",
+    };
     let cache_dir = if let Some(ref s) = params.seed.as_deref().filter(|s| !s.trim().is_empty()) {
-        instance_dir.join(".cache").join("world-tiles").join(s.trim())
+        instance_dir.join(".cache").join("world-tiles").join(s.trim()).join(dim_slug)
     } else {
-        instance_dir.join(".cache").join("world-tiles")
+        instance_dir.join(".cache").join("world-tiles").join(dim_slug)
     };
     let cache_file = cache_dir.join(format!("r.{}.{}.png", params.rx, params.rz));
 
@@ -238,7 +230,7 @@ pub async fn get_world_map_tile(
 
     // Cache miss or invalidated: render region tile
     tracing::info!("[WorldGen Tile] Rendering tile r.{}.{}.mca for instance {} from {:?}", params.rx, params.rz, id, region_dir);
-    let tile_bytes = zircon_core::world::renderer::render_region_tile(&region_dir, params.rx, params.rz);
+    let tile_bytes = zircon_core::world::renderer::render_region_tile(&region_dir, params.rx, params.rz, dim);
     match tile_bytes {
         Some(bytes) => {
             tracing::info!("[WorldGen Tile] Successfully rendered tile r.{}.{}.png for instance {} ({} bytes)", params.rx, params.rz, id, bytes.len());
@@ -278,6 +270,8 @@ pub struct PregenerateRequest {
     pub center_z: i32,
     #[serde(default)]
     pub seed: Option<String>,
+    #[serde(default)]
+    pub dimension: Option<zircon_core::world::Dimension>,
 }
 
 fn default_pregen_radius() -> i32 {
@@ -297,6 +291,7 @@ pub async fn pregenerate_instance_world(
     let center_x = req.center_x;
     let center_z = req.center_z;
     let radius_blocks = if req.radius_blocks <= 0 { 512 } else { req.radius_blocks };
+    let dim = req.dimension.unwrap_or(zircon_core::world::Dimension::Overworld);
 
     // Launch background generation
     tokio::spawn(async move {
@@ -306,6 +301,7 @@ pub async fn pregenerate_instance_world(
             center_z,
             radius_blocks,
             zoom: 1.0,
+            dimension: dim,
             selected_mods: None,
         };
         match crate::services::preview::WorldPreviewService::generate_preview(

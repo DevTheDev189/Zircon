@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Mentés",
+    "saving": "Mentés folyamatban…",
+    "cancel": "Mégse",
+    "close": "Bezárás",
+    "refresh": "Frissítés",
+    "copy": "Másolás",
+    "copied": "Vágólapra másolva!",
+    "delete": "Törlés",
+    "loading": "Betöltés…",
+    "apply": "Alkalmaz",
+    "edit": "Szerkesztés",
+    "search": "Keresés…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Alvó állapotban",
+    "booting": "Indítás…",
+    "falling_asleep": "Elalvás folyamatban…",
+    "shutting_down": "Leállítás folyamatban…",
+    "start": "Indítás",
+    "stop": "Leállítás",
+    "restart": "Újraindítás",
+    "wake": "Szerver felébresztése",
+    "detecting": "Észlelés…"
+  },
+  "nav": {
+    "global_stats": "Globális statisztikák",
+    "servers": "Szerverek",
+    "create_server": "Szerver létrehozása",
+    "import_server": "Szerver importálása (.zip)",
+    "mods": "Modok",
+    "shaders": "Shaderek",
+    "files": "Fájlok",
+    "console": "Konzol",
+    "players": "Játékosok",
+    "backups": "Biztonsági mentések",
+    "world": "Világ",
+    "settings": "Beállítások",
+    "disk_storage": "Lemeztárhely",
+    "server_manager": "Szerverkezelő"
+  },
+  "stats": {
+    "title": "Rendszertelemetria és metrikák",
+    "subtitle": "Valós idejű CPU, hoszt RAM, folyamat RSS és lemezaktivitás",
+    "host_ram": "Hoszt OS RAM",
+    "process_rss": "Java folyamat RSS",
+    "cpu_usage": "CPU terhelés",
+    "disk_allocation": "NVMe tárhely kiosztás",
+    "uptime": "Rendszer üzemidő",
+    "active_instances": "Futó példányok",
+    "sleeping_instances": "Alvó példányok"
+  },
+  "instances": {
+    "no_servers": "Nincsenek még szerverek — kattints a Szerver létrehozása gombra.",
+    "create_title": "Minecraft szerver létrehozása",
+    "name_label": "Példány neve",
+    "version_label": "Minecraft verzió",
+    "loader_label": "Mod betöltő",
+    "port_label": "Port",
+    "memory_label": "Leosztott memória (GB)",
+    "start_server": "Szerver indítása",
+    "wake_server": "Szerver felébresztése",
+    "stop_server": "Szerver leállítása",
+    "restart_server": "Szerver újraindítása",
+    "players_online": "{count} játékos online",
+    "sleeps_in": "Alvó állapotba kerül {time} múlva",
+    "idle_wakes": "Tétlenségi leállítás — ébredés, ha csatlakozik egy játékos"
+  },
+  "mods": {
+    "title": "Telepített modok",
+    "count": "Telepített modok ({count})",
+    "search_placeholder": "Telepített modok keresése…",
+    "loader_filter": "Betöltő szűrő",
+    "all_loaders": "Összes betöltő",
+    "active_loader": "Aktív betöltő ({loader})",
+    "export_mrpack": ".mrpack exportálása",
+    "copy_mrpack_url": ".mrpack URL másolása",
+    "copy_mrpack_tooltip": "Nyilvános .mrpack letöltési hivatkozás másolása nem-Zircon játékosok számára",
+    "add_mod": "Mod hozzáadása",
+    "install_update": "Frissítés",
+    "no_mods": "Még nincsenek telepítve modok."
+  },
+  "console": {
+    "title": "Szerver konzol és terminál",
+    "placeholder": "Parancs küldése (pl. /say Hello, /op Player)...",
+    "send": "Küldés",
+    "clear": "Törlés"
+  },
+  "players": {
+    "title": "Játékoskezelés",
+    "online": "Online játékosok",
+    "whitelist": "Engedélyezett lista",
+    "ops": "Operátorok",
+    "bans": "Kitiltott játékosok",
+    "kick": "Kirúgás",
+    "ban": "Kitiltás",
+    "op": "Operátorrá tétel",
+    "deop": "Operátor jog eltávolítása"
+  },
+  "backups": {
+    "title": "Világ- és példánypillanatképek",
+    "create": "Biztonsági mentés létrehozása",
+    "restore": "Visszaállítás",
+    "download": "Letöltés",
+    "delete": "Törlés"
+  },
+  "security": {
+    "online_mode": "Online mód (Mojang-hitelesítés)",
+    "online_mode_warning": "Figyelmeztetés: Az online mód kikapcsolása lehetővé teszi, hogy offline/nem ellenőrzött játékosok hamisított UUID-kkel csatlakozzanak.",
+    "whitelist_enforced": "Fehérlista kikényszerítése"
+  }
+}

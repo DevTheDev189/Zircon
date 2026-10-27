@@ -1,6 +1,4 @@
 use std::fs;
-use std::sync::Arc;
-use zircon_core::api::curseforge::CurseForgeFile;
 use zircon_core::crypto::hash;
 use zircon_core::crypto::murmur3;
 use zircon_core::model::ModEntry;
@@ -99,7 +97,14 @@ impl ModManagementService {
         // Enrich the entry with author/description/title read from the JAR's
         // mod metadata (fabric.mod.json / mods.toml / neoforge.mods.toml).
         if let Ok(meta) = zircon_core::metadata::extractor::extract(&target) {
-            entry.title = Some(meta.name);
+            match meta.normalized_environment() {
+                "client" => entry.side = zircon_core::model::ModSide::Client,
+                "server" => entry.side = zircon_core::model::ModSide::Server,
+                _ => entry.side = zircon_core::model::ModSide::Both,
+            }
+            if !meta.name.is_empty() {
+                entry.title = Some(meta.name);
+            }
             if !meta.description.is_empty() {
                 entry.description = Some(meta.description);
             }
@@ -559,6 +564,14 @@ impl ModManagementService {
             .await
             .map_err(|e| ModError::Api(format!("Modpack download failed: {e}")))?;
 
+        self.install_mrpack_bytes(&bytes).await
+    }
+
+    /// Ingests and installs an uploaded or downloaded .mrpack archive from bytes.
+    pub async fn install_mrpack_bytes(
+        &self,
+        bytes: &[u8],
+    ) -> Result<ModpackInstallResult, ModError> {
         let mut installed_count = 0;
         let mut failed_mods: Vec<String> = Vec::new();
         let index: serde_json::Value =  { // z0
@@ -568,13 +581,22 @@ impl ModManagementService {
             let mut index_entry = archive.by_name("modrinth.index.json").map_err(|_|  { // z0
                 ModError::Invalid("Invalid .mrpack: missing modrinth.index.json".to_string()) /* z0 */
             })?; // z0
+            let max_meta = zircon_core::archive::limits::DEFAULT_MAX_METADATA_BYTES;
+            if index_entry.size() > max_meta {
+                return Err(ModError::Invalid(format!(
+                    "modrinth.index.json exceeds maximum metadata size ({max_meta} bytes)"
+                )));
+            }
             use std::io::Read; // z0
             let mut index_content = String::new();
             index_entry /* z0 */
                 .by_ref() /* z0 */
-                .take(zircon_core::archive::limits::DEFAULT_MAX_METADATA_BYTES) /* z0 */
+                .take(max_meta + 1) /* z0 */
                 .read_to_string(&mut index_content)
                 .map_err(|err| ModError::Invalid(format!("Failed to read modrinth.index.json: {err}")))?;
+            if index_content.len() as u64 > max_meta {
+                return Err(ModError::Invalid("modrinth.index.json exceeded metadata quota".to_string()));
+            }
             serde_json::from_str(&index_content)
                 .map_err(|err| ModError::Invalid(format!("Invalid modrinth.index.json: {err}")))?
         }; // end-def 0
@@ -598,7 +620,14 @@ impl ModManagementService {
                 if !path.starts_with("mods/") {
                     continue;
                 }
-                let filename = &path["mods/".len()..];
+                let Ok(filename) = sanitize_filename(&path["mods/".len()..]) else {
+                    failed_mods.push(path.to_string());
+                    continue;
+                };
+                let expected_sha1 = element
+                    .get("hashes")
+                    .and_then(|h| h.get("sha1"))
+                    .and_then(|s| s.as_str());
                 let Some(download_url) = element
                     .get("downloads")
                     .and_then(|d| d.as_array())
@@ -608,13 +637,23 @@ impl ModManagementService {
                     continue;
                 };
                 match self
-                    .install_from_url(download_url, filename, ORIGIN_MODRINTH)
+                    .install_from_url(download_url, &filename, ORIGIN_MODRINTH)
                     .await
                 {
-                    Ok(_) => installed_count += 1,
+                    Ok(installed_entry) => {
+                        if let Some(exp) = expected_sha1 {
+                            if installed_entry.sha1.as_deref().map(|a| a.eq_ignore_ascii_case(exp)) != Some(true) {
+                                let _ = self.remove_mod(&filename);
+                                tracing::warn!("SHA-1 mismatch for modpack file {filename} (expected {exp})");
+                                failed_mods.push(filename);
+                                continue;
+                            }
+                        }
+                        installed_count += 1;
+                    }
                     Err(e) => {
                         tracing::warn!("Modpack file install failed for {filename}: {e}");
-                        failed_mods.push(filename.to_string());
+                        failed_mods.push(filename);
                     }
                 }
             }
@@ -622,7 +661,7 @@ impl ModManagementService {
 
         // Extract bundled overrides/ (configs, scripts, defaultoptions) into instance root
         if let Some(instance_dir) = self.mods_dir.parent() {
-            let guard = zircon_core::archive::ArchiveGuard::default();
+            let guard = zircon_core::archive::ArchiveGuard::for_modpack_import();
             let cursor = std::io::Cursor::new(bytes.to_vec());
             match zircon_core::archive::extract_mrpack_overrides(cursor, instance_dir, &guard) {
                 Ok(stats) => {
@@ -651,6 +690,200 @@ impl ModManagementService {
             failed_mods,
             message,
         })
+    }
+
+    /// Ingests and auto-unbundles a modpack archive (.zip or .mrpack) without failing with HTTP 400.
+    ///
+    /// - Uses `ArchiveGuard::for_modpack_import()` (zero false-positive decompression bomb aborts)
+    /// - Extracts overrides (configs, scripts, overrides/mods/) into the instance directory
+    /// - Unpacks any nested mod JAR files into `mods/`
+    /// - Ingests unbundled JARs into the BOM, extracting manifests and enriching metadata via
+    ///   Modrinth (batch SHA-1 `POST /v2/version_files`) and CurseForge (Murmur3 fingerprints).
+    pub async fn unbundle_modpack_archive(
+        &self,
+        bytes: &[u8],
+        filename: &str,
+    ) -> Result<Vec<ModEntry>, ModError> {
+        let guard = zircon_core::archive::ArchiveGuard::for_modpack_import();
+        let instance_dir = self.mods_dir.parent().unwrap_or(&self.mods_dir).to_path_buf();
+        fs::create_dir_all(&self.mods_dir)?;
+
+        let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+            .map_err(|e| ModError::Invalid(format!("Cannot open archive '{filename}': {e}")))?;
+
+        let is_curseforge = zip.by_name("manifest.json").is_ok();
+        let is_modrinth = zip.by_name("modrinth.index.json").is_ok();
+
+        // 1. Extract overrides if present
+        if is_curseforge {
+            let cursor = std::io::Cursor::new(bytes.to_vec());
+            zircon_core::archive::curseforge_pack::extract_curseforge_overrides(
+                cursor,
+                "overrides",
+                &instance_dir,
+                &guard,
+            )
+            .map_err(|e| ModError::Invalid(format!("CurseForge override extraction failed: {e}")))?;
+        } else if is_modrinth {
+            let cursor = std::io::Cursor::new(bytes.to_vec());
+            zircon_core::archive::extract_mrpack_overrides(
+                cursor,
+                &instance_dir,
+                &guard,
+            )
+            .map_err(|e| ModError::Invalid(format!("Modrinth override extraction failed: {e}")))?;
+        }
+
+        // 2. Extract any nested .jar files anywhere in the archive directly into self.mods_dir
+        let mut extracted_filenames = Vec::new();
+        for idx in 0..zip.len() {
+            guard
+                .record_entry()
+                .map_err(|e| ModError::Invalid(format!("Archive entry limit exceeded: {e}")))?;
+            let mut entry = match zip.by_index(idx) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            let entry_name = entry.name().to_string();
+            let entry_lower = entry_name.to_ascii_lowercase();
+
+            if entry.is_dir() || entry.is_symlink() || entry_name.contains("__MACOSX") {
+                continue;
+            }
+
+            let declared_uncompressed = entry.size();
+            let declared_compressed = entry.compressed_size();
+            guard
+                .check_entry_header(&entry_name, declared_uncompressed, declared_compressed)
+                .map_err(|e| ModError::Invalid(format!("Archive quota violation in '{entry_name}': {e}")))?;
+
+            if entry_lower.ends_with(".jar") {
+                let base_name = std::path::Path::new(&entry_name)
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .unwrap_or(&entry_name);
+                if let Ok(safe_name) = sanitize_filename(base_name) {
+                    let dest = self.mods_dir.join(&safe_name);
+                    if let Ok(mut out) = fs::File::create(&dest) {
+                        use std::io::Read;
+                        let max_rem = guard
+                            .limits()
+                            .max_uncompressed_bytes
+                            .saturating_sub(guard.cumulative_uncompressed_bytes());
+                        let mut bounded = (&mut entry).take(max_rem.saturating_add(1));
+                        let written = std::io::copy(&mut bounded, &mut out).map_err(ModError::Io)?;
+                        if let Err(e) = guard.track_stream_chunk_with_ratio(
+                            written,
+                            declared_compressed.max(1),
+                            guard.max_ratio_for_entry(&entry_name),
+                        ) {
+                            let _ = fs::remove_file(&dest);
+                            return Err(ModError::Invalid(format!("Archive quota exceeded: {e}")));
+                        }
+                        extracted_filenames.push(safe_name);
+                    }
+                }
+            } else if !is_curseforge && !is_modrinth {
+                let entry_path = std::path::Path::new(&entry_name);
+                if let Some(first_comp) = entry_path.components().next() {
+                    let first_str = first_comp.as_os_str().to_string_lossy().to_ascii_lowercase();
+                    if first_str == "config" || first_str == "scripts" || first_str == "defaultconfigs" || first_str == "kubejs" {
+                        if let Some(safe_rel) = zircon_core::archive::limits::sanitize_entry_path(entry_path) {
+                            let dest = instance_dir.join(&safe_rel);
+                            if let Some(parent) = dest.parent() {
+                                let _ = fs::create_dir_all(parent);
+                            }
+                            if let Ok(mut out) = fs::File::create(&dest) {
+                                use std::io::Read;
+                                let max_rem = guard
+                                    .limits()
+                                    .max_uncompressed_bytes
+                                    .saturating_sub(guard.cumulative_uncompressed_bytes());
+                                let mut bounded = (&mut entry).take(max_rem.saturating_add(1));
+                                let written = std::io::copy(&mut bounded, &mut out).map_err(ModError::Io)?;
+                                if let Err(e) = guard.track_stream_chunk_with_ratio(
+                                    written,
+                                    declared_compressed.max(1),
+                                    guard.max_ratio_for_entry(&entry_name),
+                                ) {
+                                    let _ = fs::remove_file(&dest);
+                                    return Err(ModError::Invalid(format!("Archive quota exceeded: {e}")));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. For Modrinth mrpack with remote files, install them
+        if is_modrinth {
+            let _ = self.install_mrpack_bytes(bytes).await;
+        }
+
+        // 4. Ingest and enrich all extracted JARs
+        let mut new_entries: Vec<ModEntry> = Vec::new();
+        for fname in &extracted_filenames {
+            let target = self.mods_dir.join(fname);
+            if !target.is_file() {
+                continue;
+            }
+
+            let size = fs::metadata(&target).map(|m| m.len()).unwrap_or(0);
+            let sha1 = hash::sha1_file(&target).await.ok();
+            let murmur3_val = murmur3::curse_forge_fingerprint_of_file(&target).unwrap_or(0);
+
+            let mut entry = ModEntry::new(
+                Some(Uuid::new_v4().to_string()),
+                fname.clone(),
+                sha1,
+                murmur3_val,
+                Some(ORIGIN_DIRECT.to_string()),
+                None,
+                size,
+            );
+
+            // Tier 1: Ground-truth embedded manifest extraction
+            if let Ok(meta) = zircon_core::metadata::extractor::extract(&target) {
+                match meta.normalized_environment() {
+                    "client" => entry.side = zircon_core::model::ModSide::Client,
+                    "server" => entry.side = zircon_core::model::ModSide::Server,
+                    _ => entry.side = zircon_core::model::ModSide::Both,
+                }
+                if !meta.name.is_empty() {
+                    entry.title = Some(meta.name);
+                }
+                if !meta.description.is_empty() {
+                    entry.description = Some(meta.description);
+                }
+                if !meta.author.is_empty() {
+                    entry.author = Some(meta.author);
+                }
+                if !meta.version.is_empty() {
+                    entry.version = Some(meta.version);
+                }
+            }
+
+            new_entries.push(entry);
+        }
+
+        // 5. Batch reverse-search enrichment (Modrinth batch SHA-1 + CurseForge Murmur3)
+        self.batch_enrich_mods(&mut new_entries).await;
+
+        // 6. Persist to BOM
+        if !new_entries.is_empty() {
+            let entries_to_add = new_entries.clone();
+            self.bom_service.with_bom(|bom| {
+                for new_entry in entries_to_add {
+                    bom.mods.retain(|m| m.filename != new_entry.filename);
+                    bom.mods.push(new_entry);
+                }
+                bom.deduplicate_mods();
+            });
+            let _ = self.bom_service.save();
+        }
+
+        Ok(new_entries)
     }
 
 }

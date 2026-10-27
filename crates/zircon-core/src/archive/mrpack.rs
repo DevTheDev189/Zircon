@@ -14,7 +14,8 @@ use std::path::Path;
 use zip::ZipArchive;
 
 use crate::archive::limits::{
-    is_safe_entry_path, sanitize_entry_path, ArchiveError, ArchiveGuard,
+    ensure_safe_destination_path, is_safe_entry_path, is_safe_override_target,
+    sanitize_entry_path, ArchiveError, ArchiveGuard,
 };
 use crate::archive::zip::ExtractionStats;
 use crate::export::{ModrinthIndex, ModrinthIndexFile};
@@ -40,11 +41,24 @@ pub fn parse_mrpack_metadata<R: Read + Seek>(reader: R) -> Result<MrpackMetadata
     let index_entry = zip
         .by_name("modrinth.index.json")
         .map_err(|_| ArchiveError::InvalidData("Missing modrinth.index.json in .mrpack".to_string()))?;
+    let max_meta = crate::archive::limits::DEFAULT_MAX_METADATA_BYTES;
+    if index_entry.size() > max_meta {
+        return Err(ArchiveError::ExceededMaxBytes {
+            limit: max_meta,
+            actual: index_entry.size(),
+        });
+    }
 
     let mut content = String::new();
     index_entry
-        .take(crate::archive::limits::DEFAULT_MAX_METADATA_BYTES)
+        .take(max_meta + 1)
         .read_to_string(&mut content)?;
+    if content.len() as u64 > max_meta {
+        return Err(ArchiveError::ExceededMaxBytes {
+            limit: max_meta,
+            actual: content.len() as u64,
+        });
+    }
 
     let index: ModrinthIndex = serde_json::from_str(&content)
         .map_err(|e| ArchiveError::InvalidData(format!("Malformed modrinth.index.json: {e}")))?;
@@ -135,6 +149,9 @@ pub fn extract_mrpack_overrides<R: Read + Seek>(
             .map_err(|err| ArchiveError::InvalidData(format!("Corrupt archive entry: {err}")))?;
 
         let raw_name = entry.name().to_string();
+        if entry.is_symlink() {
+            return Err(ArchiveError::SymlinkOrHardlink(raw_name));
+        }
 
         // Only process entries located under `overrides/` or `server-overrides/`
         let (stripped_path, is_override) = if let Some(stripped) = raw_name.strip_prefix("overrides/") {
@@ -155,6 +172,11 @@ pub fn extract_mrpack_overrides<R: Read + Seek>(
 
         let safe_rel = sanitize_entry_path(Path::new(stripped_path))
             .ok_or_else(|| ArchiveError::ZipSlip(raw_name.clone()))?;
+        if !is_safe_override_target(&safe_rel) {
+            return Err(ArchiveError::InvalidData(format!(
+                "Forbidden override target path rejected: {raw_name}"
+            )));
+        }
 
         let destination = target_root.join(&safe_rel);
         if !destination.starts_with(&target_root) {
@@ -166,13 +188,12 @@ pub fn extract_mrpack_overrides<R: Read + Seek>(
         guard.check_entry_header(&raw_name, declared_uncompressed, declared_compressed)?;
 
         if entry.is_dir() {
+            ensure_safe_destination_path(&target_root, &destination, &raw_name)?;
             fs::create_dir_all(&destination)?;
             continue;
         }
 
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent)?;
-        }
+        ensure_safe_destination_path(&target_root, &destination, &raw_name)?;
 
         let written = crate::archive::zip::copy_stream_with_guard(
             &mut entry,

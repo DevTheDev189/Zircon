@@ -469,3 +469,43 @@ pub fn generate_skin_batch(app: tauri::AppHandle, request: crate::skin_ai::Gener
     crate::skin_ai::SkinAiEngine::generate_batch(Some(&app), request)
 }
 
+// ---------------------------------------------------------------------------
+// Official Mojang Cape Management
+// ---------------------------------------------------------------------------
+
+/// Fetches all owned Mojang capes for the active authenticated user profile.
+#[tauri::command]
+pub async fn get_user_capes(state: State<'_, LauncherState>) -> Result<Vec<crate::skin::MojangCape>, String> {
+    let session = state.session.lock().await.clone();
+    let session = session.ok_or_else(|| "Not signed in".to_string())?;
+    state
+        .mojang_skin
+        .get_capes(&session.access_token)
+        .await
+        .map_err(err_string)
+}
+
+/// Sets the active cape on Mojang account for the authenticated user.
+#[tauri::command]
+pub async fn set_active_cape(state: State<'_, LauncherState>, cape_id: String) -> Result<(), String> {
+    let session = state.session.lock().await.clone();
+    let session = session.ok_or_else(|| "Not signed in".to_string())?;
+    state
+        .mojang_skin
+        .set_active_cape(&session.access_token, &cape_id)
+        .await
+        .map_err(err_string)
+}
+
+/// Unequips any active cape on Mojang account for the authenticated user.
+#[tauri::command]
+pub async fn unequip_cape(state: State<'_, LauncherState>) -> Result<(), String> {
+    let session = state.session.lock().await.clone();
+    let session = session.ok_or_else(|| "Not signed in".to_string())?;
+    state
+        .mojang_skin
+        .remove_active_cape(&session.access_token)
+        .await
+        .map_err(err_string)
+}
+

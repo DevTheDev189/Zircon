@@ -79,131 +79,234 @@ pub struct SyntheticColumn {
 
 /// Generates procedural seed-coherent Minecraft surface terrain columns.
 /// Strongly modulated by the seed so every seed produces unique continents, islands, and ranges.
-pub fn sample_synthetic_column(x: i32, z: i32, seed_val: u64) -> SyntheticColumn {
-    // Large prime coordinate shift derived from seed to sample completely unique noise locations per seed
-    let seed_shift_x = (((seed_val.wrapping_mul(0x517cc1b727220a95)) >> 16) & 0x7FFFF) as f32 - 250_000.0;
-    let seed_shift_z = (((seed_val.wrapping_mul(0x6a297c4d4f8f4f25)) >> 16) & 0x7FFFF) as f32 - 250_000.0;
+pub fn sample_synthetic_column(x: i32, z: i32, seed_val: u64, dimension: super::Dimension) -> SyntheticColumn {
+    match dimension {
+        super::Dimension::TheNether => {
+            let seed_shift_x = (((seed_val.wrapping_mul(0x517cc1b727220a95)) >> 16) & 0x7FFFF) as f32 - 250_000.0;
+            let seed_shift_z = (((seed_val.wrapping_mul(0x6a297c4d4f8f4f25)) >> 16) & 0x7FFFF) as f32 - 250_000.0;
+            let fx = x as f32 + seed_shift_x;
+            let fz = z as f32 + seed_shift_z;
 
-    let fx = x as f32 + seed_shift_x;
-    let fz = z as f32 + seed_shift_z;
+            let cont = fbm2d(fx * 0.008, fz * 0.008, seed_val ^ 0x55aa55aa, 3);
+            let ridge = fbm2d(fx * 0.014, fz * 0.014, seed_val ^ 0x33cc33cc, 3);
+            let biome_noise = fbm2d(fx * 0.004, fz * 0.004, seed_val.wrapping_add(999), 3);
 
-    // Continentalness (frequency ~ 1 / 140 blocks to produce oceans, coasts, and landmasses across the view)
-    let cont = fbm2d(fx * 0.007, fz * 0.007, seed_val, 4);
-
-    // Mountainous peaks and ridge noise
-    let mtn = fbm2d(fx * 0.015, fz * 0.015, seed_val ^ 0x9e3779b97f4a7c15, 4);
-    let mtn_peaks = (mtn - 0.44).max(0.0) / 0.56;
-
-    // Climate / Temperature and Humidity
-    let temp = fbm2d(fx * 0.0035, fz * 0.0035, seed_val.wrapping_add(1013), 3);
-    let humid = fbm2d(fx * 0.0035, fz * 0.0035, seed_val.wrapping_add(2027), 3);
-
-    // River noise: valleys when near 0.5
-    let river_val = (fbm2d(fx * 0.009, fz * 0.009, seed_val.wrapping_add(5555), 3) - 0.5).abs();
-    let is_river = river_val < 0.032 && cont > 0.42 && cont < 0.88;
-
-    if cont < 0.38 {
-        // Ocean / Deep Ocean
-        let y = (38.0 + cont * 62.0) as i32;
-        let biome = if cont < 0.24 {
-            "minecraft:deep_ocean"
-        } else if temp > 0.65 {
-            "minecraft:warm_ocean"
-        } else {
-            "minecraft:ocean"
-        };
-        SyntheticColumn {
-            y,
-            block_id: "minecraft:water",
-            biome_id: biome,
-        }
-    } else if cont < 0.43 {
-        // Coastal Shore / Beach
-        let y = 62 + ((cont - 0.38) * 40.0) as i32;
-        let biome = if temp < 0.25 {
-            "minecraft:snowy_beach"
-        } else if mtn > 0.60 {
-            "minecraft:stony_shore"
-        } else {
-            "minecraft:beach"
-        };
-        let block = if biome == "minecraft:stony_shore" {
-            "minecraft:stone"
-        } else {
-            "minecraft:sand"
-        };
-        SyntheticColumn {
-            y,
-            block_id: block,
-            biome_id: biome,
-        }
-    } else if is_river {
-        // Meandering inland river
-        SyntheticColumn {
-            y: 61,
-            block_id: "minecraft:water",
-            biome_id: "minecraft:river",
-        }
-    } else {
-        // Inland terrain & mountain ranges
-        let base_y = 63.0 + (cont - 0.43) * 36.0;
-        let peak_boost = (mtn_peaks.powf(1.8)) * 125.0;
-        let y = (base_y + peak_boost) as i32;
-
-        if y > 124 {
-            if temp < 0.45 || y > 148 {
+            if cont < 0.28 {
                 SyntheticColumn {
-                    y,
-                    block_id: "minecraft:snow_block",
-                    biome_id: "minecraft:jagged_peaks",
+                    y: 31,
+                    block_id: "minecraft:lava",
+                    biome_id: "minecraft:nether_wastes",
                 }
             } else {
-                SyntheticColumn {
-                    y,
-                    block_id: "minecraft:stone",
-                    biome_id: "minecraft:stony_peaks",
+                let y = 32 + ((cont - 0.28) * 35.0 + ridge * 28.0) as i32;
+                if biome_noise < 0.22 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:soul_sand",
+                        biome_id: "minecraft:soul_sand_valley",
+                    }
+                } else if biome_noise < 0.42 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:basalt",
+                        biome_id: "minecraft:basalt_deltas",
+                    }
+                } else if biome_noise < 0.65 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:crimson_nylium",
+                        biome_id: "minecraft:crimson_forest",
+                    }
+                } else if biome_noise < 0.85 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:warped_nylium",
+                        biome_id: "minecraft:warped_forest",
+                    }
+                } else {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:netherrack",
+                        biome_id: "minecraft:nether_wastes",
+                    }
                 }
             }
-        } else if temp > 0.70 && humid < 0.35 {
-            SyntheticColumn {
-                y,
-                block_id: "minecraft:sand",
-                biome_id: "minecraft:desert",
-            }
-        } else if temp < 0.25 {
-            SyntheticColumn {
-                y,
-                block_id: "minecraft:snow_block",
-                biome_id: "minecraft:snowy_plains",
-            }
-        } else if temp < 0.38 {
-            SyntheticColumn {
-                y,
-                block_id: "minecraft:grass_block",
-                biome_id: "minecraft:taiga",
-            }
-        } else if humid > 0.68 && temp > 0.45 {
-            SyntheticColumn {
-                y,
-                block_id: "minecraft:grass_block",
-                biome_id: "minecraft:swamp",
-            }
-        } else if humid > 0.52 {
-            SyntheticColumn {
-                y,
-                block_id: "minecraft:grass_block",
-                biome_id: "minecraft:forest",
-            }
-        } else {
-            let biome = if mtn > 0.48 {
-                "terralith:highlands"
+        }
+        super::Dimension::TheEnd => {
+            let dist = ((x as f64 * x as f64 + z as f64 * z as f64) as f32).sqrt();
+            if dist < 95.0 {
+                let elev = 60.0 + (1.0 - (dist / 95.0).powf(2.0)) * 14.0;
+                SyntheticColumn {
+                    y: elev as i32,
+                    block_id: "minecraft:end_stone",
+                    biome_id: "minecraft:the_end",
+                }
+            } else if dist < 360.0 {
+                SyntheticColumn {
+                    y: -999,
+                    block_id: "minecraft:air",
+                    biome_id: "minecraft:the_end",
+                }
             } else {
-                "minecraft:plains"
-            };
-            SyntheticColumn {
-                y,
-                block_id: "minecraft:grass_block",
-                biome_id: biome,
+                let fx = x as f32;
+                let fz = z as f32;
+                let island_noise = fbm2d(fx * 0.007, fz * 0.007, seed_val ^ 0x77112233, 3);
+                if island_noise > 0.58 {
+                    let y = 56 + ((island_noise - 0.58) * 45.0) as i32;
+                    let has_chorus = hash2d(x, z, seed_val ^ 0x4444) > 0.88;
+                    let block = if has_chorus {
+                        "minecraft:chorus_plant"
+                    } else {
+                        "minecraft:end_stone"
+                    };
+                    let biome = if island_noise > 0.72 {
+                        "minecraft:end_highlands"
+                    } else if island_noise > 0.64 {
+                        "minecraft:end_midlands"
+                    } else {
+                        "minecraft:small_end_islands"
+                    };
+                    SyntheticColumn {
+                        y,
+                        block_id: block,
+                        biome_id: biome,
+                    }
+                } else {
+                    SyntheticColumn {
+                        y: -999,
+                        block_id: "minecraft:air",
+                        biome_id: "minecraft:small_end_islands",
+                    }
+                }
+            }
+        }
+        super::Dimension::Overworld => {
+            // Large prime coordinate shift derived from seed to sample completely unique noise locations per seed
+            let seed_shift_x = (((seed_val.wrapping_mul(0x517cc1b727220a95)) >> 16) & 0x7FFFF) as f32 - 250_000.0;
+            let seed_shift_z = (((seed_val.wrapping_mul(0x6a297c4d4f8f4f25)) >> 16) & 0x7FFFF) as f32 - 250_000.0;
+
+            let fx = x as f32 + seed_shift_x;
+            let fz = z as f32 + seed_shift_z;
+
+            // Continentalness (frequency ~ 1 / 140 blocks to produce oceans, coasts, and landmasses across the view)
+            let cont = fbm2d(fx * 0.007, fz * 0.007, seed_val, 4);
+
+            // Mountainous peaks and ridge noise
+            let mtn = fbm2d(fx * 0.015, fz * 0.015, seed_val ^ 0x9e3779b97f4a7c15, 4);
+            let mtn_peaks = (mtn - 0.44).max(0.0) / 0.56;
+
+            // Climate / Temperature and Humidity
+            let temp = fbm2d(fx * 0.0035, fz * 0.0035, seed_val.wrapping_add(1013), 3);
+            let humid = fbm2d(fx * 0.0035, fz * 0.0035, seed_val.wrapping_add(2027), 3);
+
+            // River noise: valleys when near 0.5
+            let river_val = (fbm2d(fx * 0.009, fz * 0.009, seed_val.wrapping_add(5555), 3) - 0.5).abs();
+            let is_river = river_val < 0.032 && cont > 0.42 && cont < 0.88;
+
+            if cont < 0.38 {
+                // Ocean / Deep Ocean
+                let y = (38.0 + cont * 62.0) as i32;
+                let biome = if cont < 0.24 {
+                    "minecraft:deep_ocean"
+                } else if temp > 0.65 {
+                    "minecraft:warm_ocean"
+                } else {
+                    "minecraft:ocean"
+                };
+                SyntheticColumn {
+                    y,
+                    block_id: "minecraft:water",
+                    biome_id: biome,
+                }
+            } else if cont < 0.43 {
+                // Coastal Shore / Beach
+                let y = 62 + ((cont - 0.38) * 40.0) as i32;
+                let biome = if temp < 0.25 {
+                    "minecraft:snowy_beach"
+                } else if mtn > 0.60 {
+                    "minecraft:stony_shore"
+                } else {
+                    "minecraft:beach"
+                };
+                let block = if biome == "minecraft:stony_shore" {
+                    "minecraft:stone"
+                } else {
+                    "minecraft:sand"
+                };
+                SyntheticColumn {
+                    y,
+                    block_id: block,
+                    biome_id: biome,
+                }
+            } else if is_river {
+                // Meandering inland river
+                SyntheticColumn {
+                    y: 61,
+                    block_id: "minecraft:water",
+                    biome_id: "minecraft:river",
+                }
+            } else {
+                // Inland terrain & mountain ranges
+                let base_y = 63.0 + (cont - 0.43) * 36.0;
+                let peak_boost = (mtn_peaks.powf(1.8)) * 125.0;
+                let y = (base_y + peak_boost) as i32;
+
+                if y > 124 {
+                    if temp < 0.45 || y > 148 {
+                        SyntheticColumn {
+                            y,
+                            block_id: "minecraft:snow_block",
+                            biome_id: "minecraft:jagged_peaks",
+                        }
+                    } else {
+                        SyntheticColumn {
+                            y,
+                            block_id: "minecraft:stone",
+                            biome_id: "minecraft:stony_peaks",
+                        }
+                    }
+                } else if temp > 0.70 && humid < 0.35 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:sand",
+                        biome_id: "minecraft:desert",
+                    }
+                } else if temp < 0.25 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:snow_block",
+                        biome_id: "minecraft:snowy_plains",
+                    }
+                } else if temp < 0.38 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:grass_block",
+                        biome_id: "minecraft:taiga",
+                    }
+                } else if humid > 0.68 && temp > 0.45 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:grass_block",
+                        biome_id: "minecraft:swamp",
+                    }
+                } else if humid > 0.52 {
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:grass_block",
+                        biome_id: "minecraft:forest",
+                    }
+                } else {
+                    let biome = if mtn > 0.48 {
+                        "terralith:highlands"
+                    } else {
+                        "minecraft:plains"
+                    };
+                    SyntheticColumn {
+                        y,
+                        block_id: "minecraft:grass_block",
+                        biome_id: biome,
+                    }
+                }
             }
         }
     }
@@ -218,6 +321,7 @@ pub fn render_preview_map(
     radius_blocks: i32,
     zoom: f32,
     image_size: u32,
+    dimension: super::Dimension,
 ) -> WorldPreviewResult {
     let start = std::time::Instant::now();
     let mut img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(image_size, image_size);
@@ -225,6 +329,21 @@ pub fn render_preview_map(
 
     let _seed_val = seed_hash(seed);
     let half_size = image_size as f32 / 2.0;
+
+    let (void_bg, chunk_border_color) = match dimension {
+        super::Dimension::TheNether => (
+            Rgba([24, 8, 10, 255]),
+            Rgba([48, 16, 22, 255]),
+        ),
+        super::Dimension::TheEnd => (
+            Rgba([10, 6, 18, 255]),
+            Rgba([28, 18, 42, 255]),
+        ),
+        super::Dimension::Overworld => (
+            Rgba([12, 16, 23, 255]),
+            Rgba([26, 36, 54, 255]),
+        ),
+    };
 
     // Zoom scale adjustment: zoom = 1.0 means radius_blocks fits half_size
     let effective_zoom = zoom.clamp(0.2, 8.0);
@@ -251,16 +370,11 @@ pub fn render_preview_map(
                 || (py == (image_size / 2) && (px as i32 - half_size as i32).abs() <= 5);
 
             let maybe_point = surface_map.points.get(&(world_x, world_z));
-            let syn_holder;
             let (y, block_id, biome_id, delta_y) = if let Some(point) = maybe_point {
                 let nw_x = world_x - 1;
                 let nw_z = world_z - 1;
                 let nw_y = surface_map.points.get(&(nw_x, nw_z)).map(|p| p.y).unwrap_or(point.y);
                 (point.y, point.block_id.as_str(), point.biome_id.as_str(), point.y - nw_y)
-            } else if surface_map.points.is_empty() {
-                syn_holder = sample_synthetic_column(world_x, world_z, _seed_val);
-                let nw_syn = sample_synthetic_column(world_x - 1, world_z - 1, _seed_val);
-                (syn_holder.y, syn_holder.block_id, syn_holder.biome_id, syn_holder.y - nw_syn.y)
             } else {
                 (-999, "", "", 0)
             };
@@ -289,16 +403,16 @@ pub fn render_preview_map(
                     img.put_pixel(px, py, Rgba([r, g, b, 255]));
                 }
             } else {
-                // Ungenerated chunk void: Render dark sleek void with subtle chunk boundary lines
+                // Ungenerated chunk void or End space void
                 let is_chunk_border = (world_x % 16 == 0) || (world_z % 16 == 0);
                 if is_world_spawn_x || is_world_spawn_z {
                     img.put_pixel(px, py, Rgba([255, 60, 60, 255]));
                 } else if is_reticle {
                     img.put_pixel(px, py, Rgba([71, 210, 201, 255]));
                 } else if is_chunk_border {
-                    img.put_pixel(px, py, Rgba([26, 36, 54, 255])); // Chunk grid line in void
+                    img.put_pixel(px, py, chunk_border_color);
                 } else {
-                    img.put_pixel(px, py, Rgba([12, 16, 23, 255])); // Deep void
+                    img.put_pixel(px, py, void_bg);
                 }
             }
         }
@@ -455,8 +569,14 @@ fn get_block_color(block_id: &str, biome_id: &str, y: i32) -> [u8; 3] {
     if clean.contains("dripstone") {
         return [134, 105, 90];
     }
+    if clean.contains("end_stone_brick") {
+        return [228, 230, 172];
+    }
     if clean.contains("end_stone") {
         return [221, 223, 165];
+    }
+    if clean.contains("glowstone") {
+        return [218, 179, 102];
     }
     if clean.contains("cobblestone") || clean.contains("stone") {
         return if clean.contains("mossy") {
@@ -481,6 +601,36 @@ fn get_block_color(block_id: &str, biome_id: &str, y: i32) -> [u8; 3] {
     }
     if clean.contains("soul_sand") || clean.contains("soul_soil") {
         return [77, 58, 46];
+    }
+    if clean.contains("shroomlight") {
+        return [242, 147, 72];
+    }
+    if clean.contains("magma") {
+        return [189, 72, 28];
+    }
+    if clean.contains("bone_block") {
+        return [227, 222, 203];
+    }
+    if clean.contains("crying_obsidian") {
+        return [65, 23, 105];
+    }
+    if clean.contains("ancient_debris") {
+        return [92, 68, 62];
+    }
+    if clean.contains("chorus_flower") {
+        return [165, 120, 165];
+    }
+    if clean.contains("chorus") {
+        return [102, 60, 102];
+    }
+    if clean.contains("end_rod") {
+        return [255, 255, 250];
+    }
+    if clean.contains("end_stone_brick") {
+        return [228, 230, 172];
+    }
+    if clean.contains("sculk") {
+        return [13, 29, 36];
     }
 
     // 7. Sands & Soils
@@ -583,13 +733,29 @@ pub fn render_region_tile(
     region_dir: &std::path::Path,
     rx: i32,
     rz: i32,
+    dimension: super::Dimension,
 ) -> Option<Vec<u8>> {
-    let surface_map = super::anvil::scan_single_region(region_dir, rx, rz);
+    let surface_map = super::anvil::scan_single_region(region_dir, rx, rz, dimension);
     if surface_map.points.is_empty() {
         return None;
     }
 
     let mut img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(512, 512);
+
+    let (void_bg, chunk_border_color) = match dimension {
+        super::Dimension::TheNether => (
+            Rgba([24, 8, 10, 255]),
+            Rgba([48, 16, 22, 255]),
+        ),
+        super::Dimension::TheEnd => (
+            Rgba([10, 6, 18, 255]),
+            Rgba([28, 18, 42, 255]),
+        ),
+        super::Dimension::Overworld => (
+            Rgba([12, 16, 23, 255]),
+            Rgba([26, 36, 54, 255]),
+        ),
+    };
 
     for pz in 0..512 {
         for px in 0..512 {
@@ -624,9 +790,9 @@ pub fn render_region_tile(
             } else {
                 let is_chunk_border = (world_x % 16 == 0) || (world_z % 16 == 0);
                 if is_chunk_border {
-                    img.put_pixel(px, pz, Rgba([26, 36, 54, 255]));
+                    img.put_pixel(px, pz, chunk_border_color);
                 } else {
-                    img.put_pixel(px, pz, Rgba([12, 16, 23, 255]));
+                    img.put_pixel(px, pz, void_bg);
                 }
             }
         }
@@ -657,7 +823,7 @@ mod tests {
                 });
             }
         }
-        let res = render_preview_map(&map, "test", 0, 0, 64, 1.0, 128);
+        let res = render_preview_map(&map, "test", 0, 0, 64, 1.0, 128, super::super::Dimension::Overworld);
         assert!(!res.image_data_url.is_empty());
         assert_eq!(res.min_elevation, 64);
         assert_eq!(res.max_elevation, 64);
@@ -681,9 +847,9 @@ mod tests {
             biome_id: "minecraft:desert".to_string(),
         });
 
-        let center_res = render_preview_map(&map, "42", 0, 0, 384, 1.0, 128);
-        let panned_res = render_preview_map(&map, "42", 200, 200, 384, 1.0, 128);
-        let zoomed_res = render_preview_map(&map, "42", 0, 0, 384, 2.0, 128);
+        let center_res = render_preview_map(&map, "42", 0, 0, 384, 1.0, 128, super::super::Dimension::Overworld);
+        let panned_res = render_preview_map(&map, "42", 200, 200, 384, 1.0, 128, super::super::Dimension::Overworld);
+        let zoomed_res = render_preview_map(&map, "42", 0, 0, 384, 2.0, 128, super::super::Dimension::Overworld);
 
         assert_ne!(center_res.image_data_url, panned_res.image_data_url, "Panning must produce different coordinates and view");
         assert_ne!(center_res.image_data_url, zoomed_res.image_data_url, "Zooming must change image output");
@@ -711,5 +877,12 @@ mod tests {
 
         let oxidized_copper_stairs = get_block_color("minecraft:oxidized_cut_copper_stairs", "minecraft:plains", 64);
         assert_eq!(oxidized_copper_stairs, [82, 163, 134]);
+
+        // Nether & End block colors
+        let glowstone = get_block_color("minecraft:glowstone", "minecraft:nether_wastes", 64);
+        assert_eq!(glowstone, [218, 179, 102]);
+
+        let end_stone = get_block_color("minecraft:end_stone", "minecraft:the_end", 64);
+        assert_eq!(end_stone, [221, 223, 165]);
     }
 }

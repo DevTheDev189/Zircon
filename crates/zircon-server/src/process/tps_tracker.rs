@@ -75,11 +75,17 @@ impl TpsTracker {
 
     /// Feeds one console line into the parser. Returns true if telemetry was matched.
     pub fn on_line(&self, line: &str) -> bool {
+        let Some(payload) = Self::extract_server_info_payload(line) else {
+            return false;
+        };
+        if payload.starts_with('<') {
+            return false;
+        }
         let mut matched = false;
         let mut parsed_tps: Option<f64> = None;
         let mut parsed_mspt: Option<f64> = None;
 
-        if let Some(caps) = self.vanilla_tick_regex.captures(line) {
+        if let Some(caps) = self.vanilla_tick_regex.captures(payload) {
             if let Some(m) = caps.name("tps") {
                 if let Ok(val) = m.as_str().parse::<f64>() {
                     parsed_tps = Some(val.clamp(0.0, 20.0));
@@ -92,7 +98,7 @@ impl TpsTracker {
                     matched = true;
                 }
             }
-        } else if let Some(caps) = self.forge_tps_regex.captures(line) {
+        } else if let Some(caps) = self.forge_tps_regex.captures(payload) {
             if let Some(m) = caps.name("tps") {
                 if let Ok(val) = m.as_str().parse::<f64>() {
                     parsed_tps = Some(val.clamp(0.0, 20.0));
@@ -106,7 +112,7 @@ impl TpsTracker {
                 }
             }
         } else {
-            if let Some(caps) = self.spark_tps_regex.captures(line) {
+            if let Some(caps) = self.spark_tps_regex.captures(payload) {
                 if let Some(m) = caps.name("tps") {
                     if let Ok(val) = m.as_str().parse::<f64>() {
                         parsed_tps = Some(val.clamp(0.0, 20.0));
@@ -114,14 +120,14 @@ impl TpsTracker {
                     }
                 }
             }
-            if let Some(caps) = self.spark_mspt_regex.captures(line) {
+            if let Some(caps) = self.spark_mspt_regex.captures(payload) {
                 if let Some(m) = caps.name("mspt") {
                     if let Ok(val) = m.as_str().parse::<f64>() {
                         parsed_mspt = Some(val.max(0.0));
                         matched = true;
                     }
                 }
-            } else if let Some(caps) = self.vanilla_avg_regex.captures(line) {
+            } else if let Some(caps) = self.vanilla_avg_regex.captures(payload) {
                 if let Some(m) = caps.name("mspt") {
                     if let Ok(val) = m.as_str().parse::<f64>() {
                         parsed_mspt = Some(val.max(0.0));
@@ -229,24 +235,41 @@ impl TpsTracker {
         }
     }
 
-    /// Extracts the actual log payload after standard Minecraft log prefixes.
-    fn extract_log_payload(line: &str) -> &str {
+    /// Extracts the log payload only if emitted by the official Server/main INFO logger
+    /// (or a direct unprefixed console line), rejecting chat lines.
+    fn extract_server_info_payload(line: &str) -> Option<&str> {
         let trimmed = line.trim();
-        if let Some(idx) = trimmed.find("]: ") {
-            &trimmed[idx + 3..]
-        } else if let Some(idx) = trimmed.find("[Server thread/INFO]: ") {
+        if trimmed.is_empty() || trimmed.starts_with('<') {
+            return None;
+        }
+        let payload = if let Some(idx) = trimmed.find("[Server thread/INFO]: ") {
             &trimmed[idx + 22..]
+        } else if let Some(idx) = trimmed.find("[Server thread/INFO] [") {
+            let close_idx = trimmed[idx + 22..].find("]: ")?;
+            &trimmed[idx + 22 + close_idx + 3..]
         } else if let Some(idx) = trimmed.find("[main/INFO]: ") {
             &trimmed[idx + 13..]
-        } else {
+        } else if !trimmed.starts_with('[') {
             trimmed
+        } else {
+            return None;
+        };
+        let payload = payload.trim();
+        if payload.starts_with('<') {
+            return None;
         }
+        Some(payload)
     }
 
     /// Returns true if a line is an automated probe command echo, response, or command-error
     /// that should be suppressed from the human-facing console log.
     pub fn is_telemetry_probe_line(&self, line: &str) -> bool {
-        let payload = Self::extract_log_payload(line).trim();
+        if !self.is_active_monitoring_requested() {
+            return false;
+        }
+        let Some(payload) = Self::extract_server_info_payload(line) else {
+            return false;
+        };
         if payload.is_empty() {
             return false;
         }

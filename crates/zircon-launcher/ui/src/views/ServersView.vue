@@ -434,7 +434,7 @@
     </div>
 
     <!-- Right: 3D player preview -->
-    <div class="w-[420px] min-w-[340px] z-card flex flex-col p-4 bg-[#0e1622]/90 border border-slate-800/80">
+    <div class="hidden lg:flex w-72 xl:w-80 2xl:w-96 z-card flex-col p-4 bg-[#0e1622]/90 border border-slate-800/80 shrink-0">
       <span class="z-label mb-2 text-center font-bold tracking-wider uppercase text-[10px] text-accent/80">{{ $t('servers.player_preview_title') }}</span>
       <div class="flex-1 min-h-0 rounded-xl overflow-hidden bg-[#070b10] border border-slate-800/80 relative shadow-inner">
         <Player3DPreview :image-uri="previewSkin" :variant="previewVariant" />
@@ -447,7 +447,7 @@
       class="absolute inset-0 z-40 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
       @click.self="closeAddDialog"
     >
-      <div class="z-card w-full max-w-lg p-6 overflow-hidden shadow-2xl relative border border-slate-700/60 rounded-2xl bg-[#0e1622]">
+      <div class="w-full max-w-lg p-6 overflow-hidden shadow-2xl relative border border-neutral-800 rounded-2xl bg-[#0c0d12]">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h3 class="text-white font-bold text-base">{{ $t('servers.add_dialog_title') }}</h3>
@@ -839,7 +839,7 @@ function closeConfigModal() {
 // Ping/status cache per server address.
 const statusCache = ref({});
 
-const recommended = [
+const DEFAULT_RECOMMENDED = [
   {
     name: 'ZirconSMP',
     desc: 'Official ZirconSMP Server • Community Adventure & Modpack',
@@ -848,11 +848,31 @@ const recommended = [
   },
 ];
 
+const recommended = ref([...DEFAULT_RECOMMENDED]);
+
+async function loadFeaturedServers() {
+  try {
+    const res = await fetch('https://cdn.zirconmc.net/manifests/featured_servers.json', {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        recommended.value = data;
+      }
+    }
+  } catch (err) {
+    // Offline or unreachable — preserve DEFAULT_RECOMMENDED gracefully
+    recommended.value = [...DEFAULT_RECOMMENDED];
+  }
+}
+
 const gameRunning = computed(() => !!props.gameStatus?.running);
 
 onMounted(async () => {
   await refreshServers();
   await refreshPreviewSkin();
+  loadFeaturedServers();
   refreshAllStatuses(true);
   pingInterval = setInterval(() => {
     refreshAllStatuses(false);

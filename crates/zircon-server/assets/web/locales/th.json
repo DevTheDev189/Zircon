@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "บันทึก",
+    "saving": "กำลังบันทึก…",
+    "cancel": "ยกเลิก",
+    "close": "ปิด",
+    "refresh": "รีเฟรช",
+    "copy": "คัดลอก",
+    "copied": "คัดลอกไปยังคลิปบอร์ดแล้ว!",
+    "delete": "ลบ",
+    "loading": "กำลังโหลด…",
+    "apply": "นำไปใช้",
+    "edit": "แก้ไข",
+    "search": "ค้นหา…",
+    "online": "ออนไลน์",
+    "offline": "ออฟไลน์",
+    "sleeping": "โหมดพักเครื่อง",
+    "booting": "กำลังเปิดเครื่อง…",
+    "falling_asleep": "กำลังเข้าสู่โหมดพักเครื่อง…",
+    "shutting_down": "กำลังปิดระบบ…",
+    "start": "เริ่ม",
+    "stop": "หยุด",
+    "restart": "รีสตาร์ท",
+    "wake": "ปลุกเซิร์ฟเวอร์",
+    "detecting": "กำลังตรวจจับ…"
+  },
+  "nav": {
+    "global_stats": "สถิติทั่วโลก",
+    "servers": "เซิร์ฟเวอร์",
+    "create_server": "สร้างเซิร์ฟเวอร์",
+    "import_server": "นำเข้าเซิร์ฟเวอร์ (.zip)",
+    "mods": "มอด",
+    "shaders": "เชเดอร์",
+    "files": "ไฟล์",
+    "console": "คอนโซล",
+    "players": "ผู้เล่น",
+    "backups": "สำรองข้อมูล",
+    "world": "โลก",
+    "settings": "การตั้งค่า",
+    "disk_storage": "พื้นที่จัดเก็บดิสก์",
+    "server_manager": "ตัวจัดการเซิร์ฟเวอร์"
+  },
+  "stats": {
+    "title": "ข้อมูลทางเทคนิคและเมตริกของระบบ",
+    "subtitle": "การใช้งาน CPU, RAM ของโฮสต์, RSS ของกระบวนการ และกิจกรรมดิสก์แบบเรียลไทม์",
+    "host_ram": "RAM ของ OS โฮสต์",
+    "process_rss": "RSS ของกระบวนการ Java",
+    "cpu_usage": "โหลด CPU",
+    "disk_allocation": "การจัดสรรพื้นที่เก็บข้อมูล NVMe",
+    "uptime": "เวลาทำงานของระบบ",
+    "active_instances": "อินสแตนซ์ที่ทำงานอยู่",
+    "sleeping_instances": "อินสแตนซ์ที่หลับอยู่"
+  },
+  "instances": {
+    "no_servers": "ยังไม่มีเซิร์ฟเวอร์ — คลิกที่ สร้างเซิร์ฟเวอร์",
+    "create_title": "สร้างเซิร์ฟเวอร์ Minecraft",
+    "name_label": "ชื่ออินสแตนซ์",
+    "version_label": "เวอร์ชัน Minecraft",
+    "loader_label": "ตัวโหลดมอด",
+    "port_label": "พอร์ต",
+    "memory_label": "หน่วยความจำที่จัดสรร (GB)",
+    "start_server": "เริ่มเซิร์ฟเวอร์",
+    "wake_server": "ปลุกเซิร์ฟเวอร์",
+    "stop_server": "หยุดเซิร์ฟเวอร์",
+    "restart_server": "รีสตาร์ทเซิร์ฟเวอร์",
+    "players_online": "ออนไลน์ {count} คน",
+    "sleeps_in": "จะเข้าสู่โหมดพักใน {time}",
+    "idle_wakes": "ปิดเมื่อไม่มีการใช้งาน — จะตื่นเมื่อมีผู้เล่นเข้าร่วม"
+  },
+  "mods": {
+    "title": "มอดที่ติดตั้งแล้ว",
+    "count": "มอดที่ติดตั้งแล้ว ({count})",
+    "search_placeholder": "ค้นหา มอดที่ติดตั้งแล้ว…",
+    "loader_filter": "ตัวกรอง Loader",
+    "all_loaders": "Loader ทั้งหมด",
+    "active_loader": "Loader ที่ใช้งานอยู่ ({loader})",
+    "export_mrpack": "ส่งออก .mrpack",
+    "copy_mrpack_url": "คัดลอก URL ของ .mrpack",
+    "copy_mrpack_tooltip": "คัดลอกลิงก์ดาวน์โหลด .mrpack สาธารณะ สำหรับผู้เล่นที่ไม่ใช้ Zircon",
+    "add_mod": "เพิ่มมอด",
+    "install_update": "อัปเดต",
+    "no_mods": "ยังไม่มีมอดที่ติดตั้ง"
+  },
+  "console": {
+    "title": "คอนโซลและเทอร์มินัลของเซิร์ฟเวอร์",
+    "placeholder": "ส่งคำสั่ง (เช่น /say Hello, /op Player)...",
+    "send": "ส่ง",
+    "clear": "ล้าง"
+  },
+  "players": {
+    "title": "การจัดการผู้เล่น",
+    "online": "ผู้เล่นออนไลน์",
+    "whitelist": "รายการอนุญาต (Whitelist)",
+    "ops": "ผู้ดูแลระบบ (Operators)",
+    "bans": "ผู้เล่นที่ถูกแบน",
+    "kick": "เตะออก",
+    "ban": "แบน",
+    "op": "ตั้งเป็นผู้ดูแล",
+    "deop": "ถอดถอนผู้ดูแล"
+  },
+  "backups": {
+    "title": "สแนปช็อตโลกและอินสแตนซ์",
+    "create": "สร้างการสำรองข้อมูล",
+    "restore": "กู้คืน",
+    "download": "ดาวน์โหลด",
+    "delete": "ลบ"
+  },
+  "security": {
+    "online_mode": "โหมดออนไลน์ (การยืนยันตัวตน Mojang)",
+    "online_mode_warning": "คำเตือน: การปิดใช้งาน online-mode จะอนุญาตให้ผู้เล่นออฟไลน์/ที่ไม่ได้รับการยืนยันซึ่งใช้ UUID ปลอมเชื่อมต่อได้",
+    "whitelist_enforced": "บังคับใช้รายการขาว"
+  }
+}

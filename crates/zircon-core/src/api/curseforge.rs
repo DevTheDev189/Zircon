@@ -286,6 +286,14 @@ fn parse_data_data<T: serde::de::DeserializeOwned>(text: &str) -> Vec<T> {
 // Response DTOs
 // --------------------------------------------------------------------------
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurseForgeCategory {
+    pub id: i64,
+    #[serde(default)]
+    pub name: String,
+}
+
 /// A CurseForge mod (project) returned by the search endpoint.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -307,6 +315,8 @@ pub struct CurseForgeMod {
     pub latest_files: Vec<CurseForgeFile>,
     #[serde(default)]
     pub authors: Vec<CurseForgeAuthor>,
+    #[serde(default)]
+    pub categories: Vec<CurseForgeCategory>,
 }
 
 impl CurseForgeMod {
@@ -408,7 +418,8 @@ impl CurseForgeFile {
         self.hashes
             .iter()
             .find(|h| h.algo == 1)
-            .map(|h| h.value.as_str())
+            .map(|h| h.value.trim())
+            .filter(|v| v.len() == 40 && v.bytes().all(|b| b.is_ascii_hexdigit()))
     }
 
     /// Returns the MD5 hash (algo == 2) if present in the metadata.
@@ -416,7 +427,8 @@ impl CurseForgeFile {
         self.hashes
             .iter()
             .find(|h| h.algo == 2)
-            .map(|h| h.value.as_str())
+            .map(|h| h.value.trim())
+            .filter(|v| v.len() == 32 && v.bytes().all(|b| b.is_ascii_hexdigit()))
     }
 }
 

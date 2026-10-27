@@ -4,16 +4,16 @@ use async_trait::async_trait;
 use bollard::container::{
     AttachContainerOptions, Config, CreateContainerOptions,
     InspectContainerOptions, KillContainerOptions, LogsOptions,
-    StartContainerOptions, StopContainerOptions,
+    RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
 };
-use bollard::models::{HostConfig, PortBinding};
+use bollard::models::{HostConfig, Mount, MountTypeEnum, PortBinding};
 use bollard::Docker;
 use futures_util::StreamExt;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
-use super::driver::{ProcessDriver, ProcessLaunchOptions};
+use super::driver::{sanitize_server_java_args, ProcessDriver, ProcessLaunchOptions};
 
 #[derive(Debug, Clone)]
 pub struct DockerDriver {
@@ -37,8 +37,18 @@ impl DockerDriver {
         self
     }
 
-    pub fn container_name(instance_id: &str) -> String {
-        format!("zircon-inst-{instance_id}")
+    pub fn container_name(instance_id: &str) -> io::Result<String> {
+        if instance_id.is_empty()
+            || !instance_id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Invalid instance_id: {instance_id}"),
+            ));
+        }
+        Ok(format!("zircon-inst-{instance_id}"))
     }
 
     pub fn select_image(java_version: u8) -> &'static str {
@@ -53,9 +63,10 @@ impl DockerDriver {
 #[async_trait]
 impl ProcessDriver for DockerDriver {
     async fn start(&self, opts: ProcessLaunchOptions) -> io::Result<()> {
-        let name = Self::container_name(&opts.instance_id);
+        let name = Self::container_name(&opts.instance_id)?;
 
-        // Check if existing stopped container exists; if so, start it
+        // Check if existing container exists; if stopped, remove and recreate so updated
+        // ProcessLimits, ports, and JVM options are always enforced.
         if let Ok(inspect) = self.client.inspect_container(&name, None::<InspectContainerOptions>).await {
             if let Some(state) = inspect.state {
                 if state.running.unwrap_or(false) {
@@ -63,13 +74,17 @@ impl ProcessDriver for DockerDriver {
                     return Ok(());
                 }
             }
-            // Exists but stopped: trigger fast wake
-            info!("Waking stopped container {name}");
+            info!("Removing stopped container {name} to apply current launch configuration");
             self.client
-                .start_container(&name, None::<StartContainerOptions<String>>)
+                .remove_container(
+                    &name,
+                    Some(RemoveContainerOptions {
+                        force: true,
+                        ..Default::default()
+                    }),
+                )
                 .await
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to wake container: {e}")))?;
-            return Ok(());
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to remove stale container: {e}")))?;
         }
 
         // Port bindings: bind strictly to 127.0.0.1 on the host
@@ -86,18 +101,25 @@ impl ProcessDriver for DockerDriver {
         let memory_bytes = opts.limits.memory_bytes();
         let nano_cpus = opts.limits.nano_cpus();
 
+        let sanitized_memory_args = sanitize_server_java_args(&opts.memory_args)?.join(" ");
+        let canonical_server_dir = std::fs::canonicalize(&opts.server_dir)?;
+
         // Generational ZGC uncommit flags for modern Java
         let jvm_uncommit_flags = if opts.java_version >= 21 {
             "-XX:+UseZGC -XX:+ZGenerational -XX:+UnlockExperimentalVMOptions -XX:ZUncommit=true -XX:ZUncommitDelay=60"
         } else {
             "-XX:+UnlockExperimentalVMOptions"
         };
-        let java_opts = format!("{} {}", opts.memory_args, jvm_uncommit_flags);
+        let java_opts = format!("{sanitized_memory_args} {jvm_uncommit_flags}");
 
         let host_config = HostConfig {
-            binds: Some(vec![
-                format!("{}:/data:rw", opts.server_dir.display()),
-            ]),
+            mounts: Some(vec![Mount {
+                target: Some("/data".to_string()),
+                source: Some(canonical_server_dir.to_string_lossy().into_owned()),
+                typ: Some(MountTypeEnum::BIND),
+                read_only: Some(false),
+                ..Default::default()
+            }]),
             port_bindings: Some(port_bindings),
             memory: Some(memory_bytes),
             memory_swap: Some(memory_bytes), // Disable swap thrashing inside container
@@ -106,11 +128,6 @@ impl ProcessDriver for DockerDriver {
             network_mode: self.network_name.clone(),
             security_opt: Some(vec!["no-new-privileges:true".to_string()]),
             cap_drop: Some(vec!["ALL".to_string()]),
-            cap_add: Some(vec![
-                "CHOWN".to_string(),
-                "SETUID".to_string(),
-                "SETGID".to_string(),
-            ]),
             ..Default::default()
         };
 
@@ -152,7 +169,7 @@ impl ProcessDriver for DockerDriver {
     }
 
     async fn stop(&self, instance_id: &str, timeout_secs: u32) -> io::Result<()> {
-        let name = Self::container_name(instance_id);
+        let name = Self::container_name(instance_id)?;
         info!("Stopping container {name} (grace period: {timeout_secs}s)");
         self.client
             .stop_container(&name, Some(StopContainerOptions { t: timeout_secs as i64 }))
@@ -161,7 +178,7 @@ impl ProcessDriver for DockerDriver {
     }
 
     async fn kill(&self, instance_id: &str) -> io::Result<()> {
-        let name = Self::container_name(instance_id);
+        let name = Self::container_name(instance_id)?;
         warn!("Force killing container {name} with SIGKILL");
         self.client
             .kill_container(&name, Some(KillContainerOptions { signal: "SIGKILL" }))
@@ -170,7 +187,7 @@ impl ProcessDriver for DockerDriver {
     }
 
     async fn is_running(&self, instance_id: &str) -> io::Result<bool> {
-        let name = Self::container_name(instance_id);
+        let name = Self::container_name(instance_id)?;
         match self.client.inspect_container(&name, None::<InspectContainerOptions>).await {
             Ok(inspect) => Ok(inspect.state.and_then(|s| s.running).unwrap_or(false)),
             Err(bollard::errors::Error::DockerResponseServerError { status_code: 404, .. }) => Ok(false),
@@ -179,7 +196,13 @@ impl ProcessDriver for DockerDriver {
     }
 
     async fn send_command(&self, instance_id: &str, command: &str) -> io::Result<()> {
-        let name = Self::container_name(instance_id);
+        if command.contains(['\n', '\r', '\0']) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Server console command must not contain newline or NUL characters",
+            ));
+        }
+        let name = Self::container_name(instance_id)?;
         let options = AttachContainerOptions::<String> {
             stdin: Some(true),
             stream: Some(true),
@@ -206,7 +229,7 @@ impl ProcessDriver for DockerDriver {
     }
 
     async fn stream_logs(&self, instance_id: &str, tx: mpsc::Sender<String>) -> io::Result<()> {
-        let name = Self::container_name(instance_id);
+        let name = Self::container_name(instance_id)?;
         let options = LogsOptions::<String> {
             follow: true,
             stdout: true,
@@ -243,9 +266,12 @@ mod tests {
     #[test]
     fn test_container_name_formatting() {
         assert_eq!(
-            DockerDriver::container_name("emerald-01"),
+            DockerDriver::container_name("emerald-01").unwrap(),
             "zircon-inst-emerald-01"
         );
+        assert!(DockerDriver::container_name("").is_err());
+        assert!(DockerDriver::container_name("inst:evil").is_err());
+        assert!(DockerDriver::container_name("inst/../bad").is_err());
     }
 
     #[test]

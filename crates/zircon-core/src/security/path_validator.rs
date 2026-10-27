@@ -15,13 +15,42 @@ pub const ALLOWED_CONFIG_EXTENSIONS: &[&str] = &[
 /// Forbidden filename components or patterns.
 pub fn is_forbidden_segment(segment: &str) -> bool {
     let lower = segment.to_ascii_lowercase();
+    let stem = lower.split('.').next().unwrap_or("");
+    let is_windows_device = matches!(
+        stem,
+        "con"
+            | "prn"
+            | "aux"
+            | "nul"
+            | "com1"
+            | "com2"
+            | "com3"
+            | "com4"
+            | "com5"
+            | "com6"
+            | "com7"
+            | "com8"
+            | "com9"
+            | "lpt1"
+            | "lpt2"
+            | "lpt3"
+            | "lpt4"
+            | "lpt5"
+            | "lpt6"
+            | "lpt7"
+            | "lpt8"
+            | "lpt9"
+    );
     segment.is_empty()
         || segment == "."
         || segment == ".."
+        || segment.ends_with('.')
+        || segment.ends_with(' ')
         || segment.contains('\0')
         || segment.contains(':')
         || lower.ends_with(".disabled")
         || lower == ".git"
+        || is_windows_device
 }
 
 /// Checks if an extension (case-insensitive, without leading dot) is in the allowed config list.
@@ -63,11 +92,8 @@ pub fn sanitize_relative_path(input: &str) -> Result<String, String> {
                 let seg = c
                     .to_str()
                     .ok_or_else(|| "Invalid UTF-8 in path".to_string())?;
-                if seg.contains(':') {
-                    return Err("Path contains forbidden stream separator ':'".to_string());
-                }
-                if seg == ".." || seg == "." {
-                    return Err("Path traversal segment detected".to_string());
+                if is_forbidden_segment(seg) {
+                    return Err(format!("Path contains forbidden segment: '{seg}'"));
                 }
                 clean_components.push(seg);
             }
@@ -150,5 +176,8 @@ mod tests {
         );
         assert!(validate_config_relative_path("jei/recipe-lookup.jar").is_err());
         assert!(validate_config_relative_path("../jei/recipe-lookup.toml").is_err());
+        assert!(validate_config_relative_path("CON.toml").is_err());
+        assert!(validate_config_relative_path("aux.json").is_err());
+        assert!(validate_config_relative_path("foo/.git/config.toml").is_err());
     }
 }

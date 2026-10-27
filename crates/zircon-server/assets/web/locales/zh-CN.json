@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "保存",
+    "saving": "正在保存…",
+    "cancel": "取消",
+    "close": "关闭",
+    "refresh": "刷新",
+    "copy": "复制",
+    "copied": "已复制到剪贴板！",
+    "delete": "删除",
+    "loading": "加载中…",
+    "apply": "应用",
+    "edit": "编辑",
+    "search": "搜索…",
+    "online": "在线",
+    "offline": "离线",
+    "sleeping": "休眠中",
+    "booting": "启动中…",
+    "falling_asleep": "正在进入休眠…",
+    "shutting_down": "正在关机…",
+    "start": "启动",
+    "stop": "停止",
+    "restart": "重启",
+    "wake": "唤醒服务器",
+    "detecting": "检测中…"
+  },
+  "nav": {
+    "global_stats": "全局统计",
+    "servers": "服务器",
+    "create_server": "创建服务器",
+    "import_server": "导入服务器 (.zip)",
+    "mods": "模组",
+    "shaders": "光影",
+    "files": "文件",
+    "console": "控制台",
+    "players": "玩家",
+    "backups": "备份",
+    "world": "世界",
+    "settings": "设置",
+    "disk_storage": "磁盘存储",
+    "server_manager": "服务器管理器"
+  },
+  "stats": {
+    "title": "系统遥测与指标",
+    "subtitle": "实时 CPU、主机 RAM、进程 RSS 及磁盘活动",
+    "host_ram": "主机操作系统 RAM",
+    "process_rss": "Java 进程 RSS",
+    "cpu_usage": "CPU 负载",
+    "disk_allocation": "NVMe 存储分配",
+    "uptime": "系统运行时间",
+    "active_instances": "运行中的实例",
+    "sleeping_instances": "休眠中的实例"
+  },
+  "instances": {
+    "no_servers": "暂无服务器 — 点击“创建服务器”。",
+    "create_title": "创建 Minecraft 服务器",
+    "name_label": "实例名称",
+    "version_label": "Minecraft 版本",
+    "loader_label": "模组加载器",
+    "port_label": "端口",
+    "memory_label": "分配内存 (GB)",
+    "start_server": "启动服务器",
+    "wake_server": "唤醒服务器",
+    "stop_server": "停止服务器",
+    "restart_server": "重启服务器",
+    "players_online": "{count} 人在线",
+    "sleeps_in": "{time} 后休眠",
+    "idle_wakes": "空闲自动关闭 — 玩家加入时唤醒"
+  },
+  "mods": {
+    "title": "已安装的模组",
+    "count": "已安装的模组 ({count})",
+    "search_placeholder": "搜索已安装的模组…",
+    "loader_filter": "加载器筛选",
+    "all_loaders": "所有加载器",
+    "active_loader": "当前加载器 ({loader})",
+    "export_mrpack": "导出 .mrpack",
+    "copy_mrpack_url": "复制 .mrpack URL",
+    "copy_mrpack_tooltip": "复制公开的 .mrpack 下载链接，供非 Zircon 玩家使用",
+    "add_mod": "添加模组",
+    "install_update": "更新",
+    "no_mods": "尚未安装任何模组。"
+  },
+  "console": {
+    "title": "服务器控制台与终端",
+    "placeholder": "发送命令（例如 /say Hello, /op Player）...",
+    "send": "发送",
+    "clear": "清除"
+  },
+  "players": {
+    "title": "玩家管理",
+    "online": "在线玩家",
+    "whitelist": "白名单",
+    "ops": "管理员",
+    "bans": "被封禁的玩家",
+    "kick": "踢出",
+    "ban": "封禁",
+    "op": "设为管理员",
+    "deop": "取消管理员"
+  },
+  "backups": {
+    "title": "世界与实例快照",
+    "create": "创建备份",
+    "restore": "恢复",
+    "download": "下载",
+    "delete": "删除"
+  },
+  "security": {
+    "online_mode": "在线模式（Mojang 验证）",
+    "online_mode_warning": "警告：禁用 online-mode 将允许使用伪造 UUID 的离线/未验证玩家连接。",
+    "whitelist_enforced": "强制白名单"
+  }
+}

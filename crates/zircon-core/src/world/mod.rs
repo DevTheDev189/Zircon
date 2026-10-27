@@ -6,6 +6,35 @@ pub mod renderer;
 
 use serde::{Deserialize, Serialize};
 
+/// Target Minecraft dimension for world scanning and top-down map rendering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Dimension {
+    #[serde(alias = "overworld", alias = "minecraft:overworld")]
+    Overworld,
+    #[serde(alias = "nether", alias = "the_nether", alias = "theNether", alias = "minecraft:the_nether")]
+    TheNether,
+    #[serde(alias = "end", alias = "the_end", alias = "theEnd", alias = "minecraft:the_end")]
+    TheEnd,
+}
+
+impl Default for Dimension {
+    fn default() -> Self {
+        Self::Overworld
+    }
+}
+
+impl Dimension {
+    /// Relative subdirectory containing Anvil region files for this dimension.
+    pub fn region_subpath(&self) -> &'static str {
+        match self {
+            Self::Overworld => "region",
+            Self::TheNether => "DIM-1/region",
+            Self::TheEnd => "DIM1/region",
+        }
+    }
+}
+
 /// Request parameters for generating a world seed preview.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldPreviewRequest {
@@ -24,6 +53,9 @@ pub struct WorldPreviewRequest {
     /// Zoom scale factor (default 1.0).
     #[serde(default = "default_zoom")]
     pub zoom: f32,
+    /// Target dimension to preview (Overworld, The Nether, or The End).
+    #[serde(default)]
+    pub dimension: Dimension,
     /// Optional list of mod file names or identifiers to specifically include.
     #[serde(default, alias = "selectedMods")]
     pub selected_mods: Option<Vec<String>>,
@@ -39,6 +71,7 @@ fn default_zoom() -> f32 {
 
 /// Metadata summary returned alongside the rendered top-down map image.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorldPreviewResult {
     pub seed: String,
     pub radius_blocks: i32,

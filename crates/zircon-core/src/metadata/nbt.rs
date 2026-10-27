@@ -46,7 +46,7 @@ pub const MINECRAFT_DATA_VERSIONS: &[(u32, &str)] = &[
 ];
 
 /// Result of parsing a Minecraft `level.dat` file.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LevelDatInfo {
     /// Internal Minecraft data version integer (e.g. 3955 for 1.21.1).
@@ -63,6 +63,18 @@ pub struct LevelDatInfo {
     pub hardcore: bool,
     /// Whether commands/cheats are enabled.
     pub allow_commands: bool,
+    /// World spawn X coordinate.
+    pub spawn_x: Option<i32>,
+    /// World spawn Y coordinate.
+    pub spawn_y: Option<i32>,
+    /// World spawn Z coordinate.
+    pub spawn_z: Option<i32>,
+    /// Player X coordinate (singleplayer).
+    pub player_x: Option<f64>,
+    /// Player Z coordinate (singleplayer).
+    pub player_z: Option<f64>,
+    /// Dimension the player was in when saving (e.g. "minecraft:overworld", "minecraft:the_nether").
+    pub player_dimension: Option<String>,
 }
 
 /// NBT Decoder errors.
@@ -276,6 +288,44 @@ pub fn parse_level_dat_bytes(bytes: &[u8]) -> Result<LevelDatInfo, NbtError> {
     let hardcore = data_tag.get_bool("hardcore").unwrap_or(false);
     let allow_commands = data_tag.get_bool("allowCommands").unwrap_or(false);
 
+    let spawn_x = data_tag.get_i32("SpawnX");
+    let spawn_y = data_tag.get_i32("SpawnY");
+    let spawn_z = data_tag.get_i32("SpawnZ");
+
+    let player_compound = data_tag
+        .as_compound()
+        .and_then(|map| map.get("Player"))
+        .and_then(|t| t.as_compound());
+    let (player_x, player_z, player_dimension) = if let Some(player) = player_compound {
+        let (x, z) = if let Some(NbtTag::List(pos_list)) = player.get("Pos") {
+            let x = pos_list.get(0).and_then(|t| match t {
+                NbtTag::Double(d) => Some(*d),
+                NbtTag::Float(f) => Some(*f as f64),
+                _ => None,
+            });
+            let z = pos_list.get(2).and_then(|t| match t {
+                NbtTag::Double(d) => Some(*d),
+                NbtTag::Float(f) => Some(*f as f64),
+                _ => None,
+            });
+            (x, z)
+        } else {
+            (None, None)
+        };
+        let dim = player.get("Dimension").and_then(|t| match t {
+            NbtTag::String(s) => Some(s.clone()),
+            NbtTag::Int(i) => match i {
+                -1 => Some("minecraft:the_nether".to_string()),
+                1 => Some("minecraft:the_end".to_string()),
+                _ => Some("minecraft:overworld".to_string()),
+            },
+            _ => None,
+        });
+        (x, z, dim)
+    } else {
+        (None, None, None)
+    };
+
     Ok(LevelDatInfo {
         data_version,
         minecraft_version: version_name,
@@ -284,6 +334,12 @@ pub fn parse_level_dat_bytes(bytes: &[u8]) -> Result<LevelDatInfo, NbtError> {
         difficulty,
         hardcore,
         allow_commands,
+        spawn_x,
+        spawn_y,
+        spawn_z,
+        player_x,
+        player_z,
+        player_dimension,
     })
 }
 

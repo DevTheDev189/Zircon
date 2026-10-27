@@ -29,32 +29,46 @@ impl Default for ProcessLimits {
 impl ProcessLimits {
     /// Calculates memory limit in bytes for Docker cgroup v2.
     pub fn memory_bytes(&self) -> i64 {
-        (self.memory_limit_mb * 1024 * 1024) as i64
+        self.memory_limit_mb
+            .saturating_mul(1024 * 1024)
+            .min(i64::MAX as u64) as i64
     }
 
     /// Calculates CPU limit in nanoCPUs for Docker cgroup v2 (1 core = 1e9).
     pub fn nano_cpus(&self) -> i64 {
-        (self.cpu_cores * 1e9) as i64
+        let cores = if self.cpu_cores.is_finite() {
+            self.cpu_cores.clamp(0.5, 64.0)
+        } else {
+            2.5
+        };
+        (cores as f64 * 1e9) as i64
     }
 
     /// Helper to derive process limits from JVM heap arguments (e.g. -Xmx6G)
     /// allocating 20% headroom (min 1.2 GB) for off-heap, metaspace, and native memory.
     pub fn from_java_args(args: &str) -> Self {
+        const MAX_HEAP_MB: u64 = 65_536; // 64 GB safety ceiling
         let mut heap_mb: u64 = 4096; // fallback 4GB
         for part in args.split_whitespace() {
-            if let Some(rest) = part.strip_prefix("-Xmx") {
+            if part.len() > 4 && part[..4].eq_ignore_ascii_case("-xmx") {
+                let rest = &part[4..];
                 let upper = rest.to_ascii_uppercase();
                 if let Some(num) = upper.strip_suffix('G') {
                     if let Ok(g) = num.parse::<u64>() {
-                        heap_mb = g * 1024;
+                        heap_mb = g.saturating_mul(1024);
                     }
                 } else if let Some(num) = upper.strip_suffix('M') {
                     if let Ok(m) = num.parse::<u64>() {
                         heap_mb = m;
                     }
+                } else if let Some(num) = upper.strip_suffix('K') {
+                    if let Ok(k) = num.parse::<u64>() {
+                        heap_mb = (k / 1024).max(512);
+                    }
                 }
             }
         }
+        heap_mb = heap_mb.clamp(512, MAX_HEAP_MB);
         let memory_limit_mb = heap_mb + (heap_mb / 5).max(1200);
         let cpu_cores = if heap_mb >= 8192 { 4.0 } else { 2.5 };
         Self {
@@ -63,6 +77,50 @@ impl ProcessLimits {
             pids_limit: 512,
         }
     }
+}
+
+/// Validates server JVM arguments, rejecting arbitrary execution hooks, agents,
+/// `@argfile` inclusions, and classpath/jar overrides.
+pub fn sanitize_server_java_args(args: &str) -> io::Result<Vec<String>> {
+    if args.contains(['\0', '\r', '\n']) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Server JVM arguments must not contain newline or NUL characters",
+        ));
+    }
+    let mut out = Vec::new();
+    for token in args.split_whitespace() {
+        let lower = token.to_ascii_lowercase();
+        if !token.starts_with('-')
+            || token.starts_with('@')
+            || token.contains(['\0', '\r', '\n', ';', '&', '|', '`', '$', '(', ')', '<', '>', '"', '\''])
+            || lower.starts_with("-javaagent:")
+            || lower.starts_with("-agentlib:")
+            || lower.starts_with("-agentpath:")
+            || lower.starts_with("-xbootclasspath")
+            || lower.starts_with("-cp")
+            || lower.starts_with("-classpath")
+            || lower.starts_with("--class-path")
+            || lower.starts_with("--patch-module")
+            || lower.starts_with("-jar")
+            || lower.starts_with("-xx:onerror")
+            || lower.starts_with("-xx:onoutofmemoryerror")
+            || lower.starts_with("-xx:errorfile")
+            || lower.starts_with("-xx:heapdumppath")
+            || lower.starts_with("-dorg.lwjgl.librarypath=")
+            || lower.starts_with("-djna.library.path=")
+            || lower.starts_with("-djava.library.path=")
+            || lower.starts_with("-djava.security.manager")
+            || lower.starts_with("-dcom.sun.management.jmxremote")
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Disallowed server JVM argument: {token}"),
+            ));
+        }
+        out.push(token.to_string());
+    }
+    Ok(out)
 }
 
 /// Options required to launch an instance via a ProcessDriver.
@@ -127,5 +185,37 @@ mod tests {
         let pro_limits = ProcessLimits::from_java_args("-Xms4G -Xmx10G");
         assert_eq!(pro_limits.memory_limit_mb, 10240 + 2048);
         assert_eq!(pro_limits.cpu_cores, 4.0);
+    }
+
+    #[test]
+    fn test_process_limits_overflow_safe() {
+        // Enormous heap size does not overflow or panic
+        let huge = ProcessLimits::from_java_args("-Xmx99999999999999G");
+        assert_eq!(huge.memory_limit_mb, 65536 + 13107);
+        assert!(huge.memory_bytes() > 0);
+
+        // Infinite / NaN CPU cores clamp safely
+        let nan_cores = ProcessLimits {
+            memory_limit_mb: 4096,
+            cpu_cores: f32::NAN,
+            pids_limit: 512,
+        };
+        assert_eq!(nan_cores.nano_cpus(), 2500000000);
+    }
+
+    #[test]
+    fn test_sanitize_server_java_args() {
+        // Valid JVM options
+        let valid = sanitize_server_java_args("-Xms4G -Xmx8G -XX:+UseG1GC").unwrap();
+        assert_eq!(valid, vec!["-Xms4G", "-Xmx8G", "-XX:+UseG1GC"]);
+
+        // Disallowed command injection or agent flags
+        assert!(sanitize_server_java_args("-Xmx4G; rm -rf /").is_err());
+        assert!(sanitize_server_java_args("-Xmx4G\n-Xms2G").is_err());
+        assert!(sanitize_server_java_args("-javaagent:/evil.jar").is_err());
+        assert!(sanitize_server_java_args("-agentlib:jdwp").is_err());
+        assert!(sanitize_server_java_args("-XX:OnOutOfMemoryError=calc").is_err());
+        assert!(sanitize_server_java_args("@argfile").is_err());
+        assert!(sanitize_server_java_args("-cp evil.jar").is_err());
     }
 }

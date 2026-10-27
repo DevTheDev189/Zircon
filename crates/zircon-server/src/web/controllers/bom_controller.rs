@@ -16,7 +16,7 @@ use axum::response::IntoResponse;
 use crate::services::bom::BomService;
 use crate::web::app::{ApiError, AppState};
 use crate::web::config_routes::{
-    resolve_instance_for_host, resolve_instance_for_ref, resolve_instance_for_ref_with_host,
+    resolve_instance_for_host, resolve_instance_for_ref_with_host,
 };
 
 /// GET /bom — full BOM as JSON for the instance owning the request's port.

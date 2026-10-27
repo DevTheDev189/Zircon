@@ -15,6 +15,7 @@
 use axum::extract::Request;
 use axum::extract::{FromRequestParts, State};
 use axum::http::header::AUTHORIZATION;
+use axum::http::Method;
 use axum::http::request::Parts;
 use axum::middleware::Next;
 use axum::response::Response;
@@ -23,6 +24,9 @@ use axum_extra::extract::cookie::CookieJar;
 use super::app::ApiError;
 use crate::auth::jwt;
 use crate::web::app::AppState;
+
+/// Maximum accepted JWT length in bytes to prevent memory/CPU abuse.
+const MAX_TOKEN_BYTES: usize = 4096;
 
 /// Validated admin identity, inserted into request extensions by `require_auth`
 /// and extractable by handlers via `CurrentUser`.
@@ -50,21 +54,35 @@ impl<S> FromRequestParts<S> for CurrentUser {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TokenSource {
+    BearerHeader,
+    SessionCookie,
+}
+
 /// Token from the `Authorization: Bearer` header, falling back to the
-/// `zircon_session` HttpOnly cookie (browser sessions).
-fn extract_token(request: &Request) -> Option<String> {
+/// `zircon_session` HttpOnly cookie only when no `Authorization` header is sent.
+fn extract_token_with_source(request: &Request) -> Option<(String, TokenSource)> {
     if let Some(auth_header) = request.headers().get(AUTHORIZATION) {
-        if let Ok(val) = auth_header.to_str() {
-            if let Some(t) = val.strip_prefix("Bearer ") {
-                let trimmed = t.trim();
-                if !trimmed.is_empty() {
-                    return Some(trimmed.to_string());
-                }
-            }
+        let val = auth_header.to_str().ok()?;
+        let t = val.strip_prefix("Bearer ")?;
+        let trimmed = t.trim();
+        if !trimmed.is_empty() && trimmed.len() <= MAX_TOKEN_BYTES {
+            return Some((trimmed.to_string(), TokenSource::BearerHeader));
         }
+        // Never fall back to ambient cookies when an explicit Authorization header is malformed.
+        return None;
     }
     let jar = CookieJar::from_headers(request.headers());
-    jar.get("zircon_session").map(|c| c.value().to_string())
+    jar.get("zircon_session")
+        .map(|c| c.value().trim())
+        .filter(|v| !v.is_empty() && v.len() <= MAX_TOKEN_BYTES)
+        .map(|v| (v.to_string(), TokenSource::SessionCookie))
+}
+
+#[cfg(test)]
+fn extract_token(request: &Request) -> Option<String> {
+    extract_token_with_source(request).map(|(t, _)| t)
 }
 
 /// Axum middleware enforcing the bearer token or session cookie on protected
@@ -74,11 +92,31 @@ pub async fn require_auth(
     request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
-    let Some(token) = extract_token(&request) else {
+    let Some((token, source)) = extract_token_with_source(&request) else {
         return Err(ApiError::Unauthorized(
             "Authentication required.".to_string(),
         ));
     };
+
+    // Reject cross-site state-changing requests authenticated solely via cookies (CSRF defense).
+    if source == TokenSource::SessionCookie
+        && !matches!(
+            *request.method(),
+            Method::GET | Method::HEAD | Method::OPTIONS
+        )
+    {
+        if let Some(fetch_site) = request
+            .headers()
+            .get("sec-fetch-site")
+            .and_then(|v| v.to_str().ok())
+        {
+            if fetch_site.eq_ignore_ascii_case("cross-site") {
+                return Err(ApiError::Unauthorized(
+                    "Cross-site cookie authentication rejected.".to_string(),
+                ));
+            }
+        }
+    }
 
     let Some(claims) = jwt::decode_claims(&token) else {
         return Err(ApiError::Unauthorized(

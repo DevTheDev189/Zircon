@@ -20,14 +20,129 @@ window.Zircon.mods = {
             this.searchMods();
         }
     },
+    getLoaderBadgeClass(ldr) {
+        return '';
+    },
+    getLoaderIcon(ldr) {
+        const l = (ldr || '').toLowerCase();
+        if (l === 'fabric') return '/fabric.svg';
+        if (l === 'quilt') return '/quilt.svg';
+        if (l === 'neoforge') return '/neoforge.svg';
+        if (l === 'forge') return '/forge.svg';
+        return '';
+    },
+    getLoaderTitle(ldr) {
+        const l = (ldr || '').toLowerCase();
+        if (l === 'fabric') return 'Fabric';
+        if (l === 'quilt') return 'Quilt';
+        if (l === 'neoforge') return 'NeoForge';
+        if (l === 'forge') return 'Minecraft Forge';
+        return ldr;
+    },
+    isNativeLoader(ldr) {
+        const rawLoader = this.selectedInstance?.modLoader?.type === 'vanilla' ? '' : (this.selectedInstance?.modLoader?.type || '');
+        const instanceLoader = rawLoader.toLowerCase();
+        const l = (ldr || '').toLowerCase();
+        if (instanceLoader === 'quilt') return l === 'quilt' || l === 'fabric';
+        return l === instanceLoader;
+    },
+    getLoaderTooltip(ldr) {
+        const l = (ldr || '').toLowerCase();
+        const title = this.getLoaderTitle(ldr);
+        if (this.isNativeLoader(l)) {
+            return `${title} (Current Server Loader)`;
+        }
+        return `${title} (Cross-Loader • Requires translation layer)`;
+    },
+    getSortedHitLoaders(hit) {
+        const rawLoader = this.selectedInstance?.modLoader?.type === 'vanilla' ? '' : (this.selectedInstance?.modLoader?.type || '');
+        const instanceLoader = rawLoader.toLowerCase();
+        const loaders = (hit.loaders || []).map(l => (l || '').toLowerCase());
+        if (loaders.length === 0) {
+            return instanceLoader ? [instanceLoader] : [];
+        }
+        const unique = [...new Set(loaders)];
+        let result = unique;
+        if (!this.searchAllLoaders && instanceLoader) {
+            if (instanceLoader === 'quilt') {
+                result = unique.filter(l => l === 'quilt' || l === 'fabric');
+            } else {
+                result = unique.filter(l => l === instanceLoader);
+            }
+            if (result.length === 0 && unique.length > 0) {
+                result = unique;
+            }
+        }
+        // Always sort the active server loader to the left-most position
+        result.sort((a, b) => {
+            if (a === instanceLoader) return -1;
+            if (b === instanceLoader) return 1;
+            if (instanceLoader === 'quilt' && a === 'fabric') return -1;
+            if (instanceLoader === 'quilt' && b === 'fabric') return 1;
+            return a.localeCompare(b);
+        });
+        return result;
+    },
+    selectHitLoader(hit, ldr) {
+        hit.selectedLoader = (ldr || '').toLowerCase();
+        const versions = this.getFilteredVersionOptions(hit);
+        if (versions && versions.length > 0) {
+            hit.selectedVersionId = versions[0].id || versions[0].fileId;
+        }
+    },
+    getFilteredVersionOptions(hit) {
+        const all = hit.versionOptions || [];
+        if (!hit.selectedLoader) return all;
+        const target = hit.selectedLoader.toLowerCase();
+        const filtered = all.filter(v => {
+            const loaders = (v.loaders || []).map(l => (l || '').toLowerCase());
+            if (loaders.length === 0) return true;
+            return loaders.includes(target);
+        });
+        return filtered.length > 0 ? filtered : all;
+    },
+    async installFromLink() {
+        const input = (this.directModUrlInput || '').trim();
+        if (!input || !this.selectedInstance) return;
+        this.directModUrlBusy = true;
+        try {
+            let cleanQuery = input;
+            let provider = this.searchProvider;
+            if (input.includes('modrinth.com/mod/')) {
+                cleanQuery = input.split('modrinth.com/mod/')[1].split('/')[0].split('?')[0];
+                provider = 'modrinth';
+            } else if (input.includes('modrinth.com/plugin/')) {
+                cleanQuery = input.split('modrinth.com/plugin/')[1].split('/')[0].split('?')[0];
+                provider = 'modrinth';
+            } else if (input.includes('curseforge.com/minecraft/mc-mods/')) {
+                cleanQuery = input.split('curseforge.com/minecraft/mc-mods/')[1].split('/')[0].split('?')[0];
+                provider = 'curseforge';
+            }
+            this.searchProvider = provider;
+            this.searchQuery = cleanQuery;
+            await this.searchMods();
+            this.directModUrlInput = '';
+        } catch (e) {
+            alert('Lookup failed: ' + e.message);
+        } finally {
+            this.directModUrlBusy = false;
+        }
+    },
     async searchMods() {
         if (!this.selectedInstance || !this.searchQuery.trim()) return;
-        const loader = this.selectedInstance.modLoader.type === 'vanilla' ? '' : this.selectedInstance.modLoader.type;
+        const rawLoader = this.selectedInstance.modLoader?.type === 'vanilla' ? '' : (this.selectedInstance.modLoader?.type || '');
+        const instanceLoader = rawLoader.toLowerCase();
+        const loader = this.searchAllLoaders ? '' : instanceLoader;
+        let reqType = this.searchType;
+        if (this.searchType === 'shaderpack') {
+            reqType = this.searchProvider === 'curseforge' ? 'shaderpack' : 'shader';
+        }
+        const isPack = this.searchType === 'resourcepack' || this.searchType === 'shaderpack';
         const q = new URLSearchParams({
             query: this.searchQuery,
             mcVersion: this.searchAllVersions ? '' : (this.selectedInstance.minecraftVersion || ''),
-            loader,
-            type: this.searchType,
+            loader: isPack ? '' : loader,
+            type: reqType,
             origin: this.searchProvider
         });
         const mySeq = ++this.searchSeq;
@@ -38,10 +153,26 @@ window.Zircon.mods = {
             if (data.notice && (!data.hits || !data.hits.length)) {
                 alert(data.notice);
             }
-            this.searchResults = data.hits || [];
+            let hits = data.hits || [];
+            // When multiple loaders are off by default, only show mods from the instance's mod loader (if not a resource/shader pack).
+            if (!isPack && !this.searchAllLoaders && instanceLoader) {
+                hits = hits.filter(hit => {
+                    const loaders = (hit.loaders || []).map(l => (l || '').toLowerCase());
+                    if (loaders.length === 0) return true;
+                    if (instanceLoader === 'quilt') {
+                        return loaders.includes('quilt') || loaders.includes('fabric');
+                    }
+                    return loaders.includes(instanceLoader);
+                });
+            }
+            this.searchResults = hits;
             // Auto-detect the best version for each mod hit, but keep the
             // full option list so the admin can override the pick manually.
-            if (this.searchType === 'mod') this.attachVersionOptions(data.hits || []);
+            if (this.searchType === 'mod') {
+                this.attachVersionOptions(hits);
+            } else if (isPack && typeof this.attachPackVersionOptions === 'function') {
+                this.attachPackVersionOptions(hits, this.searchType, this.searchProvider);
+            }
         } catch (e) {
             if (mySeq === this.searchSeq) alert('Search failed: ' + e.message);
         } finally {
@@ -50,7 +181,9 @@ window.Zircon.mods = {
     },
     /** Fetches compatible versions for every search hit and pre-selects the best one. */
     async attachVersionOptions(hits) {
-        const loader = this.selectedInstance.modLoader.type === 'vanilla' ? '' : this.selectedInstance.modLoader.type;
+        const rawLoader = this.selectedInstance.modLoader?.type === 'vanilla' ? '' : (this.selectedInstance.modLoader?.type || '');
+        const instanceLoader = rawLoader.toLowerCase();
+        const loader = this.searchAllLoaders ? '' : instanceLoader;
         const isCurseForge = this.searchProvider === 'curseforge';
         await Promise.all(hits.map(async (hit) => {
             hit.versionOptions = [];
@@ -74,11 +207,61 @@ window.Zircon.mods = {
             } catch (e) {
                 hit.versionsFailed = true;
             }
+            const sorted = this.getSortedHitLoaders(hit);
+            hit.selectedLoader = sorted[0] || instanceLoader || 'fabric';
+            const matching = this.getFilteredVersionOptions(hit);
+            hit.selectedVersionId = matching[0] ? (matching[0].id || matching[0].fileId) : (hit.versionOptions[0] ? (hit.versionOptions[0].id || hit.versionOptions[0].fileId) : '');
         }));
+    },
+    async installPackFromSearch(hit, type) {
+        const id = hit.projectId || hit.id;
+        const isShader = type === 'shaderpack' || type === 'shader';
+        const endpoint = isShader ? 'shaderpacks' : 'resourcepacks';
+        this.installingMods[id] = true;
+        try {
+            const isCurseForge = this.searchProvider === 'curseforge' || hit.origin === 'curseforge';
+            let body = {
+                projectId: id,
+                versionId: hit.selectedVersionId || undefined,
+                origin: isCurseForge ? 'curseforge' : 'modrinth',
+            };
+            if (isCurseForge && hit.versionOptions && hit.versionOptions.length > 0) {
+                const selectedFile = hit.versionOptions.find(f => (f.id || f.fileId) == hit.selectedVersionId) || hit.versionOptions[0];
+                if (selectedFile) {
+                    body.downloadUrl = selectedFile.downloadUrl || selectedFile.url;
+                    body.filename = selectedFile.fileName || selectedFile.filename || (hit.name + '.zip');
+                }
+            }
+            await this.api(`/api/instances/${this.selectedInstance.id}/${endpoint}/install`, {
+                method: 'POST',
+                body: JSON.stringify(body)
+            });
+            if (typeof this.loadShaders === 'function') {
+                await this.loadShaders();
+            }
+            alert(`${hit.title || hit.name} installed successfully into ${endpoint}/!`);
+        } catch (e) {
+            alert(`Install failed: ${e.message || e}`);
+        } finally {
+            delete this.installingMods[id];
+        }
     },
     async installMod(hit) {
         const id = hit.projectId || hit.id;
         const isCurseForge = this.searchProvider === 'curseforge' || hit.origin === 'curseforge';
+
+        // Cross-loader safety check
+        const targetLoader = hit.selectedLoader || (hit.loaders && hit.loaders[0]) || '';
+        const isCrossLoader = targetLoader && !this.isNativeLoader(targetLoader);
+        if (isCrossLoader) {
+            const confirmed = window.confirm(
+                `Cross-Loader Installation Notice:\n\n` +
+                `You are installing a ${this.getLoaderTitle(targetLoader)} build on this ${this.selectedInstance?.modLoader?.type || 'server'} instance.\n\n` +
+                `Ensure your server has an appropriate translation layer installed to run this mod.\n\n` +
+                `Proceed with installation?`
+            );
+            if (!confirmed) return;
+        }
 
         if (isCurseForge) {
             // Compliant browser hand-off: open the CurseForge mod/modpack/file page in a new tab
@@ -525,13 +708,30 @@ window.Zircon.mods = {
         if (!this.selectedInstance) return;
         const id = this.selectedInstance.id;
         const url = `/api/instances/${id}/pack.mrpack`;
-        const a = document.createElement('a');
-        a.href = url;
-        const safeName = (this.selectedInstance.name || 'modpack').replace(/[^a-zA-Z0-9_\-]/g, '_');
-        a.download = `${safeName}.mrpack`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        try {
+            const headers = {};
+            if (this.jwtToken) {
+                headers['Authorization'] = `Bearer ${this.jwtToken}`;
+            }
+            const res = await fetch(url, { headers });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || `Download failed with status ${res.status}`);
+            }
+            const blob = await res.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            const safeName = (this.selectedInstance.name || 'modpack').replace(/[^a-zA-Z0-9_\-]/g, '_');
+            a.download = `${safeName}.mrpack`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+            this.showAlert('Downloaded .mrpack modpack successfully!', 'success');
+        } catch (e) {
+            alert(`Export error: ${e.message || e}`);
+        }
     },
 
     async copyMrpackUrl() {
@@ -540,7 +740,7 @@ window.Zircon.mods = {
         const url = `${window.location.origin}/api/instances/${id}/pack.mrpack`;
         if (navigator.clipboard && navigator.clipboard.writeText) {
             await navigator.clipboard.writeText(url);
-            alert(`✓ Copied .mrpack URL to clipboard!\n\n${url}\n\nUniversal URL for Prism Launcher, Modrinth App, and other launchers.`);
+            this.showAlert('✓ Copied .mrpack URL to clipboard! Share with friends for Prism / Modrinth.', 'success');
         } else {
             window.prompt('Copy Universal .mrpack URL:', url);
         }
@@ -618,5 +818,69 @@ window.Zircon.mods = {
         } catch (e) {
             alert('Failed to restore snapshot: ' + (e.message || 'Unknown error'));
         }
+    },
+
+    getFilteredInstalledMods() {
+        const query = (this.installedModsFilterQuery || '').trim().toLowerCase();
+        if (!query) {
+            return (this.installedMods || []).map(m => ({ mod: m, match: true, score: 0 }));
+        }
+
+        const scored = (this.installedMods || []).map(m => {
+            let score = 0;
+            const title = (m.title || '').toLowerCase();
+            const filename = (m.filename || '').toLowerCase();
+            const id = String(m.id || '').toLowerCase();
+            const slug = (m.slug || '').toLowerCase();
+            const side = (m.side || '').toLowerCase();
+            const author = (m.author || '').toLowerCase();
+            const desc = (m.description || '').toLowerCase();
+
+            // Tier 1: Exact / starts-with match in title (120 / 100 / 85 pts)
+            if (title === query) {
+                score += 120;
+            } else if (title.startsWith(query)) {
+                score += 100;
+            } else if (title.includes(query)) {
+                score += 85;
+            }
+
+            // Tier 2: Substring match in filename, id, or slug (75 pts)
+            if (filename.includes(query) || id.includes(query) || slug.includes(query)) {
+                score += 75;
+            }
+
+            // Tier 3: Match in environment side ("server", "client", "both") (50 pts)
+            if (side === query || (query === 'server' && side === 'server') || (query === 'client' && side === 'client')) {
+                score += 50;
+            }
+
+            // Tier 4: Match in description or author (25 pts)
+            if (author.includes(query) || desc.includes(query)) {
+                score += 25;
+            }
+
+            return { mod: m, match: score > 0, score };
+        });
+
+        // Float matching mods to top sorted by score descending, non-matching below
+        scored.sort((a, b) => {
+            if (a.match && !b.match) return -1;
+            if (!a.match && b.match) return 1;
+            if (a.match && b.match) return b.score - a.score;
+            return 0;
+        });
+
+        return scored;
+    },
+
+    getFilteredInstalledModsCount() {
+        const query = (this.installedModsFilterQuery || '').trim().toLowerCase();
+        if (!query) return (this.installedMods || []).length;
+        return this.getFilteredInstalledMods().filter(item => item.match).length;
+    },
+
+    clearInstalledModsFilter() {
+        this.installedModsFilterQuery = '';
     }
 };

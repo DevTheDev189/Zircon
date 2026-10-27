@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Saglabāt",
+    "saving": "Saglabā…",
+    "cancel": "Atcelt",
+    "close": "Aizvērt",
+    "refresh": "Atsvaidzināt",
+    "copy": "Kopēt",
+    "copied": "Nokopēts starpliktuvē!",
+    "delete": "Dzēst",
+    "loading": "Ielādē…",
+    "apply": "Lietot",
+    "edit": "Rediģēt",
+    "search": "Meklēt…",
+    "online": "Tiešsaistē",
+    "offline": "Bezsaistē",
+    "sleeping": "Miega režīmā",
+    "booting": "Palaiž…",
+    "falling_asleep": "Pāriet miega režīmā…",
+    "shutting_down": "Izslēdzas…",
+    "start": "Sākt",
+    "stop": "Apturēt",
+    "restart": "Restartēt",
+    "wake": "Pamodināt serveri",
+    "detecting": "Noteikšana…"
+  },
+  "nav": {
+    "global_stats": "Globālā statistika",
+    "servers": "Serveri",
+    "create_server": "Izveidot serveri",
+    "import_server": "Importēt serveri (.zip)",
+    "mods": "Modi",
+    "shaders": "Šeideri",
+    "files": "Faili",
+    "console": "Konsole",
+    "players": "Spēlētāji",
+    "backups": "Rezerves kopijas",
+    "world": "Pasaule",
+    "settings": "Iestatījumi",
+    "disk_storage": "Diska krātuve",
+    "server_manager": "Serveru pārvaldnieks"
+  },
+  "stats": {
+    "title": "Sistēmas telemetrija un metrikas",
+    "subtitle": "Reāllaika CPU, saimniekdatora RAM, procesa RSS un diska aktivitāte",
+    "host_ram": "Saimniekdatora OS RAM",
+    "process_rss": "Java procesa RSS",
+    "cpu_usage": "CPU slodze",
+    "disk_allocation": "NVMe krātuves piešķiršana",
+    "uptime": "Sistēmas darbības laiks",
+    "active_instances": "Aktīvās instances",
+    "sleeping_instances": "Migrajošās instances"
+  },
+  "instances": {
+    "no_servers": "Vēl nav serveru — noklikšķiniet uz Izveidot serveri.",
+    "create_title": "Izveidot Minecraft serveri",
+    "name_label": "Instances nosaukums",
+    "version_label": "Minecraft versija",
+    "loader_label": "Modifikāciju ielādētājs",
+    "port_label": "Ports",
+    "memory_label": "Piešķirtā atmiņa (GB)",
+    "start_server": "Sākt serveri",
+    "wake_server": "Pamodināt serveri",
+    "stop_server": "Apturēt serveri",
+    "restart_server": "Restartēt serveri",
+    "players_online": "{count} tiešsaistē",
+    "sleeps_in": "Miegā pēc {time}",
+    "idle_wakes": "Dīkstāves izslēgšana — pamostas, kad spēlētājs pievienojas"
+  },
+  "mods": {
+    "title": "Instalētie modi",
+    "count": "Instalētie modi ({count})",
+    "search_placeholder": "Meklēt instalētos modus…",
+    "loader_filter": "Ielādētāja filtrs",
+    "all_loaders": "Visi ielādētāji",
+    "active_loader": "Aktīvais ielādētājs ({loader})",
+    "export_mrpack": "Eksportēt .mrpack",
+    "copy_mrpack_url": "Kopēt .mrpack URL",
+    "copy_mrpack_tooltip": "Kopēt publisko .mrpack lejupielādes saiti spēlētājiem, kuri neizmanto Zircon",
+    "add_mod": "Pievienot modu",
+    "install_update": "Atjaunināt",
+    "no_mods": "Vēl nav instalētu modu."
+  },
+  "console": {
+    "title": "Servera konsole un terminālis",
+    "placeholder": "Sūtīt komandu (piem., /say Hello, /op Player)...",
+    "send": "Sūtīt",
+    "clear": "Notīrīt"
+  },
+  "players": {
+    "title": "Spēlētāju pārvaldība",
+    "online": "Tiešsaistes spēlētāji",
+    "whitelist": "Baltā saraksta",
+    "ops": "Operatori",
+    "bans": "Aizliegtie spēlētāji",
+    "kick": "Izmest",
+    "ban": "Aizliegt",
+    "op": "Piešķirt operatora tiesības",
+    "deop": "Noņemt operatora tiesības"
+  },
+  "backups": {
+    "title": "Pasaules un instancu momentuzņēmumi",
+    "create": "Izveidot rezerves kopiju",
+    "restore": "Atjaunot",
+    "download": "Lejupielādēt",
+    "delete": "Dzēst"
+  },
+  "security": {
+    "online_mode": "Tiešsaistes režīms (Mojang autentifikācija)",
+    "online_mode_warning": "Brīdinājums: Izslēdzot online-mode, ļauj pieslēgties bezsaistes/pārbaudītus nespēlētājus ar viltotiem UUID.",
+    "whitelist_enforced": "Piespiest baltā saraksta ievērošanu"
+  }
+}

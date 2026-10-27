@@ -67,6 +67,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let config = Arc::new(ConfigService::load()?);
+    if let Ok(port_str) = std::env::var("ZIRCON_PORT")
+        .or_else(|_| std::env::var("ZIRCON_WEB_PORT"))
+        .or_else(|_| std::env::var("MC_MANAGER_WEB_PORT"))
+    {
+        if let Ok(p) = port_str.parse::<i32>() {
+            config.with_config(|c| c.web_port = p);
+        }
+    }
+    if let Ok(port_str) = std::env::var("ZIRCON_PUBLIC_PORT")
+        .or_else(|_| std::env::var("MC_MANAGER_PUBLIC_PORT"))
+    {
+        if let Ok(p) = port_str.parse::<i32>() {
+            config.with_config(|c| c.public_port = p);
+        }
+    }
     let cf_key = config.effective_curseforge_key();
     if !cf_key.is_empty() {
         tracing::info!("CurseForge API integration active");
@@ -187,13 +202,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         preview_sessions: Arc::new(zircon_server::services::preview_session::WarmSessionManager::new()),
     };
 
-    // Axum admin API (binds 127.0.0.1:<webPort>; reachable through the
-    // multiplexer's public port too). ConnectInfo is needed so auth handlers
+    // Axum admin API (binds to ZIRCON_BIND_ADDR or 0.0.0.0 so Docker container
+    // port forwards and LAN access work seamlessly; also reachable through the
+    // multiplexer's public port). ConnectInfo is needed so auth handlers
     // can key rate limits on the client address.
     let app = router(state.clone());
     let web_port = config.get_config().web_port;
-    let listener = TcpListener::bind(("127.0.0.1", web_port as u16)).await?;
-    tracing::info!("Admin web server listening on 127.0.0.1:{web_port}");
+    let bind_addr = std::env::var("ZIRCON_BIND_ADDR")
+        .or_else(|_| std::env::var("MC_MANAGER_BIND_ADDR"))
+        .unwrap_or_else(|_| "0.0.0.0".to_string());
+    let listener = TcpListener::bind((bind_addr.as_str(), web_port as u16)).await?;
+    tracing::info!("Admin web server listening on {bind_addr}:{web_port}");
     let web_handle = tokio::spawn(async move {
         axum::serve(
             listener,

@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "cancel": "Hủy",
+    "close": "Đóng",
+    "refresh": "Làm mới",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép vào clipboard!",
+    "delete": "Xóa",
+    "loading": "Đang tải…",
+    "apply": "Áp dụng",
+    "edit": "Sửa",
+    "search": "Tìm kiếm…",
+    "online": "Trực tuyến",
+    "offline": "Ngoại tuyến",
+    "sleeping": "Đang ngủ",
+    "booting": "Đang khởi động…",
+    "falling_asleep": "Đang chuyển sang chế độ ngủ…",
+    "shutting_down": "Đang tắt…",
+    "start": "Bắt đầu",
+    "stop": "Dừng",
+    "restart": "Khởi động lại",
+    "wake": "Đánh thức Server",
+    "detecting": "Đang phát hiện…"
+  },
+  "nav": {
+    "global_stats": "Thống kê toàn cầu",
+    "servers": "Máy chủ",
+    "create_server": "Tạo máy chủ",
+    "import_server": "Nhập máy chủ (.zip)",
+    "mods": "Mod",
+    "shaders": "Shader",
+    "files": "Tệp",
+    "console": "Console",
+    "players": "Người chơi",
+    "backups": "Sao lưu",
+    "world": "Thế giới",
+    "settings": "Cài đặt",
+    "disk_storage": "Lưu trữ ổ đĩa",
+    "server_manager": "Trình quản lý máy chủ"
+  },
+  "stats": {
+    "title": "Telemetry & Số liệu hệ thống",
+    "subtitle": "Hoạt động CPU, RAM máy chủ, RSS tiến trình và ổ đĩa theo thời gian thực",
+    "host_ram": "RAM Hệ điều hành máy chủ",
+    "process_rss": "RSS Tiến trình Java",
+    "cpu_usage": "Tải CPU",
+    "disk_allocation": "Phân bổ bộ nhớ NVMe",
+    "uptime": "Thời gian hoạt động của hệ thống",
+    "active_instances": "Phiên bản đang chạy",
+    "sleeping_instances": "Phiên bản đang ngủ"
+  },
+  "instances": {
+    "no_servers": "Chưa có máy chủ nào — hãy nhấn Tạo Máy Chủ.",
+    "create_title": "Tạo Máy Chủ Minecraft",
+    "name_label": "Tên Phiên Bản",
+    "version_label": "Phiên bản Minecraft",
+    "loader_label": "Trình nạp Mod",
+    "port_label": "Cổng",
+    "memory_label": "Bộ nhớ cấp phát (GB)",
+    "start_server": "Khởi động Máy chủ",
+    "wake_server": "Đánh thức Máy chủ",
+    "stop_server": "Dừng Máy chủ",
+    "restart_server": "Khởi động lại Máy chủ",
+    "players_online": "{count} người trực tuyến",
+    "sleeps_in": "Ngủ sau {time}",
+    "idle_wakes": "Tắt khi nhàn rỗi — đánh thức khi người chơi tham gia"
+  },
+  "mods": {
+    "title": "Mod đã cài đặt",
+    "count": "Mod đã cài đặt ({count})",
+    "search_placeholder": "Tìm kiếm mod đã cài đặt…",
+    "loader_filter": "Bộ lọc Loader",
+    "all_loaders": "Tất cả Loader",
+    "active_loader": "Loader đang hoạt động ({loader})",
+    "export_mrpack": "Xuất .mrpack",
+    "copy_mrpack_url": "Sao chép URL .mrpack",
+    "copy_mrpack_tooltip": "Sao chép liên kết tải xuống công khai của tệp .mrpack dành cho người chơi không dùng Zircon",
+    "add_mod": "Thêm Mod",
+    "install_update": "Cập nhật",
+    "no_mods": "Chưa có mod nào được cài đặt."
+  },
+  "console": {
+    "title": "Bảng điều khiển & Terminal máy chủ",
+    "placeholder": "Gửi lệnh (vd: /say Hello, /op Player)...",
+    "send": "Gửi",
+    "clear": "Xóa"
+  },
+  "players": {
+    "title": "Quản lý người chơi",
+    "online": "Người chơi trực tuyến",
+    "whitelist": "Danh sách trắng",
+    "ops": "Trợ quản trị viên",
+    "bans": "Người chơi bị cấm",
+    "kick": "Đuổi",
+    "ban": "Cấm",
+    "op": "Gán quyền trợ quản trị",
+    "deop": "Thu hồi quyền trợ quản trị"
+  },
+  "backups": {
+    "title": "Bản chụp thế giới & phiên bản",
+    "create": "Tạo bản sao lưu",
+    "restore": "Khôi phục",
+    "download": "Tải xuống",
+    "delete": "Xóa"
+  },
+  "security": {
+    "online_mode": "Chế độ trực tuyến (Xác thực Mojang)",
+    "online_mode_warning": "Cảnh báo: Việc tắt chế độ trực tuyến cho phép người chơi ngoại tuyến/không được xác minh với UUID giả mạo kết nối.",
+    "whitelist_enforced": "Áp dụng danh sách trắng"
+  }
+}

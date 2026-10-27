@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use sha1::Digest;
 use tauri::{AppHandle, Emitter};
+use zircon_core::archive::limits::{ArchiveGuard, DEFAULT_MAX_METADATA_BYTES};
+use zircon_core::security::ssrf;
 
 use crate::error::LauncherError;
 use crate::offline::{OfflineInstance, OfflineInstanceManager};
@@ -75,14 +77,23 @@ pub fn parse_modrinth_index(bytes: &[u8]) -> Result<ModrinthIndex, LauncherError
     let mut zip = zip::ZipArchive::new(reader)
         .map_err(|e| LauncherError::InvalidInput(format!("Invalid .mrpack archive: {e}")))?;
 
-    let mut index_entry = zip.by_name("modrinth.index.json").map_err(|_| {
+    let index_entry = zip.by_name("modrinth.index.json").map_err(|_| {
         LauncherError::InvalidInput("Missing modrinth.index.json in modpack".to_string())
     })?;
+    if index_entry.size() > DEFAULT_MAX_METADATA_BYTES {
+        return Err(LauncherError::InvalidInput(format!(
+            "modrinth.index.json exceeds maximum metadata size ({DEFAULT_MAX_METADATA_BYTES} bytes)"
+        )));
+    }
 
     let mut content = String::new();
     index_entry
+        .take(DEFAULT_MAX_METADATA_BYTES + 1)
         .read_to_string(&mut content)
         .map_err(|e| LauncherError::InvalidInput(format!("Failed to read modrinth.index.json: {e}")))?;
+    if content.len() as u64 > DEFAULT_MAX_METADATA_BYTES {
+        return Err(LauncherError::InvalidInput("modrinth.index.json exceeded metadata quota".to_string()));
+    }
 
     let index: ModrinthIndex = serde_json::from_str(&content)
         .map_err(|e| LauncherError::Parse(format!("Malformed modrinth.index.json: {e}")))?;
@@ -168,9 +179,13 @@ pub fn extract_mrpack_overrides(bytes: &[u8], dest_dir: &Path) -> Result<usize, 
     let reader = Cursor::new(bytes);
     let mut zip = zip::ZipArchive::new(reader)
         .map_err(|e| LauncherError::InvalidInput(format!("Invalid archive: {e}")))?;
+    let guard = ArchiveGuard::for_modpack_import();
 
     let mut count = 0;
     for i in 0..zip.len() {
+        guard
+            .record_entry()
+            .map_err(|e| LauncherError::Security(e.to_string()))?;
         let mut entry = zip
             .by_index(i)
             .map_err(|e| LauncherError::InvalidInput(format!("ZIP entry read error: {e}")))?;
@@ -188,6 +203,12 @@ pub fn extract_mrpack_overrides(bytes: &[u8], dest_dir: &Path) -> Result<usize, 
             continue;
         }
 
+        let declared_uncompressed = entry.size();
+        let declared_compressed = entry.compressed_size();
+        guard
+            .check_entry_header(&entry_name, declared_uncompressed, declared_compressed)
+            .map_err(|e| LauncherError::Security(e.to_string()))?;
+
         let safe_rel = sanitize_rel_path(rel_target)?;
         let target_path = dest_dir.join(safe_rel);
 
@@ -197,8 +218,21 @@ pub fn extract_mrpack_overrides(bytes: &[u8], dest_dir: &Path) -> Result<usize, 
             if let Some(parent) = target_path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
+            let max_chunk_bytes = guard
+                .limits()
+                .max_uncompressed_bytes
+                .saturating_sub(guard.cumulative_uncompressed_bytes());
             let mut outfile = std::fs::File::create(&target_path)?;
-            std::io::copy(&mut entry, &mut outfile)?;
+            let mut bounded_reader = (&mut entry).take(max_chunk_bytes.saturating_add(1));
+            let written = std::io::copy(&mut bounded_reader, &mut outfile)?;
+            if let Err(e) = guard.track_stream_chunk_with_ratio(
+                written,
+                declared_compressed.max(1),
+                guard.max_ratio_for_entry(&entry_name),
+            ) {
+                let _ = std::fs::remove_file(&target_path);
+                return Err(LauncherError::Security(e.to_string()));
+            }
             count += 1;
         }
     }
@@ -218,8 +252,10 @@ pub fn is_client_file(file: &ModrinthIndexFile) -> bool {
     true
 }
 
-/// Verifies whether the downloaded data matches the declared SHA-1 or SHA-512 hashes.
+/// Verifies that downloaded data matches all declared SHA-1 and SHA-512 hashes,
+/// requiring at least one cryptographic digest to be present.
 pub fn verify_file_hashes(data: &[u8], hashes: &HashMap<String, String>) -> Result<(), LauncherError> {
+    let mut verified_any = false;
     if let Some(expected_sha1) = hashes.get("sha1") {
         let mut hasher = sha1::Sha1::new();
         hasher.update(data);
@@ -229,7 +265,9 @@ pub fn verify_file_hashes(data: &[u8], hashes: &HashMap<String, String>) -> Resu
                 "SHA-1 mismatch: expected {expected_sha1}, got {actual_sha1}"
             )));
         }
-    } else if let Some(expected_sha512) = hashes.get("sha512") {
+        verified_any = true;
+    }
+    if let Some(expected_sha512) = hashes.get("sha512") {
         use sha2::Digest as _;
         let mut hasher = sha2::Sha512::new();
         hasher.update(data);
@@ -239,6 +277,12 @@ pub fn verify_file_hashes(data: &[u8], hashes: &HashMap<String, String>) -> Resu
                 "SHA-512 mismatch: expected {expected_sha512}, got {actual_sha512}"
             )));
         }
+        verified_any = true;
+    }
+    if !verified_any {
+        return Err(LauncherError::Security(
+            "Modpack file entry is missing required SHA-1/SHA-512 integrity hashes".to_string(),
+        ));
     }
     Ok(())
 }
@@ -254,6 +298,16 @@ pub async fn install_modpack(
     emit_progress(app, "Reading modpack manifest...", 0, 1, 0.05, "Parsing modrinth.index.json");
     let index = parse_modrinth_index(mrpack_bytes)?;
     let meta = extract_modpack_metadata(&index, custom_name);
+
+    // Pre-flight disk space check: declared client downloads + archive safety margin (min 1 GB)
+    let total_download_size: u64 = index
+        .files
+        .iter()
+        .filter(|f| is_client_file(f))
+        .map(|f| f.file_size)
+        .sum();
+    let required_bytes = std::cmp::max(total_download_size + (mrpack_bytes.len() as u64 * 3), 1024 * 1024 * 1024);
+    crate::paths::check_available_disk_space(manager.base_dir(), required_bytes)?;
 
     emit_progress(
         app,
@@ -271,57 +325,96 @@ pub async fn install_modpack(
     )?;
     let instance_dir = manager.instance_dir(&instance.id);
 
-    emit_progress(app, "Extracting configs and assets...", 0, 1, 0.15, "Applying overrides");
-    extract_mrpack_overrides(mrpack_bytes, &instance_dir)?;
+    let install_result: Result<(), LauncherError> = async {
+        emit_progress(app, "Extracting configs and assets...", 0, 1, 0.15, "Applying overrides");
+        extract_mrpack_overrides(mrpack_bytes, &instance_dir)?;
 
-    let client_files: Vec<&ModrinthIndexFile> = index.files.iter().filter(|f| is_client_file(f)).collect();
-    let total_files = client_files.len();
+        let client_files: Vec<&ModrinthIndexFile> =
+            index.files.iter().filter(|f| is_client_file(f)).collect();
+        let total_files = client_files.len();
 
-    emit_progress(
-        app,
-        "Downloading mods & assets...",
-        0,
-        total_files,
-        0.20,
-        &format!("0 / {total_files} files"),
-    );
-
-    for (idx, file) in client_files.into_iter().enumerate() {
-        let safe_rel = sanitize_rel_path(&file.path)?;
-        let dest = instance_dir.join(safe_rel);
-
-        let Some(download_url) = file.downloads.first() else {
-            continue;
-        };
-
-        let fraction = 0.20 + (0.75 * (idx as f64 / total_files.max(1) as f64));
         emit_progress(
             app,
             "Downloading mods & assets...",
-            idx + 1,
+            0,
             total_files,
-            fraction,
-            &format!("{}/{} - {}", idx + 1, total_files, file.path),
+            0.20,
+            &format!("0 / {total_files} files"),
         );
 
-        if !dest.is_file() {
-            if let Some(parent) = dest.parent() {
-                tokio::fs::create_dir_all(parent).await?;
+        for (idx, file) in client_files.into_iter().enumerate() {
+            let safe_rel = sanitize_rel_path(&file.path)?;
+            let allowed_prefix = safe_rel
+                .components()
+                .next()
+                .and_then(|c| c.as_os_str().to_str())
+                .map(|s| {
+                    matches!(
+                        s.to_ascii_lowercase().as_str(),
+                        "mods" | "resourcepacks" | "shaderpacks" | "datapacks" | "config"
+                    )
+                })
+                .unwrap_or(false);
+            if !allowed_prefix || safe_rel.components().count() < 2 {
+                return Err(LauncherError::Security(format!(
+                    "Disallowed target path in modrinth.index.json: {}",
+                    file.path
+                )));
             }
-            let resp = http
-                .get(download_url)
-                .send()
-                .await?;
-            let bytes = resp
-                .bytes()
-                .await?;
+            let dest = instance_dir.join(safe_rel);
 
-            verify_file_hashes(&bytes, &file.hashes)?;
-            tokio::fs::write(&dest, bytes).await?;
+            let Some(download_url) = file.downloads.first() else {
+                continue;
+            };
+            if !ssrf::is_safe_cdn_url(download_url) {
+                return Err(LauncherError::Security(format!(
+                    "Rejected untrusted modpack download URL: {download_url}"
+                )));
+            }
+
+            let fraction = 0.20 + (0.75 * (idx as f64 / total_files.max(1) as f64));
+            emit_progress(
+                app,
+                "Downloading mods & assets...",
+                idx + 1,
+                total_files,
+                fraction,
+                &format!("{}/{} - {}", idx + 1, total_files, file.path),
+            );
+
+            if !dest.is_file() {
+                if let Some(parent) = dest.parent() {
+                    tokio::fs::create_dir_all(parent).await?;
+                }
+                let resp = http
+                    .get(download_url)
+                    .send()
+                    .await?;
+                if !resp.status().is_success() {
+                    return Err(LauncherError::InvalidInput(format!(
+                        "Failed to download {}: HTTP {}",
+                        file.path,
+                        resp.status()
+                    )));
+                }
+                let bytes = resp
+                    .bytes()
+                    .await?;
+
+                verify_file_hashes(&bytes, &file.hashes)?;
+                tokio::fs::write(&dest, bytes).await?;
+            }
         }
+        emit_progress(app, "Installation complete!", total_files, total_files, 1.0, "Ready to launch");
+        Ok(())
+    }
+    .await;
+
+    if let Err(err) = install_result {
+        let _ = std::fs::remove_dir_all(&instance_dir);
+        return Err(err);
     }
 
-    emit_progress(app, "Installation complete!", total_files, total_files, 1.0, "Ready to launch");
     Ok(instance)
 }
 
@@ -407,14 +500,23 @@ pub fn parse_curseforge_manifest(bytes: &[u8]) -> Result<CurseForgeManifest, Lau
     let mut zip = zip::ZipArchive::new(reader)
         .map_err(|e| LauncherError::InvalidInput(format!("Invalid CurseForge archive: {e}")))?;
 
-    let mut entry = zip.by_name("manifest.json").map_err(|_| {
+    let entry = zip.by_name("manifest.json").map_err(|_| {
         LauncherError::InvalidInput("Missing manifest.json in CurseForge modpack".to_string())
     })?;
+    if entry.size() > DEFAULT_MAX_METADATA_BYTES {
+        return Err(LauncherError::InvalidInput(format!(
+            "manifest.json exceeds maximum metadata size ({DEFAULT_MAX_METADATA_BYTES} bytes)"
+        )));
+    }
 
     let mut content = String::new();
     entry
+        .take(DEFAULT_MAX_METADATA_BYTES + 1)
         .read_to_string(&mut content)
         .map_err(|e| LauncherError::InvalidInput(format!("Failed to read manifest.json: {e}")))?;
+    if content.len() as u64 > DEFAULT_MAX_METADATA_BYTES {
+        return Err(LauncherError::InvalidInput("manifest.json exceeded metadata quota".to_string()));
+    }
 
     let manifest: CurseForgeManifest = serde_json::from_str(&content)
         .map_err(|e| LauncherError::Parse(format!("Malformed manifest.json: {e}")))?;
@@ -468,41 +570,14 @@ pub fn extract_curseforge_overrides(
     overrides_dir_name: &str,
     target_dir: &Path,
 ) -> Result<(), LauncherError> {
-    let reader = Cursor::new(zip_bytes);
-    let mut zip = zip::ZipArchive::new(reader)
-        .map_err(|e| LauncherError::InvalidInput(format!("Invalid zip archive: {e}")))?;
-
-    let prefix = format!("{}/", overrides_dir_name.trim_matches('/'));
-
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).map_err(|e| {
-            LauncherError::InvalidInput(format!("Failed reading zip index {i}: {e}"))
-        })?;
-
-        let name = file.name().to_string();
-        if !name.starts_with(&prefix) {
-            continue;
-        }
-
-        let rel_path = match name.strip_prefix(&prefix) {
-            Some(p) if !p.trim().is_empty() => p,
-            _ => continue,
-        };
-
-        let safe_rel = sanitize_rel_path(rel_path)?;
-        let out_path = target_dir.join(safe_rel);
-
-        if file.is_dir() {
-            std::fs::create_dir_all(&out_path)?;
-        } else {
-            if let Some(parent) = out_path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            let mut out_file = std::fs::File::create(&out_path)?;
-            std::io::copy(&mut file, &mut out_file)?;
-        }
-    }
-
+    let guard = ArchiveGuard::for_modpack_import();
+    zircon_core::archive::curseforge_pack::extract_curseforge_overrides(
+        Cursor::new(zip_bytes),
+        overrides_dir_name,
+        target_dir,
+        &guard,
+    )
+    .map_err(|e| LauncherError::Security(e.to_string()))?;
     Ok(())
 }
 
@@ -517,6 +592,11 @@ pub async fn install_curseforge_modpack(
     emit_progress(app, "Reading CurseForge manifest...", 0, 1, 0.05, "Parsing manifest.json");
     let manifest = parse_curseforge_manifest(zip_bytes)?;
     let meta = extract_curseforge_metadata(&manifest, custom_name);
+
+    // Pre-flight disk space check: CurseForge manifests don't declare uncompressed sizes,
+    // so enforce at least 4x archive size or 1.5 GB minimum.
+    let required_bytes = std::cmp::max(zip_bytes.len() as u64 * 4, 1536 * 1024 * 1024);
+    crate::paths::check_available_disk_space(manager.base_dir(), required_bytes)?;
 
     emit_progress(
         app,
@@ -537,67 +617,106 @@ pub async fn install_curseforge_modpack(
     let mods_dir = instance_dir.join("mods");
     tokio::fs::create_dir_all(&mods_dir).await?;
 
-    emit_progress(app, "Extracting configs and assets...", 0, 1, 0.15, "Applying overrides");
-    extract_curseforge_overrides(zip_bytes, &manifest.overrides, &instance_dir)?;
+    let install_result: Result<(), LauncherError> = async {
+        emit_progress(app, "Extracting configs and assets...", 0, 1, 0.15, "Applying overrides");
+        extract_curseforge_overrides(zip_bytes, &manifest.overrides, &instance_dir)?;
 
-    let total_files = manifest.files.len();
-    emit_progress(
-        app,
-        "Resolving mod files from CurseForge...",
-        0,
-        total_files,
-        0.20,
-        &format!("0 / {total_files} mods"),
-    );
-
-    // Batch resolve CurseForge files (in chunks of 50)
-    let mut resolved_files = Vec::new();
-    for chunk in manifest.files.chunks(50) {
-        let file_ids: Vec<i64> = chunk.iter().map(|f| f.file_id as i64).collect();
-        if let Ok(files) = curse_forge.get_files(&file_ids).await {
-            resolved_files.extend(files);
-        } else {
-            // Fallback to individual file fetching
-            for file_ref in chunk {
-                if let Ok(file) = curse_forge.get_mod_file(file_ref.project_id as i64, file_ref.file_id as i64).await {
-                    resolved_files.push(file);
-                }
-            }
-        }
-    }
-
-    for (idx, file) in resolved_files.into_iter().enumerate() {
-        let dest = mods_dir.join(&file.file_name);
-        let fraction = 0.20 + (0.75 * (idx as f64 / total_files.max(1) as f64));
+        let total_files = manifest.files.len();
         emit_progress(
             app,
-            "Downloading mods...",
-            idx + 1,
+            "Resolving mod files from CurseForge...",
+            0,
             total_files,
-            fraction,
-            &format!("{}/{} - {}", idx + 1, total_files, file.file_name),
+            0.20,
+            &format!("0 / {total_files} mods"),
         );
 
-        if !dest.is_file() {
-            let download_url = if !file.download_url.is_empty() {
-                file.download_url
+        // Batch resolve CurseForge files (in chunks of 50)
+        let mut resolved_files = Vec::new();
+        for chunk in manifest.files.chunks(50) {
+            let file_ids: Vec<i64> = chunk.iter().map(|f| f.file_id as i64).collect();
+            if let Ok(files) = curse_forge.get_files(&file_ids).await {
+                resolved_files.extend(files);
             } else {
-                let p1 = file.id / 1000;
-                let p2 = file.id % 1000;
-                format!("https://edge.forgecdn.net/files/{p1}/{p2}/{}", file.file_name)
-            };
-
-            if let Ok(resp) = http.get(&download_url).send().await {
-                if resp.status().is_success() {
-                    if let Ok(bytes) = resp.bytes().await {
-                        let _ = tokio::fs::write(&dest, bytes).await;
+                // Fallback to individual file fetching
+                for file_ref in chunk {
+                    if let Ok(file) = curse_forge.get_mod_file(file_ref.project_id as i64, file_ref.file_id as i64).await {
+                        resolved_files.push(file);
                     }
                 }
             }
         }
+
+        for (idx, file) in resolved_files.into_iter().enumerate() {
+            let safe_file_name = sanitize_rel_path(&file.file_name)?;
+            if safe_file_name.components().count() != 1 {
+                return Err(LauncherError::Security(format!(
+                    "Illegal CurseForge mod filename: {}",
+                    file.file_name
+                )));
+            }
+            let dest = mods_dir.join(&safe_file_name);
+            let fraction = 0.20 + (0.75 * (idx as f64 / total_files.max(1) as f64));
+            emit_progress(
+                app,
+                "Downloading mods...",
+                idx + 1,
+                total_files,
+                fraction,
+                &format!("{}/{} - {}", idx + 1, total_files, file.file_name),
+            );
+
+            if !dest.is_file() {
+                let download_url = if !file.download_url.is_empty() {
+                    file.download_url.clone()
+                } else {
+                    let p1 = file.id / 1000;
+                    let p2 = file.id % 1000;
+                    format!(
+                        "https://edge.forgecdn.net/files/{p1}/{p2}/{}",
+                        safe_file_name.to_string_lossy()
+                    )
+                };
+                if !ssrf::is_safe_cdn_url(&download_url) {
+                    return Err(LauncherError::Security(format!(
+                        "Rejected untrusted CurseForge download URL: {download_url}"
+                    )));
+                }
+
+                let resp = http.get(&download_url).send().await?;
+                if !resp.status().is_success() {
+                    return Err(LauncherError::InvalidInput(format!(
+                        "Failed to download {}: HTTP {}",
+                        file.file_name,
+                        resp.status()
+                    )));
+                }
+                let bytes = resp.bytes().await?;
+                if let Some(expected_sha1) = file.sha1() {
+                    let mut hasher = sha1::Sha1::new();
+                    hasher.update(&bytes);
+                    let actual_sha1 = hex::encode(hasher.finalize());
+                    if !actual_sha1.eq_ignore_ascii_case(expected_sha1) {
+                        return Err(LauncherError::Security(format!(
+                            "CurseForge SHA-1 mismatch for {}: expected {expected_sha1}, got {actual_sha1}",
+                            file.file_name
+                        )));
+                    }
+                }
+                let _ = tokio::fs::write(&dest, bytes).await;
+            }
+        }
+
+        emit_progress(app, "Installation complete!", total_files, total_files, 1.0, "Ready to launch");
+        Ok(())
+    }
+    .await;
+
+    if let Err(err) = install_result {
+        let _ = std::fs::remove_dir_all(&instance_dir);
+        return Err(err);
     }
 
-    emit_progress(app, "Installation complete!", total_files, total_files, 1.0, "Ready to launch");
     Ok(instance)
 }
 

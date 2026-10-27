@@ -149,22 +149,32 @@ fn validate_pack_archive_internal<R: Read + Seek>(
             continue;
         }
 
-        // Skip harmless OS metadata files created by macOS/Windows zip tools
-        if name.starts_with("__MACOSX/")
-            || name.ends_with(".DS_Store")
-            || name.ends_with("Thumbs.db")
-            || name.ends_with(".gitattributes")
-            || name.ends_with(".gitignore")
-        {
-            continue;
-        }
-
-        // 3. Size checks against bombs
+        // 3. Size checks against bombs (MUST run for every entry, including OS metadata)
         let size = entry.size();
         let comp_size = entry.compressed_size();
         total_uncompressed = total_uncompressed.saturating_add(size);
         total_compressed = total_compressed.saturating_add(comp_size);
         guard.check_entry_header(&name, size, comp_size)?;
+        if total_uncompressed > guard.limits().max_uncompressed_bytes {
+            return Err(PackSecurityError::Archive(ArchiveError::ExceededMaxBytes {
+                limit: guard.limits().max_uncompressed_bytes,
+                actual: total_uncompressed,
+            }));
+        }
+
+        // Only skip exact harmless OS metadata basenames if they are small (< 64 KiB)
+        // and never blindly skip arbitrary executables inside __MACOSX/.
+        let file_name_lower = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_ascii_lowercase());
+        if matches!(
+            file_name_lower.as_deref(),
+            Some(".ds_store" | "thumbs.db" | ".gitattributes" | ".gitignore")
+        ) && size <= 65_536
+        {
+            continue;
+        }
 
         // 4. Extension check for files
         let ext = path

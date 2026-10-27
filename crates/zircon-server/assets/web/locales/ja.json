@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "保存",
+    "saving": "保存中…",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "refresh": "更新",
+    "copy": "コピー",
+    "copied": "クリップボードにコピーしました！",
+    "delete": "削除",
+    "loading": "読み込み中…",
+    "apply": "適用",
+    "edit": "編集",
+    "search": "検索…",
+    "online": "オンライン",
+    "offline": "オフライン",
+    "sleeping": "スリープ中",
+    "booting": "起動中…",
+    "falling_asleep": "スリープに移行中…",
+    "shutting_down": "シャットダウン中…",
+    "start": "開始",
+    "stop": "停止",
+    "restart": "再起動",
+    "wake": "サーバーを起動",
+    "detecting": "検出中…"
+  },
+  "nav": {
+    "global_stats": "グローバル統計",
+    "servers": "サーバー",
+    "create_server": "サーバー作成",
+    "import_server": "サーバーインポート (.zip)",
+    "mods": "MOD",
+    "shaders": "シェーダー",
+    "files": "ファイル",
+    "console": "コンソール",
+    "players": "プレイヤー",
+    "backups": "バックアップ",
+    "world": "ワールド",
+    "settings": "設定",
+    "disk_storage": "ディスクストレージ",
+    "server_manager": "サーバーマネージャー"
+  },
+  "stats": {
+    "title": "システムテレメトリとメトリクス",
+    "subtitle": "CPU、ホスト RAM、プロセス RSS、ディスクアクティビティのリアルタイム監視",
+    "host_ram": "ホスト OS の RAM",
+    "process_rss": "Java プロセスの RSS",
+    "cpu_usage": "CPU 負荷",
+    "disk_allocation": "NVMe ストレージ割り当て",
+    "uptime": "システム稼働時間",
+    "active_instances": "実行中のインスタンス",
+    "sleeping_instances": "スリープ中のインスタンス"
+  },
+  "instances": {
+    "no_servers": "サーバーがありません — 「サーバー作成」をクリックしてください。",
+    "create_title": "Minecraft サーバーを作成",
+    "name_label": "インスタンス名",
+    "version_label": "Minecraft バージョン",
+    "loader_label": "Mod ローダー",
+    "port_label": "ポート",
+    "memory_label": "割り当てメモリ (GB)",
+    "start_server": "サーバー起動",
+    "wake_server": "サーバーを復帰",
+    "stop_server": "サーバー停止",
+    "restart_server": "サーバー再起動",
+    "players_online": "{count} 人がオンライン",
+    "sleeps_in": "{time} 後にスリープ",
+    "idle_wakes": "アイドル状態でのシャットダウン — プレイヤー参加時に復帰"
+  },
+  "mods": {
+    "title": "インストール済みMOD",
+    "count": "インストール済みMOD ({count})",
+    "search_placeholder": "インストール済みMODを検索…",
+    "loader_filter": "ローダーフィルター",
+    "all_loaders": "すべてのローダー",
+    "active_loader": "アクティブなローダー ({loader})",
+    "export_mrpack": ".mrpackをエクスポート",
+    "copy_mrpack_url": ".mrpack URLをコピー",
+    "copy_mrpack_tooltip": "Zircon以外のプレイヤー向けに公開 .mrpack ダウンロードリンクをコピーします",
+    "add_mod": "MODを追加",
+    "install_update": "更新",
+    "no_mods": "まだMODがインストールされていません。"
+  },
+  "console": {
+    "title": "サーバーコンソール＆ターミナル",
+    "placeholder": "コマンドを送信（例: /say Hello, /op Player）...",
+    "send": "送信",
+    "clear": "クリア"
+  },
+  "players": {
+    "title": "プレイヤー管理",
+    "online": "オンラインプレイヤー",
+    "whitelist": "ホワイトリスト",
+    "ops": "オペレーター",
+    "bans": "BANされたプレイヤー",
+    "kick": "キック",
+    "ban": "BAN",
+    "op": "OP権限を付与",
+    "deop": "OP権限を解除"
+  },
+  "backups": {
+    "title": "ワールドとインスタンスのスナップショット",
+    "create": "バックアップを作成",
+    "restore": "復元",
+    "download": "ダウンロード",
+    "delete": "削除"
+  },
+  "security": {
+    "online_mode": "オンラインモード (Mojang認証)",
+    "online_mode_warning": "警告: online-modeを無効にすると、偽造されたUUIDを持つオフライン/未検証のプレイヤーが接続できるようになります。",
+    "whitelist_enforced": "ホワイトリストを強制"
+  }
+}

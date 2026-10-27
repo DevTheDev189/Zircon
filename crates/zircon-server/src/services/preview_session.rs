@@ -303,7 +303,7 @@ impl WarmSessionManager {
         let requested_seed = seed.trim();
 
         // Check if clean instance (no region files in live server world)
-        let live_region_dir_opt = WorldPreviewService::find_region_dir(instance_dir, &src_root);
+        let live_region_dir_opt = WorldPreviewService::find_region_dir(instance_dir, &src_root, zircon_core::world::Dimension::Overworld);
         let is_clean_instance = live_region_dir_opt.is_none();
 
         let req = WorldPreviewRequest {
@@ -312,6 +312,7 @@ impl WarmSessionManager {
             center_z: 0,
             radius_blocks: 512,
             zoom: 1.0,
+            dimension: zircon_core::world::Dimension::Overworld,
             selected_mods,
         };
 
@@ -329,8 +330,10 @@ impl WarmSessionManager {
 
         // Command assembly
         let java_version = crate::process::manager::detect_java_version(&mc_version);
-        let java_bin = crate::installer::java_bin_for_version(java_version);
-        let mut cmd = Command::new(java_bin);
+        let java_bin = crate::installer::ensure_java_installed(java_version)
+            .await
+            .map_err(|e| format!("Java error: {e}"))?;
+        let mut cmd = Command::new(&java_bin);
         cmd.current_dir(&target_dir);
         cmd.arg("-Xmx1536M");
         cmd.arg("-Xms512M");

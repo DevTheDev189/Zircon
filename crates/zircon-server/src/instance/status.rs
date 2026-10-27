@@ -45,6 +45,47 @@ impl ServerInstanceManager {
             .unwrap_or(false)
     }
 
+    /// Returns the OS process ID for a running instance, if active.
+    pub fn get_instance_pid(&self, instance_id: &str) -> Option<u32> {
+        let inner = self.inner.lock().unwrap();
+        inner.active_processes.get(instance_id).and_then(|pm| pm.process_id())
+    }
+
+    /// Returns process IDs for all currently running instances.
+    pub fn all_running_pids(&self) -> Vec<u32> {
+        let inner = self.inner.lock().unwrap();
+        inner
+            .active_processes
+            .values()
+            .filter_map(|pm| pm.process_id())
+            .collect()
+    }
+
+    /// Returns the configured maximum RAM in bytes (e.g. from -Xmx or instance config).
+    pub fn get_instance_configured_memory_bytes(&self, instance_id: &str) -> u64 {
+        let inner = self.inner.lock().unwrap();
+        if let Some(cfg) = inner.instance_configs.get(instance_id) {
+            for arg in cfg.java_args.split_whitespace() {
+                if let Some(val) = arg.strip_prefix("-Xmx") {
+                    let s = val.trim();
+                    if let Some(last) = s.chars().last() {
+                        let upper = last.to_ascii_uppercase();
+                        if upper == 'G' {
+                            if let Ok(num) = s[..s.len() - 1].parse::<u64>() {
+                                return num * 1024 * 1024 * 1024;
+                            }
+                        } else if upper == 'M' {
+                            if let Ok(num) = s[..s.len() - 1].parse::<u64>() {
+                                return num * 1024 * 1024;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        4 * 1024 * 1024 * 1024
+    }
+
     /// Polls an internal port on loopback until it accepts connections or `timeout` expires.
     pub async fn poll_port_ready(&self, port: u16, timeout: Duration) -> bool {
         let start = Instant::now();

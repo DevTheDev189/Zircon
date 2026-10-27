@@ -118,6 +118,7 @@ pub fn scan_region_surface(
     center_x: i32,
     center_z: i32,
     radius_blocks: i32,
+    dimension: super::Dimension,
 ) -> RegionSurfaceMap {
     let mut surface_map = RegionSurfaceMap::new();
     if !region_dir.exists() || !region_dir.is_dir() {
@@ -151,7 +152,7 @@ pub fn scan_region_surface(
                     }
 
                     if let Ok(Some(payload)) = read_chunk_payload(&region_file, cx, cz) {
-                        extract_chunk_surface(&payload, cx, cz, &mut surface_map);
+                        extract_chunk_surface(&payload, cx, cz, &mut surface_map, dimension);
                     }
                 }
             }
@@ -166,6 +167,7 @@ pub fn scan_single_region(
     region_dir: &Path,
     rx: i32,
     rz: i32,
+    dimension: super::Dimension,
 ) -> RegionSurfaceMap {
     let mut surface_map = RegionSurfaceMap::new();
     let region_file = region_dir.join(format!("r.{rx}.{rz}.mca"));
@@ -176,7 +178,7 @@ pub fn scan_single_region(
     for cx in (rx << 5)..=((rx << 5) + 31) {
         for cz in (rz << 5)..=((rz << 5) + 31) {
             if let Ok(Some(payload)) = read_chunk_payload(&region_file, cx, cz) {
-                extract_chunk_surface(&payload, cx, cz, &mut surface_map);
+                extract_chunk_surface(&payload, cx, cz, &mut surface_map, dimension);
             }
         }
     }
@@ -233,6 +235,7 @@ fn extract_chunk_surface(
     chunk_x: i32,
     chunk_z: i32,
     surface_map: &mut RegionSurfaceMap,
+    dimension: super::Dimension,
 ) {
     let root = match parse_nbt_compound(payload) {
         Ok(r) => r,
@@ -252,10 +255,18 @@ fn extract_chunk_surface(
 
     // Track which columns have discovered their surface block
     let mut filled = [[false; 16]; 16];
+    let mut has_seen_air = [[false; 16]; 16];
+    let mut fallback_point: [[Option<(i32, String)>; 16]; 16] = Default::default();
     let mut columns_left = 256;
 
-    // Default chunk biome
-    let mut chunk_biome = "minecraft:plains".to_string();
+    // Default chunk biome based on target dimension
+    let mut chunk_biome = match dimension {
+        super::Dimension::TheNether => "minecraft:nether_wastes".to_string(),
+        super::Dimension::TheEnd => "minecraft:the_end".to_string(),
+        super::Dimension::Overworld => "minecraft:plains".to_string(),
+    };
+
+    let is_nether = dimension == super::Dimension::TheNether;
 
     if let Some(NbtTag::List(sections)) = sections_list {
         // Collect sections with their Y index
@@ -269,6 +280,11 @@ fn extract_chunk_surface(
                     _ => None,
                 });
                 if let Some(sec_y) = y {
+                    // In the Nether, skip sections above ceiling (sec_y >= 8 corresponds to Y >= 128)
+                    if is_nether && sec_y >= 8 {
+                        continue;
+                    }
+
                     // Extract biome candidate if present
                     if let Some(NbtTag::Compound(biomes_tag)) = sec.get("biomes") {
                         if let Some(NbtTag::List(b_pal)) = biomes_tag.get("palette") {
@@ -287,7 +303,7 @@ fn extract_chunk_surface(
             }
         }
 
-        // Sort descending: scan from top sky section down to bedrock
+        // Sort descending: scan from top sky/roof section down to bedrock
         sorted_sections.sort_by(|a, b| b.0.cmp(&a.0));
 
         for (sec_y, sec) in sorted_sections {
@@ -326,23 +342,38 @@ fn extract_chunk_surface(
                         };
 
                         if let Some(name) = name_opt {
-                            if is_transparent_passable(name) {
-                                continue; // All air / transparent, skip section
+                            let is_passable = is_transparent_passable(name) || (is_nether && name.ends_with("bedrock"));
+                            if is_passable {
+                                for dz in 0..16 {
+                                    for dx in 0..16 {
+                                        has_seen_air[dz][dx] = true;
+                                    }
+                                }
+                                continue;
                             }
 
                             let base_y = sec_y * 16 + 15;
+                            // In Nether, slice below Y=120
+                            if is_nether && base_y >= 120 {
+                                continue;
+                            }
+
                             for dz in 0..16 {
                                 for dx in 0..16 {
                                     if !filled[dz][dx] {
-                                        filled[dz][dx] = true;
-                                        columns_left -= 1;
-                                        surface_map.insert(SurfacePoint {
-                                            x: base_block_x + dx as i32,
-                                            z: base_block_z + dz as i32,
-                                            y: base_y,
-                                            block_id: name.to_string(),
-                                            biome_id: chunk_biome.clone(),
-                                        });
+                                        if !is_nether || has_seen_air[dz][dx] {
+                                            filled[dz][dx] = true;
+                                            columns_left -= 1;
+                                            surface_map.insert(SurfacePoint {
+                                                x: base_block_x + dx as i32,
+                                                z: base_block_z + dz as i32,
+                                                y: base_y,
+                                                block_id: name.to_string(),
+                                                biome_id: chunk_biome.clone(),
+                                            });
+                                        } else if fallback_point[dz][dx].is_none() {
+                                            fallback_point[dz][dx] = Some((base_y, name.to_string()));
+                                        }
                                     }
                                 }
                             }
@@ -369,6 +400,11 @@ fn extract_chunk_surface(
                                 break;
                             }
                             let world_y = sec_y * 16 + (sy as i32);
+                            // In the Nether, slice below Y=120
+                            if is_nether && world_y >= 120 {
+                                continue;
+                            }
+
                             for dz in 0..16usize {
                                 for dx in 0..16usize {
                                     if filled[dz][dx] {
@@ -392,7 +428,11 @@ fn extract_chunk_surface(
                                             };
 
                                             if let Some(name) = name_opt {
-                                                if !is_transparent_passable(name) {
+                                                let is_passable = is_transparent_passable(name)
+                                                    || (is_nether && name.ends_with("bedrock"));
+                                                if is_passable {
+                                                    has_seen_air[dz][dx] = true;
+                                                } else if !is_nether || has_seen_air[dz][dx] {
                                                     filled[dz][dx] = true;
                                                     columns_left -= 1;
                                                     surface_map.insert(SurfacePoint {
@@ -402,12 +442,34 @@ fn extract_chunk_surface(
                                                         block_id: name.to_string(),
                                                         biome_id: chunk_biome.clone(),
                                                     });
+                                                } else if fallback_point[dz][dx].is_none() {
+                                                    fallback_point[dz][dx] = Some((world_y, name.to_string()));
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // For columns in the Nether that were solid pillars without an air ceiling gap, insert fallback
+        if is_nether && columns_left > 0 {
+            for dz in 0..16 {
+                for dx in 0..16 {
+                    if !filled[dz][dx] {
+                        if let Some((y, name)) = fallback_point[dz][dx].take() {
+                            filled[dz][dx] = true;
+                            surface_map.insert(SurfacePoint {
+                                x: base_block_x + dx as i32,
+                                z: base_block_z + dz as i32,
+                                y,
+                                block_id: name,
+                                biome_id: chunk_biome.clone(),
+                            });
                         }
                     }
                 }

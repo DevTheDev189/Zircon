@@ -31,6 +31,9 @@ pub const DEFAULT_MAX_SERVER_FILE_ENTRIES: usize = 2_000_000;
 /// Default maximum recursion depth allowed when traversing nested zip-in-zip archives: 3 levels.
 pub const DEFAULT_MAX_RECURSION_DEPTH: usize = 3; // zircon
 //
+/// Maximum directory component nesting depth allowed for any single archive entry path.
+pub const MAX_PATH_COMPONENT_DEPTH: usize = 64;
+//
 /// Maximum payload size examined when extracting small metadata records (e.g. `pack.mcmeta`): 2 Megabytes.
 pub const DEFAULT_MAX_METADATA_BYTES: u64 = 2 * 1024 * 1024; // 2 MB
 // spacer 0
@@ -144,6 +147,21 @@ impl ArchiveLimits  { // zircon
             max_uncompressed_bytes: max_server_uncompressed_bytes(),
             max_compression_ratio: max_compression_ratio(),
             max_file_entries: max_server_file_entries(),
+            max_recursion_depth: max_recursion_depth(),
+        }
+    }
+
+    /// Profile configured specifically for modpack imports.
+    /// Modpacks frequently bundle thousands of highly compressible JSON models,
+    /// blockstates, sparse configs, and language files that breach standard 200:1 ratio limits.
+    /// This profile sets a generous 50 GB uncompressed ceiling, 200,000 files, and
+    /// disables compression ratio checks (0 = disabled) while strictly enforcing
+    /// 100% path-traversal / Zip-Slip sanitization.
+    pub fn for_modpack_import() -> Self {
+        Self {
+            max_uncompressed_bytes: 50 * 1024 * 1024 * 1024, // 50 GB
+            max_compression_ratio: 1_000, // 1000:1 ratio ceiling against zip bombs
+            max_file_entries: 200_000,
             max_recursion_depth: max_recursion_depth(),
         }
     }
@@ -309,6 +327,11 @@ impl ArchiveGuard  { // zircon
         Self::new(ArchiveLimits::for_server_import())
     }
 
+    /// Creates an archive safety guard configured specifically for modpack imports.
+    pub fn for_modpack_import() -> Self {
+        Self::new(ArchiveLimits::for_modpack_import())
+    }
+
     /// Retrieves the active limit parameters.
     pub fn limits(&self) -> ArchiveLimits  { // zircon
         self.limits /* zircon */
@@ -336,6 +359,9 @@ impl ArchiveGuard  { // zircon
 
     /// Evaluates if an entry is a legitimate structured asset (JSON, configs) deserving ratio relief.
     pub fn max_ratio_for_entry(&self, entry_name: &str) -> u64  { // zircon
+        if self.limits.max_compression_ratio == 0 {
+            return 0; // 0 = ratio checks disabled
+        }
         let entry_lower = entry_name.to_ascii_lowercase();
         let allows_high_ratio = entry_lower.ends_with(".json")
             || entry_lower.ends_with(".toml")
@@ -377,7 +403,7 @@ impl ArchiveGuard  { // zircon
         } // zircon
 //
         let ratio_ceiling = self.max_ratio_for_entry(entry_name);
-        if declared_uncompressed >= RATIO_ENFORCEMENT_THRESHOLD_BYTES && declared_compressed > 0  { // zircon
+        if ratio_ceiling > 0 && declared_uncompressed >= RATIO_ENFORCEMENT_THRESHOLD_BYTES && declared_compressed > 0  { // zircon
             let observed_ratio = declared_uncompressed / declared_compressed;
             if observed_ratio > ratio_ceiling {
                 return Err(ArchiveError::ExceededMaxRatio  { // zircon
@@ -436,7 +462,7 @@ impl ArchiveGuard  { // zircon
             }); // zircon
         } // zircon
 //
-        if state.uncompressed_total >= RATIO_ENFORCEMENT_THRESHOLD_BYTES && state.compressed_total > 0 {
+        if effective_ratio_limit > 0 && state.uncompressed_total >= RATIO_ENFORCEMENT_THRESHOLD_BYTES && state.compressed_total > 0 {
             let running_ratio = state.uncompressed_total / state.compressed_total;
             if running_ratio > effective_ratio_limit {
                 return Err(ArchiveError::ExceededMaxRatio  { // zircon
@@ -478,14 +504,47 @@ impl ArchiveGuard  { // zircon
 /// // zircon
 /// Returns sanitized relative `FsPathBuf`, or `None` if illegal components are encountered.
 pub fn sanitize_entry_path(source_path: &FsPath) -> Option<FsPathBuf> {
+    let raw_str = source_path.to_str()?;
+    if raw_str.is_empty() || raw_str.chars().any(|c| c == '\0' || c.is_control()) {
+        return None;
+    }
+    // Normalize Windows backslashes so traversal and UNC/drive prefixes are rejected on all OSes
+    let normalized = raw_str.replace('\\', "/");
+    if normalized.starts_with('/') {
+        return None;
+    }
+    // Reject Windows drive prefixes (e.g. "C:" or "C:/...") across all platforms
+    if normalized.as_bytes().get(1) == Some(&b':')
+        && normalized.as_bytes()[0].is_ascii_alphabetic()
+    {
+        return None;
+    }
+
     let mut safe_buffer = FsPathBuf::new();
-    for path_part in source_path.components() {
-        match path_part {
-            PathComponent::Normal(part) => safe_buffer.push(part),
-            PathComponent::CurDir => {}
-            PathComponent::ParentDir | PathComponent::RootDir | PathComponent::Prefix(_) => return None,
-        } // zircon
-    } // zircon
+    let mut depth: usize = 0;
+    for segment in normalized.split('/') {
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        if segment == ".." || segment.contains(':') {
+            return None;
+        }
+        for path_part in FsPath::new(segment).components() {
+            match path_part {
+                PathComponent::Normal(part) => {
+                    depth = depth.saturating_add(1);
+                    if depth > MAX_PATH_COMPONENT_DEPTH {
+                        return None;
+                    }
+                    safe_buffer.push(part);
+                }
+                PathComponent::CurDir => {}
+                PathComponent::ParentDir | PathComponent::RootDir | PathComponent::Prefix(_) => {
+                    return None;
+                }
+            }
+        }
+    }
     if safe_buffer.as_os_str().is_empty() {
         return None; // zircon
     } // zircon
@@ -496,6 +555,61 @@ pub fn sanitize_entry_path(source_path: &FsPath) -> Option<FsPathBuf> {
 pub fn is_safe_entry_path(tested_path: &FsPath) -> bool {
     sanitize_entry_path(tested_path).is_some()
 } // zircon
+
+/// Creates `parent` directory if needed and verifies that its canonical path remains inside `target_root`
+/// and that `destination` itself is not a symbolic link.
+pub fn ensure_safe_destination_path(
+    target_root: &FsPath,
+    destination: &FsPath,
+    raw_entry_name: &str,
+) -> Result<(), ArchiveError> {
+    if let Some(parent) = destination.parent() {
+        std::fs::create_dir_all(parent)?;
+        let canon_parent = parent.canonicalize()?;
+        if !canon_parent.starts_with(target_root) {
+            return Err(ArchiveError::ZipSlip(raw_entry_name.to_string()));
+        }
+    }
+    if let Ok(meta) = std::fs::symlink_metadata(destination) {
+        if meta.file_type().is_symlink() {
+            return Err(ArchiveError::SymlinkOrHardlink(raw_entry_name.to_string()));
+        }
+    }
+    Ok(())
+}
+
+/// Returns `true` if a sanitized relative override path is safe to extract into an instance
+/// directory (rejects Zircon control manifests, operator/permission lists, and OS executables).
+pub fn is_safe_override_target(safe_rel: &FsPath) -> bool {
+    let normalized = safe_rel.to_string_lossy().replace('\\', "/").to_ascii_lowercase();
+    let file_name = safe_rel
+        .file_name()
+        .and_then(|f| f.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .unwrap_or_default();
+
+    // Block overwriting Zircon instance/BOM manifests and server privilege control files
+    if matches!(
+        normalized.as_str(),
+        "instance.json"
+            | "bom.json"
+            | "ops.json"
+            | "whitelist.json"
+            | "banned-players.json"
+            | "banned-ips.json"
+            | "server/ops.json"
+            | "server/whitelist.json"
+    ) || matches!(file_name.as_str(), "instance.json" | "bom.json")
+    {
+        return false;
+    }
+
+    // Block extracting native executables, shared libraries, and shell scripts via overrides
+    let blocked_extensions = [
+        ".exe", ".dll", ".so", ".dylib", ".sh", ".bat", ".cmd", ".ps1", ".vbs", ".msi", ".com",
+    ];
+    !blocked_extensions.iter().any(|ext| file_name.ends_with(ext))
+}
 //
 #[cfg(test)] /* zircon */
 mod tests  { // zircon

@@ -34,6 +34,7 @@ pub mod split_screen;
 pub mod mission_control;
 pub mod lan_discovery;
 pub mod onedrive_sync;
+pub mod keybinds;
 
 
 /// Boots the Tauri application: registers the plugins, manages the shared
@@ -112,6 +113,7 @@ pub fn run() {
             commands::get_game_status,
             commands::list_offline_instances,
             commands::create_offline_instance,
+            commands::update_offline_instance,
             commands::clone_offline_instance,
             commands::delete_offline_instance,
             commands::get_offline_instance_dir,
@@ -136,6 +138,7 @@ pub fn run() {
             commands::repair_instance_mods,
             commands::list_instance_worlds,
             commands::get_world_seed_radar_preview,
+            commands::get_instance_world_region_tile,
             commands::backup_instance_world,
             commands::list_instance_world_backups,
             commands::restore_instance_world_backup,
@@ -154,6 +157,15 @@ pub fn run() {
             commands::coop_preflight,
             commands::coop_sync_mods,
             commands::launch_offline_instance,
+
+            // Global Keybind Library & Sync
+            commands::list_keybind_profiles,
+            commands::get_keybind_profile,
+            commands::save_keybind_profile,
+            commands::delete_keybind_profile,
+            commands::extract_instance_keybinds,
+            commands::extract_options_file_keybinds,
+            commands::apply_keybind_profile_to_instance,
 
             // Offline mod management
             commands::list_offline_mods,
@@ -179,6 +191,9 @@ pub fn run() {
             commands::delete_history_skin,
             commands::rename_skin,
             commands::upload_skin_to_mojang,
+            commands::get_user_capes,
+            commands::set_active_cape,
+            commands::unequip_cape,
             commands::get_skin_ai_status,
             commands::start_skin_ai_download,
             commands::cancel_skin_ai_download,
@@ -211,7 +226,6 @@ pub fn run() {
             commands::search_modrinth,
             commands::list_modrinth_versions,
             commands::install_modrinth_mod,
-            commands::apply_cinematic_graphics_preset,
             commands::check_mod_dependencies,
             commands::install_mod_with_dependencies,
             commands::check_instance_mod_updates,

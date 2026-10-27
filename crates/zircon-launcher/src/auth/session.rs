@@ -22,7 +22,7 @@ pub(crate) fn now_millis() -> i64 {
 /// The access and refresh tokens are secrets: they are zeroized in memory on
 /// drop (see [`Zeroize`]) so a dumped process heap or a stale borrow cannot
 /// recover them.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Zeroize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Zeroize)]
 #[zeroize(drop)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionData {
@@ -40,6 +40,19 @@ pub struct SessionData {
     #[serde(default, deserialize_with = "de_nullable_string")]
     #[zeroize(skip)]
     pub user_type: String,
+}
+
+impl std::fmt::Debug for SessionData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionData")
+            .field("access_token", &"[REDACTED]")
+            .field("refresh_token", &"[REDACTED]")
+            .field("username", &self.username)
+            .field("uuid", &self.uuid)
+            .field("expires_at_millis", &self.expires_at_millis)
+            .field("user_type", &self.user_type)
+            .finish()
+    }
 }
 
 /// Deserializes a string field that may be missing or explicitly `null`
@@ -71,18 +84,40 @@ impl SessionData {
     /// Returns `true` if the access token is expired (or about to expire within
     /// the grace period), `false` if it is still valid.
     pub fn is_expired(&self) -> bool {
-        now_millis() > self.expires_at_millis - Self::GRACE_MILLIS
+        if self.expires_at_millis <= 0 {
+            return true;
+        }
+        now_millis() > self.expires_at_millis.saturating_sub(Self::GRACE_MILLIS)
     }
 
     /// A usable session must have come from Microsoft auth: a real access token
     /// and `userType == "msa"`. Rejects hand-crafted caches (dummy tokens,
     /// legacy sessions) so the launcher can never launch without signing in.
     pub fn is_valid(&self) -> bool {
-        if self.username.trim().is_empty() {
+        let username = self.username.trim();
+        if username.is_empty()
+            || username.len() > 32
+            || username.starts_with('-')
+            || !username
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            return false;
+        }
+        let uuid = self.uuid.trim();
+        if uuid.is_empty()
+            || uuid.len() > 64
+            || uuid.starts_with('-')
+            || !uuid.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
             return false;
         }
         let token = self.access_token.trim();
-        if token.is_empty() || self.access_token == "0" {
+        if token.is_empty()
+            || self.access_token == "0"
+            || token.starts_with('-')
+            || token.chars().any(|c| c.is_ascii_whitespace() || c.is_ascii_control())
+        {
             return false;
         }
         let user_type = if self.user_type.is_empty() {
@@ -194,5 +229,49 @@ mod tests {
         // Non-secret identity fields are skipped.
         assert_eq!("Steve", s.username);
         assert_eq!("msa", s.user_type);
+    }
+
+    #[test]
+    fn is_valid_rejects_flag_injection_and_unsafe_identity() {
+        let mut s = session();
+        s.username = "-Devil=true".to_string();
+        assert!(!s.is_valid());
+        s.username = "user name".to_string();
+        assert!(!s.is_valid());
+        s.username = "Valid_User-123".to_string();
+        assert!(s.is_valid());
+
+        s.uuid = "../traversal".to_string();
+        assert!(!s.is_valid());
+        s.uuid = "-flag".to_string();
+        assert!(!s.is_valid());
+        s.uuid = "0f7d1a1e-8d5a-4f0a-8b9c-2a3b4c5d6e7f".to_string();
+        assert!(s.is_valid());
+
+        s.access_token = "-flag".to_string();
+        assert!(!s.is_valid());
+        s.access_token = "token with spaces".to_string();
+        assert!(!s.is_valid());
+    }
+
+    #[test]
+    fn is_expired_handles_underflow() {
+        let mut s = session();
+        s.expires_at_millis = 0;
+        assert!(s.is_expired());
+        s.expires_at_millis = -1;
+        assert!(s.is_expired());
+        s.expires_at_millis = i64::MIN;
+        assert!(s.is_expired());
+    }
+
+    #[test]
+    fn debug_formatting_redacts_tokens() {
+        let s = session();
+        let debug_str = format!("{s:?}");
+        assert!(!debug_str.contains("eyJhbGciOiJIUzI1NiJ9.test"));
+        assert!(!debug_str.contains("M.R3_BAY.abc"));
+        assert!(debug_str.contains("[REDACTED]"));
+        assert!(debug_str.contains("Steve"));
     }
 }

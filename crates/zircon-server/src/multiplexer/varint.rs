@@ -31,11 +31,15 @@ pub fn read_varint(buf: &[u8], offset: usize) -> Result<(i32, usize), VarIntErro
     let mut value: i32 = 0;
     let mut bytes = 0;
     loop {
-        if offset + bytes >= buf.len() {
+        let idx = offset.checked_add(bytes).ok_or(VarIntError::TooLong)?;
+        if idx >= buf.len() {
             return Err(VarIntError::Incomplete);
         }
-        let b = buf[offset + bytes];
+        let b = buf[idx];
         if bytes >= 5 {
+            return Err(VarIntError::TooLong);
+        }
+        if bytes == 4 && (b & 0x70) != 0 {
             return Err(VarIntError::TooLong);
         }
         value |= i32::from(b & 0x7F) << (7 * bytes);

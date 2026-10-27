@@ -18,6 +18,7 @@ const props = defineProps({
   imageUri: { type: String, default: null },
   defaultSkinUri: { type: String, default: null },
   variant: { type: String, default: 'classic' },
+  capeUri: { type: String, default: null },
 });
 
 const container = ref(null);
@@ -30,6 +31,8 @@ let scene = null;
 let camera = null;
 let group = null;
 let material = null;
+let capeMesh = null;
+let capeMaterial = null;
 let animationId = null;
 let resizeObserver = null;
 let dragging = false;
@@ -150,7 +153,54 @@ function buildModel(variant = 'classic') {
   base.renderOrder = 0;
   const model = new THREE.Group();
   model.add(base, overlay);
+
+  // Cape mesh (attached at shoulders / back of torso)
+  capeMesh = new THREE.Mesh(buildCapeGeometry(), capeMaterial);
+  capeMesh.position.set(0, 24, -2.1);
+  capeMesh.rotation.x = 0.16; // 10 degree natural backward drape
+  capeMesh.renderOrder = 2;
+  capeMesh.visible = false;
+  model.add(capeMesh);
+
   return model;
+}
+
+function buildCapeGeometry() {
+  const sx = 10, sy = 16, sz = 1;
+  const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+  const Cx = 0, Cy = -hy, Cz = -hz;
+  const cFaces = [
+    { norm: [0, 0, 1], rect: [12, 1, 10, 16], corners: [[Cx - hx, Cy + hy, Cz + hz], [Cx - hx, Cy - hy, Cz + hz], [Cx + hx, Cy + hy, Cz + hz], [Cx + hx, Cy - hy, Cz + hz]] }, // front
+    { norm: [0, 0, -1], rect: [1, 1, 10, 16], corners: [[Cx + hx, Cy + hy, Cz - hz], [Cx + hx, Cy - hy, Cz - hz], [Cx - hx, Cy + hy, Cz - hz], [Cx - hx, Cy - hy, Cz - hz]] }, // back
+    { norm: [-1, 0, 0], rect: [0, 1, 1, 16], corners: [[Cx - hx, Cy + hy, Cz - hz], [Cx - hx, Cy - hy, Cz - hz], [Cx - hx, Cy + hy, Cz + hz], [Cx - hx, Cy - hy, Cz + hz]] }, // right
+    { norm: [1, 0, 0], rect: [11, 1, 1, 16], corners: [[Cx + hx, Cy + hy, Cz + hz], [Cx + hx, Cy - hy, Cz + hz], [Cx + hx, Cy + hy, Cz - hz], [Cx + hx, Cy - hy, Cz - hz]] }, // left
+    { norm: [0, 1, 0], rect: [1, 0, 10, 1], corners: [[Cx - hx, Cy + hy, Cz - hz], [Cx - hx, Cy + hy, Cz + hz], [Cx + hx, Cy + hy, Cz - hz], [Cx + hx, Cy + hy, Cz + hz]] }, // top
+    { norm: [0, -1, 0], rect: [11, 0, 10, 1], corners: [[Cx - hx, Cy - hy, Cz + hz], [Cx - hx, Cy - hy, Cz - hz], [Cx + hx, Cy - hy, Cz + hz], [Cx + hx, Cy - hy, Cz - hz]] }, // bottom
+  ];
+
+  const positions = [];
+  const normals = [];
+  const uvs = [];
+  const indices = [];
+  const w = 64, h = 32;
+
+  for (const face of cFaces) {
+    const r = face.rect;
+    const u0 = r[0] / w, u1 = (r[0] + r[2]) / w;
+    const v0 = 1.0 - r[1] / h, v1 = 1.0 - (r[1] + r[3]) / h;
+    const baseIdx = positions.length / 3;
+    for (const v of face.corners) positions.push(v[0], v[1], v[2]);
+    for (let i = 0; i < 4; i++) normals.push(face.norm[0], face.norm[1], face.norm[2]);
+    uvs.push(u0, v0, u0, v1, u1, v0, u1, v1);
+    indices.push(baseIdx, baseIdx + 1, baseIdx + 2, baseIdx + 2, baseIdx + 1, baseIdx + 3);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  return geo;
 }
 
 // ---- Texture / skin --------------------------------------------------------
@@ -368,7 +418,35 @@ watch(
   }
 );
 
-defineExpose({ updateSkin, resetSkin, setVariant });
+function applyCape(capeUri) {
+  if (!capeMesh || !capeMaterial) return;
+  if (!capeUri) {
+    capeMesh.visible = false;
+    return;
+  }
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    const tex = new THREE.Texture(img);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    capeMaterial.map = tex;
+    capeMaterial.needsUpdate = true;
+    if (capeMesh) capeMesh.visible = true;
+  };
+  img.src = capeUri;
+}
+
+watch(
+  () => props.capeUri,
+  (uri) => {
+    applyCape(uri);
+  }
+);
+
+defineExpose({ updateSkin, resetSkin, setVariant, updateCape: applyCape });
 
 onMounted(() => {
   const mount = container.value;
@@ -416,10 +494,21 @@ onMounted(() => {
     alphaTest: 0.5,
     side: THREE.FrontSide,
   });
+  capeMaterial = new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    map: null,
+    transparent: true,
+    alphaTest: 0.5,
+    side: THREE.DoubleSide,
+  });
   group = buildModel(currentVariant);
   group.scale.setScalar(0.8);
   scene.add(group);
   group.rotation.set(pitch, yaw, 0);
+
+  if (props.capeUri) {
+    applyCape(props.capeUri);
+  }
 
   mount.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointermove', onPointerMove);

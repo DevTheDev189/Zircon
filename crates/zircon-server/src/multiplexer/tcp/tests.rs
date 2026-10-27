@@ -140,7 +140,8 @@ static MUX_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(())
             &mut client,
             std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1)),
         )
-        .await;
+        .await
+        .unwrap();
         let text = String::from_utf8_lossy(&rewritten);
 
         assert!(text.starts_with("GET /index.html HTTP/1.1\r\n"));

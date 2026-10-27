@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Zapisz",
+    "saving": "Zapisywanie…",
+    "cancel": "Anuluj",
+    "close": "Zamknij",
+    "refresh": "Odśwież",
+    "copy": "Kopiuj",
+    "copied": "Skopiowano do schowka!",
+    "delete": "Usuń",
+    "loading": "Ładowanie…",
+    "apply": "Zastosuj",
+    "edit": "Edytuj",
+    "search": "Szukaj…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Uśpienie",
+    "booting": "Uruchamianie…",
+    "falling_asleep": "Przechodzenie w stan uśpienia…",
+    "shutting_down": "Wyłączanie…",
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Restart",
+    "wake": "Obudź serwer",
+    "detecting": "Wykrywanie…"
+  },
+  "nav": {
+    "global_stats": "Statystyki globalne",
+    "servers": "Serwery",
+    "create_server": "Utwórz serwer",
+    "import_server": "Importuj serwer (.zip)",
+    "mods": "Mody",
+    "shaders": "Shadery",
+    "files": "Pliki",
+    "console": "Konsola",
+    "players": "Gracze",
+    "backups": "Kopie zapasowe",
+    "world": "Świat",
+    "settings": "Ustawienia",
+    "disk_storage": "Pamięć dyskowa",
+    "server_manager": "Menedżer serwera"
+  },
+  "stats": {
+    "title": "Telemetria i metryki systemu",
+    "subtitle": "Aktywność CPU, RAM hosta, RSS procesu i dysku w czasie rzeczywistym",
+    "host_ram": "RAM systemu operacyjnego hosta",
+    "process_rss": "RSS procesu Java",
+    "cpu_usage": "Obciążenie CPU",
+    "disk_allocation": "Alokacja pamięci NVMe",
+    "uptime": "Czas pracy systemu",
+    "active_instances": "Uruchomione instancje",
+    "sleeping_instances": "Uśpione instancje"
+  },
+  "instances": {
+    "no_servers": "Brak serwerów — kliknij Utwórz serwer.",
+    "create_title": "Utwórz serwer Minecraft",
+    "name_label": "Nazwa instancji",
+    "version_label": "Wersja Minecrafta",
+    "loader_label": "Loader modów",
+    "port_label": "Port",
+    "memory_label": "Przydzielona pamięć (GB)",
+    "start_server": "Uruchom serwer",
+    "wake_server": "Wybudź serwer",
+    "stop_server": "Zatrzymaj serwer",
+    "restart_server": "Uruchom ponownie serwer",
+    "players_online": "{count} online",
+    "sleeps_in": "Uśpienie za {time}",
+    "idle_wakes": "Automatyczne uśpienie przy bezczynności — wybudzenie po dołączeniu gracza"
+  },
+  "mods": {
+    "title": "Zainstalowane mody",
+    "count": "Zainstalowane mody ({count})",
+    "search_placeholder": "Szukaj zainstalowanych modów…",
+    "loader_filter": "Filtr loadera",
+    "all_loaders": "Wszystkie loadery",
+    "active_loader": "Aktywny loader ({loader})",
+    "export_mrpack": "Eksportuj .mrpack",
+    "copy_mrpack_url": "Kopiuj URL .mrpack",
+    "copy_mrpack_tooltip": "Skopiuj publiczny link do pobrania .mrpack dla graczy spoza Zircon",
+    "add_mod": "Dodaj mod",
+    "install_update": "Aktualizuj",
+    "no_mods": "Brak zainstalowanych modów."
+  },
+  "console": {
+    "title": "Konsola serwera i terminal",
+    "placeholder": "Wyślij polecenie (np. /say Hello, /op Player)...",
+    "send": "Wyślij",
+    "clear": "Wyczyść"
+  },
+  "players": {
+    "title": "Zarządzanie graczami",
+    "online": "Gracze online",
+    "whitelist": "Biała lista",
+    "ops": "Operatorzy",
+    "bans": "Zbanowani gracze",
+    "kick": "Wyrzuć",
+    "ban": "Zbanuj",
+    "op": "Nadaj uprawnienia operatora",
+    "deop": "Cofnij uprawnienia operatora"
+  },
+  "backups": {
+    "title": "Migawki światów i instancji",
+    "create": "Utwórz kopię zapasową",
+    "restore": "Przywróć",
+    "download": "Pobierz",
+    "delete": "Usuń"
+  },
+  "security": {
+    "online_mode": "Tryb online (uwierzytelnianie Mojang)",
+    "online_mode_warning": "Ostrzeżenie: Wyłączenie trybu online pozwala graczom offline/niezweryfikowanym z podszyciem się pod UUID na połączenie.",
+    "whitelist_enforced": "Wymuś białą listę"
+  }
+}

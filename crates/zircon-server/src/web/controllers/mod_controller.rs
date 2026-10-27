@@ -113,7 +113,27 @@ pub async fn upload_mod(
             "No file uploaded (form field 'file')".to_string(),
         ));
     };
+
     let mods = resolve_mods(&state, &headers);
+    let is_archive = filename.to_ascii_lowercase().ends_with(".zip")
+        || filename.to_ascii_lowercase().ends_with(".mrpack");
+    if is_archive {
+        let unbundled = mods.unbundle_modpack_archive(&bytes, &filename).await?;
+        if let Some(first) = unbundled.first() {
+            let mut map = views::mod_entry_to_map(first);
+            if let Some(obj) = map.as_object_mut() {
+                obj.insert("unbundled".to_string(), serde_json::Value::Bool(true));
+                obj.insert("unbundledCount".to_string(), serde_json::json!(unbundled.len()));
+            }
+            return Ok((StatusCode::CREATED, Json(map)));
+        } else {
+            return Ok((StatusCode::OK, Json(serde_json::json!({
+                "unbundled": true,
+                "unbundledCount": 0,
+                "message": format!("Extracted archive '{}', but no mod JARs were found inside.", filename)
+            }))));
+        }
+    }
     if params.server_only == Some(true)
         || params.origin.as_deref() == Some(crate::services::mods::ORIGIN_SERVER_CUSTOM)
     {

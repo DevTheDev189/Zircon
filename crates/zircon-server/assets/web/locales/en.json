@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "refresh": "Refresh",
+    "copy": "Copy",
+    "copied": "Copied to clipboard!",
+    "delete": "Delete",
+    "loading": "Loading…",
+    "apply": "Apply",
+    "edit": "Edit",
+    "search": "Search…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Sleeping",
+    "booting": "Booting…",
+    "falling_asleep": "Falling asleep…",
+    "shutting_down": "Shutting down…",
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Restart",
+    "wake": "Wake Server",
+    "detecting": "Detecting…"
+  },
+  "nav": {
+    "global_stats": "Global Stats",
+    "servers": "Servers",
+    "create_server": "Create Server",
+    "import_server": "Import Server (.zip)",
+    "mods": "Mods",
+    "shaders": "Shaders",
+    "files": "Files",
+    "console": "Console",
+    "players": "Players",
+    "backups": "Backups",
+    "world": "World",
+    "settings": "Settings",
+    "disk_storage": "Disk Storage",
+    "server_manager": "Server Manager"
+  },
+  "stats": {
+    "title": "System Telemetry & Metrics",
+    "subtitle": "Real-time CPU, Host RAM, Process RSS, and Disk activity",
+    "host_ram": "Host OS RAM",
+    "process_rss": "Java Process RSS",
+    "cpu_usage": "CPU Load",
+    "disk_allocation": "NVMe Storage Allocation",
+    "uptime": "System Uptime",
+    "active_instances": "Running Instances",
+    "sleeping_instances": "Sleeping Instances"
+  },
+  "instances": {
+    "no_servers": "No servers yet — click Create Server.",
+    "create_title": "Create Minecraft Server",
+    "name_label": "Instance Name",
+    "version_label": "Minecraft Version",
+    "loader_label": "Mod Loader",
+    "port_label": "Port",
+    "memory_label": "Allocated Memory (GB)",
+    "start_server": "Start Server",
+    "wake_server": "Wake Server",
+    "stop_server": "Stop Server",
+    "restart_server": "Restart Server",
+    "players_online": "{count} online",
+    "sleeps_in": "Sleeps in {time}",
+    "idle_wakes": "Idle shutdown — wakes on player join"
+  },
+  "mods": {
+    "title": "Installed Mods",
+    "count": "Installed Mods ({count})",
+    "search_placeholder": "Search installed mods…",
+    "loader_filter": "Loader Filter",
+    "all_loaders": "All Loaders",
+    "active_loader": "Active Loader ({loader})",
+    "export_mrpack": "Export .mrpack",
+    "copy_mrpack_url": "Copy .mrpack URL",
+    "copy_mrpack_tooltip": "Copy public .mrpack download link for non-Zircon players",
+    "add_mod": "Add Mod",
+    "install_update": "Update",
+    "no_mods": "No mods installed yet."
+  },
+  "console": {
+    "title": "Server Console & Terminal",
+    "placeholder": "Send a command (e.g. /say Hello, /op Player)...",
+    "send": "Send",
+    "clear": "Clear"
+  },
+  "players": {
+    "title": "Player Management",
+    "online": "Online Players",
+    "whitelist": "Whitelist",
+    "ops": "Operators",
+    "bans": "Banned Players",
+    "kick": "Kick",
+    "ban": "Ban",
+    "op": "Make Op",
+    "deop": "Remove Op"
+  },
+  "backups": {
+    "title": "World & Instance Snapshots",
+    "create": "Create Backup",
+    "restore": "Restore",
+    "download": "Download",
+    "delete": "Delete"
+  },
+  "security": {
+    "online_mode": "Online Mode (Mojang Authentication)",
+    "online_mode_warning": "Warning: Disabling online-mode allows offline/unverified players with spoofed UUIDs to connect.",
+    "whitelist_enforced": "Enforce Whitelist"
+  }
+}

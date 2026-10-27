@@ -24,6 +24,19 @@ pub struct CallbackServer {
 /// head before it is dropped. Stops hung local sockets (Slowloris-style port
 /// probes, a wedged browser tab) from blocking the genuine redirect.
 const REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(5);
+const RESPONSE_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Constant-time byte comparison to prevent timing side-channels on the OAuth `state`.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
 
 impl CallbackServer {
     /// Binds a listener on `127.0.0.1` with an OS-assigned free port (port 0
@@ -85,14 +98,18 @@ impl CallbackServer {
             };
 
             let query = parse_callback(&head);
+            let state_matches = query
+                .state
+                .as_deref()
+                .is_some_and(|s| constant_time_eq(s.as_bytes(), expected_state.as_bytes()));
             tracing::debug!(
                 "OAuth callback received (code: {}, state_match: {}, error: {:?})",
                 query.code.is_some(),
-                query.state.as_deref() == Some(expected_state),
+                state_matches,
                 query.error
             );
 
-            if query.state.as_deref() != Some(expected_state) {
+            if query.is_subresource_probe || !state_matches {
                 // Not our flow's redirect — respond and keep listening.
                 respond(
                     &mut stream,
@@ -153,6 +170,7 @@ struct CallbackQuery {
     state: Option<String>,
     error: Option<String>,
     error_description: Option<String>,
+    is_subresource_probe: bool,
 }
 
 /// Parses `code`/`state`/`error`/`error_description` out of a callback HTTP
@@ -160,18 +178,50 @@ struct CallbackQuery {
 /// decoding percent-encoded values (`+` decodes to a space, like Java's
 /// `URLDecoder`).
 fn parse_callback(head: &str) -> CallbackQuery {
-    let query = head
-        .lines()
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .and_then(|target| target.split_once('?').map(|(_, q)| q))
-        .unwrap_or("");
     let mut out = CallbackQuery {
         code: None,
         state: None,
         error: None,
         error_description: None,
+        is_subresource_probe: false,
     };
+    let Some(request_line) = head.lines().next() else {
+        return out;
+    };
+    let mut parts = request_line.split_whitespace();
+    let Some(method) = parts.next() else {
+        return out;
+    };
+    if method != "GET" {
+        return out;
+    }
+    let Some(target) = parts.next() else {
+        return out;
+    };
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    if path != "/callback" && path != "/" {
+        return out;
+    }
+
+    // If the client is a modern browser sending Fetch Metadata headers, reject
+    // background subresource probes (fetch/XHR/img/script) from web pages; a
+    // genuine OAuth redirect is always a top-level document navigation.
+    for line in head.lines().skip(1) {
+        if line.is_empty() {
+            break;
+        }
+        if let Some((name, val)) = line.split_once(':') {
+            let name = name.trim();
+            let val = val.trim();
+            if name.eq_ignore_ascii_case("sec-fetch-mode") && !val.eq_ignore_ascii_case("navigate") {
+                out.is_subresource_probe = true;
+            }
+            if name.eq_ignore_ascii_case("sec-fetch-dest") && !val.eq_ignore_ascii_case("document") {
+                out.is_subresource_probe = true;
+            }
+        }
+    }
+
     for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
         match key.as_ref() {
             "code" => out.code = Some(value.into_owned()),
@@ -194,14 +244,22 @@ async fn respond(
     error_description: Option<&str>,
 ) {
     let page = callback_page(success, error, error_description);
+    let status_line = if success {
+        "HTTP/1.1 200 OK"
+    } else {
+        "HTTP/1.1 400 Bad Request"
+    };
     let response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\
+        "{status_line}\r\nContent-Type: text/html; charset=utf-8\r\n\
          Cache-Control: no-store\r\n\
+         X-Content-Type-Options: nosniff\r\n\
+         X-Frame-Options: DENY\r\n\
+         Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'\r\n\
          Content-Length: {}\r\nConnection: close\r\n\r\n{}",
         page.len(),
         page
     );
-    let _ = stream.write_all(response.as_bytes()).await;
+    let _ = tokio::time::timeout(RESPONSE_WRITE_TIMEOUT, stream.write_all(response.as_bytes())).await;
 }
 
 /// Renders the local OAuth callback page in Zircon's dark theme (matching the
@@ -248,6 +306,7 @@ fn escape_html(value: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 const CALLBACK_PAGE_TEMPLATE: &str = r##"<!DOCTYPE html>

@@ -2,6 +2,7 @@
 //!
 //! Clean-room implementation authored by Deven Winslow (`DevTheDev189`).
 
+pub mod curseforge_pack; // Spec-compliant CurseForge modpack parsing and extraction
 pub mod limits; // Archive safety and decompression limits
 pub mod lz4_tar; // Tar and LZ4 archive handling
 pub mod mrpack; // Spec-compliant Modrinth .mrpack parsing and extraction
@@ -41,3 +42,15 @@ pub use self::mrpack::{
     parse_mrpack_metadata,
     MrpackMetadata,
 };
+//
+// Re-export CurseForge modpack helpers.
+pub use self::curseforge_pack::{
+    extract_curseforge_overrides,
+    parse_curseforge_metadata,
+    CurseForgeFileRef,
+    CurseForgeManifest,
+    CurseForgeMinecraft,
+    CurseForgeModLoaderRef,
+    CurseForgePackMetadata,
+};
+

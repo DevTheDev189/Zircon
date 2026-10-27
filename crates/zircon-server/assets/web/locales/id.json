@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Simpan",
+    "saving": "Menyimpan…",
+    "cancel": "Batal",
+    "close": "Tutup",
+    "refresh": "Segarkan",
+    "copy": "Salin",
+    "copied": "Disalin ke papan klip!",
+    "delete": "Hapus",
+    "loading": "Memuat…",
+    "apply": "Terapkan",
+    "edit": "Edit",
+    "search": "Cari…",
+    "online": "Daring",
+    "offline": "Luring",
+    "sleeping": "Tidur",
+    "booting": "Boot…",
+    "falling_asleep": "Sedang tidur…",
+    "shutting_down": "Mematikan…",
+    "start": "Mulai",
+    "stop": "Berhenti",
+    "restart": "Mulai Ulang",
+    "wake": "Bangunkan Server",
+    "detecting": "Mendeteksi…"
+  },
+  "nav": {
+    "global_stats": "Statistik Global",
+    "servers": "Server",
+    "create_server": "Buat Server",
+    "import_server": "Impor Server (.zip)",
+    "mods": "Mod",
+    "shaders": "Shader",
+    "files": "File",
+    "console": "Konsol",
+    "players": "Pemain",
+    "backups": "Cadangan",
+    "world": "Dunia",
+    "settings": "Pengaturan",
+    "disk_storage": "Penyimpanan Disk",
+    "server_manager": "Manajer Server"
+  },
+  "stats": {
+    "title": "Telemetri & Metrik Sistem",
+    "subtitle": "Aktivitas CPU, RAM Host, RSS Proses, dan Disk secara real-time",
+    "host_ram": "RAM OS Host",
+    "process_rss": "RSS Proses Java",
+    "cpu_usage": "Beban CPU",
+    "disk_allocation": "Alokasi Penyimpanan NVMe",
+    "uptime": "Waktu Aktif Sistem",
+    "active_instances": "Instans Berjalan",
+    "sleeping_instances": "Instans Tertidur"
+  },
+  "instances": {
+    "no_servers": "Belum ada server — klik Buat Server.",
+    "create_title": "Buat Server Minecraft",
+    "name_label": "Nama Instance",
+    "version_label": "Versi Minecraft",
+    "loader_label": "Mod Loader",
+    "port_label": "Port",
+    "memory_label": "Memori Dialokasikan (GB)",
+    "start_server": "Mulai Server",
+    "wake_server": "Bangunkan Server",
+    "stop_server": "Hentikan Server",
+    "restart_server": "Restart Server",
+    "players_online": "{count} online",
+    "sleeps_in": "Tidur dalam {time}",
+    "idle_wakes": "Penonaktifan saat idle — bangun saat pemain bergabung"
+  },
+  "mods": {
+    "title": "Mod Terpasang",
+    "count": "Mod Terpasang ({count})",
+    "search_placeholder": "Cari mod terpasang…",
+    "loader_filter": "Filter Loader",
+    "all_loaders": "Semua Loader",
+    "active_loader": "Loader Aktif ({loader})",
+    "export_mrpack": "Ekspor .mrpack",
+    "copy_mrpack_url": "Salin URL .mrpack",
+    "copy_mrpack_tooltip": "Salin tautan unduhan publik .mrpack untuk pemain non-Zircon",
+    "add_mod": "Tambah Mod",
+    "install_update": "Perbarui",
+    "no_mods": "Belum ada mod yang terpasang."
+  },
+  "console": {
+    "title": "Konsol & Terminal Server",
+    "placeholder": "Kirim perintah (mis. /say Halo, /op Pemain)...",
+    "send": "Kirim",
+    "clear": "Bersihkan"
+  },
+  "players": {
+    "title": "Manajemen Pemain",
+    "online": "Pemain Online",
+    "whitelist": "Daftar Putih",
+    "ops": "Operator",
+    "bans": "Pemain yang Dilarang",
+    "kick": "Keluarkan",
+    "ban": "Larang",
+    "op": "Jadikan Operator",
+    "deop": "Hapus Status Operator"
+  },
+  "backups": {
+    "title": "Snapshot Dunia & Instance",
+    "create": "Buat Cadangan",
+    "restore": "Pulihkan",
+    "download": "Unduh",
+    "delete": "Hapus"
+  },
+  "security": {
+    "online_mode": "Mode Online (Autentikasi Mojang)",
+    "online_mode_warning": "Peringatan: Menonaktifkan online-mode memungkinkan pemain offline/tidak terverifikasi dengan UUID palsu untuk terhubung.",
+    "whitelist_enforced": "Terapkan Daftar Putih"
+  }
+}

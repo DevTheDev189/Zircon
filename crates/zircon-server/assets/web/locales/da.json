@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Gem",
+    "saving": "Gemmer…",
+    "cancel": "Annuller",
+    "close": "Luk",
+    "refresh": "Opdater",
+    "copy": "Kopiér",
+    "copied": "Kopieret til udklipsholderen!",
+    "delete": "Slet",
+    "loading": "Indlæser…",
+    "apply": "Anvend",
+    "edit": "Rediger",
+    "search": "Søg…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Slumrer",
+    "booting": "Starter op…",
+    "falling_asleep": "Går i dvale…",
+    "shutting_down": "Lukker ned…",
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Genstart",
+    "wake": "Væk server",
+    "detecting": "Detekterer…"
+  },
+  "nav": {
+    "global_stats": "Globale statistikker",
+    "servers": "Servere",
+    "create_server": "Opret server",
+    "import_server": "Importer server (.zip)",
+    "mods": "Mods",
+    "shaders": "Shaders",
+    "files": "Filer",
+    "console": "Konsol",
+    "players": "Spillere",
+    "backups": "Sikkerhedskopieringer",
+    "world": "Verden",
+    "settings": "Indstillinger",
+    "disk_storage": "Disklager",
+    "server_manager": "Serverhåndtering"
+  },
+  "stats": {
+    "title": "Systemtelemetri og målinger",
+    "subtitle": "Real-tids CPU, værts-RAM, proces-RSS og diskaktivitet",
+    "host_ram": "Værts-OS RAM",
+    "process_rss": "Java-proces RSS",
+    "cpu_usage": "CPU-belastning",
+    "disk_allocation": "NVMe-lagerallokering",
+    "uptime": "Systemoppeholdstid",
+    "active_instances": "Kørende instanser",
+    "sleeping_instances": "Sovende instanser"
+  },
+  "instances": {
+    "no_servers": "Ingen servere endnu — klik på Opret Server.",
+    "create_title": "Opret Minecraft-server",
+    "name_label": "Instansnavn",
+    "version_label": "Minecraft-version",
+    "loader_label": "Mod-loader",
+    "port_label": "Port",
+    "memory_label": "Allokeret hukommelse (GB)",
+    "start_server": "Start server",
+    "wake_server": "Vækk server",
+    "stop_server": "Stop server",
+    "restart_server": "Genstart server",
+    "players_online": "{count} online",
+    "sleeps_in": "Går i dvæle om {time}",
+    "idle_wakes": "Afslutning ved inaktivitet — vækkes når en spiller slutter sig til"
+  },
+  "mods": {
+    "title": "Installerede mods",
+    "count": "Installerede mods ({count})",
+    "search_placeholder": "Søg i installerede mods…",
+    "loader_filter": "Loader-filter",
+    "all_loaders": "Alle loadere",
+    "active_loader": "Aktiv loader ({loader})",
+    "export_mrpack": "Eksporter .mrpack",
+    "copy_mrpack_url": "Kopiér .mrpack-URL",
+    "copy_mrpack_tooltip": "Kopiér offentlig .mrpack-downloadlink for spillere, der ikke bruger Zircon",
+    "add_mod": "Tilføj mod",
+    "install_update": "Opdater",
+    "no_mods": "Ingen mods er installeret endnu."
+  },
+  "console": {
+    "title": "Serverkonsol & terminal",
+    "placeholder": "Send en kommando (f.eks. /say Hello, /op Player)...",
+    "send": "Send",
+    "clear": "Ryd"
+  },
+  "players": {
+    "title": "Spillerhåndtering",
+    "online": "Online spillere",
+    "whitelist": "Hvidliste",
+    "ops": "Operatorer",
+    "bans": "Udelukkede spillere",
+    "kick": "Smid ud",
+    "ban": "Udeluk",
+    "op": "Gør til operator",
+    "deop": "Fjern operatorstatus"
+  },
+  "backups": {
+    "title": "Verdens- og instanssnapshot",
+    "create": "Opret sikkerhedskopi",
+    "restore": "Gendan",
+    "download": "Download",
+    "delete": "Slet"
+  },
+  "security": {
+    "online_mode": "Online-tilstand (Mojang-autentifikation)",
+    "online_mode_warning": "Advarsel: Hvis du deaktiverer online-mode, kan offline/ubekræftede spillere med forfalskede UUID'er oprette forbindelse.",
+    "whitelist_enforced": "Håndhæv hvidliste"
+  }
+}

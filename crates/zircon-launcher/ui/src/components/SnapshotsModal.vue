@@ -131,6 +131,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { api } from '../lib/api.js';
+import { askConfirm } from '../lib/confirm';
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -185,9 +186,13 @@ async function handleCreateSnapshot() {
 
 async function handleRestore(snap) {
   if (!props.instance) return;
-  if (!confirm(`Are you sure you want to rollback to "${snap.label}"? Current mods will be backed up automatically.`)) {
-    return;
-  }
+  const ok = await askConfirm({
+    title: 'Rollback Snapshot',
+    message: `Are you sure you want to rollback to "${snap.label}"? Current mods will be backed up automatically.`,
+    confirmText: 'Rollback Snapshot',
+    isDanger: true,
+  });
+  if (!ok) return;
   restoring.value = snap.filename;
   try {
     const result = await api.restoreInstanceModSnapshot(props.instance.id, snap.filename);
@@ -205,7 +210,13 @@ async function handleRestore(snap) {
 
 async function handleDelete(snap) {
   if (!props.instance) return;
-  if (!confirm(`Delete snapshot "${snap.label}"?`)) return;
+  const ok = await askConfirm({
+    title: 'Delete Snapshot',
+    message: `Are you sure you want to delete snapshot "${snap.label}"? This action cannot be undone.`,
+    confirmText: 'Delete Snapshot',
+    isDanger: true,
+  });
+  if (!ok) return;
   try {
     await api.deleteInstanceModSnapshot(props.instance.id, snap.filename);
     snapshots.value = snapshots.value.filter((s) => s.filename !== snap.filename);

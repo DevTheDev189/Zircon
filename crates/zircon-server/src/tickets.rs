@@ -11,6 +11,7 @@
 //! Port of `com.mcmanager.server.auth.JoinTicketManager`.
 
 use dashmap::DashMap;
+use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
 /// 5 minutes — generous enough that a heavily modded pack on an older device
@@ -34,12 +35,20 @@ pub fn join_intent_ttl() -> Duration {
 /// remote attacker could otherwise grow the store without limit; past the cap,
 /// registrations are dropped until the housekeeping task purges expired ones.
 pub const MAX_TICKETS: usize = 5000;
+/// Maximum valid identifier length (Minecraft username <= 16, UUID <= 36).
+pub const MAX_IDENTIFIER_LEN: usize = 64;
+
+#[derive(Debug, Clone)]
+struct TicketEntry {
+    expiry: Instant,
+    client_ip: Option<IpAddr>,
+}
 
 /// In-memory join ticket store. Keys are lower-cased identifiers
-/// (username or UUID); values are expiry instants.
+/// (username or UUID); values are ticket entries with expiry and optional IP binding.
 #[derive(Default)]
 pub struct JoinTicketManager {
-    active_tickets: DashMap<String, Instant>,
+    active_tickets: DashMap<String, TicketEntry>,
 }
 
 impl JoinTicketManager {
@@ -49,49 +58,115 @@ impl JoinTicketManager {
 
     /// Registers a join intent for a username or UUID (case-insensitive).
     pub fn register_ticket(&self, identifier: &str) {
-        self.register_ticket_ttl(identifier, Duration::from_millis(TICKET_TTL_MS));
+        self.register_ticket_with_ip(identifier, None, Duration::from_millis(TICKET_TTL_MS));
+    }
+
+    /// Registers a join intent bound to a specific client IP address.
+    pub fn register_ticket_for_ip(&self, identifier: &str, client_ip: IpAddr) {
+        self.register_ticket_with_ip(
+            identifier,
+            Some(client_ip.to_canonical()),
+            Duration::from_millis(TICKET_TTL_MS),
+        );
     }
 
     /// Registers a ticket with a custom TTL (tests use short TTLs). Drops the
     /// registration when the store is full so a public endpoint cannot grow
     /// memory without bound.
     pub fn register_ticket_ttl(&self, identifier: &str, ttl: Duration) {
+        self.register_ticket_with_ip(identifier, None, ttl);
+    }
+
+    pub fn register_ticket_with_ip(
+        &self,
+        identifier: &str,
+        client_ip: Option<IpAddr>,
+        ttl: Duration,
+    ) {
         let trimmed = identifier.trim();
-        if trimmed.is_empty() {
+        if trimmed.is_empty()
+            || trimmed.len() > MAX_IDENTIFIER_LEN
+            || !trimmed
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
             return;
         }
-        if self.active_tickets.len() >= MAX_TICKETS {
+        let key = trimmed.to_ascii_lowercase();
+        let Some(expiry) = Instant::now().checked_add(ttl) else {
+            return;
+        };
+        if !self.active_tickets.contains_key(&key) && self.active_tickets.len() >= MAX_TICKETS {
             self.purge_expired();
             if self.active_tickets.len() >= MAX_TICKETS {
                 tracing::warn!(
-                    "Join ticket store is full ({MAX_TICKETS}); dropping registration for '{trimmed}'"
+                    "Join ticket store is full ({MAX_TICKETS}); dropping registration"
                 );
                 return;
             }
         }
-        self.active_tickets
-            .insert(trimmed.to_lowercase(), Instant::now() + ttl);
+        self.active_tickets.insert(
+            key,
+            TicketEntry {
+                expiry,
+                client_ip: client_ip.map(|ip| ip.to_canonical()),
+            },
+        );
     }
 
     /// Checks and consumes (one-time use) the ticket for an identifier.
     ///
     /// Returns `true` when a fresh ticket existed and was consumed.
     pub fn consume_ticket(&self, identifier: &str) -> bool {
+        self.consume_ticket_for_ip(identifier, None)
+    }
+
+    /// Checks and consumes the ticket for an identifier, verifying that the
+    /// connecting socket's IP matches the IP that registered the ticket (when bound).
+    /// Does NOT burn the ticket if an unauthorized IP attempts to consume it.
+    pub fn consume_ticket_for_ip(&self, identifier: &str, peer_ip: Option<IpAddr>) -> bool {
         let trimmed = identifier.trim();
-        if trimmed.is_empty() {
+        if trimmed.is_empty() || trimmed.len() > MAX_IDENTIFIER_LEN {
             return false;
         }
-        let key = trimmed.to_lowercase();
-        match self.active_tickets.remove(&key) {
-            Some((_, expiry)) => expiry > Instant::now(),
-            None => false,
+        let key = trimmed.to_ascii_lowercase();
+        let now = Instant::now();
+        let canonical_peer = peer_ip.map(|ip| ip.to_canonical());
+        self.active_tickets
+            .remove_if(&key, |_, entry| {
+                if entry.expiry <= now {
+                    return true; // Remove expired entry
+                }
+                match (entry.client_ip, canonical_peer) {
+                    (Some(expected_ip), Some(actual_ip)) => expected_ip == actual_ip,
+                    (Some(_), None) => false,
+                    (None, _) => true,
+                }
+            })
+            .map(|(_, entry)| entry.expiry > now)
+            .unwrap_or(false)
+    }
+
+    /// Peeks at whether a non-expired ticket exists for `identifier` without
+    /// consuming it (useful during initial TCP pre-filtering before the player's
+    /// identity is cryptographically verified, or to avoid burning tickets on
+    /// aborted handshakes).
+    pub fn has_valid_ticket(&self, identifier: &str) -> bool {
+        let trimmed = identifier.trim();
+        if trimmed.is_empty() || trimmed.len() > MAX_IDENTIFIER_LEN {
+            return false;
         }
+        let key = trimmed.to_ascii_lowercase();
+        let now = Instant::now();
+        self.active_tickets
+            .get(&key)
+            .is_some_and(|entry| entry.expiry > now)
     }
 
     /// Removes expired tickets. Called periodically by the scheduler.
     pub fn purge_expired(&self) {
         let now = Instant::now();
-        self.active_tickets.retain(|_, expiry| *expiry > now);
+        self.active_tickets.retain(|_, entry| entry.expiry > now);
     }
 }
 

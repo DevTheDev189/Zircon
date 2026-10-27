@@ -22,7 +22,7 @@
           <div class="flex items-center gap-1.5">
             <span class="text-xs font-black tracking-wider text-teal-300 uppercase font-mono">2048</span>
             <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-200 font-bold tracking-tight border border-teal-500/30">
-              {{ $t('game_2048.minigame') }}
+              {{ $t('game_2048.badge') || $t('game_2048.minigame') }}
             </span>
           </div>
           <p class="text-[10px] text-slate-400 font-medium leading-none mt-0.5">{{ $t('game_2048.tagline') }}</p>
@@ -58,7 +58,7 @@
         <button
           type="button"
           class="p-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-rose-500/20 hover:border-rose-400/60 text-slate-400 hover:text-rose-300 transition-all text-xs"
-          :title="$t('game_2048.minimize_tooltip')"
+          :title="$t('game_2048.close_tooltip') || $t('game_2048.minimize_tooltip')"
           @click="$emit('close')"
         >
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -114,7 +114,7 @@
         class="absolute inset-0 z-20 bg-[#05090f]/90 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-4 text-center animate-fade-in border border-rose-500/30"
       >
         <span class="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-1">{{ $t('game_2048.game_over') }}</span>
-        <p class="text-sm font-extrabold text-white mb-3">{{ $t('game_2048.no_more_moves') }}</p>
+        <p class="text-sm font-extrabold text-white mb-3">{{ $t('game_2048.no_moves') || $t('game_2048.no_more_moves') }}</p>
         <button
           type="button"
           class="z-btn-accent text-xs font-bold px-4 py-1.5 rounded-xl shadow-lg hover:shadow-teal-400/30 transition-all active:scale-95"

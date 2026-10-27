@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Išsaugoti",
+    "saving": "Išsaugoma…",
+    "cancel": "Atšaukti",
+    "close": "Uždaryti",
+    "refresh": "Atnaujinti",
+    "copy": "Kopijuoti",
+    "copied": "Nukopijuota į iškarpinę!",
+    "delete": "Ištrinti",
+    "loading": "Kraunama…",
+    "apply": "Taikyti",
+    "edit": "Redaguoti",
+    "search": "Paieška…",
+    "online": "Prisijungęs",
+    "offline": "Neprisijungęs",
+    "sleeping": "Miego būsena",
+    "booting": "Paleidžiama…",
+    "falling_asleep": "Perėjimas į miego būseną…",
+    "shutting_down": "Išjungiama…",
+    "start": "Paleisti",
+    "stop": "Sustabdyti",
+    "restart": "Perkrauti",
+    "wake": "Pažadinti serverį",
+    "detecting": "Aptinkama…"
+  },
+  "nav": {
+    "global_stats": "Bendra statistika",
+    "servers": "Serveriai",
+    "create_server": "Sukurti serverį",
+    "import_server": "Importuoti serverį (.zip)",
+    "mods": "Modai",
+    "shaders": "Šeideriai",
+    "files": "Failai",
+    "console": "Konsolė",
+    "players": "Žaidėjai",
+    "backups": "Atsarginės kopijos",
+    "world": "Pasaulis",
+    "settings": "Nustatymai",
+    "disk_storage": "Disko saugykla",
+    "server_manager": "Serverių tvarkyklė"
+  },
+  "stats": {
+    "title": "Sistemos telemetrija ir rodikliai",
+    "subtitle": "Realaus laiko CPU, pagrindinės RAM, proceso RSS ir disko veikla",
+    "host_ram": "Pagrindinės OS RAM",
+    "process_rss": "Java proceso RSS",
+    "cpu_usage": "CPU apkrova",
+    "disk_allocation": "NVMe saugyklos paskirstymas",
+    "uptime": "Sistemos veikimo laikas",
+    "active_instances": "Paleistos instancijos",
+    "sleeping_instances": "Miegojančios instancijos"
+  },
+  "instances": {
+    "no_servers": "Serverių dar nėra — spustelėkite „Sukurti serverį“.",
+    "create_title": "Sukurti „Minecraft“ serverį",
+    "name_label": "Tiesioginio pavadinimas",
+    "version_label": "„Minecraft“ versija",
+    "loader_label": "Modžių įkėlėjas",
+    "port_label": "Prievadas",
+    "memory_label": "Paskirta atmintis (GB)",
+    "start_server": "Paleisti serverį",
+    "wake_server": "Pažadinti serverį",
+    "stop_server": "Stabdyti serverį",
+    "restart_server": "Perkrauti serverį",
+    "players_online": "{count} prisijungę",
+    "sleeps_in": "Užmiega po {time}",
+    "idle_wakes": "Neaktyvus išjungimas — pažadinamas, kai žaidėjas prisijungia"
+  },
+  "mods": {
+    "title": "Įdiegti modai",
+    "count": "Įdiegti modai ({count})",
+    "search_placeholder": "Ieškoti įdiegtų modų…",
+    "loader_filter": "Kroviklio filtras",
+    "all_loaders": "Visi krovikliai",
+    "active_loader": "Aktyvus kroviklis ({loader})",
+    "export_mrpack": "Eksportuoti .mrpack",
+    "copy_mrpack_url": "Kopijuoti .mrpack URL",
+    "copy_mrpack_tooltip": "Kopijuoti viešąją .mrpack atsisiuntimo nuorodą žaidėjams, kurie nenaudoja Zircon",
+    "add_mod": "Pridėti modą",
+    "install_update": "Atnaujinti",
+    "no_mods": "Modai dar neįdiegti."
+  },
+  "console": {
+    "title": "Serverio konsolė ir terminalas",
+    "placeholder": "Siųsti komandą (pvz., /say Hello, /op Player)...",
+    "send": "Siųsti",
+    "clear": "Išvalyti"
+  },
+  "players": {
+    "title": "Žaidėjų valdymas",
+    "online": "Prisijungę žaidėjai",
+    "whitelist": "Baltasis sąrašas",
+    "ops": "Operatoriai",
+    "bans": "Užblokuoti žaidėjai",
+    "kick": "Išmesti",
+    "ban": "Užblokuoti",
+    "op": "Suteikti operatoriaus teises",
+    "deop": "Atimti operatoriaus teises"
+  },
+  "backups": {
+    "title": "Pasaulių ir instansų kopijos",
+    "create": "Sukurti atsarginę kopiją",
+    "restore": "Atkurti",
+    "download": "Atsisiųsti",
+    "delete": "Ištrinti"
+  },
+  "security": {
+    "online_mode": "Internetinis režimas (Mojang autentifikacija)",
+    "online_mode_warning": "Įspėjimas: išjungus internetinį režimą, neprisijungę / nepatikrinti žaidėjai su suklastotais UUID gali prisijungti.",
+    "whitelist_enforced": "Priverstinai taikyti baltąjį sąrašą"
+  }
+}

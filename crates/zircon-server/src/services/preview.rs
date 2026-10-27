@@ -103,11 +103,11 @@ impl WorldPreviewService {
         );
 
         // 4. Check if live world already has generated region files
-        let live_region_dir_opt = Self::find_region_dir(instance_dir, &src_root);
+        let live_region_dir_opt = Self::find_region_dir(instance_dir, &src_root, req.dimension);
 
         if use_live {
             if let Some(ref live_region_dir) = live_region_dir_opt {
-                let surface_map = scan_region_surface(live_region_dir, req.center_x, req.center_z, req.radius_blocks);
+                let surface_map = scan_region_surface(live_region_dir, req.center_x, req.center_z, req.radius_blocks, req.dimension);
                 tracing::info!(
                     "[WorldGen] Live region scan in '{:?}': found {} chunks",
                     live_region_dir,
@@ -118,7 +118,7 @@ impl WorldPreviewService {
                         message: format!("Loaded {} generated chunks from active world. Rendering map...", surface_map.chunks_found),
                     });
                     let seed_display = if !active_seed.is_empty() { active_seed } else { req.seed };
-                    let result = render_preview_map(&surface_map, &seed_display, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512);
+                    let result = render_preview_map(&surface_map, &seed_display, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512, req.dimension);
                     progress_cb(PreviewProgress::Ready { result: result.clone() });
                     return Ok(result);
                 }
@@ -126,8 +126,8 @@ impl WorldPreviewService {
         } else {
             // Check persistent seed cache directory for alternate seed
             let seed_cache_dir = instance_dir.join(".cache").join("world-seeds").join(requested_seed);
-            if let Some(cache_region_dir) = Self::find_region_dir(&seed_cache_dir, &seed_cache_dir) {
-                let surface_map = scan_region_surface(&cache_region_dir, req.center_x, req.center_z, req.radius_blocks);
+            if let Some(cache_region_dir) = Self::find_region_dir(&seed_cache_dir, &seed_cache_dir, req.dimension) {
+                let surface_map = scan_region_surface(&cache_region_dir, req.center_x, req.center_z, req.radius_blocks, req.dimension);
                 tracing::info!(
                     "[WorldGen] Cache region scan in '{:?}': found {} chunks",
                     cache_region_dir,
@@ -137,7 +137,7 @@ impl WorldPreviewService {
                     progress_cb(PreviewProgress::Rendering {
                         message: format!("Loaded {} cached chunks for seed '{}'. Rendering map...", surface_map.chunks_found, requested_seed),
                     });
-                    let result = render_preview_map(&surface_map, requested_seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512);
+                    let result = render_preview_map(&surface_map, requested_seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512, req.dimension);
                     progress_cb(PreviewProgress::Ready { result: result.clone() });
                     return Ok(result);
                 }
@@ -266,6 +266,11 @@ impl WorldPreviewService {
     }
 
     pub fn prepare_server_properties(server_props_path: &Path, seed: &str, port: u16) -> io::Result<()> {
+        let bak_path = server_props_path.with_extension("preview_bak");
+        if server_props_path.exists() && !bak_path.exists() {
+            let _ = fs::copy(server_props_path, &bak_path);
+        }
+
         let mut key_values: Vec<(String, String)> = Vec::new();
         if server_props_path.exists() {
             if let Ok(content) = fs::read_to_string(server_props_path) {
@@ -321,6 +326,28 @@ impl WorldPreviewService {
     }
 
     pub fn restore_server_port(server_props_path: &Path, port: u16) -> io::Result<()> {
+        let bak_path = server_props_path.with_extension("preview_bak");
+        if bak_path.exists() {
+            if let Ok(content) = fs::read_to_string(&bak_path) {
+                let mut lines: Vec<String> = Vec::new();
+                let mut updated_port = false;
+                for line in content.lines() {
+                    if line.starts_with("server-port=") {
+                        lines.push(format!("server-port={port}"));
+                        updated_port = true;
+                    } else {
+                        lines.push(line.to_string());
+                    }
+                }
+                if !updated_port {
+                    lines.push(format!("server-port={port}"));
+                }
+                let _ = fs::write(server_props_path, lines.join("\n") + "\n");
+                let _ = fs::remove_file(&bak_path);
+                return Ok(());
+            }
+        }
+
         if !server_props_path.exists() {
             return Ok(());
         }
@@ -329,6 +356,13 @@ impl WorldPreviewService {
         let mut updated_port = false;
         let mut updated_max = false;
         let mut updated_status = false;
+        let mut updated_diff = false;
+        let mut updated_monsters = false;
+        let mut updated_animals = false;
+        let mut updated_npcs = false;
+        let mut updated_online = false;
+        let mut updated_view = false;
+        let mut updated_sim = false;
         for line in content.lines() {
             if line.starts_with("server-port=") {
                 lines.push(format!("server-port={port}"));
@@ -339,6 +373,27 @@ impl WorldPreviewService {
             } else if line.starts_with("enable-status=") {
                 lines.push("enable-status=true".to_string());
                 updated_status = true;
+            } else if line.starts_with("difficulty=") {
+                lines.push("difficulty=normal".to_string());
+                updated_diff = true;
+            } else if line.starts_with("spawn-monsters=") {
+                lines.push("spawn-monsters=true".to_string());
+                updated_monsters = true;
+            } else if line.starts_with("spawn-animals=") {
+                lines.push("spawn-animals=true".to_string());
+                updated_animals = true;
+            } else if line.starts_with("spawn-npcs=") {
+                lines.push("spawn-npcs=true".to_string());
+                updated_npcs = true;
+            } else if line.starts_with("online-mode=") {
+                lines.push("online-mode=true".to_string());
+                updated_online = true;
+            } else if line.starts_with("view-distance=") {
+                lines.push("view-distance=10".to_string());
+                updated_view = true;
+            } else if line.starts_with("simulation-distance=") {
+                lines.push("simulation-distance=10".to_string());
+                updated_sim = true;
             } else {
                 lines.push(line.to_string());
             }
@@ -351,6 +406,27 @@ impl WorldPreviewService {
         }
         if !updated_status {
             lines.push("enable-status=true".to_string());
+        }
+        if !updated_diff {
+            lines.push("difficulty=normal".to_string());
+        }
+        if !updated_monsters {
+            lines.push("spawn-monsters=true".to_string());
+        }
+        if !updated_animals {
+            lines.push("spawn-animals=true".to_string());
+        }
+        if !updated_npcs {
+            lines.push("spawn-npcs=true".to_string());
+        }
+        if !updated_online {
+            lines.push("online-mode=true".to_string());
+        }
+        if !updated_view {
+            lines.push("view-distance=10".to_string());
+        }
+        if !updated_sim {
+            lines.push("simulation-distance=10".to_string());
         }
         fs::write(server_props_path, lines.join("\n") + "\n")
     }
@@ -474,8 +550,10 @@ impl WorldPreviewService {
     {
         // 1. Resolve exact Java binary based on Minecraft version (e.g. Java 21 for 1.20.5+)
         let java_version = crate::process::manager::detect_java_version(mc_version);
-        let java_bin = crate::installer::java_bin_for_version(java_version);
-        let mut cmd = Command::new(java_bin);
+        let java_bin = crate::installer::ensure_java_installed(java_version)
+            .await
+            .map_err(|e| format!("Java error: {e}"))?;
+        let mut cmd = Command::new(&java_bin);
         cmd.current_dir(target_dir);
         cmd.arg("-Xmx1536M");
         cmd.arg("-Xms512M");
@@ -537,11 +615,11 @@ impl WorldPreviewService {
             cmd.arg("-jar").arg(jar);
         } else {
             // Fallback: If no server jar present (e.g. client mock / test suite), scan available files
-            let region_dir = Self::find_region_dir(target_dir, target_dir)
-                .or_else(|| Self::find_region_dir(src_root, src_root))
-                .unwrap_or_else(|| target_dir.join("world/region"));
-            let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks);
-            let result = render_preview_map(&surface_map, &req.seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512);
+            let region_dir = Self::find_region_dir(target_dir, target_dir, req.dimension)
+                .or_else(|| Self::find_region_dir(src_root, src_root, req.dimension))
+                .unwrap_or_else(|| target_dir.join("world").join(req.dimension.region_subpath()));
+            let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks, req.dimension);
+            let result = render_preview_map(&surface_map, &req.seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512, req.dimension);
             progress_cb(PreviewProgress::Ready { result: result.clone() });
             return Ok(result);
         }
@@ -559,11 +637,11 @@ impl WorldPreviewService {
             },
             Err(e) => {
                 tracing::warn!("Failed to spawn headless preview worker: {e}");
-                let region_dir = Self::find_region_dir(target_dir, target_dir)
-                    .or_else(|| Self::find_region_dir(src_root, src_root))
-                    .unwrap_or_else(|| target_dir.join("world/region"));
-                let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks);
-                let result = render_preview_map(&surface_map, &req.seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512);
+                let region_dir = Self::find_region_dir(target_dir, target_dir, req.dimension)
+                    .or_else(|| Self::find_region_dir(src_root, src_root, req.dimension))
+                    .unwrap_or_else(|| target_dir.join("world").join(req.dimension.region_subpath()));
+                let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks, req.dimension);
+                let result = render_preview_map(&surface_map, &req.seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512, req.dimension);
                 progress_cb(PreviewProgress::Ready { result: result.clone() });
                 return Ok(result);
             }
@@ -582,11 +660,11 @@ impl WorldPreviewService {
         let mut stdin = match child.stdin.take() {
             Some(s) => s,
             None => {
-                let region_dir = Self::find_region_dir(target_dir, target_dir)
-                    .or_else(|| Self::find_region_dir(src_root, src_root))
-                    .unwrap_or_else(|| target_dir.join("world/region"));
-                let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks);
-                let result = render_preview_map(&surface_map, &req.seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512);
+                let region_dir = Self::find_region_dir(target_dir, target_dir, req.dimension)
+                    .or_else(|| Self::find_region_dir(src_root, src_root, req.dimension))
+                    .unwrap_or_else(|| target_dir.join("world").join(req.dimension.region_subpath()));
+                let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks, req.dimension);
+                let result = render_preview_map(&surface_map, &req.seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512, req.dimension);
                 progress_cb(PreviewProgress::Ready { result: result.clone() });
                 return Ok(result);
             }
@@ -595,11 +673,11 @@ impl WorldPreviewService {
         let stdout = match child.stdout.take() {
             Some(s) => s,
             None => {
-                let region_dir = Self::find_region_dir(target_dir, target_dir)
-                    .or_else(|| Self::find_region_dir(src_root, src_root))
-                    .unwrap_or_else(|| target_dir.join("world/region"));
-                let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks);
-                let result = render_preview_map(&surface_map, &req.seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512);
+                let region_dir = Self::find_region_dir(target_dir, target_dir, req.dimension)
+                    .or_else(|| Self::find_region_dir(src_root, src_root, req.dimension))
+                    .unwrap_or_else(|| target_dir.join("world").join(req.dimension.region_subpath()));
+                let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks, req.dimension);
+                let result = render_preview_map(&surface_map, &req.seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512, req.dimension);
                 progress_cb(PreviewProgress::Ready { result: result.clone() });
                 return Ok(result);
             }
@@ -685,11 +763,11 @@ impl WorldPreviewService {
             }
         }
 
-        let region_dir = Self::find_region_dir(target_dir, target_dir)
-            .or_else(|| Self::find_region_dir(src_root, src_root))
-            .unwrap_or_else(|| target_dir.join("world/region"));
-        let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks);
-        let result = render_preview_map(&surface_map, &final_seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512);
+        let region_dir = Self::find_region_dir(target_dir, target_dir, req.dimension)
+            .or_else(|| Self::find_region_dir(src_root, src_root, req.dimension))
+            .unwrap_or_else(|| target_dir.join("world").join(req.dimension.region_subpath()));
+        let surface_map = scan_region_surface(&region_dir, req.center_x, req.center_z, req.radius_blocks, req.dimension);
+        let result = render_preview_map(&surface_map, &final_seed, req.center_x, req.center_z, req.radius_blocks, req.zoom, 512, req.dimension);
 
         progress_cb(PreviewProgress::Ready {
             result: result.clone(),
@@ -698,16 +776,40 @@ impl WorldPreviewService {
         Ok(result)
     }
 
-    /// Finds the Minecraft overworld region directory across standard, Bukkit, and modern dimension structures.
-    pub fn find_region_dir(instance_dir: &Path, src_root: &Path) -> Option<PathBuf> {
-        let candidates = [
-            src_root.join("world").join("dimensions").join("minecraft").join("overworld").join("region"),
-            src_root.join("world").join("region"),
-            instance_dir.join("world").join("dimensions").join("minecraft").join("overworld").join("region"),
-            instance_dir.join("world").join("region"),
-            instance_dir.join("server").join("world").join("dimensions").join("minecraft").join("overworld").join("region"),
-            instance_dir.join("server").join("world").join("region"),
-        ];
+    /// Finds the Minecraft region directory across standard, Bukkit, and modern dimension structures.
+    pub fn find_region_dir(instance_dir: &Path, src_root: &Path, dimension: zircon_core::world::Dimension) -> Option<PathBuf> {
+        let candidates: Vec<PathBuf> = match dimension {
+            zircon_core::world::Dimension::Overworld => vec![
+                src_root.join("world").join("dimensions").join("minecraft").join("overworld").join("region"),
+                src_root.join("world").join("region"),
+                instance_dir.join("world").join("dimensions").join("minecraft").join("overworld").join("region"),
+                instance_dir.join("world").join("region"),
+                instance_dir.join("server").join("world").join("dimensions").join("minecraft").join("overworld").join("region"),
+                instance_dir.join("server").join("world").join("region"),
+            ],
+            zircon_core::world::Dimension::TheNether => vec![
+                src_root.join("world").join("dimensions").join("minecraft").join("the_nether").join("region"),
+                src_root.join("world").join("DIM-1").join("region"),
+                src_root.join("world_nether").join("DIM-1").join("region"),
+                src_root.join("world_nether").join("region"),
+                instance_dir.join("world").join("DIM-1").join("region"),
+                instance_dir.join("world_nether").join("DIM-1").join("region"),
+                instance_dir.join("world_nether").join("region"),
+                instance_dir.join("server").join("world").join("DIM-1").join("region"),
+                instance_dir.join("server").join("world_nether").join("region"),
+            ],
+            zircon_core::world::Dimension::TheEnd => vec![
+                src_root.join("world").join("dimensions").join("minecraft").join("the_end").join("region"),
+                src_root.join("world").join("DIM1").join("region"),
+                src_root.join("world_the_end").join("DIM1").join("region"),
+                src_root.join("world_the_end").join("region"),
+                instance_dir.join("world").join("DIM1").join("region"),
+                instance_dir.join("world_the_end").join("DIM1").join("region"),
+                instance_dir.join("world_the_end").join("region"),
+                instance_dir.join("server").join("world").join("DIM1").join("region"),
+                instance_dir.join("server").join("world_the_end").join("region"),
+            ],
+        };
 
         for cand in &candidates {
             if cand.is_dir() && fs::read_dir(cand).map(|mut d| d.next().is_some()).unwrap_or(false) {
@@ -715,7 +817,31 @@ impl WorldPreviewService {
             }
         }
 
-        for base in &[src_root.join("world"), instance_dir.join("world"), instance_dir.join("server/world")] {
+        let base_dirs = match dimension {
+            zircon_core::world::Dimension::Overworld => vec![
+                src_root.join("world"),
+                instance_dir.join("world"),
+                instance_dir.join("server/world"),
+            ],
+            zircon_core::world::Dimension::TheNether => vec![
+                src_root.join("world/DIM-1"),
+                src_root.join("world_nether"),
+                instance_dir.join("world/DIM-1"),
+                instance_dir.join("world_nether"),
+                instance_dir.join("server/world/DIM-1"),
+                instance_dir.join("server/world_nether"),
+            ],
+            zircon_core::world::Dimension::TheEnd => vec![
+                src_root.join("world/DIM1"),
+                src_root.join("world_the_end"),
+                instance_dir.join("world/DIM1"),
+                instance_dir.join("world_the_end"),
+                instance_dir.join("server/world/DIM1"),
+                instance_dir.join("server/world_the_end"),
+            ],
+        };
+
+        for base in &base_dirs {
             if base.is_dir() {
                 if let Some(found) = find_region_recursive(base, 4) {
                     return Some(found);
@@ -819,6 +945,7 @@ mod tests {
             center_x: 0,
             center_z: 0,
             zoom: 1.0,
+            dimension: zircon_core::world::Dimension::Overworld,
             selected_mods: None,
         };
 
@@ -850,7 +977,7 @@ mod tests {
         fs::create_dir_all(&region_path).unwrap();
         fs::write(region_path.join("r.0.0.mca"), b"dummy mca data").unwrap();
 
-        let found = WorldPreviewService::find_region_dir(dir.path(), dir.path());
+        let found = WorldPreviewService::find_region_dir(dir.path(), dir.path(), zircon_core::world::Dimension::Overworld);
         assert!(found.is_some());
         assert_eq!(found.unwrap(), region_path);
     }

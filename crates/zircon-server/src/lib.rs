@@ -7,8 +7,6 @@
 
 pub mod audit;
 pub mod auth;
-#[cfg(feature = "cloud")]
-pub mod cloud;
 pub mod config;
 pub mod installer;
 pub mod instance;

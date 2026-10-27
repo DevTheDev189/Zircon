@@ -127,6 +127,25 @@ pub fn parse_toml_metadata(
         .unwrap_or_default()
         .to_string();
 
+    let environment = if first.get("clientSideOnly").and_then(|v| v.as_bool()).unwrap_or(false) {
+        "client"
+    } else if let Some(display_test) = first.get("displayTest").and_then(|v| v.as_str()) {
+        let dt = display_test.to_ascii_uppercase();
+        if dt.contains("IGNORE_SERVER_VERSION") || dt.contains("IGNORE_ALL_VERSION") {
+            "client"
+        } else {
+            "both"
+        }
+    } else if let Some(side) = first.get("side").and_then(|v| v.as_str()) {
+        match side.to_ascii_lowercase().as_str() {
+            "client" => "client",
+            "server" => "server",
+            _ => "both",
+        }
+    } else {
+        "both"
+    };
+
     Ok(ModMetadata::new(
         id,
         name,
@@ -134,7 +153,7 @@ pub fn parse_toml_metadata(
         description,
         author,
         loader_type,
-        "both",
+        environment,
     ))
 }
 

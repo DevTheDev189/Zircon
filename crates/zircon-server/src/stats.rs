@@ -21,6 +21,10 @@ pub struct MetricPoint {
     pub process_cpu_load: f64,
     pub used_memory_bytes: u64,
     pub max_memory_bytes: u64,
+    pub server_process_memory_bytes: u64,
+    pub server_configured_max_memory_bytes: u64,
+    pub is_server_running: bool,
+    pub is_server_sleeping: bool,
     pub total_disk_bytes: u64,
     pub free_disk_bytes: u64,
     pub tps: Option<f64>,
@@ -37,15 +41,19 @@ static STATE: Mutex<Option<MetricsState>> = Mutex::new(None);
 
 /// Takes one measurement of the host without specific telemetry, appends it to history.
 pub fn sample(data_dir: &Path) -> MetricPoint {
-    sample_with_telemetry(data_dir, None, None, None)
+    sample_with_telemetry(data_dir, None, None, None, None, 0, false, false)
 }
 
-/// Takes one measurement of the host with optional server tick telemetry.
+/// Takes one measurement of the host with optional server tick telemetry and process metrics.
 pub fn sample_with_telemetry(
     data_dir: &Path,
     tps: Option<f64>,
     mspt: Option<f64>,
     ping_ms: Option<u64>,
+    server_pid: Option<u32>,
+    server_configured_mem: u64,
+    is_running: bool,
+    is_sleeping: bool,
 ) -> MetricPoint {
     let mut guard = STATE.lock().unwrap();
     let state = guard.get_or_insert_with(|| MetricsState {
@@ -56,12 +64,26 @@ pub fn sample_with_telemetry(
     state.system.refresh_all();
 
     let sys_cpu = percent_of(f64::from(state.system.global_cpu_usage()) / 100.0);
-    let pid = sysinfo::get_current_pid().ok();
-    let proc_cpu = percent_of(
-        pid.and_then(|p| state.system.process(p))
-            .map(|p| f64::from(p.cpu_usage()) / 100.0)
-            .unwrap_or(0.0),
-    );
+
+    // If a Minecraft server process is running, sample that specific process for CPU & memory.
+    // If stopped/sleeping, process memory and process CPU are 0 (resources released).
+    let (proc_cpu, server_process_mem) = if is_running {
+        if let Some(spid) = server_pid {
+            let pid = sysinfo::Pid::from_u32(spid);
+            if let Some(proc) = state.system.process(pid) {
+                (
+                    percent_of(f64::from(proc.cpu_usage()) / 100.0),
+                    proc.memory(),
+                )
+            } else {
+                (0.0, 0)
+            }
+        } else {
+            (0.0, 0)
+        }
+    } else {
+        (0.0, 0)
+    };
 
     let total_mem = state.system.total_memory();
     let used_mem = state.system.used_memory();
@@ -74,6 +96,10 @@ pub fn sample_with_telemetry(
         process_cpu_load: round1(proc_cpu),
         used_memory_bytes: used_mem,
         max_memory_bytes: total_mem,
+        server_process_memory_bytes: server_process_mem,
+        server_configured_max_memory_bytes: server_configured_mem,
+        is_server_running: is_running,
+        is_server_sleeping: is_sleeping,
         total_disk_bytes: total_disk,
         free_disk_bytes: free_disk,
         tps,
@@ -99,12 +125,16 @@ pub fn get_metrics_snapshot(data_dir: &Path) -> MetricsSnapshot {
         Vec::new(),
         None,
         HashMap::new(),
+        None,
+        0,
+        false,
+        false,
     )
 }
 
 use std::collections::HashMap;
 
-/// The latest measurement with full server tick telemetry.
+/// The latest measurement with full server tick telemetry and instance process stats.
 pub fn get_metrics_snapshot_with_telemetry(
     data_dir: &Path,
     tps: Option<f64>,
@@ -114,8 +144,21 @@ pub fn get_metrics_snapshot_with_telemetry(
     mspt_history: Vec<f64>,
     active_instance_id: Option<String>,
     all_instances_telemetry: HashMap<String, crate::instance::InstanceTelemetrySummary>,
+    server_pid: Option<u32>,
+    server_configured_mem: u64,
+    is_running: bool,
+    is_sleeping: bool,
 ) -> MetricsSnapshot {
-    let current = sample_with_telemetry(data_dir, tps, mspt, ping_ms);
+    let current = sample_with_telemetry(
+        data_dir,
+        tps,
+        mspt,
+        ping_ms,
+        server_pid,
+        server_configured_mem,
+        is_running,
+        is_sleeping,
+    );
     let history = STATE
         .lock()
         .unwrap()
@@ -123,6 +166,10 @@ pub fn get_metrics_snapshot_with_telemetry(
         .map(|s| s.history.clone())
         .unwrap_or_default();
     MetricsSnapshot {
+        server_process_memory_bytes: current.server_process_memory_bytes,
+        server_configured_max_memory_bytes: current.server_configured_max_memory_bytes,
+        is_server_running: current.is_server_running,
+        is_server_sleeping: current.is_server_sleeping,
         current,
         history,
         tps,
@@ -148,17 +195,27 @@ pub struct MetricsSnapshot {
     pub mspt_history: Vec<f64>,
     pub active_instance_id: Option<String>,
     pub all_instances_telemetry: HashMap<String, crate::instance::InstanceTelemetrySummary>,
+    pub server_process_memory_bytes: u64,
+    pub server_configured_max_memory_bytes: u64,
+    pub is_server_running: bool,
+    pub is_server_sleeping: bool,
 }
 
 fn disk_space(data_dir: &Path) -> (u64, u64) {
     let disks = Disks::new_with_refreshed_list();
+    let data_dir_str = data_dir.to_string_lossy().to_lowercase();
     for disk in &disks {
-        if data_dir.starts_with(disk.mount_point()) {
+        let mount_str = disk.mount_point().to_string_lossy().to_lowercase();
+        let trimmed_mount = mount_str.trim_end_matches(['\\', '/']);
+        if data_dir_str.starts_with(&mount_str)
+            || (!trimmed_mount.is_empty() && data_dir_str.starts_with(trimmed_mount))
+        {
             return (disk.total_space(), disk.available_space());
         }
     }
     disks
-        .first()
+        .iter()
+        .max_by_key(|d| d.total_space())
         .map(|d| (d.total_space(), d.available_space()))
         .unwrap_or((0, 0))
 }
@@ -195,7 +252,7 @@ mod tests {
         assert!(first.total_disk_bytes > 0);
 
         for _ in 0..70 {
-            sample_with_telemetry(&dir, Some(20.0), Some(22.5), Some(5));
+            sample_with_telemetry(&dir, Some(20.0), Some(22.5), Some(5), None, 0, false, false);
         }
         let snapshot = get_metrics_snapshot_with_telemetry(
             &dir,
@@ -206,6 +263,10 @@ mod tests {
             vec![22.5; 60],
             Some("inst-1".to_string()),
             HashMap::new(),
+            None,
+            4 * 1024 * 1024 * 1024,
+            false,
+            false,
         );
         assert!(snapshot.history.len() <= HISTORY_LIMIT);
         assert_eq!(HISTORY_LIMIT, snapshot.history.len());

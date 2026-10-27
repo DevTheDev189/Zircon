@@ -78,6 +78,38 @@
 
           <div class="h-3 w-px bg-slate-800 mx-0.5" />
 
+          <!-- Backdrop Mode Selector [Checkerboard / Dark / Neutral] -->
+          <button
+            type="button"
+            class="px-2 h-6 rounded border text-[10px] font-bold flex items-center gap-1 transition-all"
+            :class="
+              backdropMode === 'checker'
+                ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_8px_rgba(56,189,248,0.3)]'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+            "
+            :title="`Backdrop: ${backdropMode.toUpperCase()} (Click to cycle Checkerboard / Dark / Neutral)`"
+            @click="cycleBackdropMode"
+          >
+            <!-- Grid / Checkerboard SVG -->
+            <svg v-if="backdropMode === 'checker'" class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+            </svg>
+            <!-- Moon / Dark SVG -->
+            <svg v-else-if="backdropMode === 'dark'" class="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+            <!-- Neutral SVG -->
+            <svg v-else class="w-3 h-3 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+            </svg>
+            <span class="capitalize hidden sm:inline">{{ backdropMode }}</span>
+          </button>
+
+          <div class="h-3 w-px bg-slate-800 mx-0.5" />
+
           <!-- In-Viewport HUD Toggle -->
           <button
             type="button"
@@ -103,12 +135,17 @@
     <!-- 3D WebGL Canvas Container -->
     <div
       ref="containerRef"
-      class="relative flex-1 min-h-0 w-full h-full overflow-hidden"
-      :class="
+      class="relative flex-1 min-h-0 w-full h-full overflow-hidden transition-colors duration-150"
+      :class="[
         studio.state.viewMode3D === 'orbit' || isRotating
           ? 'cursor-grab active:cursor-grabbing'
-          : 'cursor-crosshair'
-      "
+          : 'cursor-crosshair',
+        backdropMode === 'dark'
+          ? 'bg-[#070b10]'
+          : backdropMode === 'neutral'
+          ? 'bg-[#222630]'
+          : 'viewport-checker-bg'
+      ]"
       @wheel.prevent="onWheel"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
@@ -174,6 +211,19 @@ const hoverPixel = ref(null);
 const showPartsHud = ref(false);
 const selectedAngle = ref('iso');
 const containerWidth = ref(400);
+
+const backdropMode = ref(localStorage.getItem('zircon_skin_viewport_bg') || 'checker');
+function setBackdropMode(mode) {
+  backdropMode.value = mode;
+  try {
+    localStorage.setItem('zircon_skin_viewport_bg', mode);
+  } catch (_) {}
+}
+function cycleBackdropMode() {
+  const modes = ['checker', 'dark', 'neutral'];
+  const next = modes[(modes.indexOf(backdropMode.value) + 1) % modes.length];
+  setBackdropMode(next);
+}
 
 let renderer = null;
 let scene = null;
@@ -639,3 +689,16 @@ onBeforeUnmount(() => {
   if (renderer) renderer.dispose();
 });
 </script>
+
+<style scoped>
+.viewport-checker-bg {
+  background-color: #323640;
+  background-image:
+    linear-gradient(45deg, #2a2d35 25%, transparent 25%),
+    linear-gradient(-45deg, #2a2d35 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2a2d35 75%),
+    linear-gradient(-45deg, transparent 75%, #2a2d35 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+</style>

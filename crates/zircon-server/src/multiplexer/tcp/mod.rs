@@ -16,8 +16,7 @@ pub mod proxy;
 #[cfg(test)]
 mod tests;
 
-pub use handshake::*;
-pub use proxy::*;
+pub(crate) use proxy::*;
 
 use std::collections::HashMap;
 use std::io;
@@ -29,6 +28,8 @@ use zircon_core::model::InstanceConfig;
 use crate::config::ConfigService;
 use crate::instance::{PortBindingListener, ServerInstanceManager};
 use crate::tickets::JoinTicketManager;
+
+const PUBLIC_LISTENER_KEY: &str = "__public_listener__";
 
 /// The Tokio TCP multiplexer.
 #[derive(Clone)]
@@ -69,7 +70,15 @@ impl TcpMultiplexer {
     /// instance.
     pub fn start(&self) -> io::Result<()> {
         let public_port = self.config.get_config().public_port as u16;
-        self.spawn_listener(public_port, None);
+        let handle = self.spawn_listener(public_port, None);
+        if let Some(old) = self
+            .bindings
+            .lock()
+            .unwrap()
+            .insert(PUBLIC_LISTENER_KEY.to_string(), handle)
+        {
+            old.abort();
+        }
         if let Some(instances) = &self.instances {
             for instance in instances.list_instances() {
                 self.bind_instance(&instance);

@@ -68,9 +68,9 @@ const _hoisted_28 = ["onClick"]
 const _hoisted_29 = { class: "flex-1 flex flex-col bg-[#0b0f19] overflow-hidden relative" }
 const _hoisted_30 = {
   key: 0,
-  class: "h-16 z-top-header px-6 flex items-center justify-between"
+  class: "h-16 z-top-header px-4 sm:px-6 flex items-center justify-between gap-3 overflow-x-auto min-w-0 shrink-0"
 }
-const _hoisted_31 = { class: "flex gap-2" }
+const _hoisted_31 = { class: "flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 min-w-0 shrink flex-1 whitespace-nowrap" }
 const _hoisted_32 = ["onClick"]
 const _hoisted_33 = ["onClick"]
 const _hoisted_34 = { class: "text-xs font-semibold text-slate-300" }
@@ -237,7 +237,7 @@ const _hoisted_133 = {
   key: 2,
   class: "flex flex-col gap-6 h-full"
 }
-const _hoisted_134 = { class: "grid grid-cols-2 grid-rows-1 gap-6 flex-1 min-h-0 p-1.5 -m-1.5" }
+const _hoisted_134 = { class: "grid grid-cols-1 xl:grid-cols-2 gap-6 flex-1 min-h-0 p-1.5 -m-1.5 overflow-y-auto xl:overflow-hidden" }
 const _hoisted_135 = { class: "zircon-glass-card rounded-2xl p-4 flex flex-col min-h-0" }
 const _hoisted_136 = { class: "flex items-center justify-between mb-3 gap-2 flex-wrap" }
 const _hoisted_137 = { class: "flex items-center gap-3" }
@@ -451,7 +451,7 @@ const _hoisted_239 = {
   key: 0,
   class: "text-[10px] text-cyan-400/80 font-mono mt-0.5 truncate"
 }
-const _hoisted_240 = { class: "grid grid-cols-2 gap-6" }
+const _hoisted_240 = { class: "grid grid-cols-1 xl:grid-cols-2 gap-6" }
 const _hoisted_241 = ["onDragover", "onDrop"]
 const _hoisted_242 = { class: "flex items-center justify-between" }
 const _hoisted_243 = { class: "flex items-center bg-[#1e293b] p-1 rounded-xl border border-slate-800 shadow-inner gap-1" }
@@ -595,7 +595,7 @@ const _hoisted_320 = {
 const _hoisted_321 = { class: "flex items-center gap-3 mt-1 text-[10px] text-slate-500" }
 const _hoisted_322 = { key: 0 }
 const _hoisted_323 = ["href"]
-const _hoisted_324 = { class: "flex items-center gap-1.5 shrink-0" }
+const _hoisted_324 = { class: "flex items-center gap-1.5 shrink-0 flex-wrap justify-end" }
 const _hoisted_325 = ["onClick", "disabled"]
 const _hoisted_326 = {
   key: 0,
@@ -630,7 +630,7 @@ const _hoisted_341 = ["onChange"]
 const _hoisted_342 = ["onClick"]
 const _hoisted_343 = ["onClick"]
 const _hoisted_344 = { class: "flex-1 overflow-y-auto border border-slate-800/80 rounded-xl bg-[#080c14]/60 min-h-0 select-none" }
-const _hoisted_345 = { class: "w-full text-left text-xs text-slate-300 border-collapse" }
+const _hoisted_345 = { class: "w-full min-w-[660px] text-left text-xs text-slate-300 border-collapse" }
 const _hoisted_346 = { class: "divide-y divide-slate-800/60" }
 const _hoisted_347 = {
   key: 0,
@@ -690,7 +690,7 @@ const _hoisted_375 = {
 }
 const _hoisted_376 = { class: "flex items-center justify-between zircon-glass-card p-5 rounded-2xl" }
 const _hoisted_377 = ["onClick"]
-const _hoisted_378 = { class: "grid grid-cols-2 gap-6" }
+const _hoisted_378 = { class: "grid grid-cols-1 xl:grid-cols-2 gap-6" }
 const _hoisted_379 = { class: "zircon-glass-card rounded-2xl p-5" }
 const _hoisted_380 = {
   key: 0,
@@ -1673,7 +1673,7 @@ return function render(_ctx, _cache) {
                             }, _toDisplayString(t), 11 /* TEXT, CLASS, PROPS */, _hoisted_32))
                           }), 128 /* KEYED_FRAGMENT */))
                         ]),
-                        _createElementVNode("div", { class: "flex items-center gap-3" }, [
+                        _createElementVNode("div", { class: "flex items-center gap-2.5 shrink-0 ml-auto whitespace-nowrap" }, [
                           (selectedInstance)
                             ? (_openBlock(), _createElementBlock("button", {
                                 key: 0,
@@ -2347,6 +2347,18 @@ return function render(_ctx, _cache) {
                                             : 'text-slate-400 hover:text-slate-200', "px-3 py-1 rounded-lg transition-all"])
                                       }, "Mods", 10 /* CLASS, PROPS */, _hoisted_146),
                                       _createElementVNode("button", {
+                                        onClick: $event => (setSearchType('resourcepack')),
+                                        class: _normalizeClass([searchType === 'resourcepack'
+                                            ? (searchProvider === 'curseforge' ? 'bg-[#F16436] text-white shadow-[0_0_10px_rgba(241,100,54,0.3)] font-semibold' : 'bg-[#46d66d] text-slate-950 font-bold shadow-[0_0_10px_rgba(70,214,109,0.3)]')
+                                            : 'text-slate-400 hover:text-slate-200', "px-3 py-1 rounded-lg transition-all"])
+                                      }, "Resource Packs", 10 /* CLASS, PROPS */, _hoisted_146),
+                                      _createElementVNode("button", {
+                                        onClick: $event => (setSearchType('shaderpack')),
+                                        class: _normalizeClass([searchType === 'shaderpack'
+                                            ? (searchProvider === 'curseforge' ? 'bg-[#F16436] text-white shadow-[0_0_10px_rgba(241,100,54,0.3)] font-semibold' : 'bg-[#46d66d] text-slate-950 font-bold shadow-[0_0_10px_rgba(70,214,109,0.3)]')
+                                            : 'text-slate-400 hover:text-slate-200', "px-3 py-1 rounded-lg transition-all"])
+                                      }, "Shader Packs", 10 /* CLASS, PROPS */, _hoisted_146),
+                                      _createElementVNode("button", {
                                         onClick: $event => (setSearchType('modpack')),
                                         class: _normalizeClass([searchType === 'modpack'
                                             ? (searchProvider === 'curseforge' ? 'bg-[#F16436] text-white shadow-[0_0_10px_rgba(241,100,54,0.3)] font-semibold' : 'bg-[#46d66d] text-slate-950 font-bold shadow-[0_0_10px_rgba(70,214,109,0.3)]')
@@ -2431,7 +2443,7 @@ return function render(_ctx, _cache) {
                                         _withDirectives(_createElementVNode("input", {
                                           "onUpdate:modelValue": $event => ((searchQuery) = $event),
                                           onKeyup: _withKeys(searchMods, ["enter"]),
-                                          placeholder: searchProvider === 'curseforge' ? (searchType === 'modpack' ? 'Search CurseForge modpacks...' : 'Search CurseForge mods...') : (searchType === 'modpack' ? 'Search Modrinth modpacks...' : 'Search Modrinth mods...'),
+                                          placeholder: searchProvider === 'curseforge' ? (searchType === 'modpack' ? 'Search CurseForge modpacks...' : (searchType === 'resourcepack' ? 'Search CurseForge resource packs...' : (searchType === 'shaderpack' ? 'Search CurseForge shaders...' : 'Search CurseForge mods...'))) : (searchType === 'modpack' ? 'Search Modrinth modpacks...' : (searchType === 'resourcepack' ? 'Search Modrinth resource packs...' : (searchType === 'shaderpack' ? 'Search Modrinth shaders...' : 'Search Modrinth mods...'))),
                                           class: _normalizeClass(["flex-1 z-search-input border border-slate-700/80 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 transition-all", searchProvider === 'curseforge' ? 'focus:border-[#F16436] focus:ring-[#F16436]/20' : 'focus:border-[#46d66d] focus:ring-[#46d66d]/20'])
                                         }, null, 42 /* CLASS, PROPS, NEED_HYDRATION */, _hoisted_157), [
                                           [_vModelText, searchQuery]
@@ -2442,19 +2454,34 @@ return function render(_ctx, _cache) {
                                           class: _normalizeClass(["disabled:opacity-50 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm", searchProvider === 'curseforge' ? 'bg-[#F16436] hover:bg-[#ff7849] text-white shadow-[0_0_12px_rgba(241,100,54,0.25)]' : 'bg-[#46d66d] hover:bg-[#5ae07f] text-slate-950 shadow-[0_0_12px_rgba(70,214,109,0.25)]'])
                                         }, "Search", 10 /* CLASS, PROPS */, _hoisted_158)
                                       ]),
-                                      _createElementVNode("div", _hoisted_159, [
+                                      _createElementVNode("div", { class: "flex items-center gap-4 mb-3 text-xs text-slate-400 flex-wrap" }, [
                                         _createElementVNode("label", _hoisted_160, [
                                           _withDirectives(_createElementVNode("input", {
                                             type: "checkbox",
                                             "onUpdate:modelValue": $event => ((searchAllVersions) = $event),
+                                            onChange: searchMods,
                                             class: "zircon-check"
                                           }, null, 8 /* PROPS */, _hoisted_161), [
                                             [_vModelCheckbox, searchAllVersions]
                                           ]),
-                                          _cache[59] || (_cache[59] = _createElementVNode("span", null, [
+                                          _createElementVNode("span", null, [
                                             _createTextVNode("Search For All Versions "),
                                             _createElementVNode("span", { class: "text-slate-500 font-mono text-[11px]" }, "--Advanced")
-                                          ], -1 /* CACHED */))
+                                          ])
+                                        ]),
+                                        _createElementVNode("label", _hoisted_160, [
+                                          _withDirectives(_createElementVNode("input", {
+                                            type: "checkbox",
+                                            "onUpdate:modelValue": $event => ((searchAllLoaders) = $event),
+                                            onChange: searchMods,
+                                            class: "zircon-check"
+                                          }, null, 8 /* PROPS */, _hoisted_161), [
+                                            [_vModelCheckbox, searchAllLoaders]
+                                          ]),
+                                          _createElementVNode("span", null, [
+                                            _createTextVNode("Show All Mod Loaders "),
+                                            _createElementVNode("span", { class: "text-slate-500 font-mono text-[11px]" }, "--Advanced")
+                                          ])
                                         ])
                                       ]),
                                       _createElementVNode("div", _hoisted_162, [
@@ -2481,7 +2508,7 @@ return function render(_ctx, _cache) {
                                                   d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                                 }, null, -1 /* CACHED */)
                                               ]))], 2 /* CLASS */)),
-                                              _createElementVNode("span", _hoisted_164, "Searching " + _toDisplayString(searchType === 'modpack' ? 'modpacks' : 'mods') + " on " + _toDisplayString(searchProvider === 'curseforge' ? 'CurseForge' : 'Modrinth') + "...", 1 /* TEXT */)
+                                              _createElementVNode("span", _hoisted_164, "Searching " + _toDisplayString(searchType === 'modpack' ? 'modpacks' : (searchType === 'resourcepack' ? 'resource packs' : (searchType === 'shaderpack' ? 'shaders' : 'mods'))) + " on " + _toDisplayString(searchProvider === 'curseforge' ? 'CurseForge' : 'Modrinth') + "...", 1 /* TEXT */)
                                             ]))
                                           : _createCommentVNode("v-if", true),
                                         (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(searchResults, (hit) => {
@@ -2504,7 +2531,7 @@ return function render(_ctx, _cache) {
                                                   _createElementVNode("span", null, _toDisplayString(hit.title || hit.name), 1 /* TEXT */)
                                                 ], 10 /* CLASS, PROPS */, _hoisted_168),
                                                 _createElementVNode("button", {
-                                                  onClick: $event => (searchType === 'modpack' ? installModpack(hit) : installMod(hit)),
+                                                  onClick: $event => (searchType === 'modpack' ? installModpack(hit) : ((searchType === 'resourcepack' || searchType === 'shaderpack') ? installPackFromSearch(hit, searchType) : installMod(hit))),
                                                   disabled: installingMods[hit.projectId || hit.id],
                                                   class: _normalizeClass(["text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed", searchProvider === 'curseforge'
                                                         ? 'bg-[#F16436]/20 text-orange-200 border border-[#F16436]/40 hover:bg-[#F16436]/30'
@@ -2537,6 +2564,38 @@ return function render(_ctx, _cache) {
                                                 ], 10 /* CLASS, PROPS */, _hoisted_169)
                                               ]),
                                               _createElementVNode("p", _hoisted_170, _toDisplayString(hit.description || hit.summary), 1 /* TEXT */),
+                                              (getSortedHitLoaders(hit) && getSortedHitLoaders(hit).length)
+                                                ? (_openBlock(), _createElementBlock("div", { class: "flex items-center gap-2 flex-wrap my-1.5" }, [
+                                                    (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(getSortedHitLoaders(hit), (ldr) => {
+                                                      return (_openBlock(), _createElementBlock("button", {
+                                                        key: ldr,
+                                                        type: "button",
+                                                        onClick: () => selectHitLoader(hit, ldr),
+                                                        title: getLoaderTooltip(ldr),
+                                                        class: _normalizeClass([
+                                                          "p-1.5 rounded-lg transition-all flex items-center justify-center cursor-pointer",
+                                                          (hit.selectedLoader || '').toLowerCase() === ldr.toLowerCase()
+                                                            ? "border border-cyan-400 bg-cyan-500/15 text-cyan-300 shadow-[0_0_12px_rgba(71,210,201,0.4)] ring-1 ring-cyan-400/60 opacity-100"
+                                                            : (isNativeLoader(ldr)
+                                                                ? "border border-slate-700/80 bg-slate-900/40 opacity-60 hover:opacity-100 hover:border-slate-500"
+                                                                : "border border-dashed border-slate-700/60 bg-transparent opacity-40 hover:opacity-100 hover:border-slate-500")
+                                                        ])
+                                                      }, [
+                                                        getLoaderIcon(ldr)
+                                                          ? (_openBlock(), _createElementBlock("img", {
+                                                              key: 0,
+                                                              src: getLoaderIcon(ldr),
+                                                              alt: ldr,
+                                                              class: "w-4 h-4 object-contain"
+                                                            }, null, 8 /* PROPS */, ["src", "alt"]))
+                                                          : (_openBlock(), _createElementBlock("span", {
+                                                              key: 1,
+                                                              class: "text-[9px] uppercase tracking-wider font-extrabold px-1 text-slate-300"
+                                                            }, _toDisplayString(ldr), 1 /* TEXT */))
+                                                      ], 10 /* CLASS, PROPS */, ["onClick", "title"]))
+                                                    }), 128 /* KEYED_FRAGMENT */))
+                                                  ]))
+                                                : _createCommentVNode("v-if", true),
                                               _createElementVNode("div", _hoisted_171, [
                                                 _createElementVNode("span", null, "by " + _toDisplayString(hit.author), 1 /* TEXT */),
                                                 _createElementVNode("a", {
@@ -2559,7 +2618,7 @@ return function render(_ctx, _cache) {
                                                         : (!hit.versionOptions || !hit.versionOptions.length)
                                                           ? (_openBlock(), _createElementBlock("option", _hoisted_176, "Loading versions…"))
                                                           : _createCommentVNode("v-if", true),
-                                                      (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(hit.versionOptions, (v) => {
+                                                      (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(getFilteredVersionOptions(hit), (v) => {
                                                         return (_openBlock(), _createElementBlock("option", {
                                                           key: v.id || v.fileId,
                                                           value: v.id || v.fileId
@@ -2599,9 +2658,9 @@ return function render(_ctx, _cache) {
                                   ]))
                                 : _createCommentVNode("v-if", true),
                               _createElementVNode("div", _hoisted_183, [
-                                _createElementVNode("h3", _hoisted_184, `Installed Mods (${installedMods.length})`, 1 /* TEXT */),
+                                _createElementVNode("h3", _hoisted_184, `Installed Mods (${(installedMods || []).length})`, 1 /* TEXT */),
                                 _createElementVNode("div", { class: "flex items-center gap-2.5 ml-auto" }, [
-                                  (installedMods.length > 0)
+                                  (Boolean(installedMods && installedMods.length > 0))
                                     ? (_openBlock(), _createElementBlock("label", _hoisted_185, [
                                         _createElementVNode("input", {
                                           type: "checkbox",
@@ -2634,11 +2693,56 @@ return function render(_ctx, _cache) {
                                     : _createCommentVNode("v-if", true)
                                 ])
                               ]),
+                              _createElementVNode("div", { class: "relative mb-3" }, [
+                                _createElementVNode("div", { class: "relative flex items-center" }, [
+                                    _createElementVNode("input", {
+                                      id: "installed-mods-search-input",
+                                      type: "text",
+                                      value: installedModsFilterQuery,
+                                      onInput: ($event) => { installedModsFilterQuery = $event.target.value },
+                                      placeholder: "Filter installed mods... (Press '/' or Ctrl+F to focus)",
+                                      class: "w-full z-search-input border border-slate-700/80 rounded-xl px-3.5 pr-10 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 transition-all"
+                                    }, null, 40 /* PROPS, NEED_HYDRATION */, ["value", "onInput"]),
+                                  (installedModsFilterQuery)
+                                    ? (_openBlock(), _createElementBlock("button", {
+                                        key: 0,
+                                        type: "button",
+                                        onClick: () => clearInstalledModsFilter(),
+                                        title: "Clear filter",
+                                        class: "absolute right-2 px-1.5 py-0.5 text-xs text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                                      }, "✕"))
+                                    : _createCommentVNode("v-if", true)
+                                ]),
+                                (installedModsFilterQuery)
+                                  ? (_openBlock(), _createElementBlock("div", {
+                                      key: 0,
+                                      class: "mt-1.5 flex items-center justify-between px-1 text-[11px] text-slate-400"
+                                    }, [
+                                      _createElementVNode("span", null, `Found ${getFilteredInstalledModsCount()} of ${(installedMods || []).length} mods`),
+                                      _createElementVNode("button", {
+                                        type: "button",
+                                        onClick: () => clearInstalledModsFilter(),
+                                        class: "text-cyan-400 hover:text-cyan-300 hover:underline"
+                                      }, "Reset filter")
+                                    ]))
+                                  : _createCommentVNode("v-if", true)
+                              ]),
                               _createElementVNode("div", _hoisted_192, [
-                                (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(installedMods, (m) => {
+                                (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(getFilteredInstalledMods(), (item) => {
+                                  const m = item.mod;
+                                  const isMatch = item.match;
+                                  const hasFilter = Boolean(installedModsFilterQuery && installedModsFilterQuery.trim());
                                   return (_openBlock(), _createElementBlock("div", {
                                     key: m.filename + ':' + (m.side || 'both'),
-                                    class: _normalizeClass(["bg-slate-900/60 border border-slate-800 p-3 rounded-xl flex gap-3 items-center transition hover:border-slate-700", { 'mod-row-disabled': !m.enabled }])
+                                    class: _normalizeClass([
+                                      "p-3 rounded-xl flex gap-3 items-center transition",
+                                      { 'mod-row-disabled': !m.enabled },
+                                      hasFilter && isMatch
+                                        ? "bg-slate-900/95 border border-cyan-500/50 shadow-[0_0_12px_rgba(71,210,201,0.15)] ring-1 ring-cyan-500/20"
+                                        : hasFilter && !isMatch
+                                          ? "bg-slate-900/30 border border-slate-800/40 opacity-25 filter grayscale contrast-75 hover:opacity-75"
+                                          : "bg-slate-900/60 border border-slate-800 hover:border-slate-700"
+                                    ])
                                   }, [
                                     _createElementVNode("input", {
                                       type: "checkbox",
@@ -2728,9 +2832,11 @@ return function render(_ctx, _cache) {
                                     ])
                                   ], 2 /* CLASS */))
                                 }), 128 /* KEYED_FRAGMENT */)),
-                                (!installedMods.length)
+                                (!installedMods || !installedMods.length)
                                   ? (_openBlock(), _createElementBlock("p", _hoisted_217, "No mods installed yet."))
-                                  : _createCommentVNode("v-if", true)
+                                  : (installedModsFilterQuery && getFilteredInstalledModsCount() === 0)
+                                    ? (_openBlock(), _createElementBlock("p", { key: 999, class: "text-xs text-slate-500 text-center py-6" }, `No mods matching "${installedModsFilterQuery}"`))
+                                    : _createCommentVNode("v-if", true)
                               ])
                             ])
                           ])
@@ -3538,7 +3644,7 @@ return function render(_ctx, _cache) {
                               onDragover: handleFileDragOver,
                               onDragleave: handleFileDragLeave,
                               onDrop: handleFileDrop,
-                              class: _normalizeClass(["flex-1 overflow-y-auto border border-slate-800/80 rounded-xl bg-[#080c14]/70 min-h-0 select-none relative", fileManager.isDragging ? 'z-file-dropzone-active' : ''])
+                              class: _normalizeClass(["flex-1 overflow-auto border border-slate-800/80 rounded-xl bg-[#080c14]/70 min-h-0 select-none relative", fileManager.isDragging ? 'z-file-dropzone-active' : ''])
                             }, [
                               _createElementVNode("table", _hoisted_345, [
                                 _createElementVNode("thead", { class: "z-file-table-header text-[11px] uppercase tracking-wider font-semibold text-slate-400 sticky top-0 backdrop-blur z-10 border-b border-slate-800" }, [
@@ -3564,7 +3670,7 @@ return function render(_ctx, _cache) {
                                       _createTextVNode("Modified "),
                                       _createElementVNode("span", { class: "text-cyan-400 text-[10px]" }, _toDisplayString(fileManager.sortColumn === 'modified' ? (fileManager.sortDirection === 'asc' ? '▲' : '▼') : '⇅'), 1 /* TEXT */)
                                     ]),
-                                    _createElementVNode("th", { class: "py-3 px-4 w-36" }, "BOM Sync"),
+                                    _createElementVNode("th", { class: "py-3 px-4 w-36 whitespace-nowrap" }, "BOM Sync"),
                                     _createElementVNode("th", { class: "py-3 px-4 w-28 text-right pr-4" }, "Actions")
                                   ])
                                 ]),
@@ -3633,12 +3739,12 @@ return function render(_ctx, _cache) {
                                         class: "py-2.5 px-4 text-slate-500 text-[11px]",
                                         onClick: $event => (openFile(file))
                                       }, _toDisplayString(formatFileDate(file.modified)), 9 /* TEXT, PROPS */, _hoisted_354),
-                                      _createElementVNode("td", _hoisted_355, [
+                                      _createElementVNode("td", { class: "py-2.5 px-4 whitespace-nowrap" }, [
                                         (file.can_sync_config || file.canSyncConfig)
                                           ? (_openBlock(), _createElementBlock("button", {
                                               key: 0,
                                               onClick: _withModifiers($event => (toggleBomSync(file)), ["stop"]),
-                                              class: _normalizeClass(["px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border flex items-center gap-1.5", (file.is_synced_config || file.isSyncedConfig)
+                                              class: _normalizeClass(["px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border inline-flex items-center gap-1.5 whitespace-nowrap shrink-0", (file.is_synced_config || file.isSyncedConfig)
                                                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_8px_rgba(70,214,109,0.2)]'
                                                         : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:border-slate-600'])
                                             }, [
@@ -4020,6 +4126,131 @@ return function render(_ctx, _cache) {
                                       ? (_openBlock(), _createElementBlock("p", _hoisted_406, "No banned players."))
                                       : _createCommentVNode("v-if", true)
                                   ], 64 /* STABLE_FRAGMENT */))
+                            ])
+                          ]),
+                          _createCommentVNode(" Players Online Now "),
+                          _createElementVNode("div", { class: "zircon-glass-card rounded-2xl p-5" }, [
+                            _createElementVNode("div", { class: "flex items-center justify-between gap-3 mb-1" }, [
+                              _createElementVNode("div", { class: "flex items-center gap-2.5" }, [
+                                _createElementVNode("h4", { class: "font-bold text-sm text-white" }, "Players Online Now (" + _toDisplayString((onlinePlayers || []).length) + ")", 1 /* TEXT */),
+                                (selectedInstance && selectedInstance.running)
+                                  ? (_openBlock(), _createElementBlock("span", {
+                                      key: 0,
+                                      class: "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(52,211,153,0.25)] font-mono"
+                                    }, [
+                                      _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" }),
+                                      _createElementVNode("span", null, "LIVE")
+                                    ]))
+                                  : (_openBlock(), _createElementBlock("span", {
+                                      key: 1,
+                                      class: "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800/80 text-slate-400 border border-slate-700 font-mono"
+                                    }, [
+                                      _createElementVNode("span", { class: "w-1.5 h-1.5 rounded-full bg-slate-500" }),
+                                      _createElementVNode("span", null, "OFFLINE")
+                                    ]))
+                              ]),
+                              _createElementVNode("button", {
+                                onClick: $event => (loadPlayers()),
+                                title: "Refresh player list",
+                                class: "text-slate-400 hover:text-cyan-300 text-xs flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition"
+                              }, [
+                                _createElementVNode("svg", {
+                                  class: _normalizeClass(["w-3 h-3", { "animate-spin": playersLoading }]),
+                                  fill: "none",
+                                  stroke: "currentColor",
+                                  viewBox: "0 0 24 24"
+                                }, [
+                                  _createElementVNode("path", { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" })
+                                ], 2 /* CLASS */),
+                                _createElementVNode("span", null, "Refresh")
+                              ])
+                            ]),
+                            _createElementVNode("p", { class: "text-xs text-slate-500 mb-3" }, "Active players currently connected to this Minecraft server instance in real time."),
+                            _createElementVNode("div", { class: "space-y-1.5 max-h-48 overflow-y-auto pr-1" }, [
+                              (playersLoading && !playersLoaded)
+                                ? (_openBlock(), _createElementBlock("div", { class: "flex items-center justify-center gap-2 py-4" }, [
+                                    _createElementVNode("svg", {
+                                      class: "animate-spin h-4 w-4 text-cyan-400",
+                                      xmlns: "http://www.w3.org/2000/svg",
+                                      fill: "none",
+                                      viewBox: "0 0 24 24"
+                                    }, [
+                                      _createElementVNode("circle", {
+                                        class: "opacity-25",
+                                        cx: "12",
+                                        cy: "12",
+                                        r: "10",
+                                        stroke: "currentColor",
+                                        "stroke-width": "4"
+                                      }),
+                                      _createElementVNode("path", {
+                                        class: "opacity-75",
+                                        fill: "currentColor",
+                                        d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                      })
+                                    ]),
+                                    _createElementVNode("span", { class: "text-xs text-slate-400" }, "Loading...")
+                                  ]))
+                                : (!(selectedInstance && selectedInstance.running))
+                                  ? (_openBlock(), _createElementBlock("p", { key: 1, class: "text-xs text-slate-500 text-center py-4 italic" }, "Server is offline. Connected players will appear here when the server is started."))
+                                  : (!onlinePlayers || !onlinePlayers.length)
+                                    ? (_openBlock(), _createElementBlock("p", { key: 2, class: "text-xs text-slate-500 text-center py-4" }, "No players currently online."))
+                                    : (_openBlock(), _createElementBlock(_Fragment, { key: 3 }, [
+                                        (_openBlock(true), _createElementBlock(_Fragment, null, _renderList(onlinePlayers, (p) => {
+                                          const pName = typeof p === 'string' ? p : (p.name || '');
+                                          const isOp = isPlayerOp(pName);
+                                          return (_openBlock(), _createElementBlock("div", {
+                                            key: pName.toLowerCase(),
+                                            class: "flex items-center justify-between gap-2.5 p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-sm hover:border-slate-700/80 transition"
+                                          }, [
+                                            _createElementVNode("div", { class: "flex items-center gap-2.5 min-w-0" }, [
+                                              _createElementVNode("span", { class: "w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] shrink-0" }),
+                                              _createElementVNode("img", {
+                                                src: "https://mc-heads.net/avatar/" + encodeURIComponent(pName) + "/24",
+                                                alt: "",
+                                                class: "w-6 h-6 rounded shrink-0 bg-slate-800",
+                                                onError: $event => ($event.target.style.display = 'none')
+                                              }, null, 40 /* PROPS, NEED_HYDRATION */, ["src", "onError"]),
+                                              _createElementVNode("span", { class: "font-medium text-slate-200 truncate" }, _toDisplayString(pName), 1 /* TEXT */),
+                                              isOp
+                                                ? (_openBlock(), _createElementBlock("span", {
+                                                    key: 0,
+                                                    class: "text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono font-bold shrink-0"
+                                                  }, "OP"))
+                                                : _createCommentVNode("v-if", true)
+                                            ]),
+                                            _createElementVNode("div", { class: "flex items-center gap-1.5 shrink-0" }, [
+                                              isOp
+                                                ? (_openBlock(), _createElementBlock("button", {
+                                                    key: 0,
+                                                    type: "button",
+                                                    onClick: $event => (removeOp(pName)),
+                                                    title: "Remove operator permissions",
+                                                    class: "text-slate-400 hover:text-slate-200 text-xs font-semibold px-2 py-0.5 rounded hover:bg-slate-800 transition"
+                                                  }, "Deop", 8 /* PROPS */, ["onClick"]))
+                                                : (_openBlock(), _createElementBlock("button", {
+                                                    key: 1,
+                                                    type: "button",
+                                                    onClick: $event => (opPlayerDirect(pName)),
+                                                    title: "Grant operator permissions",
+                                                    class: "text-cyan-400 hover:text-cyan-300 text-xs font-semibold px-2 py-0.5 rounded hover:bg-cyan-500/10 transition"
+                                                  }, "Op", 8 /* PROPS */, ["onClick"])),
+                                              _createElementVNode("button", {
+                                                type: "button",
+                                                onClick: $event => (kickPlayer(pName)),
+                                                title: "Kick player from server",
+                                                class: "text-amber-400 hover:text-amber-300 text-xs font-semibold px-2 py-0.5 rounded hover:bg-amber-500/10 transition"
+                                              }, "Kick", 8 /* PROPS */, ["onClick"]),
+                                              _createElementVNode("button", {
+                                                type: "button",
+                                                onClick: $event => (banOnlinePlayer(pName)),
+                                                title: "Ban player from server",
+                                                class: "text-rose-400 hover:text-rose-300 text-xs font-semibold px-2 py-0.5 rounded hover:bg-rose-500/10 transition"
+                                              }, "Ban", 8 /* PROPS */, ["onClick"])
+                                            ])
+                                          ]))
+                                        }), 128 /* KEYED_FRAGMENT */))
+                                      ], 64 /* STABLE_FRAGMENT */))
                             ])
                           ]),
                           _createCommentVNode(" Players Who Have Joined "),
@@ -4918,9 +5149,9 @@ return function render(_ctx, _cache) {
                               ]),
 
                               // Row 2: Dedicated World Seed Input Deck & Wipe World Action
-                              _createElementVNode("div", { class: "topbar-row pt-1 border-t border-slate-800/80" }, [
+                              _createElementVNode("div", { class: "topbar-row pt-1 border-t border-slate-800/80 flex flex-wrap gap-2.5 items-center justify-between" }, [
                                 // Seed Configuration Group
-                                _createElementVNode("div", { class: "flex items-center gap-2.5 flex-1 min-w-0" }, [
+                                _createElementVNode("div", { class: "flex items-center gap-2.5 flex-1 min-w-[260px] flex-wrap" }, [
                                   _createElementVNode("span", { class: "text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 shrink-0" }, [
                                     _createElementVNode("span", { class: "w-2 h-2 rounded-full bg-cyan-400" }),
                                     _createTextVNode("World Seed")
@@ -4959,7 +5190,7 @@ return function render(_ctx, _cache) {
                                   }, "Apply Seed", 8 /* PROPS */, ["disabled"])
                                 ]),
                                 // Wipe World & Try New Seed Action on the right side of Row 2
-                                _createElementVNode("div", { class: "flex items-center gap-2 shrink-0" }, [
+                                _createElementVNode("div", { class: "flex items-center gap-2 shrink-0 ml-auto" }, [
                                   _createElementVNode("button", {
                                     onClick: $event => (promptWipeAndResetWorld()),
                                     title: "Wipe all world data and regenerate with a fresh random seed",
@@ -4995,7 +5226,7 @@ return function render(_ctx, _cache) {
                                       _createElementVNode("p", { class: "text-xs text-slate-300 mb-4 leading-relaxed" }, 
                                         isServerOnline()
                                           ? "Server engine is live. Click below to render terrain and inspect your seed with custom worldgen mods."
-                                          : (isServerSleeping()
+                                          : ((typeof isServerSleeping === 'function' ? isServerSleeping() : !!isServerSleeping)
                                               ? "Server engine is currently sleeping (idle shutdown). Click below to wake the server and render terrain."
                                               : "Boot the server engine to render terrain and explore your world in real-time.")
                                       ),
@@ -5014,7 +5245,7 @@ return function render(_ctx, _cache) {
                                         _createTextVNode(
                                           isServerOnline()
                                             ? "Render Map"
-                                            : (isServerSleeping()
+                                            : ((typeof isServerSleeping === 'function' ? isServerSleeping() : !!isServerSleeping)
                                                 ? "Wake Server & Render Map"
                                                 : "Start Server & Render Map")
                                         )

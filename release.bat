@@ -35,7 +35,7 @@ if errorlevel 1 (
 
 echo.
 echo [2/4] Committing version bump and workspace changes...
-git add .gitignore Cargo.toml Cargo.lock crates/ website/ scripts/sync-version.ps1 release.bat
+git add .gitignore Cargo.toml Cargo.lock README.md DONT_DELETE_GITHUB_ACTIONS.md crates/ website/ scripts/sync-version.ps1 release.bat
 git commit -m "Release v%VERSION%"
 
 echo.

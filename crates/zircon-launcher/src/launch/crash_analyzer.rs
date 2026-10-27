@@ -102,11 +102,26 @@ impl CrashAnalysis {
             sanitized_log: String::new(),
         }
     }
+
+    /// Sanitizes all human-facing text fields in case raw Minecraft JSON chat components
+    /// were passed directly as error messages.
+    pub fn sanitize_text_fields(&mut self) {
+        self.title = strip_minecraft_json_text(&self.title);
+        self.plain_english_summary = strip_minecraft_json_text(&self.plain_english_summary);
+        self.explanation = strip_minecraft_json_text(&self.explanation);
+        self.suggested_fix = strip_minecraft_json_text(&self.suggested_fix);
+    }
 }
 
 /// Classifies a log or crash report text into a known failure category and produces
 /// preliminary remediation actions.
 pub fn analyze_log_content(log_text: &str) -> CrashAnalysis {
+    let mut analysis = analyze_log_content_raw(log_text);
+    analysis.sanitize_text_fields();
+    analysis
+}
+
+fn analyze_log_content_raw(log_text: &str) -> CrashAnalysis {
     let lines: Vec<&str> = log_text.lines().collect();
 
     // 1. Missing Dependencies (Fabric/Quilt, NeoForge, Forge)
@@ -640,6 +655,79 @@ pub fn sanitize_log_text(raw: &str) -> String {
     s5.to_string()
 }
 
+/// If a string contains or is a serialized Minecraft JSON text component (e.g. `{"text": "...", "extra": [...]}`),
+/// parses and extracts plain text elements cleanly into human-readable text.
+pub fn strip_minecraft_json_text(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if !trimmed.contains('{') || !trimmed.contains('}') {
+        return trimmed.to_string();
+    }
+
+    // Direct JSON object check
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            let mut out = String::new();
+            extract_text_from_json(&value, &mut out);
+            let cleaned = out.trim();
+            if !cleaned.is_empty() {
+                return cleaned.to_string();
+            }
+        }
+    }
+
+    // Substring JSON component check (e.g. "Minecraft crashed: {"text": "..."}")
+    if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
+        if start < end {
+            let candidate = &trimmed[start..=end];
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(candidate) {
+                let mut out = String::new();
+                extract_text_from_json(&value, &mut out);
+                let cleaned = out.trim();
+                if !cleaned.is_empty() {
+                    let mut prefix = trimmed[..start].trim().to_string();
+                    if !prefix.is_empty() {
+                        prefix.push(' ');
+                    }
+                    prefix.push_str(cleaned);
+                    return prefix;
+                }
+            }
+        }
+    }
+
+    trimmed.to_string()
+}
+
+fn extract_text_from_json(val: &serde_json::Value, out: &mut String) {
+    match val {
+        serde_json::Value::String(s) => {
+            out.push_str(s);
+        }
+        serde_json::Value::Object(map) => {
+            if let Some(text) = map.get("text").and_then(|v| v.as_str()) {
+                out.push_str(text);
+            }
+            if let Some(translate) = map.get("translate").and_then(|v| v.as_str()) {
+                if !out.is_empty() && !out.ends_with(' ') {
+                    out.push(' ');
+                }
+                out.push_str(translate);
+            }
+            if let Some(extra) = map.get("extra").and_then(|v| v.as_array()) {
+                for item in extra {
+                    extract_text_from_json(item, out);
+                }
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr {
+                extract_text_from_json(item, out);
+            }
+        }
+        _ => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -696,5 +784,19 @@ mod tests {
         let analysis = analyze_log_content("preparing spawn area\nDone (1.234s)!");
         assert!(!analysis.is_crash);
         assert_eq!(CrashCategory::None, analysis.category);
+    }
+
+    #[test]
+    fn strips_minecraft_json_text_components() {
+        let raw_json = r#"{"text": "Failed to connect", "extra": [{"text": ": Invalid player session"}]}"#;
+        let stripped = strip_minecraft_json_text(raw_json);
+        assert_eq!(stripped, "Failed to connect: Invalid player session");
+
+        let embedded = r#"Exception thrown: {"text": "Mod initialization error", "extra": [{"text": " in Sodium"}]}"#;
+        let stripped_embedded = strip_minecraft_json_text(embedded);
+        assert_eq!(stripped_embedded, "Exception thrown: Mod initialization error in Sodium");
+
+        let plain = "Simple plain text error message";
+        assert_eq!(strip_minecraft_json_text(plain), plain);
     }
 }

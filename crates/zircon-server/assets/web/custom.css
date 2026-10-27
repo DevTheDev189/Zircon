@@ -1745,3 +1745,96 @@ option {
     flex-direction: column !important;
     gap: 1rem;
 }
+
+/* Installed Mods Filter Input */
+
+
+/* Responsive improvements for server wrapper layout */
+@media (max-width: 1100px) {
+    .z-sidebar {
+        width: 14rem !important;
+    }
+}
+
+
+
+/* Half-screen & Square Monitor Responsive Enhancements */
+@media (max-width: 1200px) {
+    .z-sidebar {
+        width: 14rem !important;
+    }
+}
+
+@media (max-width: 960px) {
+    .z-sidebar {
+        width: 13rem !important;
+    }
+}
+
+.world-studio-topbar .topbar-row {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+}
+
+.z-file-row td {
+    vertical-align: middle;
+}
+
+
+/* Web App Responsiveness, Search Glow & Topbar Scroll Polish (v0.9.1) */
+.z-top-header {
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+.z-top-header::-webkit-scrollbar {
+    display: none !important;
+}
+
+header nav {
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    white-space: nowrap !important;
+}
+header nav::-webkit-scrollbar {
+    display: none !important;
+}
+
+.z-copy-ip-btn {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+}
+
+/* Installed Mods Search & Filter Input - perfectly matched with .z-search-input */
+#installed-mods-search-input {
+    padding-right: 2.5rem !important;
+}
+
+/* World Studio Map Controls on Narrow/Half-Screen Displays */
+.world-studio-topbar {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+}
+.world-studio-topbar .topbar-row {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+}
+.world-studio-topbar .topbar-group {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+}
+
+/* File Manager Table Responsiveness & BOM Column Protection */
+.z-file-table-container,
+.z-file-dropzone {
+    overflow: auto !important;
+}
+table.z-file-table,
+.z-file-table {
+    min-width: 660px !important;
+}
+.z-bom-sync-btn {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+}

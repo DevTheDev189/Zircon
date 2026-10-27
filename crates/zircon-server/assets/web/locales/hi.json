@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "सेव करें",
+    "saving": "सेव हो रहा है…",
+    "cancel": "रद्द करें",
+    "close": "बंद करें",
+    "refresh": "रीफ्रेश करें",
+    "copy": "कॉपी करें",
+    "copied": "क्लिपबोर्ड में कॉपी किया गया!",
+    "delete": "हटाएं",
+    "loading": "लोड हो रहा है…",
+    "apply": "लागू करें",
+    "edit": "संपादित करें",
+    "search": "खोजें…",
+    "online": "ऑनलाइन",
+    "offline": "ऑफ़लाइन",
+    "sleeping": "स्लीप मोड में",
+    "booting": "बूट हो रहा है…",
+    "falling_asleep": "स्लीप मोड में जा रहा है…",
+    "shutting_down": "शट डाउन हो रहा है…",
+    "start": "स्टार्ट करें",
+    "stop": "स्टॉप करें",
+    "restart": "रीस्टार्ट करें",
+    "wake": "सर्वर को जगाएं",
+    "detecting": "पता लगाया जा रहा है…"
+  },
+  "nav": {
+    "global_stats": "वैश्विक आँकड़े",
+    "servers": "सर्वर",
+    "create_server": "सर्वर बनाएँ",
+    "import_server": "सर्वर आयात करें (.zip)",
+    "mods": "मॉड्स",
+    "shaders": "शेडर्स",
+    "files": "फ़ाइलें",
+    "console": "कंसोल",
+    "players": "खिलाड़ी",
+    "backups": "बैकअप",
+    "world": "दुनिया",
+    "settings": "सेटिंग्स",
+    "disk_storage": "डिस्क स्टोरेज",
+    "server_manager": "सर्वर प्रबंधक"
+  },
+  "stats": {
+    "title": "सिस्टम टेलीमेट्री और मेट्रिक्स",
+    "subtitle": "रियल-टाइम CPU, होस्ट RAM, प्रोसेस RSS, और डिस्क गतिविधि",
+    "host_ram": "होस्ट OS RAM",
+    "process_rss": "Java प्रोसेस RSS",
+    "cpu_usage": "CPU लोड",
+    "disk_allocation": "NVMe स्टोरेज आवंटन",
+    "uptime": "सिस्टम अपटाइम",
+    "active_instances": "चालू इंस्टेंस",
+    "sleeping_instances": "स्लीपिंग इंस्टेंस"
+  },
+  "instances": {
+    "no_servers": "अभी तक कोई सर्वर नहीं — 'सर्वर बनाएं' पर क्लिक करें।",
+    "create_title": "Minecraft सर्वर बनाएं",
+    "name_label": "इंस्टेंस का नाम",
+    "version_label": "Minecraft संस्करण",
+    "loader_label": "मॉड लोडर",
+    "port_label": "पोर्ट",
+    "memory_label": "आवंटित मेमोरी (GB)",
+    "start_server": "सर्वर शुरू करें",
+    "wake_server": "सर्वर जगाएं",
+    "stop_server": "सर्वर रोकें",
+    "restart_server": "सर्वर पुनः आरंभ करें",
+    "players_online": "{count} ऑनलाइन",
+    "sleeps_in": "{time} में स्लीप मोड में जाएंगे",
+    "idle_wakes": "निष्क्रिय बंद होना — खिलाड़ी के जुड़ने पर फिर से सक्रिय होगा"
+  },
+  "mods": {
+    "title": "इंस्टॉल किए गए मॉड्स",
+    "count": "इंस्टॉल किए गए मॉड्स ({count})",
+    "search_placeholder": "इंस्टॉल किए गए मॉड्स खोजें…",
+    "loader_filter": "लोडर फ़िल्टर",
+    "all_loaders": "सभी लोडर्स",
+    "active_loader": "सक्रिय लोडर ({loader})",
+    "export_mrpack": ".mrpack निर्यात करें",
+    "copy_mrpack_url": ".mrpack URL कॉपी करें",
+    "copy_mrpack_tooltip": "गैर-Zircon खिलाड़ियों के लिए सार्वजनिक .mrpack डाउनलोड लिंक कॉपी करें",
+    "add_mod": "मॉड जोड़ें",
+    "install_update": "अपडेट",
+    "no_mods": "अभी तक कोई मॉड इंस्टॉल नहीं हैं।"
+  },
+  "console": {
+    "title": "सर्वर कंसोल और टर्मिनल",
+    "placeholder": "एक कमांड भेजें (जैसे /say Hello, /op Player)...",
+    "send": "भेजें",
+    "clear": "साफ़ करें"
+  },
+  "players": {
+    "title": "खिलाड़ी प्रबंधन",
+    "online": "ऑनलाइन खिलाड़ी",
+    "whitelist": "व्हाइटलिस्ट",
+    "ops": "ऑपरेटर",
+    "bans": "प्रतिबंधित खिलाड़ी",
+    "kick": "निष्कासित करें",
+    "ban": "प्रतिबंध लगाएं",
+    "op": "ऑप बनाएं",
+    "deop": "ऑप हटाएं"
+  },
+  "backups": {
+    "title": "वर्ल्ड और इंस्टेंस स्नैपशॉट",
+    "create": "बैकअप बनाएं",
+    "restore": "पुनर्स्थापित करें",
+    "download": "डाउनलोड करें",
+    "delete": "हटाएं"
+  },
+  "security": {
+    "online_mode": "ऑनलाइन मोड (Mojang प्रमाणीकरण)",
+    "online_mode_warning": "चेतावनी: online-mode को अक्षम करने से ऑफ़लाइन/असत्यापित खिलाड़ी, जिनके UUID छलकृत (spoofed) हैं, सर्वर से जुड़ सकते हैं।",
+    "whitelist_enforced": "व्हाइटलिस्ट लागू करें"
+  }
+}

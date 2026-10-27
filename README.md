@@ -211,7 +211,7 @@ zircon/
 | Auth | Microsoft OAuth2 + PKCE (client) · JWT + BCrypt (admin) |
 | Data | serde/serde_json, `server.properties` editor, per-instance files |
 | Archival | LZ4 (`lz4_flex`) + tar |
-| Tests | cargo test (219 unit/integration tests across the workspace) |
+| Tests | cargo test (569 unit/integration tests across the workspace) |
 
 ---
 

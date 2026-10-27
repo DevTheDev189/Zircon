@@ -12,9 +12,11 @@
 
 use std::fmt;
 use std::fs;
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use zircon_core::model::{ModLoaderInfo, ModLoaderType};
 use zircon_core::security::ssrf;
@@ -28,6 +30,10 @@ const QUILT_META_URL: &str = "https://meta.quiltmc.org/v3";
 const FORGE_MAVEN_BASE: &str = "https://maven.minecraftforge.net/net/minecraftforge/forge/";
 const NEOFORGE_MAVEN_BASE: &str = "https://maven.neoforged.net/releases/net/neoforged/neoforge/";
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const MAX_METADATA_JSON_BYTES: usize = 32 * 1024 * 1024;
+const MAX_SERVER_JAR_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_JDK_ARCHIVE_BYTES: usize = 512 * 1024 * 1024;
+const MAX_JDK_UNPACKED_BYTES: u64 = 1536 * 1024 * 1024;
 
 const INSTALLED_STATE_FILE: &str = ".zircon_installed.json";
 
@@ -157,6 +163,27 @@ pub fn is_installed(
     true
 }
 
+/// Validates that a version identifier (`mc_version`, `loader.version`, or `installer_version`)
+/// contains only safe version characters (`[A-Za-z0-9._+-]`), does not start with `-` or `.`,
+/// and contains no `..` traversal sequences.
+fn validate_version_token(label: &str, value: &str) -> Result<(), InstallError> {
+    if value.is_empty() {
+        return Err(InstallError::Config(format!("{label} cannot be empty")));
+    }
+    if value.starts_with('-')
+        || value.starts_with('.')
+        || value.contains("..")
+        || !value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+'))
+    {
+        return Err(InstallError::Config(format!(
+            "Invalid characters or traversal in {label}: {value:?}"
+        )));
+    }
+    Ok(())
+}
+
 /// Installs the server for the configured loader if it is not already
 /// installed. Safe to call on every start; it is a no-op once installed.
 pub async fn ensure_server_installed(
@@ -166,6 +193,10 @@ pub async fn ensure_server_installed(
     mc_version: &str,
     loader: &ModLoaderInfo,
 ) -> Result<(), InstallError> {
+    validate_version_token("minecraftVersion", mc_version.trim())?;
+    if !loader.version.trim().is_empty() {
+        validate_version_token("modLoader.version", loader.version.trim())?;
+    }
     let loader_type = ModLoaderType::from_id(&loader.r#type).ok_or_else(||  { // z0
         InstallError::Config(format!( /* z0 */
             "Invalid mod loader '{}'. Allowed loaders: {}", // z0
@@ -185,6 +216,9 @@ pub async fn ensure_server_installed(
             loader_type.id(),
             mc_version
         );
+        let java_major = crate::process::manager::detect_java_version(mc_version);
+        let _ = ensure_java_installed(java_major).await?;
+
         clean_old_server_binaries(server_dir);
         match loader_type {
             ModLoaderType::Fabric =>  { // z0
@@ -370,6 +404,7 @@ async fn install_fabric_like(
     } else {
         loader.version.clone()
     };
+    validate_version_token("resolved loader version", &loader_version)?;
 
     // The meta API's combined server JAR needs the installer version too.
     let installers: Vec<serde_json::Value> =
@@ -381,6 +416,7 @@ async fn install_fabric_like(
         .ok_or_else(|| {
             InstallError::Config("No installer versions found at meta API".to_string())
         })?;
+    validate_version_token("installer version", installer_version)?;
 
     let url = format!(
         "{meta_url}/versions/loader/{mc_version}/{loader_version}/{installer_version}/server/jar"
@@ -409,6 +445,7 @@ async fn install_quilt(
     } else {
         loader.version.clone()
     };
+    validate_version_token("resolved Quilt loader version", &loader_version)?;
 
     let installers: Vec<serde_json::Value> =
         get_json(&format!("{QUILT_META_URL}/versions/installer")).await?;
@@ -423,6 +460,7 @@ async fn install_quilt(
         .get("version")
         .and_then(|v| v.as_str())
         .unwrap_or("latest");
+    validate_version_token("Quilt installer version", installer_ver)?;
 
     fs::create_dir_all(cache_dir)?;
     let installer_jar = cache_dir.join(format!("quilt-installer-{installer_ver}.jar"));
@@ -432,7 +470,7 @@ async fn install_quilt(
     }
 
     fs::create_dir_all(server_dir)?;
-    let java = java_bin_for_version(crate::process::manager::detect_java_version(mc_version));
+    let java = ensure_java_installed(crate::process::manager::detect_java_version(mc_version)).await?;
     let mut args = vec![
         java.as_str(),
         "-jar",
@@ -531,7 +569,7 @@ async fn install_forge_like(
     } else {
         "--installServer"
     };
-    let java_bin = java_bin_for_version(crate::process::manager::detect_java_version(mc_version));
+    let java_bin = ensure_java_installed(crate::process::manager::detect_java_version(mc_version)).await?;
     let exit_code = run_installer(
         &[
             java_bin.as_str(),
@@ -553,13 +591,22 @@ async fn install_forge_like(
 
 async fn run_installer(command: &[&str], working_dir: &Path) -> Result<i32, InstallError> {
     tracing::info!("Executing command: {}", command.join(" "));
-    let mut child = tokio::process::Command::new(command[0])
+    let mut child = match tokio::process::Command::new(command[0])
         .args(&command[1..])
         .current_dir(working_dir)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .map_err(InstallError::Io)?;
+    {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(InstallError::Process(format!(
+                "Java executable '{}' not found. Please install Java or set JAVA_HOME in settings.",
+                command[0]
+            )));
+        }
+        Err(e) => return Err(InstallError::Io(e)),
+    };
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
@@ -601,43 +648,64 @@ async fn run_installer(command: &[&str], working_dir: &Path) -> Result<i32, Inst
 // HTTP helpers
 // --------------------------------------------------------------------------
 
+fn build_safe_cdn_client(url: &str, timeout: Duration) -> Result<reqwest::Client, InstallError> {
+    let (host, addrs) = ssrf::resolve_and_validate_cdn_url(url).map_err(InstallError::Http)?;
+    reqwest::Client::builder()
+        .timeout(timeout)
+        .connect_timeout(Duration::from_secs(15))
+        .resolve_to_addrs(&host, &addrs)
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 5 {
+                return attempt.error("too many redirects");
+            }
+            if !ssrf::is_safe_cdn_url(attempt.url().as_str()) {
+                return attempt.error("redirect target is not an allowed CDN host");
+            }
+            attempt.follow()
+        }))
+        .build()
+        .map_err(|e| InstallError::Http(format!("Failed to build HTTP client: {e}")))
+}
+
 async fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, InstallError> {
-    if !ssrf::is_safe_cdn_url(url) {
-        return Err(InstallError::Http(format!(
-            "Rejected metadata URL (host is not an allowed CDN): {url}"
-        )));
-    }
-    let client = reqwest::Client::new();
+    let client = build_safe_cdn_client(url, Duration::from_secs(120))?;
     let response = client
         .get(url)
-        .timeout(Duration::from_secs(120))
         .send()
         .await
         .map_err(|e| InstallError::Http(format!("GET {url} failed: {e}")))?;
     let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| InstallError::Http(format!("GET {url} failed: {e}")))?;
     if !status.is_success() {
         return Err(InstallError::Http(format!(
             "GET {url} failed: HTTP {status}"
         )));
     }
-    serde_json::from_str(&body)
+    if let Some(len) = response.content_length() {
+        if len > MAX_METADATA_JSON_BYTES as u64 {
+            return Err(InstallError::Http(format!(
+                "GET {url} exceeded metadata size limit ({len} > {MAX_METADATA_JSON_BYTES})"
+            )));
+        }
+    }
+    let mut body = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| InstallError::Http(format!("GET {url} failed: {e}")))?;
+        if body.len().saturating_add(chunk.len()) > MAX_METADATA_JSON_BYTES {
+            return Err(InstallError::Http(format!(
+                "GET {url} response body exceeded {MAX_METADATA_JSON_BYTES} bytes"
+            )));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    serde_json::from_slice(&body)
         .map_err(|e| InstallError::Json(format!("Invalid JSON from {url}: {e}")))
 }
 
 async fn download(url: &str, target: &Path) -> Result<(), InstallError> {
-    if !ssrf::is_safe_cdn_url(url) {
-        return Err(InstallError::Http(format!(
-            "Rejected download URL (host is not an allowed CDN): {url}"
-        )));
-    }
-    let client = reqwest::Client::new();
+    let client = build_safe_cdn_client(url, Duration::from_secs(10 * 60))?;
     let response = client
         .get(url)
-        .timeout(Duration::from_secs(10 * 60))
         .send()
         .await
         .map_err(|e| InstallError::Http(format!("Download {url} failed: {e}")))?;
@@ -647,14 +715,32 @@ async fn download(url: &str, target: &Path) -> Result<(), InstallError> {
             "Download {url} failed: HTTP {status}"
         )));
     }
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| InstallError::Http(format!("Download {url} failed: {e}")))?;
+    if let Some(len) = response.content_length() {
+        if len > MAX_SERVER_JAR_BYTES {
+            return Err(InstallError::Http(format!(
+                "Download {url} Content-Length ({len}) exceeds limit ({MAX_SERVER_JAR_BYTES})"
+            )));
+        }
+    }
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(target, bytes)?;
+    let mut file = fs::File::create(target)?;
+    let mut written: u64 = 0;
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| InstallError::Http(format!("Download {url} failed: {e}")))?;
+        written = written.saturating_add(chunk.len() as u64);
+        if written > MAX_SERVER_JAR_BYTES {
+            drop(file);
+            let _ = fs::remove_file(target);
+            return Err(InstallError::Http(format!(
+                "Download {url} exceeded maximum size limit ({MAX_SERVER_JAR_BYTES} bytes)"
+            )));
+        }
+        use std::io::Write as _;
+        file.write_all(&chunk)?;
+    }
     Ok(())
 }
 
@@ -667,9 +753,10 @@ async fn download(url: &str, target: &Path) -> Result<(), InstallError> {
 /// Preference order:
 /// 1. `MC_MANAGER_JAVA_HOME` — explicit override for this wrapper
 /// 2. Exact match in standard install locations (e.g. `jdk-21.*`)
-/// 3. Cached runtime in server's `runtimes/jdk-{target_major}/bin/java(.exe)`
-/// 4. `$JAVA_HOME` if its version matches `target_major`
-/// 5. Fallback to newest installed JDK or `java` on PATH
+/// 3. Cached runtime in server's `server-data/runtimes/jdk-{target_major}` or `runtimes/jdk-{target_major}`
+/// 4. Zircon Launcher cache in `~/.mcmanager/launcher/jdk-{target_major}`
+/// 5. `$JAVA_HOME` if its version matches `target_major`
+/// 6. Fallback to newest installed JDK or `java` verified on PATH
 pub fn java_bin_for_version(target_major: u8) -> String {
     let exe = if is_windows() { "java.exe" } else { "java" };
     if let Some(candidate) = java_home_bin("MC_MANAGER_JAVA_HOME", exe) {
@@ -681,12 +768,9 @@ pub fn java_bin_for_version(target_major: u8) -> String {
     }
     // 3. Scan local server runtimes directory
     for sub in ["server-data/runtimes", "runtimes"] {
-        let candidate = Path::new(sub)
-            .join(format!("jdk-{target_major}"))
-            .join("bin")
-            .join(exe);
-        if candidate.is_file() {
-            return candidate.to_string_lossy().into_owned();
+        let candidate_dir = Path::new(sub).join(format!("jdk-{target_major}"));
+        if let Some(cand) = find_java_exe_in_tree(&candidate_dir, exe) {
+            return cand.to_string_lossy().into_owned();
         }
     }
     // 4. Check JAVA_HOME only if it matches target_major
@@ -698,12 +782,15 @@ pub fn java_bin_for_version(target_major: u8) -> String {
             }
         }
     }
-    // 5. Fallbacks: newest installed JDK or system PATH
+    // 5. Fallbacks: newest installed JDK or system PATH if verified
     if let Some(candidate) = find_newest_jdk(exe) {
         return candidate;
     }
     if let Some(candidate) = java_home_bin("JAVA_HOME", exe) {
         return candidate;
+    }
+    if let Some(on_path) = find_on_path(exe) {
+        return on_path.to_string_lossy().into_owned();
     }
     exe.to_string()
 }
@@ -711,6 +798,247 @@ pub fn java_bin_for_version(target_major: u8) -> String {
 /// Fallback for callers that don't know the Minecraft version. Defaults to Java 21.
 pub fn java_bin() -> String {
     java_bin_for_version(21)
+}
+
+/// Ensures a Java runtime for `target_major` is present on the system.
+/// If no local JDK or system Java is found, it automatically provisions the
+/// official Eclipse Adoptium Temurin JDK into `server-data/runtimes/jdk-{target_major}`.
+pub async fn ensure_java_installed(target_major: u8) -> Result<String, InstallError> {
+    let existing = java_bin_for_version(target_major);
+    let exe = if is_windows() { "java.exe" } else { "java" };
+
+    // If an existing valid binary was resolved, return it!
+    if existing != exe && Path::new(&existing).is_file() {
+        return Ok(existing);
+    }
+    if let Some(p) = find_on_path(exe) {
+        if p.is_file() {
+            return Ok(p.to_string_lossy().into_owned());
+        }
+    }
+
+    // Auto-provision from Adoptium Temurin API
+    tracing::info!("Java {target_major} not found locally. Auto-downloading Temurin JDK from Eclipse Adoptium...");
+    let runtimes_dir = PathBuf::from("server-data").join("runtimes").join(format!("jdk-{target_major}"));
+    let _ = fs::create_dir_all(&runtimes_dir);
+
+    match download_adoptium_jdk(target_major, &runtimes_dir).await {
+        Ok(java_path) => {
+            tracing::info!("Successfully provisioned Java {target_major} at {java_path}");
+            Ok(java_path)
+        }
+        Err(e) => {
+            tracing::error!("Failed to auto-download Java {target_major} from Adoptium: {e}");
+            Err(InstallError::Config(format!(
+                "Java {target_major} runtime (java.exe) was not found on this system and auto-download failed: {e}. \
+                 Minecraft requires Java {target_major}. Please install Java {target_major} from https://adoptium.net/ \
+                 or configure JAVA_HOME in settings."
+            )))
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct AdoptiumPackage {
+    link: String,
+    #[serde(default)]
+    checksum: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AdoptiumBinary {
+    package: AdoptiumPackage,
+}
+
+#[derive(serde::Deserialize)]
+struct AdoptiumRelease {
+    binary: AdoptiumBinary,
+}
+
+async fn download_adoptium_jdk(major: u8, target_dir: &Path) -> Result<String, InstallError> {
+    let os = if is_windows() {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "mac"
+    } else {
+        "linux"
+    };
+    let arch = if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        "x64"
+    };
+    let api_url = format!(
+        "https://api.adoptium.net/v3/assets/feature_releases/{major}/ga?architecture={arch}&image_type=jdk&os={os}&vendor=eclipse"
+    );
+
+    let client = build_safe_cdn_client(&api_url, Duration::from_secs(600))?;
+
+    let resp = client
+        .get(&api_url)
+        .send()
+        .await
+        .map_err(|e| InstallError::Config(format!("Failed to connect to Adoptium API: {e}")))?;
+
+    if !resp.status().is_success() {
+        return Err(InstallError::Config(format!(
+            "Adoptium API returned HTTP status {}",
+            resp.status()
+        )));
+    }
+
+    let releases: Vec<AdoptiumRelease> = resp
+        .json()
+        .await
+        .map_err(|e| InstallError::Config(format!("Failed to parse Adoptium response: {e}")))?;
+
+    let first = releases.into_iter().next().ok_or_else(|| {
+        InstallError::Config(format!("No Adoptium release found for Java {major}"))
+    })?;
+
+    let download_url = first.binary.package.link;
+    let expected_checksum = first.binary.package.checksum.trim().to_string();
+    if !ssrf::is_safe_cdn_url(&download_url) {
+        return Err(InstallError::Http(format!(
+            "Rejected Adoptium JDK download URL (host is not an allowed CDN): {download_url}"
+        )));
+    }
+    if expected_checksum.len() != 64 || !expected_checksum.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(InstallError::Config(
+            "Adoptium API response is missing a valid 64-character SHA-256 checksum".to_string(),
+        ));
+    }
+
+    tracing::info!(
+        "Downloading Java {major} runtime from {download_url} into {}...",
+        target_dir.display()
+    );
+
+    let dl_client = build_safe_cdn_client(&download_url, Duration::from_secs(600))?;
+    let archive_resp = dl_client
+        .get(&download_url)
+        .header(reqwest::header::ACCEPT, "application/octet-stream")
+        .send()
+        .await
+        .map_err(|e| InstallError::Config(format!("Failed to download JDK archive: {e}")))?;
+
+    if !archive_resp.status().is_success() {
+        return Err(InstallError::Config(format!(
+            "JDK archive download returned HTTP status {}",
+            archive_resp.status()
+        )));
+    }
+
+    let mut bytes = Vec::new();
+    let mut stream = archive_resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk
+            .map_err(|e| InstallError::Config(format!("Failed to read JDK archive bytes: {e}")))?;
+        if bytes.len().saturating_add(chunk.len()) > MAX_JDK_ARCHIVE_BYTES {
+            return Err(InstallError::Config(format!(
+                "JDK archive download exceeded maximum size ({MAX_JDK_ARCHIVE_BYTES} bytes)"
+            )));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(&bytes);
+    let actual_checksum = hex::encode(hasher.finalize());
+    if !actual_checksum.eq_ignore_ascii_case(&expected_checksum) {
+        return Err(InstallError::Config(format!(
+            "Checksum mismatch for Adoptium JDK archive (expected {expected_checksum}, got {actual_checksum})"
+        )));
+    }
+
+    let exe = if is_windows() { "java.exe" } else { "java" };
+
+    if is_windows() || download_url.ends_with(".zip") {
+        let cursor = std::io::Cursor::new(bytes);
+        let guard = zircon_core::archive::limits::ArchiveGuard::for_server_import();
+        zircon_core::archive::zip::extract_zip(cursor, target_dir, &guard)
+            .map_err(|e| InstallError::Config(format!("Failed to extract JDK zip archive: {e}")))?;
+    } else {
+        let cursor = std::io::Cursor::new(bytes);
+        let decoder = flate2::read::GzDecoder::new(cursor).take(MAX_JDK_UNPACKED_BYTES);
+        let mut archive = tar::Archive::new(decoder);
+        archive.set_preserve_permissions(false);
+        archive
+            .unpack(target_dir)
+            .map_err(|e| InstallError::Config(format!("Failed to unpack JDK tar.gz archive: {e}")))?;
+    }
+
+    if let Some(cand) = find_java_exe_in_tree(target_dir, exe) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = fs::metadata(&cand) {
+                let mut perms = meta.permissions();
+                perms.set_mode(perms.mode() | 0o755);
+                let _ = fs::set_permissions(&cand, perms);
+            }
+        }
+        return Ok(cand.to_string_lossy().into_owned());
+    }
+
+    Err(InstallError::Config(format!(
+        "JDK extracted into {} but {exe} was not found",
+        target_dir.display()
+    )))
+}
+
+/// Recursively searches for `exe` (or `bin/exe` / `Contents/Home/bin/exe`) within `dir`.
+pub fn find_java_exe_in_tree(dir: &Path, exe: &str) -> Option<PathBuf> {
+    if !dir.is_dir() {
+        return None;
+    }
+    if dir.join("bin").join(exe).is_file() {
+        return Some(dir.join("bin").join(exe));
+    }
+    if dir.join("Contents").join("Home").join("bin").join(exe).is_file() {
+        return Some(dir.join("Contents").join("Home").join("bin").join(exe));
+    }
+    if dir.join(exe).is_file() {
+        return Some(dir.join(exe));
+    }
+    find_java_exe_recursive(dir, 0, 4, exe)
+}
+
+fn find_java_exe_recursive(dir: &Path, depth: usize, max_depth: usize, exe: &str) -> Option<PathBuf> {
+    if depth > max_depth {
+        return None;
+    }
+    let Ok(entries) = fs::read_dir(dir) else {
+        return None;
+    };
+    for entry in entries.flatten() {
+        let p = entry.path();
+        if p.is_dir() {
+            if p.join("bin").join(exe).is_file() {
+                return Some(p.join("bin").join(exe));
+            }
+            if p.join("Contents").join("Home").join("bin").join(exe).is_file() {
+                return Some(p.join("Contents").join("Home").join("bin").join(exe));
+            }
+            if let Some(found) = find_java_exe_recursive(&p, depth + 1, max_depth, exe) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
+/// Searches `PATH` for the first existing `name` executable.
+pub fn find_on_path(name: &str) -> Option<PathBuf> {
+    let path_val = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_val) {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 /// Returns `<env>/bin/java(.exe)` when the variable is set and the file exists.
@@ -732,10 +1060,11 @@ fn find_exact_jdk_in(target_major: u8, exe: &str, roots: &[PathBuf]) -> Option<S
         };
         for entry in entries.flatten() {
             let dir_name = entry.file_name().to_string_lossy().into_owned();
-            let candidate = entry.path().join("bin").join(exe);
-            if !candidate.is_file() {
+            let p = entry.path();
+            let candidate = find_java_exe_in_tree(&p, exe);
+            let Some(cand) = candidate else {
                 continue;
-            }
+            };
             let (major, minor) = jdk_version_from_dir(&dir_name);
             if major == target_major as i64 {
                 let newer = best
@@ -743,7 +1072,7 @@ fn find_exact_jdk_in(target_major: u8, exe: &str, roots: &[PathBuf]) -> Option<S
                     .map(|(best_minor, _)| minor > *best_minor)
                     .unwrap_or(true);
                 if newer {
-                    best = Some((minor, candidate.to_string_lossy().into_owned()));
+                    best = Some((minor, cand.to_string_lossy().into_owned()));
                 }
             }
         }
@@ -765,10 +1094,11 @@ fn find_newest_jdk_in(exe: &str, roots: &[PathBuf]) -> Option<String> {
         };
         for entry in entries.flatten() {
             let dir_name = entry.file_name().to_string_lossy().into_owned();
-            let candidate = entry.path().join("bin").join(exe);
-            if !candidate.is_file() {
+            let p = entry.path();
+            let candidate = find_java_exe_in_tree(&p, exe);
+            let Some(cand) = candidate else {
                 continue;
-            }
+            };
             let (major, minor) = jdk_version_from_dir(&dir_name);
             let newer = best
                 .as_ref()
@@ -777,7 +1107,7 @@ fn find_newest_jdk_in(exe: &str, roots: &[PathBuf]) -> Option<String> {
                 })
                 .unwrap_or(true);
             if newer {
-                best = Some((major, minor, candidate.to_string_lossy().into_owned()));
+                best = Some((major, minor, cand.to_string_lossy().into_owned()));
             }
         }
     }
@@ -787,7 +1117,33 @@ fn find_newest_jdk_in(exe: &str, roots: &[PathBuf]) -> Option<String> {
 /// Standard directories that JDK installers drop their homes into.
 fn default_jdk_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
+
+    // Check user profile directories (e.g. Zircon Launcher cache, IntelliJ, Minecraft)
+    if let Some(user_home) = std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(PathBuf::from)
+    {
+        roots.push(user_home.join(".mcmanager").join("launcher"));
+        roots.push(user_home.join(".mcmanager").join("runtimes"));
+        roots.push(user_home.join(".zircon").join("runtimes"));
+        roots.push(user_home.join(".jdks"));
+        roots.push(user_home.join(".minecraft").join("runtime"));
+    }
+
     if is_windows() {
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            let lad = PathBuf::from(local_app_data);
+            roots.push(lad.join("Programs").join("Eclipse Adoptium"));
+            roots.push(lad.join("Programs").join("Microsoft"));
+            roots.push(lad.join("Programs").join("Java"));
+            roots.push(
+                lad.join("Packages")
+                    .join("Microsoft.4297127D64EC6_8wekyb3d8bbwe")
+                    .join("LocalCache")
+                    .join("Local")
+                    .join("runtime"),
+            );
+        }
         for var in ["ProgramFiles", "ProgramFiles(x86)"] {
             if let Ok(pf) = std::env::var(var) {
                 for sub in [
@@ -796,6 +1152,7 @@ fn default_jdk_roots() -> Vec<PathBuf> {
                     "Microsoft",
                     "Amazon Corretto",
                     "Zulu",
+                    "Semeru",
                 ] {
                     roots.push(PathBuf::from(&pf).join(sub));
                 }
@@ -809,6 +1166,10 @@ fn default_jdk_roots() -> Vec<PathBuf> {
             "/Library/Java/JavaVirtualMachines",
         ] {
             roots.push(PathBuf::from(path));
+        }
+        if let Some(user_home) = std::env::var_os("HOME").map(PathBuf::from) {
+            roots.push(user_home.join(".sdkman").join("candidates").join("java"));
+            roots.push(user_home.join("Library").join("Java").join("JavaVirtualMachines"));
         }
     }
     roots

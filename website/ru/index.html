@@ -51,7 +51,7 @@
   (function() {
     try {
       var ua = (navigator.userAgent || '').toLowerCase();
-      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta|yandex/i.test(ua)) return;
       var override = localStorage.getItem('zircon_locale_override');
       if (override) return;
       var SUPPORTED = {
@@ -110,8 +110,7 @@
 <meta content="Zircon Contributors" name="author"/>
 <meta content="index, follow" name="robots"/>
 <meta content="#0d1117" name="theme-color"/>
-<!-- Canonical URL -->
-<link href="https://zirconmc.net/" rel="canonical"/>
+<meta name="yandex-verification" content="e65cacaa35ada795"/>
 <!-- Open Graph / Social Sharing -->
 <meta content="Zircon" property="og:site_name"/>
 <meta content="https://zirconmc.net/" property="og:url"/>

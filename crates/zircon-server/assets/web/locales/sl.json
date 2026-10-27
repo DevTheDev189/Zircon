@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Shrani",
+    "saving": "Shranjujem…",
+    "cancel": "Prekliči",
+    "close": "Zapri",
+    "refresh": "Osveži",
+    "copy": "Kopiraj",
+    "copied": "Kopirano v odložišče!",
+    "delete": "Izbriši",
+    "loading": "Nalagam…",
+    "apply": "Uporabi",
+    "edit": "Uredi",
+    "search": "Iskanje…",
+    "online": "Na spletu",
+    "offline": "Brez povezave",
+    "sleeping": "V mirovanju",
+    "booting": "Zaganjam…",
+    "falling_asleep": "Uspavam…",
+    "shutting_down": "Zaustavljam…",
+    "start": "Zaženi",
+    "stop": "Ustavi",
+    "restart": "Ponovni zagon",
+    "wake": "Prebudi strežnik",
+    "detecting": "Zaznavam…"
+  },
+  "nav": {
+    "global_stats": "Globalne statistike",
+    "servers": "Strežniki",
+    "create_server": "Ustvari strežnik",
+    "import_server": "Uvozi strežnik (.zip)",
+    "mods": "Modi",
+    "shaders": "Šejderji",
+    "files": "Datoteke",
+    "console": "Konzola",
+    "players": "Igralci",
+    "backups": "Varnostne kopije",
+    "world": "Svet",
+    "settings": "Nastavitve",
+    "disk_storage": "Shramba na disku",
+    "server_manager": "Upravitelj strežnikov"
+  },
+  "stats": {
+    "title": "Sistemska telemetrija in metrike",
+    "subtitle": "Realni čas: CPU, RAM gostitelja, RSS procesa in diskovna aktivnost",
+    "host_ram": "RAM operacijskega sistema gostitelja",
+    "process_rss": "RSS Java procesa",
+    "cpu_usage": "Obremenitev CPU",
+    "disk_allocation": "Dodeljen prostor na NVMe disku",
+    "uptime": "Čas delovanja sistema",
+    "active_instances": "Aktivne instance",
+    "sleeping_instances": "Instance v mirovanju"
+  },
+  "instances": {
+    "no_servers": "Ni še nobenih strežnikov — kliknite Ustvari strežnik.",
+    "create_title": "Ustvari Minecraft strežnik",
+    "name_label": "Ime instanc",
+    "version_label": "Različica Minecrafta",
+    "loader_label": "Nakladalnik modov",
+    "port_label": "Vrata",
+    "memory_label": "Dodeljen pomnilnik (GB)",
+    "start_server": "Zaženi strežnik",
+    "wake_server": "Prebudi strežnik",
+    "stop_server": "Ustavi strežnik",
+    "restart_server": "Ponovno zaženi strežnik",
+    "players_online": "{count} na spletu",
+    "sleeps_in": "Uspe v {time}",
+    "idle_wakes": "Zaustavitev ob mirovanju — prebudi se ob vstopu igralca"
+  },
+  "mods": {
+    "title": "Nameščeni modifikaciji",
+    "count": "Nameščene modifikacije ({count})",
+    "search_placeholder": "Iskanje nameščenih modifikacij…",
+    "loader_filter": "Filter nalagalnika",
+    "all_loaders": "Vsi nalagalniki",
+    "active_loader": "Aktivni nalagalnik ({loader})",
+    "export_mrpack": "Izvozi .mrpack",
+    "copy_mrpack_url": "Kopiraj URL .mrpack",
+    "copy_mrpack_tooltip": "Kopiraj javno povezavo za prenos .mrpack za igralce, ki ne uporabljajo Zircon",
+    "add_mod": "Dodaj modifikacijo",
+    "install_update": "Posodobi",
+    "no_mods": "Ni še nameščenih modifikacij."
+  },
+  "console": {
+    "title": "Strežniška konzola in terminal",
+    "placeholder": "Pošlji ukaz (npr. /say Pozdravljeni, /op Igralec)...",
+    "send": "Pošlji",
+    "clear": "Počisti"
+  },
+  "players": {
+    "title": "Upravljanje igralcev",
+    "online": "Igralci na spletu",
+    "whitelist": "Seznam dovoljenih",
+    "ops": "Operatorji",
+    "bans": "Prepovedani igralci",
+    "kick": "Vrzi ven",
+    "ban": "Prepovej",
+    "op": "Naredi operatorja",
+    "deop": "Odstrani status operatorja"
+  },
+  "backups": {
+    "title": "Posnetki svetov in instanc",
+    "create": "Ustvari varnostno kopijo",
+    "restore": "Obnovi",
+    "download": "Prenesi",
+    "delete": "Izbriši"
+  },
+  "security": {
+    "online_mode": "Način online (preverjanje pristnosti Mojang)",
+    "online_mode_warning": "Opozorilo: Onemogočenje načina online omogoča povezavo nepreverjenih igralcev brez povezave z lažnimi UUID-ji.",
+    "whitelist_enforced": "Uveljavi beli seznam"
+  }
+}

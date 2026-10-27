@@ -110,6 +110,11 @@ impl OfflineInstanceManager {
         Self::new(offline_instances_dir())
     }
 
+    /// Returns the base directory where offline instances are stored.
+    pub fn base_dir(&self) -> &Path {
+        &self.base_dir
+    }
+
     /// The instance's root directory (`<base_dir>/<sanitized id>`); does not
     /// create it. Non-`[A-Za-z0-9_-]` characters (path separators and dots
     /// included) are dropped so an id can never escape the instances root; an

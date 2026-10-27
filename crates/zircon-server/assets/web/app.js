@@ -85,6 +85,10 @@ createApp({
             searchType: 'mod', // 'mod' or 'modpack'
             searchProvider: 'modrinth', // 'modrinth' or 'curseforge'
             searchAllVersions: false,
+            searchAllLoaders: false,
+            searchLoaderFilter: 'instance',
+            directModUrlInput: '',
+            directModUrlBusy: false,
             searching: false,
             searchSeq: 0, // bumped per search so stale responses never clobber newer ones
             searchResults: [],
@@ -115,6 +119,7 @@ createApp({
                 error: ''
             },
             installedMods: [],
+            installedModsFilterQuery: '',
             // True while the Installed Mods list is being fetched so the tab can
             // show a spinner instead of a jarring empty/offline flash.
             isLoadingMods: false,
@@ -152,6 +157,7 @@ createApp({
             opPlayers: [],
             bannedPlayers: [],
             playerHistory: [],
+            onlinePlayers: [],
             playersLoading: false,
             playersLoaded: false,
             playerForms: { whitelist: '', op: '' },
@@ -244,6 +250,7 @@ createApp({
             previewCenterX: 0,
             previewCenterZ: 0,
             previewZoom: 1.0,
+            previewDimension: 'overworld',
             previewShowGrid: true,
             previewDragging: false,
             previewTerrainMods: [],
@@ -342,7 +349,56 @@ createApp({
             if (!Array.isArray(list) || list.length === 0) return false;
             return list.every(item => Boolean(this.selectedResourcePacks?.[item.filename]));
         },
+        serverMemoryBytes() {
+            return this.systemStats?.current?.serverProcessMemoryBytes ?? this.systemStats?.serverProcessMemoryBytes ?? 0;
+        },
+        serverMaxMemoryBytes() {
+            return this.systemStats?.current?.serverConfiguredMaxMemoryBytes ?? this.systemStats?.serverConfiguredMaxMemoryBytes ?? (4 * 1024 * 1024 * 1024);
+        },
+        isServerRunning() {
+            if (this.systemStats?.current?.isServerRunning !== undefined) {
+                return !!this.systemStats.current.isServerRunning;
+            }
+            if (this.systemStats?.isServerRunning !== undefined) {
+                return !!this.systemStats.isServerRunning;
+            }
+            return this.isStatsInstanceRunning;
+        },
+        serverMemoryPercent() {
+            if (!this.isServerRunning) return 0;
+            const used = this.serverMemoryBytes;
+            const max = this.serverMaxMemoryBytes || 1;
+            return Math.min(100, Math.round((used / max) * 100));
+        },
+        hostMemoryUsedBytes() {
+            return this.systemStats?.current?.usedMemoryBytes || 0;
+        },
+        hostMemoryTotalBytes() {
+            return this.systemStats?.current?.maxMemoryBytes || 0;
+        },
+        hostMemoryPercent() {
+            const used = this.hostMemoryUsedBytes;
+            const total = this.hostMemoryTotalBytes || 1;
+            return Math.min(100, Math.round((used / total) * 100));
+        },
+        diskUsedBytes() {
+            const total = this.systemStats?.current?.totalDiskBytes || 0;
+            const free = this.systemStats?.current?.freeDiskBytes || 0;
+            return Math.max(0, total - free);
+        },
+        diskTotalBytes() {
+            return this.systemStats?.current?.totalDiskBytes || 0;
+        },
+        diskPercent() {
+            const total = this.diskTotalBytes;
+            if (!total) return 0;
+            const used = this.diskUsedBytes;
+            return Math.min(100, Math.max(0, Math.round((used / total) * 100)));
+        },
         isStatsInstanceRunning() {
+            if (this.systemStats?.current?.isServerRunning !== undefined) {
+                return !!this.systemStats.current.isServerRunning;
+            }
             const inst = this.statsSelectedInstance;
             return inst ? !!inst.running : (this.runningInstancesCount > 0);
         },
@@ -482,5 +538,23 @@ createApp({
                 }
             }
         }
+    },
+    mounted() {
+        window.addEventListener('keydown', (e) => {
+            if (this.activeTab === 'mods') {
+                if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+                    e.preventDefault();
+                    const el = document.getElementById('installed-mods-search-input');
+                    if (el) el.focus();
+                } else if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+                    const el = document.getElementById('installed-mods-search-input');
+                    if (el) {
+                        e.preventDefault();
+                        el.focus();
+                        el.select();
+                    }
+                }
+            }
+        });
     }
 }).mount('#app');

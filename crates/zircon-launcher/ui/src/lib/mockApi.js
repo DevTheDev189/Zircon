@@ -194,6 +194,77 @@ export async function handleMockInvoke(cmd, args = {}) {
     case 'scan_installed_launchers':
       return MOCK_MIGRATION;
 
+    case 'list_keybind_profiles':
+      return [
+        {
+          id: 'fps_competitive',
+          name: 'FPS Competitive',
+          description: 'Optimized sprint on Shift, crouch on Ctrl, zoom on C',
+          count: 32,
+          updated_at: Math.floor(Date.now() / 1000),
+        },
+        {
+          id: 'standard_modded',
+          name: 'Standard Modded Layout',
+          description: 'Default WASD with REI recipe lookup on R',
+          count: 45,
+          updated_at: Math.floor(Date.now() / 1000) - 86400,
+        },
+      ];
+
+    case 'get_keybind_profile':
+      return {
+        id: args.id || 'fps_competitive',
+        name: 'FPS Competitive',
+        description: 'Optimized sprint on Shift, crouch on Ctrl, zoom on C',
+        created_at: Math.floor(Date.now() / 1000) - 100000,
+        updated_at: Math.floor(Date.now() / 1000),
+        keybinds: {
+          'key_key.forward': 'key.keyboard.w',
+          'key_key.left': 'key.keyboard.a',
+          'key_key.back': 'key.keyboard.s',
+          'key_key.right': 'key.keyboard.d',
+          'key_key.jump': 'key.keyboard.space',
+          'key_key.sprint': 'key.keyboard.left.shift',
+          'key_key.sneak': 'key.keyboard.left.control',
+          'key_key.attack': 'key.mouse.left',
+          'key_key.use': 'key.mouse.right',
+          'key_key.inventory': 'key.keyboard.e',
+          'key_key.drop': 'key.keyboard.q',
+          'key_key.chat': 'key.keyboard.t',
+        },
+      };
+
+    case 'save_keybind_profile':
+      return { ...args.profile, updated_at: Math.floor(Date.now() / 1000) };
+
+    case 'delete_keybind_profile':
+      return null;
+
+    case 'extract_instance_keybinds':
+    case 'extract_options_file_keybinds':
+      return {
+        'key_key.forward': 'key.keyboard.w',
+        'key_key.left': 'key.keyboard.a',
+        'key_key.back': 'key.keyboard.s',
+        'key_key.right': 'key.keyboard.d',
+        'key_key.jump': 'key.keyboard.space',
+        'key_key.sprint': 'key.keyboard.left.control',
+        'key_key.sneak': 'key.keyboard.left.shift',
+        'key_key.attack': 'key.mouse.left',
+        'key_key.use': 'key.mouse.right',
+        'key_key.inventory': 'key.keyboard.e',
+      };
+
+    case 'apply_keybind_profile_to_instance':
+      return {
+        profile_id: args.profileId,
+        keys_applied: 10,
+        keys_updated: 8,
+        keys_added: 2,
+        backup_path: 'options.txt.bak',
+      };
+
     case 'get_game_status':
       return { running: false, label: '' };
 

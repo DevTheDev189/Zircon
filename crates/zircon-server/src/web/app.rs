@@ -447,6 +447,10 @@ pub fn router(state: AppState) -> Router {
             delete(instance_controller::remove_ban),
         )
         .route(
+            "/api/instances/:id/players/kick",
+            post(instance_controller::kick_player),
+        )
+        .route(
             "/api/instances/:id/bom",
             get(instance_controller::get_instance_bom),
         )
@@ -818,9 +822,33 @@ pub fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
             "image/svg+xml",
             include_str!("../../assets/web/curseforge.svg"),
         ),
+        "/fabric.svg" => (
+            "image/svg+xml",
+            include_str!("../../assets/web/fabric.svg"),
+        ),
+        "/quilt.svg" => (
+            "image/svg+xml",
+            include_str!("../../assets/web/quilt.svg"),
+        ),
+        "/forge.svg" => (
+            "image/svg+xml",
+            include_str!("../../assets/web/forge.svg"),
+        ),
+        "/neoforge.svg" => (
+            "image/svg+xml",
+            include_str!("../../assets/web/neoforge.svg"),
+        ),
         "/js/alerts.js" => (
             "application/javascript; charset=utf-8",
             include_str!("../../assets/web/js/alerts.js"),
+        ),
+        "/js/i18n.js" => (
+            "application/javascript; charset=utf-8",
+            include_str!("../../assets/web/js/i18n.js"),
+        ),
+        "/locales/en.json" => (
+            "application/json; charset=utf-8",
+            include_str!("../../assets/web/locales/en.json"),
         ),
         "/js/auth.js" => (
             "application/javascript; charset=utf-8",

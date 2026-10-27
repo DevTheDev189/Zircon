@@ -14,6 +14,7 @@ pub mod packs;
 pub mod sync;
 pub mod modpack;
 pub mod system;
+pub mod keybinds;
 
 pub use state::*;
 pub use auth::*;
@@ -27,6 +28,7 @@ pub use packs::*;
 pub use sync::*;
 pub use modpack::*;
 pub use system::*;
+pub use keybinds::*;
 
 #[cfg(test)]
 mod tests;

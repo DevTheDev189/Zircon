@@ -16,6 +16,7 @@ use base64::Engine;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use url::form_urlencoded::Serializer;
+use zeroize::Zeroize;
 
 use crate::auth::callback::CallbackServer;
 use crate::auth::session::{now_millis, SessionData};
@@ -93,7 +94,9 @@ impl MicrosoftAuthService {
         // static, so the unwrap is unreachable in practice.
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(20))
-            .redirect(reqwest::redirect::Policy::limited(10))
+            .timeout(Duration::from_secs(30))
+            .redirect(reqwest::redirect::Policy::none())
+            .https_only(true)
             .build()
             .expect("failed to build HTTP client");
         MicrosoftAuthService {
@@ -141,7 +144,7 @@ impl MicrosoftAuthService {
 
         // PKCE: the code verifier is a one-time secret; only its S256 challenge
         // is sent in the authorize URL, and the verifier is sent at token exchange.
-        let code_verifier = Self::generate_code_verifier();
+        let mut code_verifier = Self::generate_code_verifier();
         let code_challenge = Self::generate_code_challenge(&code_verifier);
         // `state` binds the browser redirect back to this exact flow, so a
         // stale callback or a malicious local process cannot feed us a code.
@@ -152,11 +155,10 @@ impl MicrosoftAuthService {
         let authorize_url = self.build_authorize_url(&redirect_uri, &code_challenge, &state);
 
         tracing::info!(
-            "Opening browser for Microsoft login (client_id={}, redirect_uri={})",
-            self.client_id,
-            redirect_uri
+            "Opening browser for Microsoft login (client_id={})",
+            self.client_id
         );
-        tracing::debug!("Authorize URL: {authorize_url}");
+        tracing::debug!("Authorize URL prepared (state and callback port redacted)");
 
         let browser_opened = match open::that(&authorize_url) {
             Ok(_) => true,
@@ -173,8 +175,11 @@ impl MicrosoftAuthService {
         let code = server
             .await_code(Duration::from_secs(5 * 60), &state)
             .await?;
-        self.complete_login(&code, Some(&code_verifier), &redirect_uri)
-            .await
+        let result = self
+            .complete_login(&code, Some(&code_verifier), &redirect_uri)
+            .await;
+        code_verifier.zeroize();
+        result
     }
 
     /// Continues the flow after the browser callback: MS token → XBL → XSTS →
@@ -212,7 +217,9 @@ impl MicrosoftAuthService {
         let access_token = get_string(&json, "access_token").ok_or_else(|| {
             LauncherError::Auth("Token refresh failed: response missing access_token".to_string())
         })?;
-        let refresh_token = get_string(&json, "refresh_token").unwrap_or_default();
+        let refresh_token = get_string(&json, "refresh_token")
+            .filter(|t| !t.trim().is_empty())
+            .unwrap_or_else(|| session.refresh_token.clone());
         tracing::debug!("Token refresh OK");
         self.complete_login_with_ms_token(MsTokenResponse {
             access_token,
@@ -234,18 +241,20 @@ impl MicrosoftAuthService {
         let xsts = self.xsts_authorize(&xbl_token).await?;
 
         tracing::debug!("Step 4/5: Minecraft login...");
-        let identity_token = format!("XBL3.0 x={};{}", xsts.uhs, xsts.token);
+        let mut identity_token = format!("XBL3.0 x={};{}", xsts.uhs, xsts.token);
         let mc = self.minecraft_login(&identity_token).await?;
+        identity_token.zeroize();
 
         tracing::debug!("Step 5/5: fetching Minecraft profile...");
         let profile = self.fetch_profile(&mc.access_token).await?;
 
+        let expires_in_ms = mc.expires_in.clamp(60, 31_536_000).saturating_mul(1000);
         let session = SessionData {
-            access_token: mc.access_token,
-            refresh_token: ms.refresh_token,
+            access_token: mc.access_token.clone(),
+            refresh_token: ms.refresh_token.clone(),
             username: profile.name,
             uuid: profile.id,
-            expires_at_millis: now_millis() + mc.expires_in * 1000,
+            expires_at_millis: now_millis().saturating_add(expires_in_ms),
             user_type: "msa".to_string(),
         };
         self.save(&session)?;
@@ -343,11 +352,10 @@ impl MicrosoftAuthService {
     /// (`auth-session` and `auth-refresh`) so neither exceeds the platform
     /// 2560-character limit on Windows Credential Manager.
     pub fn save(&self, session: &SessionData) -> Result<(), LauncherError> {
-        let json = serde_json::to_string(session)?;
         if self.use_keyring {
             let mut session_without_refresh = session.clone();
             session_without_refresh.refresh_token.clear();
-            let session_json = serde_json::to_string(&session_without_refresh)?;
+            let mut session_json = serde_json::to_string(&session_without_refresh)?;
 
             let session_res = Self::keyring_session_entry().and_then(|e| {
                 e.set_password(&session_json)
@@ -357,6 +365,7 @@ impl MicrosoftAuthService {
                 e.set_password(&session.refresh_token)
                     .map_err(|err| LauncherError::Auth(err.to_string()))
             });
+            session_json.zeroize();
 
             match (session_res, refresh_res) {
                 (Ok(()), Ok(())) => {
@@ -368,10 +377,15 @@ impl MicrosoftAuthService {
                     tracing::warn!(
                         "Could not store the session in the OS keychain ({e}); falling back to a protected cache file"
                     );
+                    let _ = Self::keyring_session_entry().map(|entry| entry.delete_credential());
+                    let _ = Self::keyring_refresh_entry().map(|entry| entry.delete_credential());
                 }
             }
         }
-        self.write_cache_file(&json)
+        let mut json = serde_json::to_string(session)?;
+        let res = self.write_cache_file(&json);
+        json.zeroize();
+        res
     }
 
     /// Writes the session JSON to the cache file, restricted to the current
@@ -380,15 +394,27 @@ impl MicrosoftAuthService {
         if let Some(parent) = self.cache_file.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(&self.cache_file, json)?;
+        let tmp_file = self.cache_file.with_extension("json.tmp");
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            // Owner read/write only: keeps other local users (and malware
-            // running as them) from reading the refresh token.
-            let _ =
-                std::fs::set_permissions(&self.cache_file, std::fs::Permissions::from_mode(0o600));
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+            // Create the file atomically with 0o600 permissions from the start
+            // so there is no window where the refresh token is world-readable.
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&tmp_file)?;
+            file.write_all(json.as_bytes())?;
+            file.sync_all()?;
         }
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&tmp_file, json)?;
+        }
+        std::fs::rename(&tmp_file, &self.cache_file)?;
         Ok(())
     }
 
@@ -488,12 +514,22 @@ impl MicrosoftAuthService {
     fn random_alphabet_chars(len: usize) -> String {
         const ALPHABET: &[u8] =
             b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-        let mut bytes = vec![0u8; len];
-        getrandom::fill(&mut bytes).expect("failed to obtain randomness for the OAuth flow");
-        bytes
-            .iter()
-            .map(|b| ALPHABET[(*b as usize) % ALPHABET.len()] as char)
-            .collect()
+        // Largest multiple of 66 <= 256 is 198 (66 * 3). Rejecting >= 198 eliminates modulo bias.
+        const UNBIASED_LIMIT: u8 = (256 / ALPHABET.len() * ALPHABET.len()) as u8;
+        let mut out = String::with_capacity(len);
+        let mut buf = [0u8; 64];
+        while out.len() < len {
+            getrandom::fill(&mut buf).expect("failed to obtain randomness for the OAuth flow");
+            for &b in &buf {
+                if b < UNBIASED_LIMIT {
+                    out.push(ALPHABET[(b as usize) % ALPHABET.len()] as char);
+                    if out.len() == len {
+                        break;
+                    }
+                }
+            }
+        }
+        out
     }
 
     /// S256 challenge = base64url(sha256(verifier)), unpadded.
@@ -729,14 +765,21 @@ impl MicrosoftAuthService {
 /// Resolves the client id: `MC_MANAGER_CLIENT_ID` env var, then the
 /// `~/.mcmanager/client_id.txt` file, then the embedded default.
 fn resolve_client_id() -> String {
+    let is_valid_client_id = |s: &str| -> bool {
+        !s.is_empty()
+            && s.len() <= 128
+            && s.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    };
     if let Ok(id) = std::env::var("MC_MANAGER_CLIENT_ID") {
-        if !id.trim().is_empty() {
-            return id;
+        let trimmed = id.trim();
+        if is_valid_client_id(trimmed) {
+            return trimmed.to_string();
         }
     }
     if let Ok(content) = std::fs::read_to_string(paths::client_id_file()) {
         let from_file = content.trim();
-        if !from_file.is_empty() {
+        if is_valid_client_id(from_file) {
             return from_file.to_string();
         }
     }
@@ -783,18 +826,25 @@ fn urlencode(value: &str) -> String {
 }
 
 /// Response DTOs for the token chain.
+#[derive(Zeroize)]
+#[zeroize(drop)]
 struct MsTokenResponse {
     access_token: String,
     refresh_token: String,
 }
 
+#[derive(Zeroize)]
+#[zeroize(drop)]
 struct XstsResponse {
     token: String,
     uhs: String,
 }
 
+#[derive(Zeroize)]
+#[zeroize(drop)]
 struct McLoginResponse {
     access_token: String,
+    #[zeroize(skip)]
     expires_in: i64,
 }
 

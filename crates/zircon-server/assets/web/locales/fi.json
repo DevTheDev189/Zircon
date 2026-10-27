@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "cancel": "Peruuta",
+    "close": "Sulje",
+    "refresh": "Päivitä",
+    "copy": "Kopioi",
+    "copied": "Kopioitu leikepöydälle!",
+    "delete": "Poista",
+    "loading": "Ladataan…",
+    "apply": "Käytä",
+    "edit": "Muokkaa",
+    "search": "Hae…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Nukkumassa",
+    "booting": "Käynnistyy…",
+    "falling_asleep": "Siirtyy nukkumaan…",
+    "shutting_down": "Sammutetaan…",
+    "start": "Käynnistä",
+    "stop": "Pysäytä",
+    "restart": "Käynnistä uudelleen",
+    "wake": "Herätä palvelin",
+    "detecting": "Tunnistetaan…"
+  },
+  "nav": {
+    "global_stats": "Yleiset tilastot",
+    "servers": "Palvelimet",
+    "create_server": "Luo palvelin",
+    "import_server": "Tuo palvelin (.zip)",
+    "mods": "Modit",
+    "shaders": "Varjostimet",
+    "files": "Tiedostot",
+    "console": "Konsoli",
+    "players": "Pelaajat",
+    "backups": "Varmuuskopiot",
+    "world": "Maailma",
+    "settings": "Asetukset",
+    "disk_storage": "Levytila",
+    "server_manager": "Palvelinhallinta"
+  },
+  "stats": {
+    "title": "Järjestelmän telemetria ja mittarit",
+    "subtitle": "Reaaliaikainen CPU-, isäntäjärjestelmän RAM-, prosessin RSS- ja levyaktiivisuus",
+    "host_ram": "Isäntäjärjestelmän RAM",
+    "process_rss": "Java-prosessin RSS",
+    "cpu_usage": "CPU-kuormitus",
+    "disk_allocation": "NVMe-tallennustilan allokaatio",
+    "uptime": "Järjestelmän käyntiaika",
+    "active_instances": "Käynnissä olevat instanssit",
+    "sleeping_instances": "Lepotilassa olevat instanssit"
+  },
+  "instances": {
+    "no_servers": "Ei palvelimia vielä — napsauta Luo palvelin.",
+    "create_title": "Luo Minecraft-palvelin",
+    "name_label": "Instanssin nimi",
+    "version_label": "Minecraft-versio",
+    "loader_label": "Mod-lataaja",
+    "port_label": "Portti",
+    "memory_label": "Varattu muisti (GB)",
+    "start_server": "Käynnistä palvelin",
+    "wake_server": "Herätä palvelin",
+    "stop_server": "Sammuta palvelin",
+    "restart_server": "Käynnistä palvelin uudelleen",
+    "players_online": "{count} pelaajaa paikalla",
+    "sleeps_in": "Siirtyy lepoon {time}",
+    "idle_wakes": "Tyhjäkäyntisulkeutuminen — herää, kun pelaaja liittyy"
+  },
+  "mods": {
+    "title": "Asennetut modit",
+    "count": "Asennetut modit ({count})",
+    "search_placeholder": "Hae asennettuja modeja…",
+    "loader_filter": "Lataussuodatin",
+    "all_loaders": "Kaikki lataajat",
+    "active_loader": "Aktiivinen lataaja ({loader})",
+    "export_mrpack": "Vie .mrpack",
+    "copy_mrpack_url": "Kopioi .mrpack-URL",
+    "copy_mrpack_tooltip": "Kopioi julkinen .mrpack-latauslinkki muille kuin Zircon-pelaajille",
+    "add_mod": "Lisää modi",
+    "install_update": "Päivitä",
+    "no_mods": "Modeja ei ole vielä asennettu."
+  },
+  "console": {
+    "title": "Palvelinkonsoli ja pääte",
+    "placeholder": "Lähetä komento (esim. /say Hei, /op Pelaaja)...",
+    "send": "Lähetä",
+    "clear": "Tyhjennä"
+  },
+  "players": {
+    "title": "Pelaajien hallinta",
+    "online": "Paikalla olevat pelaajat",
+    "whitelist": "Valkoinen lista",
+    "ops": "Operaattorit",
+    "bans": "Portkielletut pelaajat",
+    "kick": "Potkaise",
+    "ban": "Porttikielto",
+    "op": "Tee operaattoriksi",
+    "deop": "Poista operaattorioikeudet"
+  },
+  "backups": {
+    "title": "Maailma- ja instanssivarmakuvat",
+    "create": "Luo varmuuskopio",
+    "restore": "Palauta",
+    "download": "Lataa",
+    "delete": "Poista"
+  },
+  "security": {
+    "online_mode": "Online-tila (Mojang-todennus)",
+    "online_mode_warning": "Varoitus: Online-tilan poistaminen käytöstä sallii offline-/varmistamattomien pelaajien, joilla on väärennetty UUID, yhdistämisen palvelimelle.",
+    "whitelist_enforced": "Pakota valkoinen lista"
+  }
+}

@@ -10,7 +10,7 @@
 //! Port of `com.mcmanager.core.util.Lz4ArchiveUtil`.
 
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf}; // Filesystem path representations
 //
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
@@ -145,6 +145,33 @@ pub const MAX_FILE_ENTRIES: usize = crate::archive::limits::DEFAULT_MAX_FILE_ENT
 /// Decompresses a `.tar.lz4` archive into `destination_dir`, overwriting files
 /// that already exist. Aborts extraction when an entry escapes destination or violates bounds.
 pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Result<()> {
+    let final_dest = canonicalize_or_create(destination_dir)?;
+    let parent_dir = final_dest.parent().unwrap_or(&final_dest);
+    let staging_dir = parent_dir.join(format!(
+        ".zircon-lz4-staging-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    std::fs::create_dir_all(&staging_dir)?;
+
+    match extract_archive_into_staging(archive_file, &staging_dir) {
+        Ok(()) => {
+            let commit_res = copy_staging_tree(&staging_dir, &final_dest);
+            let _ = std::fs::remove_dir_all(&staging_dir);
+            commit_res
+        }
+        Err(err) => {
+            let _ = std::fs::remove_dir_all(&staging_dir);
+            Err(err)
+        }
+    }
+}
+
+fn extract_archive_into_staging(archive_file: &Path, destination_dir: &Path) -> io::Result<()> {
+    let compressed_file_len = std::fs::metadata(archive_file)?.len().max(1);
     let file_in = File::open(archive_file)?;
     let lz4_in = FrameDecoder::new(file_in);
     let mut tar_in = Archive::new(lz4_in);
@@ -152,6 +179,7 @@ pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Resul
     let dest = canonicalize_or_create(destination_dir)?;
     let byte_limit = crate::archive::limits::max_uncompressed_bytes();
     let entry_limit = crate::archive::limits::max_file_entries();
+    let ratio_limit = crate::archive::limits::max_compression_ratio();
     // Tracking extracted volume and entries
     let mut entries_seen: usize = 0;
     let mut bytes_extracted: u64 = 0;
@@ -205,11 +233,53 @@ pub fn extract_archive(archive_file: &Path, destination_dir: &Path) -> io::Resul
             if let Some(parent_dir) = destination_path.parent() {
                 std::fs::create_dir_all(parent_dir)?;
             } // ensure parent directory
+            let remaining_budget = byte_limit.saturating_sub(bytes_extracted);
             let mut file_out = File::create(&destination_path)?;
-            let copied = io::copy(&mut entry, &mut file_out)?;
+            let mut bounded_entry = (&mut entry).take(remaining_budget.saturating_add(1));
+            let copied = io::copy(&mut bounded_entry, &mut file_out)?;
             bytes_extracted = bytes_extracted.saturating_add(copied);
             if bytes_extracted > byte_limit {
+                let _ = std::fs::remove_file(&destination_path);
                 return Err(io::Error::new(io::ErrorKind::InvalidData, format!("TAR-LZ4 extracted size exceeded limit: {byte_limit}")));
+            }
+            if ratio_limit > 0
+                && bytes_extracted >= crate::archive::limits::RATIO_ENFORCEMENT_THRESHOLD_BYTES
+                && (bytes_extracted / compressed_file_len) > ratio_limit
+            {
+                let _ = std::fs::remove_file(&destination_path);
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "TAR-LZ4 compression ratio exceeded ceiling ({ratio_limit}:1)"
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn copy_staging_tree(src_root: &Path, dst_root: &Path) -> io::Result<()> {
+    let mut stack = vec![src_root.to_path_buf()];
+    while let Some(curr) = stack.pop() {
+        for entry in std::fs::read_dir(&curr)? {
+            let entry = entry?;
+            let path = entry.path();
+            let rel = path.strip_prefix(src_root).map_err(|e| {
+                io::Error::new(io::ErrorKind::InvalidData, e.to_string())
+            })?;
+            let target = dst_root.join(rel);
+            let ft = entry.file_type()?;
+            if ft.is_dir() {
+                std::fs::create_dir_all(&target)?;
+                stack.push(path);
+            } else if ft.is_file() {
+                if let Some(parent) = target.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::rename(&path, &target).or_else(|_| {
+                    std::fs::copy(&path, &target).map(|_| ())
+                })?;
             }
         }
     }

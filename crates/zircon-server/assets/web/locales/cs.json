@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Uložit",
+    "saving": "Ukládání…",
+    "cancel": "Zrušit",
+    "close": "Zavřít",
+    "refresh": "Obnovit",
+    "copy": "Kopírovat",
+    "copied": "Zkopírováno do schránky!",
+    "delete": "Smazat",
+    "loading": "Načítání…",
+    "apply": "Použít",
+    "edit": "Upravit",
+    "search": "Hledat…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Režim spánku",
+    "booting": "Spouštění…",
+    "falling_asleep": "Uspávání…",
+    "shutting_down": "Vypínání…",
+    "start": "Spustit",
+    "stop": "Zastavit",
+    "restart": "Restartovat",
+    "wake": "Probudit server",
+    "detecting": "Detekce…"
+  },
+  "nav": {
+    "global_stats": "Globální statistiky",
+    "servers": "Servery",
+    "create_server": "Vytvořit server",
+    "import_server": "Importovat server (.zip)",
+    "mods": "Mody",
+    "shaders": "Shadery",
+    "files": "Soubory",
+    "console": "Konzole",
+    "players": "Hráči",
+    "backups": "Zálohy",
+    "world": "Svět",
+    "settings": "Nastavení",
+    "disk_storage": "Úložiště na disku",
+    "server_manager": "Správce serveru"
+  },
+  "stats": {
+    "title": "Systémová telemetrie a metriky",
+    "subtitle": "Aktivita CPU, RAM hostitele, RSS procesu a disku v reálném čase",
+    "host_ram": "RAM operačního systému hostitele",
+    "process_rss": "RSS Java procesu",
+    "cpu_usage": "Zatížení CPU",
+    "disk_allocation": "Přidělené úložiště NVMe",
+    "uptime": "Doba běhu systému",
+    "active_instances": "Běžící instance",
+    "sleeping_instances": "Instance ve spánku"
+  },
+  "instances": {
+    "no_servers": "Zatím žádné servery — klikněte na Vytvořit server.",
+    "create_title": "Vytvořit Minecraft server",
+    "name_label": "Název instance",
+    "version_label": "Verze Minecraftu",
+    "loader_label": "Mod Loader",
+    "port_label": "Port",
+    "memory_label": "Přidělená paměť (GB)",
+    "start_server": "Spustit server",
+    "wake_server": "Probudit server",
+    "stop_server": "Zastavit server",
+    "restart_server": "Restartovat server",
+    "players_online": "{count} online",
+    "sleeps_in": "Usne za {time}",
+    "idle_wakes": "Ukončení při nečinnosti — probudí se při připojení hráče"
+  },
+  "mods": {
+    "title": "Nainstalované mody",
+    "count": "Nainstalované mody ({count})",
+    "search_placeholder": "Hledat nainstalované mody…",
+    "loader_filter": "Filtr loaderu",
+    "all_loaders": "Všechny loadery",
+    "active_loader": "Aktivní loader ({loader})",
+    "export_mrpack": "Exportovat .mrpack",
+    "copy_mrpack_url": "Kopírovat URL .mrpack",
+    "copy_mrpack_tooltip": "Zkopírovat veřejný odkaz na stažení .mrpack pro hráče bez Zirconu",
+    "add_mod": "Přidat mod",
+    "install_update": "Aktualizovat",
+    "no_mods": "Zatím nejsou nainstalovány žádné mody."
+  },
+  "console": {
+    "title": "Konzole serveru & Terminál",
+    "placeholder": "Odeslat příkaz (např. /say Ahoj, /op Hráč)...",
+    "send": "Odeslat",
+    "clear": "Vymazat"
+  },
+  "players": {
+    "title": "Správa hráčů",
+    "online": "Online hráči",
+    "whitelist": "Whitelist",
+    "ops": "Operátoři",
+    "bans": "Zabanovaní hráči",
+    "kick": "Vyřadit",
+    "ban": "Zabanovat",
+    "op": "Udělat operátora",
+    "deop": "Odebrat oprávnění operátora"
+  },
+  "backups": {
+    "title": "Snímky světů a instancí",
+    "create": "Vytvořit zálohu",
+    "restore": "Obnovit",
+    "download": "Stáhnout",
+    "delete": "Smazat"
+  },
+  "security": {
+    "online_mode": "Online režim (ověřování Mojang)",
+    "online_mode_warning": "Upozornění: Vypnutím online-režimu umožníte připojení offline/neověřených hráčů se zfalšovanými UUID.",
+    "whitelist_enforced": "Vynutit whitelist"
+  }
+}

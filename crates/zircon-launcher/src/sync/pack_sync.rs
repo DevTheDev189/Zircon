@@ -23,8 +23,12 @@ use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
 
 use zircon_core::model::{BillOfMaterials, PackEntry};
+use zircon_core::security::ssrf;
 
 use super::mod_sync::{validate_entry_filename, HashVerifier};
+
+/// Hard ceiling on a single downloaded resourcepack or shaderpack archive (512 MiB).
+const MAX_PACK_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
 
 /// Receives human-readable pack sync progress. Port of the Java
 /// `PackSyncEngine.ProgressListener` — status only, the Java reports no
@@ -68,7 +72,25 @@ impl PackSyncEngine {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(15))
-            .redirect(reqwest::redirect::Policy::limited(10))
+            .timeout(std::time::Duration::from_secs(300))
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                if attempt.previous().len() >= 5 {
+                    return attempt.error("too many redirects");
+                }
+                let target = attempt.url();
+                if ssrf::is_safe_cdn_url(target.as_str()) {
+                    return attempt.follow();
+                }
+                if let Some(first) = attempt.previous().first() {
+                    if first.scheme() == target.scheme()
+                        && first.host_str() == target.host_str()
+                        && first.port_or_known_default() == target.port_or_known_default()
+                    {
+                        return attempt.follow();
+                    }
+                }
+                attempt.error("blocked cross-origin or non-CDN redirect (SSRF protection)")
+            }))
             .build()
             .expect("failed to build reqwest client");
         Self { http }
@@ -146,6 +168,7 @@ impl PackSyncEngine {
         }
 
         let wanted: Vec<String> = packs.iter().map(|p| p.filename.clone()).collect();
+        let keep_set: HashSet<&str> = keep.iter().map(|s| s.as_str()).collect();
 
         for pack in packs {
             // Filenames come from the untrusted server BOM; never allow one to
@@ -156,69 +179,66 @@ impl PackSyncEngine {
             }
             let target = dir.join(&pack.filename);
             let guard = zircon_core::archive::limits::ArchiveGuard::default();
-            let is_prescanned = pack
-                .origin
-                .as_deref()
-                .map(|o| o.eq_ignore_ascii_case("modrinth") || o.eq_ignore_ascii_case("curseforge"))
-                .unwrap_or(false);
 
             if HashVerifier::matches_pack(&target, pack) {
-                // Verify local cached file passes zero-trust security audit
+                // Verify local cached file passes zero-trust security audit (strict whitelist)
                 let is_safe = match std::fs::File::open(&target) {
-                    Ok(f) => {
-                        if is_prescanned {
-                            zircon_core::security::pack_validator::validate_pack_archive_safety(f, &guard).is_ok()
-                        } else {
-                            zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok()
-                        }
-                    }
+                    Ok(f) => zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok(),
                     Err(_) => false,
                 };
                 if is_safe {
                     continue;
                 } else {
-                    let _ = std::fs::remove_file(&target);
+                    if !keep_set.contains(pack.filename.as_str()) {
+                        let _ = std::fs::remove_file(&target);
+                    }
                     warn!(
                         "Existing pack '{}' failed security audit and was purged",
                         pack.filename
                     );
                 }
             }
+            if keep_set.contains(pack.filename.as_str()) && target.is_file() {
+                info!("Preserving local player-kept pack '{}' over server BOM entry", pack.filename);
+                continue;
+            }
             emit_status(listener, &format!("Downloading {}...", pack.filename));
             let url = format!("{base}{url_prefix}{}", url_encode(&pack.filename));
-            match self.download(&url, &target).await {
+            let temp_target = dir.join(format!(".{}.tmp.{}", pack.filename, uuid::Uuid::new_v4().simple()));
+            match self.download(&url, &temp_target).await {
                 Ok(_) => {
                     // The downloaded archive must match the hash pinned in the
                     // BOM; a server serving something else is discarded.
-                    if HashVerifier::matches_pack(&target, pack) {
-                        let is_safe = match std::fs::File::open(&target) {
-                            Ok(f) => {
-                                if is_prescanned {
-                                    zircon_core::security::pack_validator::validate_pack_archive_safety(f, &guard).is_ok()
-                                } else {
-                                    zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok()
-                                }
-                            }
+                    if HashVerifier::matches_pack(&temp_target, pack) {
+                        let is_safe = match std::fs::File::open(&temp_target) {
+                            Ok(f) => zircon_core::security::pack_validator::validate_pack_archive(f, &guard).is_ok(),
                             Err(_) => false,
                         };
                         if is_safe {
-                            downloaded.push(pack.filename.clone());
+                            if std::fs::rename(&temp_target, &target).is_ok() {
+                                downloaded.push(pack.filename.clone());
+                            } else {
+                                let _ = std::fs::remove_file(&temp_target);
+                            }
                         } else {
-                            let _ = std::fs::remove_file(&target);
+                            let _ = std::fs::remove_file(&temp_target);
                             warn!(
                                 "Pack '{}' failed client-side security whitelist audit and was discarded",
                                 pack.filename
                             );
                         }
                     } else {
-                        let _ = std::fs::remove_file(&target);
+                        let _ = std::fs::remove_file(&temp_target);
                         warn!(
                             "Pack download failed hash check and was discarded: {}",
                             pack.filename
                         );
                     }
                 }
-                Err(e) => warn!("Pack sync failed for {}: {}", pack.filename, e),
+                Err(e) => {
+                    let _ = std::fs::remove_file(&temp_target);
+                    warn!("Pack sync failed for {}: {}", pack.filename, e);
+                }
             }
         }
 
@@ -233,8 +253,62 @@ impl PackSyncEngine {
     }
 
     /// Streams a file download to `target`. A non-2xx response becomes
-    /// [`LauncherError::Http`].
+    /// [`LauncherError::Http`]. Retries up to 3 times on transient failures.
     async fn download(&self, url: &str, target: &Path) -> Result<u64, crate::error::LauncherError> {
+        const MAX_RETRIES: usize = 3;
+        let mut attempt = 0;
+        let mut last_error: Option<crate::error::LauncherError> = None;
+
+        while attempt <= MAX_RETRIES {
+            if attempt > 0 {
+                let base_delay_ms = 400u64.saturating_mul(1 << (attempt - 1));
+                let rand_u64 = (uuid::Uuid::new_v4().as_u128() as u64) % base_delay_ms.max(1);
+                let delay_ms = (base_delay_ms / 2).saturating_add(rand_u64);
+                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            }
+
+            match self.download_attempt(url, target).await {
+                Ok(written) => return Ok(written),
+                Err(err) => {
+                    let is_transient = match &err {
+                        crate::error::LauncherError::Http { status, .. } => {
+                            matches!(*status, 429 | 500 | 502 | 503 | 504)
+                        }
+                        crate::error::LauncherError::Network(_) => true,
+                        crate::error::LauncherError::Io(io_err) => matches!(
+                            io_err.kind(),
+                            std::io::ErrorKind::TimedOut
+                                | std::io::ErrorKind::Interrupted
+                                | std::io::ErrorKind::ConnectionReset
+                                | std::io::ErrorKind::UnexpectedEof
+                        ),
+                        _ => false,
+                    };
+
+                    if is_transient && attempt < MAX_RETRIES {
+                        warn!(
+                            "Download attempt {}/{} failed for {url} ({err}); retrying...",
+                            attempt + 1,
+                            MAX_RETRIES + 1
+                        );
+                        let _ = tokio::fs::remove_file(target).await;
+                        attempt += 1;
+                        last_error = Some(err);
+                    } else {
+                        let _ = tokio::fs::remove_file(target).await;
+                        return Err(err);
+                    }
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| {
+            crate::error::LauncherError::Network(format!("Download failed after {MAX_RETRIES} retries: {url}"))
+        }))
+    }
+
+    /// Single attempt to stream a file download to `target`.
+    async fn download_attempt(&self, url: &str, target: &Path) -> Result<u64, crate::error::LauncherError> {
         let response = self.http.get(url).send().await?;
         let status = response.status();
         if !status.is_success() {
@@ -243,14 +317,29 @@ impl PackSyncEngine {
                 url: url.to_string(),
             });
         }
+        if let Some(len) = response.content_length() {
+            if len > MAX_PACK_DOWNLOAD_BYTES {
+                return Err(crate::error::LauncherError::InvalidInput(format!(
+                    "Pack Content-Length ({len} bytes) exceeds limit ({MAX_PACK_DOWNLOAD_BYTES} bytes)"
+                )));
+            }
+        }
         let mut out = tokio::fs::File::create(target).await?;
         let mut written: u64 = 0;
         let mut stream = response.bytes_stream();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
+            written = written.saturating_add(chunk.len() as u64);
+            if written > MAX_PACK_DOWNLOAD_BYTES {
+                drop(out);
+                let _ = tokio::fs::remove_file(target).await;
+                return Err(crate::error::LauncherError::InvalidInput(format!(
+                    "Aborted pack download from {url}: stream exceeded {MAX_PACK_DOWNLOAD_BYTES} bytes"
+                )));
+            }
             out.write_all(&chunk).await?;
-            written += chunk.len() as u64;
         }
+        out.flush().await?;
         Ok(written)
     }
 }

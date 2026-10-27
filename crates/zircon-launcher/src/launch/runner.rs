@@ -91,6 +91,7 @@ impl MinecraftRunner {
             data,
             Some(session),
             None,
+            None,
             java_args,
             game_dir,
             Some(server_ip),
@@ -125,15 +126,16 @@ impl MinecraftRunner {
         game_dir: &Path,
         output: Option<Arc<dyn Fn(String) + Send + Sync>>,
     ) -> Result<Child, LauncherError> {
-        self.launch_offline_with_options(data, username, java_args, game_dir, None, output)
+        self.launch_offline_with_options(data, username, None, java_args, game_dir, None, output)
             .await
     }
 
-    /// Launches offline mode with custom display options.
+    /// Launches offline mode with custom display options and optional persistent UUID.
     pub async fn launch_offline_with_options(
         &self,
         data: &LaunchData,
         username: &str,
+        uuid: Option<&str>,
         java_args: &str,
         game_dir: &Path,
         display: Option<LaunchDisplayOptions>,
@@ -150,6 +152,7 @@ impl MinecraftRunner {
             data,
             None,
             Some(player),
+            uuid,
             Some(java_args),
             game_dir,
             None,
@@ -187,6 +190,7 @@ impl MinecraftRunner {
             data,
             session,
             username,
+            None,
             java_args,
             game_dir,
             server_ip,
@@ -200,6 +204,7 @@ impl MinecraftRunner {
         data: &LaunchData,
         session: Option<&SessionData>,
         username: Option<&str>,
+        uuid: Option<&str>,
         java_args: Option<&str>,
         game_dir: &Path,
         server_ip: Option<&str>,
@@ -233,7 +238,7 @@ impl MinecraftRunner {
                 display,
             ),
             None => match username {
-                Some(name) => build_offline_command(data, name, java_args, game_dir, display),
+                Some(name) => build_offline_command(data, name, uuid, java_args, game_dir, display),
                 None => Err(LauncherError::InvalidInput(
                     "no Microsoft session and no offline username provided".to_string(),
                 )),
@@ -370,13 +375,16 @@ fn build_online_command(
     // Forge/NeoForge contribute JVM args from the version profile chain:
     // -p module path, --add-modules/--add-opens/--add-exports, -D system
     // properties such as -DlibraryDirectory and -DignoreList.
-    command.extend(data.jvm_args.iter().cloned());
+    for arg in &data.jvm_args {
+        validate_profile_jvm_arg(arg)?;
+        command.push(arg.clone());
+    }
     let java_major = crate::launch::java::get_java_home_major_version(&data.java_home)
         .or_else(|| {
             Some(crate::launch::java::JavaRuntimeSelector::get_required_java_major_version(&data.version_name))
         });
     let is_vr = crate::launch::java::is_vr_instance(game_dir, Some(&data.version_name));
-    append_jvm_memory_args(&mut command, java_args, java_major, is_vr);
+    append_jvm_memory_args(&mut command, java_args, java_major, is_vr)?;
     command.push(format!(
         "-Djava.library.path={}",
         data.natives_dir.display()
@@ -393,13 +401,14 @@ fn build_online_command(
         let tokens = online_tokens(data, session, game_dir, host, port);
         let mut profile_args: Vec<String> = Vec::new();
         for arg in &data.game_args {
-            let substituted = substitute(arg, &tokens);
-            if substituted.contains(' ') && (substituted.contains("--") || substituted.starts_with('-')) {
-                for part in substituted.split_whitespace() {
-                    profile_args.push(part.to_string());
+            // Only split if the *template* itself is a compound flag string (e.g. "--flag ${val}"),
+            // and substitute each template token individually so substituted values are never split!
+            if arg.contains(' ') && (arg.contains("--") || arg.starts_with('-')) {
+                for raw_part in arg.split_whitespace() {
+                    profile_args.push(substitute(raw_part, &tokens));
                 }
             } else {
-                profile_args.push(substituted);
+                profile_args.push(substitute(arg, &tokens));
             }
         }
         // The profile may contribute --quickPlayMultiplayer; drop it so the
@@ -456,6 +465,7 @@ fn build_online_command(
 fn build_offline_command(
     data: &LaunchData,
     username: &str,
+    uuid: Option<&str>,
     java_args: Option<&str>,
     game_dir: &Path,
     display: Option<LaunchDisplayOptions>,
@@ -465,6 +475,15 @@ fn build_offline_command(
     } else {
         username.trim()
     };
+    if player_name.len() > 16
+        || !player_name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err(LauncherError::InvalidInput(format!(
+            "Invalid offline username '{player_name}': must be 1..=16 ASCII alphanumeric or underscore characters"
+        )));
+    }
 
     let java = java_executable(&data.java_home);
     let mut command = vec![java.display().to_string()];
@@ -475,13 +494,16 @@ fn build_offline_command(
     {
         command.push("-XstartOnFirstThread".to_string());
     }
-    command.extend(data.jvm_args.iter().cloned());
+    for arg in &data.jvm_args {
+        validate_profile_jvm_arg(arg)?;
+        command.push(arg.clone());
+    }
     let java_major = crate::launch::java::get_java_home_major_version(&data.java_home)
         .or_else(|| {
             Some(crate::launch::java::JavaRuntimeSelector::get_required_java_major_version(&data.version_name))
         });
     let is_vr = crate::launch::java::is_vr_instance(game_dir, Some(&data.version_name));
-    append_jvm_memory_args(&mut command, java_args, java_major, is_vr);
+    append_jvm_memory_args(&mut command, java_args, java_major, is_vr)?;
     command.push(format!(
         "-Djava.library.path={}",
         data.natives_dir.display()
@@ -490,21 +512,27 @@ fn build_offline_command(
     command.push(data.classpath.clone());
     command.push(data.main_class.clone());
 
-    let uuid = offline_uuid(player_name);
+    let effective_uuid = if let Some(u) = uuid.filter(|s| !s.trim().is_empty()) {
+        let parsed = uuid::Uuid::parse_str(u.trim()).map_err(|_| {
+            LauncherError::InvalidInput(format!("Invalid offline UUID: {u}"))
+        })?;
+        parsed.to_string()
+    } else {
+        offline_uuid(player_name)
+    };
 
     if !data.game_args.is_empty() {
         // Forge/NeoForge: substitute the version profile's game-argument
         // placeholders with offline credentials instead of a live session.
-        let tokens = offline_tokens(data, player_name, &uuid, game_dir);
+        let tokens = offline_tokens(data, player_name, &effective_uuid, game_dir);
         let mut profile_args: Vec<String> = Vec::new();
         for arg in &data.game_args {
-            let substituted = substitute(arg, &tokens);
-            if substituted.contains(' ') && (substituted.contains("--") || substituted.starts_with('-')) {
-                for part in substituted.split_whitespace() {
-                    profile_args.push(part.to_string());
+            if arg.contains(' ') && (arg.contains("--") || arg.starts_with('-')) {
+                for raw_part in arg.split_whitespace() {
+                    profile_args.push(substitute(raw_part, &tokens));
                 }
             } else {
-                profile_args.push(substituted);
+                profile_args.push(substitute(arg, &tokens));
             }
         }
         // Drop any quick-play multiplayer args so offline stays single-player.
@@ -520,7 +548,7 @@ fn build_offline_command(
             &data.assets_dir.display().to_string(),
         );
         push_arg(&mut command, "--assetIndex", &data.asset_index_id);
-        push_arg(&mut command, "--uuid", &uuid);
+        push_arg(&mut command, "--uuid", &effective_uuid);
         push_arg(&mut command, "--accessToken", "0");
         push_arg(&mut command, "--userType", "legacy");
         push_arg(&mut command, "--versionType", "release");
@@ -538,6 +566,65 @@ fn build_offline_command(
 }
 
 
+/// Rejects dangerous JVM flags in version profiles that could execute shell commands
+/// or load unauthorized agents/native libraries.
+fn validate_profile_jvm_arg(arg: &str) -> Result<(), LauncherError> {
+    let trimmed = arg.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    const FORBIDDEN_PREFIXES: &[&str] = &[
+        "@",
+        "-javaagent:",
+        "-agentlib:",
+        "-agentpath:",
+        "-xx:onerror",
+        "-xx:onoutofmemoryerror",
+        "-xx:errorfile",
+        "-xbootclasspath",
+        "-dorg.lwjgl.librarypath=",
+        "-djna.library.path=",
+        "-djava.library.path=",
+        "-djava.security.manager",
+        "-dcom.sun.management.jmxremote",
+    ];
+    if FORBIDDEN_PREFIXES.iter().any(|p| lower.starts_with(p)) {
+        return Err(LauncherError::InvalidInput(format!(
+            "Forbidden JVM argument in profile: {trimmed}"
+        )));
+    }
+    Ok(())
+}
+
+/// Validates user-supplied JVM tuning flags, allowing only safe memory sizing (`-Xms`, `-Xmx`, `-Xmn`, `-Xss`)
+/// and safe `-XX:` garbage-collector / performance tuning flags.
+fn validate_user_jvm_token(token: &str) -> Result<(), LauncherError> {
+    let lower = token.to_ascii_lowercase();
+    if token.starts_with('@')
+        || token.contains(['\0', '\r', '\n'])
+        || lower.starts_with("-javaagent:")
+        || lower.starts_with("-agentlib:")
+        || lower.starts_with("-agentpath:")
+        || lower.starts_with("-xbootclasspath")
+        || lower.starts_with("-cp")
+        || lower.starts_with("-classpath")
+        || lower.starts_with("--class-path")
+        || lower.starts_with("--patch-module")
+        || lower.starts_with("-jar")
+        || lower.starts_with("-d")
+        || lower.starts_with("-xx:onerror")
+        || lower.starts_with("-xx:onoutofmemoryerror")
+        || lower.starts_with("-xx:errorfile")
+        || lower.starts_with("-xx:heapdumppath")
+        || lower.starts_with("-xx:flightrecorderoptions")
+        || lower.starts_with("-xx:startflightrecording")
+        || !token.starts_with('-')
+    {
+        return Err(LauncherError::InvalidInput(format!(
+            "Disallowed custom JVM argument: {token}"
+        )));
+    }
+    Ok(())
+}
+
 /// Appends JVM memory and GC flags, defaulting to safe optimal memory (-Xms matching -Xmx)
 /// and dynamically selecting between Generational ZGC (Java 21+, >=4GB or VR) and G1GC (legacy/low-RAM).
 fn append_jvm_memory_args(
@@ -545,12 +632,20 @@ fn append_jvm_memory_args(
     java_args: Option<&str>,
     java_major: Option<i32>,
     is_vr: bool,
-) {
+) -> Result<(), LauncherError> {
     let args = match java_args {
         Some(s) if !s.trim().is_empty() => s.trim().to_string(),
         _ => "-Xms4G -Xmx4G".to_string(),
     };
+    if args.contains(['\0', '\r', '\n']) {
+        return Err(LauncherError::InvalidInput(
+            "Custom JVM arguments must not contain newline or NUL characters".into(),
+        ));
+    }
     let mut tokens: Vec<String> = args.split_whitespace().map(str::to_string).collect();
+    for token in &tokens {
+        validate_user_jvm_token(token)?;
+    }
     if !tokens.iter().any(|t| t.to_ascii_lowercase().starts_with("-xms")) {
         if let Some(xmx) = tokens.iter().find(|t| t.to_ascii_lowercase().starts_with("-xmx")).cloned() {
             tokens.push(format!("-Xms{}", &xmx[4..]));
@@ -575,6 +670,7 @@ fn append_jvm_memory_args(
         tokens.extend(gc_flags);
     }
     command.extend(tokens);
+    Ok(())
 }
 
 /// Deterministic v3 UUID for an offline player, derived from the
@@ -1242,6 +1338,7 @@ mod tests {
             None,
             Some("Player"),
             None,
+            None,
             game_dir,
             None,
             None,
@@ -1262,6 +1359,7 @@ mod tests {
             None,
             Some("Player"),
             None,
+            None,
             game_dir,
             None,
             None,
@@ -1273,6 +1371,77 @@ mod tests {
         )
         .unwrap();
         assert_eq!(*cmd_fs.last().unwrap(), "--fullscreen");
+    }
+
+    #[test]
+    fn disallowed_jvm_args_and_agent_flags_are_rejected() {
+        let data = launch_data();
+        let game_dir = Path::new("/game");
+        let session = session("msa", "tok123");
+
+        let dangerous_flags = [
+            "-XX:OnOutOfMemoryError=calc.exe",
+            "-javaagent:evil.jar",
+            "-agentlib:jdwp",
+            "-agentpath:/tmp/lib.so",
+            "-Dorg.lwjgl.librarypath=/tmp",
+            "-cp malicious.jar",
+            "@argfile",
+            "-XX:OnError=reboot",
+        ];
+
+        for flag in dangerous_flags {
+            let res = MinecraftRunner::build_launch_command(
+                &data,
+                Some(&session),
+                None,
+                Some(flag),
+                game_dir,
+                Some("mc.example.com"),
+                Some(25565),
+            );
+            assert!(
+                res.is_err(),
+                "Flag {flag} must be rejected by JVM argument validator"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_offline_username_and_uuid_are_rejected() {
+        let data = launch_data();
+        let game_dir = Path::new("/game");
+
+        // Disallowed offline usernames
+        for bad_name in ["Steve --gameDir evil", "Player!@#", "A_very_long_player_name_exceeding_16_chars", "-demoname"] {
+            let res = MinecraftRunner::build_launch_command(
+                &data,
+                None,
+                Some(bad_name),
+                None,
+                game_dir,
+                None,
+                None,
+            );
+            assert!(
+                res.is_err(),
+                "Offline username '{bad_name}' must be rejected"
+            );
+        }
+
+        // Malformed UUID
+        let res = MinecraftRunner::build_launch_command_with_display(
+            &data,
+            None,
+            Some("Player"),
+            Some("not-a-valid-uuid"),
+            None,
+            game_dir,
+            None,
+            None,
+            None,
+        );
+        assert!(res.is_err(), "Malformed UUID must be rejected");
     }
 }
 

@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Spara",
+    "saving": "Sparar…",
+    "cancel": "Avbryt",
+    "close": "Stäng",
+    "refresh": "Uppdatera",
+    "copy": "Kopiera",
+    "copied": "Kopierat till urklipp!",
+    "delete": "Radera",
+    "loading": "Laddar…",
+    "apply": "Tillämpa",
+    "edit": "Redigera",
+    "search": "Sök…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Viloläge",
+    "booting": "Startar…",
+    "falling_asleep": "Går ner i viloläge…",
+    "shutting_down": "Stänger av…",
+    "start": "Starta",
+    "stop": "Stoppa",
+    "restart": "Starta om",
+    "wake": "Väck servern",
+    "detecting": "Detekterar…"
+  },
+  "nav": {
+    "global_stats": "Global statistik",
+    "servers": "Servare",
+    "create_server": "Skapa server",
+    "import_server": "Importera server (.zip)",
+    "mods": "Mods",
+    "shaders": "Shaders",
+    "files": "Filer",
+    "console": "Konsol",
+    "players": "Spelare",
+    "backups": "Säkerhetskopior",
+    "world": "Värld",
+    "settings": "Inställningar",
+    "disk_storage": "Disklagring",
+    "server_manager": "Serverhanterare"
+  },
+  "stats": {
+    "title": "Systemtelemetri & Mätvärden",
+    "subtitle": "Real-tids CPU, Värd-RAM, Process-RSS och Diskaktivitet",
+    "host_ram": "Värd-OS RAM",
+    "process_rss": "Java-process RSS",
+    "cpu_usage": "CPU-belastning",
+    "disk_allocation": "NVMe-lagringstilldelning",
+    "uptime": "Systemets drifttid",
+    "active_instances": "Aktiva instanser",
+    "sleeping_instances": "Vilande instanser"
+  },
+  "instances": {
+    "no_servers": "Inga servrar ännu — klicka på Skapa server.",
+    "create_title": "Skapa Minecraft-server",
+    "name_label": "Instansnamn",
+    "version_label": "Minecraft-version",
+    "loader_label": "Mod-laddare",
+    "port_label": "Port",
+    "memory_label": "Allokerat minne (GB)",
+    "start_server": "Starta server",
+    "wake_server": "Väck server",
+    "stop_server": "Stoppa server",
+    "restart_server": "Starta om server",
+    "players_online": "{count} online",
+    "sleeps_in": "Går i viloläge om {time}",
+    "idle_wakes": "Avstängning vid inaktivitet — vaknar när en spelare ansluter"
+  },
+  "mods": {
+    "title": "Installerade moddar",
+    "count": "Installerade moddar ({count})",
+    "search_placeholder": "Sök bland installerade moddar…",
+    "loader_filter": "Loader-filter",
+    "all_loaders": "Alla loaders",
+    "active_loader": "Aktiv loader ({loader})",
+    "export_mrpack": "Exportera .mrpack",
+    "copy_mrpack_url": "Kopiera .mrpack-URL",
+    "copy_mrpack_tooltip": "Kopiera offentlig nedladdningslänk för .mrpack till spelare som inte använder Zircon",
+    "add_mod": "Lägg till modd",
+    "install_update": "Uppdatera",
+    "no_mods": "Inga moddar har installerats ännu."
+  },
+  "console": {
+    "title": "Serverkonsol & terminal",
+    "placeholder": "Skicka ett kommando (t.ex. /say Hello, /op Player)...",
+    "send": "Skicka",
+    "clear": "Rensa"
+  },
+  "players": {
+    "title": "Spelarhantering",
+    "online": "Online spelare",
+    "whitelist": "Vitlista",
+    "ops": "Operatörer",
+    "bans": "Bannlysta spelare",
+    "kick": "Sparka",
+    "ban": "Bannlys",
+    "op": "Gör till op",
+    "deop": "Ta bort op"
+  },
+  "backups": {
+    "title": "Världs- & instanssnappskott",
+    "create": "Skapa säkerhetskopia",
+    "restore": "Återställ",
+    "download": "Ladda ner",
+    "delete": "Radera"
+  },
+  "security": {
+    "online_mode": "Online-läge (Mojang-autentisering)",
+    "online_mode_warning": "Varning: Om du inaktiverar online-läge tillåts offline-/overifierade spelare med förfalskade UUID:n att ansluta.",
+    "whitelist_enforced": "Tvinga vitlista"
+  }
+}

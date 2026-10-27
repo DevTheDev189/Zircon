@@ -4,7 +4,7 @@
     :class="viewMode === 'split' ? 'overflow-hidden' : 'overflow-y-auto'"
   >
     <!-- Master Header & Control Bar -->
-    <div class="relative z-50 z-card bg-[#0e1622]/90 border border-slate-800/80 px-4 py-3 flex items-center justify-between gap-3 shrink-0 flex-wrap sm:flex-nowrap">
+    <div v-if="!isStudioFocused" class="relative z-50 z-card bg-[#0e1622]/90 border border-slate-800/80 px-4 py-3 flex items-center justify-between gap-3 shrink-0 flex-wrap sm:flex-nowrap transition-all duration-300">
       <!-- Left: Title, Count, Search, Loader Filter Pills -->
       <div class="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
         <div class="flex items-center gap-2 mr-1">
@@ -229,7 +229,7 @@
             v-for="instance in filteredInstances"
             :key="instance.id"
             :instance="instance"
-            :selected="selected?.id === instance.id"
+            :selected="viewMode === 'split' && selected?.id === instance.id"
             :banner-url="instanceBanner(instance)"
             :icon-url="instanceArtworks[instance.id]?.iconDataUrl"
             :active-dropdown="activeCardDropdownId === instance.id"
@@ -242,7 +242,6 @@
             @clone="cloneInstanceCard"
             @open-folder="openInstanceFolderCard"
             @export-mrpack="exportMrpackCard"
-            @install-cinematic="installCinematicPresetCard"
             @delete="deleteInstanceById"
           />
         </div>
@@ -394,6 +393,17 @@
                 <span class="bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-2.5 py-0.5 rounded-lg text-[11px] capitalize">
                   {{ selected.modLoader.type }} {{ selected.modLoader.version }}
                 </span>
+                <button
+                  type="button"
+                  class="text-[11px] font-sans px-2 py-0.5 rounded-lg border border-slate-700/80 hover:border-cyan-500/50 bg-[#070b10]/60 hover:bg-cyan-500/10 text-slate-300 hover:text-cyan-300 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Change Minecraft or mod loader version"
+                  @click="openEditInstanceModal"
+                >
+                  <svg class="w-3 h-3 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>Edit Version</span>
+                </button>
                 <span class="text-slate-400 text-[11px] ml-1">
                   {{ mods.length }} mod{{ mods.length === 1 ? '' : 's' }}
                 </span>
@@ -546,6 +556,15 @@
                       {{ $t('offline.actions_manage_versioning') }}
                     </div>
 
+                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="openEditInstanceModal">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">Edit Version &amp; Loader</span>
+                    </button>
+
                     <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="promptCloneInstance">
                       <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -562,6 +581,15 @@
                         </svg>
                       </div>
                       <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.time_machine') }}</span>
+                    </button>
+
+                                        <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="showKeybindModal = true; showActionsDropdown = false;">
+                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                      </div>
+                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">Keybinds &amp; Sync</span>
                     </button>
 
                     <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="showAuditModal = true; showActionsDropdown = false;">
@@ -635,14 +663,6 @@
                       <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.export_mrpack') }}</span>
                     </button>
 
-                    <button class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-cyan-500/15 border border-transparent hover:border-cyan-500/30 flex items-center gap-2.5 transition-all duration-150 group cursor-pointer" @click="exportDedicatedServer">
-                      <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:bg-cyan-500/20 group-hover:scale-105 transition-all shrink-0">
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                        </svg>
-                      </div>
-                      <span class="text-xs text-slate-200 group-hover:text-white font-medium">{{ $t('offline.export_server_zip') }}</span>
-                    </button>
                   </div>
                 </transition>
               </div>
@@ -1009,12 +1029,39 @@
                 <button class="z-btn-ghost px-4 text-xs font-bold shrink-0" :disabled="modSearchBusy" @click="searchMods">{{ $t('common.search') }}</button>
               </div>
 
-              <div class="flex items-center justify-between mt-2 text-xs text-slate-400">
-                <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input type="checkbox" v-model="modSearchAllVersions" class="zircon-check" @change="searchMods" />
-                  <span>{{ $t('offline.show_all_versions') }}</span>
-                </label>
-                <span v-if="modSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5">
+              <div class="flex items-center justify-between mt-2.5 text-xs flex-wrap gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div
+                    v-if="selected?.gameVersion && !modSearchAllVersions"
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-mono font-semibold shadow-[0_0_8px_rgba(71,210,201,0.15)]"
+                    :title="`Filtered to Minecraft ${selected.gameVersion} (${selected.modLoader?.type || 'vanilla'})`"
+                  >
+                    <svg class="w-3 h-3 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    <span>Locked to Instance: {{ selected.gameVersion }} ({{ selected.modLoader?.type || 'vanilla' }})</span>
+                  </div>
+
+                  <div
+                    v-else-if="modSearchAllVersions"
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono font-semibold"
+                    title="Cross-version search active. Results may not match current instance version."
+                  >
+                    <svg class="w-3 h-3 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                    </svg>
+                    <span>Unlocked: All Minecraft Versions</span>
+                  </div>
+
+                  <label class="flex items-center gap-1.5 cursor-pointer select-none text-slate-400 hover:text-white transition-colors">
+                    <input type="checkbox" v-model="modSearchAllVersions" class="zircon-check" @change="searchMods" />
+                    <span :class="modSearchAllVersions ? 'text-amber-300 font-semibold' : ''">{{ $t('offline.show_all_versions') }}</span>
+                  </label>
+                </div>
+
+                <span v-if="modSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5 text-xs">
                   <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
                   {{ $t('offline.searching') }}
                 </span>
@@ -1807,8 +1854,8 @@
       :modal="curseforgeModal"
       @close="closeCurseforgeModal"
       @trigger-download="triggerCurseforgeDownload"
-      @drop="onCurseforgeDrop"
-      @browse="browseCurseforgePack"
+      @drop="onCurseforgeModalDrop"
+      @browse="browseCurseforgeModalFile"
     />
 
     <!-- ================= MODAL: NEW INSTANCE ================= -->
@@ -1860,10 +1907,10 @@
       @update:clone-copy-mods="cloneCopyMods = $event"
       @update-loader-versions="updateLoaderVersions"
       @create="createInstance"
-      @toggle-import-mode="importMode = $event"
-      @browse-archive="browseImportArchive"
+      @toggle-import-mode="toggleImportMode"
+      @browse-archive="browseLocalMrpack"
       @drop-archive="onImportDrop"
-      @install-archive="installImportArchive"
+      @install-archive="installLocalMrpack"
       @search-modpacks="searchModpacks"
       @install-modpack="installModpack"
       @clone-source-change="onCloneSourceChange"
@@ -2011,9 +2058,21 @@
     <!-- SHARE SETUP MODAL -->
     <ShareSetupModal
       :open="showShareModal"
+      :instance="selected"
       :instance-id="selected?.id"
       :instance-name="selected?.name"
+      :mod-count="mods.length"
       @close="showShareModal = false"
+      @edit-version="openEditInstanceModal"
+    />
+
+    <!-- EDIT INSTANCE MODAL -->
+    <EditInstanceModal
+      :open="showEditInstanceModal"
+      :instance="selected"
+      :mc-versions="mcVersions"
+      @close="showEditInstanceModal = false"
+      @saved="onInstanceUpdated"
     />
 
     <!-- IMPORT SETUP MODAL -->
@@ -2061,6 +2120,13 @@
       @imported="onInstancesMigrated"
     />
 
+        <!-- GLOBAL KEYBIND LIBRARY & CROSS-INSTANCE SYNC MODAL -->
+    <KeybindManagerModal
+      :open="showKeybindModal"
+      :target-instance="selected"
+      @close="showKeybindModal = false"
+    />
+
     <!-- COUCH CO-OP SPLIT-SCREEN MODAL -->
     <CouchCoopModal
       :is-open="showCouchCoopModal"
@@ -2079,22 +2145,26 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import DependencyPromptModal from '../components/DependencyPromptModal.vue';
-import ServerResourcePacksModal from '../components/ServerResourcePacksModal.vue';
-import JoinByCodeModal from '../components/JoinByCodeModal.vue';
-import ShareSetupModal from '../components/ShareSetupModal.vue';
-import ImportSetupModal from '../components/ImportSetupModal.vue';
-import SnapshotsModal from '../components/SnapshotsModal.vue';
-import AuditRepairModal from '../components/AuditRepairModal.vue';
-import LauncherMigrationModal from '../components/LauncherMigrationModal.vue';
-import CouchCoopModal from '../components/CouchCoopModal.vue';
-import WorldSeedRadarModal from '../components/WorldSeedRadarModal.vue';
 import InstanceCard from '../components/offline/InstanceCard.vue';
-import PackSyncModal from '../components/offline/PackSyncModal.vue';
 import InstanceCreationModal from '../components/offline/InstanceCreationModal.vue';
-import WorldManagerModal from '../components/offline/WorldManagerModal.vue';
+import EditInstanceModal from '../components/offline/EditInstanceModal.vue';
+
+// Lazy-loaded secondary modals
+const DependencyPromptModal = defineAsyncComponent(() => import('../components/DependencyPromptModal.vue'));
+const ServerResourcePacksModal = defineAsyncComponent(() => import('../components/ServerResourcePacksModal.vue'));
+const JoinByCodeModal = defineAsyncComponent(() => import('../components/JoinByCodeModal.vue'));
+const ShareSetupModal = defineAsyncComponent(() => import('../components/ShareSetupModal.vue'));
+const ImportSetupModal = defineAsyncComponent(() => import('../components/ImportSetupModal.vue'));
+const SnapshotsModal = defineAsyncComponent(() => import('../components/SnapshotsModal.vue'));
+const AuditRepairModal = defineAsyncComponent(() => import('../components/AuditRepairModal.vue'));
+const LauncherMigrationModal = defineAsyncComponent(() => import('../components/LauncherMigrationModal.vue'));
+const CouchCoopModal = defineAsyncComponent(() => import('../components/CouchCoopModal.vue'));
+const KeybindManagerModal = defineAsyncComponent(() => import('../components/KeybindManagerModal.vue'));
+const WorldSeedRadarModal = defineAsyncComponent(() => import('../components/WorldSeedRadarModal.vue'));
+const PackSyncModal = defineAsyncComponent(() => import('../components/offline/PackSyncModal.vue'));
+const WorldManagerModal = defineAsyncComponent(() => import('../components/offline/WorldManagerModal.vue'));
 import {
   api,
   fmtBytes,
@@ -2108,6 +2178,7 @@ import {
   saveFile,
   onModpackProgress,
 } from '../lib/api';
+import { askConfirm } from '../lib/confirm';
 
 const emit = defineEmits(['launching', 'stopped', 'error']);
 
@@ -2250,36 +2321,16 @@ async function exportMrpackCard(instance) {
   await exportMrpack();
 }
 
-async function installCinematicPresetCard(instance) {
-  activeCardDropdownId.value = null;
-  window.dispatchEvent(
-    new CustomEvent('zircon-status', {
-      detail: `Installing Cinematic Graphics preset (Sodium + Iris + Shaders) for ${instance.name}…`,
-    })
-  );
-  try {
-    const pack = await api.applyCinematicGraphicsPreset(instance.id);
-    window.dispatchEvent(
-      new CustomEvent('zircon-status', {
-        detail: `Cinematic Graphics enabled with ${pack}!`,
-      })
-    );
-    if (selected.value?.id === instance.id) {
-      await Promise.all([loadMods(), loadPacks()]);
-    }
-  } catch (err) {
-    window.dispatchEvent(
-      new CustomEvent('zircon-status', {
-        detail: `Failed to install Cinematic Preset: ${err}`,
-      })
-    );
-  }
-}
-
 async function deleteInstanceById(instance) {
   if (!instance) return;
   activeCardDropdownId.value = null;
-  if (!window.confirm(`Delete '${instance.name}' and all of its files?`)) return;
+  const ok = await askConfirm({
+    title: 'Delete Instance',
+    message: `Are you sure you want to delete '${instance.name}' and all of its files? This action cannot be undone.`,
+    confirmText: 'Delete Instance',
+    isDanger: true,
+  });
+  if (!ok) return;
   await api.deleteOfflineInstance(instance.id);
   if (selected.value?.id === instance.id) {
     selected.value = null;
@@ -2365,6 +2416,23 @@ const showSnapshotsModal = ref(false);
 const showAuditModal = ref(false);
 const showMigrationModal = ref(false);
 const showCouchCoopModal = ref(false);
+const showKeybindModal = ref(false);
+const showEditInstanceModal = ref(false);
+
+function openEditInstanceModal() {
+  showActionsDropdown.value = false;
+  showEditInstanceModal.value = true;
+}
+
+async function onInstanceUpdated(updated) {
+  await loadInstances();
+  if (updated && updated.id) {
+    const match = instances.value.find((i) => i.id === updated.id);
+    if (match) {
+      await selectInstance(match);
+    }
+  }
+}
 
 function closeImportModal() {
   showImportModal.value = false;
@@ -2756,7 +2824,13 @@ async function playOffline() {
 
 async function deleteInstance() {
   if (!selected.value) return;
-  if (!window.confirm(`Delete '${selected.value.name}' and all of its files?`)) return;
+  const ok = await askConfirm({
+    title: 'Delete Instance',
+    message: `Are you sure you want to delete '${selected.value.name}' and all of its files? This action cannot be undone.`,
+    confirmText: 'Delete Instance',
+    isDanger: true,
+  });
+  if (!ok) return;
   await api.deleteOfflineInstance(selected.value.id);
   selected.value = null;
   await loadInstances();
@@ -2836,7 +2910,13 @@ async function bulkDeleteSelected() {
   if (targetFiles.length === 0) return;
   const count = targetFiles.length;
   const label = count === 1 ? 'mod' : 'mods';
-  if (!window.confirm(`Permanently remove ${count} selected ${label}?`)) return;
+  const ok = await askConfirm({
+    title: 'Bulk Delete Mods',
+    message: `Are you sure you want to permanently remove ${count} selected ${label}?`,
+    confirmText: `Delete ${count} ${label}`,
+    isDanger: true,
+  });
+  if (!ok) return;
   try {
     await Promise.all(targetFiles.map((target) => api.deleteOfflineMod(selected.value.id, target)));
     selectedMods.value = {};
@@ -3588,6 +3668,11 @@ function toggleImportMode() {
   }
 }
 
+const onCurseforgeDrop = onCurseforgeModalDrop;
+const browseCurseforgePack = browseCurseforgeModalFile;
+const browseImportArchive = browseLocalMrpack;
+const installImportArchive = installLocalMrpack;
+
 async function onImportDrop(e) {
   const files = e.dataTransfer?.files;
   if (!files || !files.length) return;
@@ -3853,9 +3938,13 @@ async function loadBackups() {
 
 async function restoreBackup(backupFilename) {
   if (!selected.value) return;
-  if (!confirm(`Are you sure you want to restore "${backupFilename}"? Any unsaved world progress will be overwritten.`)) {
-    return;
-  }
+  const ok = await askConfirm({
+    title: 'Restore World Backup',
+    message: `Are you sure you want to restore "${backupFilename}"? Any unsaved world progress will be overwritten.`,
+    confirmText: 'Restore Backup',
+    isDanger: true,
+  });
+  if (!ok) return;
   try {
     await api.restoreInstanceWorldBackup(selected.value.id, backupFilename);
     await loadWorlds();
@@ -4049,7 +4138,7 @@ onMounted(async () => {
         const paths = event.payload.paths;
         if (!paths || !paths.length) return;
 
-        // 1. Detect .mrpack modpacks dropped anywhere onto the window
+        // 1. Detect .mrpack or CurseForge modpacks dropped anywhere onto the window
         const mrpackPath = paths.find(
           (p) => p.toLowerCase().endsWith('.mrpack')
         );
@@ -4067,7 +4156,18 @@ onMounted(async () => {
           for (const path of paths) {
             if (path.endsWith('.jar')) {
               await api.importOfflineModFile(selected.value.id, path);
-            } else if (path.endsWith('.zip')) {
+            } else if (path.toLowerCase().endsWith('.zip')) {
+              // Check if the zip is actually a CurseForge or Modrinth modpack archive
+              try {
+                const inspect = await api.inspectLocalModpack(path);
+                if (inspect && (inspect.archiveType === 'curseforge' || inspect.archiveType === 'modrinth')) {
+                  droppedMrpackPath.value = path;
+                  showImportModal.value = true;
+                  return;
+                }
+              } catch (_) {
+                // Not a modpack archive, treat as regular resource pack
+              }
               await api.importInstancePack(selectedDir.value, 'resource', path);
             }
           }

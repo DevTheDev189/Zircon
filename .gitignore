@@ -94,6 +94,42 @@ import_desktop_export.bat
 skills-lock.json
 .wrangler/
 
-
-
-
+# ---------- Development Plans, Audits, Bundles & Temp Files ----------
+/*_PLAN.md
+/*_AUDIT*
+/LOC_REPORT.md
+/loc_report.csv
+/*_REPORT.md
+/MULTI_INSTANCE_ROUTING_AND_BOM_ISSUE.md
+/ROADMAP_*.md
+/ZIRCONSMP_PRODUCTION_DEPLOYMENT_GUIDE.md
+/ZIRCON_UNIMPLEMENTED_FEATURES_ROADMAP.md
+/localization_roadmap_server_and_website.md
+/modularization_implementation_plan.md
+/universal_launcher_migration_plan.md
+/worldgen_persistent_streaming_plan.md
+/GEMINI_AUDIT_SYSTEM_PROMPT.md
+/*bundle*.txt
+/security_audit_bundles/
+/EULA.md
+/Caddyfile
+/Dockerfile.server
+/docker-compose.server.yml
+/.github/workflows/docker.yml
+/distribution/
+/templates/
+/docs/*PLAN*.md
+/docs/*AUDIT*.md
+/docs/*DEPLOYMENT*.md
+/docs/*ARCHITECTURE*.md
+/assets/*.png
+/assets/*.jpg
+/At_Launcher.svg
+/MC Reference.png
+/Prism_Launcher_logo.svg
+/fabric.mod.json
+/fabric.svg
+/forge.svg
+/neoforge.png
+/neoforge.svg
+/quilt.svg

@@ -16,6 +16,7 @@ const MOJANG_MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/versio
 const FABRIC_META_URL: &str = "https://meta.fabricmc.net/v2";
 const QUILT_META_URL: &str = "https://meta.quiltmc.org/v3";
 const FORGE_PROMOTIONS_URL: &str = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json";
+const FORGE_MAVEN_METADATA_URL: &str = "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml";
 const NEOFORGE_MAVEN_METADATA_URL: &str = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
 
 const CACHE_TTL: Duration = Duration::from_secs(600); // 10 minutes cache
@@ -64,6 +65,7 @@ pub struct VersionService {
     client: reqwest::Client,
     mc_versions_cache: Arc<RwLock<CachedData<Vec<MinecraftVersionInfo>>>>,
     forge_promos_cache: Arc<RwLock<CachedData<serde_json::Value>>>,
+    forge_maven_versions_cache: Arc<RwLock<CachedData<Vec<String>>>>,
     neoforge_versions_cache: Arc<RwLock<CachedData<Vec<String>>>>,
 }
 
@@ -82,6 +84,7 @@ impl VersionService {
                 .unwrap_or_default(),
             mc_versions_cache: Arc::new(RwLock::new(CachedData::default())),
             forge_promos_cache: Arc::new(RwLock::new(CachedData::default())),
+            forge_maven_versions_cache: Arc::new(RwLock::new(CachedData::default())),
             neoforge_versions_cache: Arc::new(RwLock::new(CachedData::default())),
         }
     }
@@ -169,7 +172,8 @@ impl VersionService {
     }
 
     async fn get_fabric_loader_versions(&self, mc_version: &str) -> Result<LoaderVersionResult, String> {
-        let url = format!("{FABRIC_META_URL}/versions/loader/{mc_version}");
+        let clean_mc = validate_mc_version_segment(mc_version)?;
+        let url = format!("{FABRIC_META_URL}/versions/loader/{clean_mc}");
         if !ssrf::is_safe_cdn_url(&url) {
             return Err("Fabric meta URL failed SSRF check".to_string());
         }
@@ -211,7 +215,8 @@ impl VersionService {
     }
 
     async fn get_quilt_loader_versions(&self, mc_version: &str) -> Result<LoaderVersionResult, String> {
-        let url = format!("{QUILT_META_URL}/versions/loader/{mc_version}");
+        let clean_mc = validate_mc_version_segment(mc_version)?;
+        let url = format!("{QUILT_META_URL}/versions/loader/{clean_mc}");
         if !ssrf::is_safe_cdn_url(&url) {
             return Err("Quilt meta URL failed SSRF check".to_string());
         }
@@ -253,8 +258,8 @@ impl VersionService {
     }
 
     async fn get_forge_loader_versions(&self, mc_version: &str) -> Result<LoaderVersionResult, String> {
-        let promos = self.fetch_forge_promotions().await?;
-        let promos_obj = promos.get("promos").and_then(|p| p.as_object());
+        let promos = self.fetch_forge_promotions().await.ok();
+        let promos_obj = promos.as_ref().and_then(|p| p.get("promos")).and_then(|p| p.as_object());
 
         let rec_key = format!("{mc_version}-recommended");
         let lat_key = format!("{mc_version}-latest");
@@ -265,21 +270,95 @@ impl VersionService {
             .map(|s| s.to_string());
 
         let mut versions = Vec::new();
-        if let Some(rec) = &recommended {
-            versions.push(rec.clone());
+
+        // 1. Fetch full list of versions from Forge Maven metadata
+        if let Ok(all_maven_versions) = self.fetch_forge_maven_versions().await {
+            let prefix = format!("{mc_version}-");
+            for v in all_maven_versions {
+                if let Some(stripped) = v.strip_prefix(&prefix) {
+                    if !stripped.is_empty() && !versions.contains(&stripped.to_string()) {
+                        versions.push(stripped.to_string());
+                    }
+                }
+            }
+            // Sort versions descending (newest first)
+            versions.sort_by(|a, b| compare_versions(b, a));
         }
-        if let Some(lat) = promos_obj.and_then(|p| p.get(&lat_key)).and_then(|v| v.as_str()) {
-            if !versions.contains(&lat.to_string()) {
-                versions.push(lat.to_string());
+
+        // 2. Fallback to promotions if maven metadata failed or was empty
+        if versions.is_empty() {
+            if let Some(ref rec) = recommended {
+                versions.push(rec.clone());
+            }
+            if let Some(lat) = promos_obj.and_then(|p| p.get(&lat_key)).and_then(|v| v.as_str()) {
+                if !versions.contains(&lat.to_string()) {
+                    versions.push(lat.to_string());
+                }
+            }
+        } else if let Some(ref rec) = recommended {
+            // Ensure recommended version is in the list
+            if !versions.contains(rec) {
+                versions.insert(0, rec.clone());
             }
         }
+
+        let best_rec = recommended.clone().or_else(|| versions.first().cloned());
 
         Ok(LoaderVersionResult {
             loader: "forge".to_string(),
             mc_version: mc_version.to_string(),
-            recommended: recommended.clone().or_else(|| versions.first().cloned()),
+            recommended: best_rec,
             versions,
         })
+    }
+
+    async fn fetch_forge_maven_versions(&self) -> Result<Vec<String>, String> {
+        {
+            let cache = self.forge_maven_versions_cache.read().await;
+            if let Some(cached) = cache.get() {
+                return Ok(cached);
+            }
+        }
+
+        if !ssrf::is_safe_cdn_url(FORGE_MAVEN_METADATA_URL) {
+            return Err("Forge Maven metadata URL failed SSRF check".to_string());
+        }
+
+        let resp = self
+            .client
+            .get(FORGE_MAVEN_METADATA_URL)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch Forge Maven metadata: {e}"))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("Forge Maven metadata returned HTTP {}", resp.status()));
+        }
+
+        let xml = resp
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read Forge Maven XML: {e}"))?;
+
+        let mut versions = Vec::new();
+        for line in xml.lines() {
+            let trimmed = line.trim();
+            if let Some(rest) = trimmed.strip_prefix("<version>") {
+                if let Some(ver) = rest.strip_suffix("</version>") {
+                    let v = ver.trim();
+                    if !v.is_empty() {
+                        versions.push(v.to_string());
+                    }
+                }
+            }
+        }
+
+        {
+            let mut cache = self.forge_maven_versions_cache.write().await;
+            cache.set(versions.clone());
+        }
+
+        Ok(versions)
     }
 
     async fn fetch_forge_promotions(&self) -> Result<serde_json::Value, String> {
@@ -451,6 +530,19 @@ fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
         }
     }
     a.len().cmp(&b.len())
+}
+
+fn validate_mc_version_segment(mc_version: &str) -> Result<&str, String> {
+    let clean = mc_version.trim();
+    if clean.is_empty()
+        || clean.contains("..")
+        || !clean
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '+'))
+    {
+        return Err(format!("Invalid Minecraft version identifier: {mc_version:?}"));
+    }
+    Ok(clean)
 }
 
 #[cfg(test)]

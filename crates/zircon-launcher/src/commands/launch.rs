@@ -98,19 +98,37 @@ pub(crate) async fn run_online_flow(
                     *session_guard = Some(fresh.clone());
                     fresh
                 }
-                Err(_) => {
-                    emit_status(app, "Session expired — please sign in again.");
-                    return Err(LauncherError::Auth(
-                        "Session expired; sign in again from the launcher.".to_string(),
-                    ));
+                Err(err) => {
+                    if !session.access_token.trim().is_empty() && session.access_token != "0" {
+                        tracing::warn!("Session refresh failed ({err}), using cached credentials for offline/local launch");
+                        session.clone()
+                    } else {
+                        emit_status(app, "Session expired — please sign in again.");
+                        return Err(LauncherError::Auth(
+                            "Session expired; sign in again from the launcher.".to_string(),
+                        ));
+                    }
                 }
             }
         }
         None => {
-            emit_status(app, "Sign in required before launching.");
-            return Err(LauncherError::Auth(
-                "Not signed in — log in first.".to_string(),
-            ));
+            let accounts = state.accounts.load_accounts(None);
+            if let Some(ref active_uuid) = accounts.active_uuid {
+                if let Some(saved) = state.accounts.load_session_for_uuid(active_uuid) {
+                    *session_guard = Some(saved.clone());
+                    saved
+                } else {
+                    emit_status(app, "Sign in required before launching.");
+                    return Err(LauncherError::Auth(
+                        "Not signed in — log in first.".to_string(),
+                    ));
+                }
+            } else {
+                emit_status(app, "Sign in required before launching.");
+                return Err(LauncherError::Auth(
+                    "Not signed in — log in first.".to_string(),
+                ));
+            }
         }
     };
     drop(session_guard);
@@ -1103,13 +1121,22 @@ pub(crate) async fn run_offline_flow(
     let is_vr = crate::launch::java::is_vr_instance(&game_dir, Some(&launch_data.version_name));
     let java_args = override_heap_with_context(&instance.java_args, memory_gb, custom_jvm.as_deref(), java_major, is_vr);
 
-    let player_name = {
+    let (player_name, player_uuid): (String, Option<String>) = {
         let session = state.session.lock().await;
-        session
-            .as_ref()
-            .map(|s| s.username.clone())
-            .filter(|u| !u.trim().is_empty())
-            .unwrap_or_else(|| "Player".to_string())
+        if let Some(s) = session.as_ref() {
+            (s.username.clone(), Some(s.uuid.clone()))
+        } else {
+            let accounts = state.accounts.load_accounts(None);
+            if let Some(ref active_uuid) = accounts.active_uuid {
+                if let Some(profile) = accounts.accounts.iter().find(|a| &a.uuid == active_uuid) {
+                    (profile.username.clone(), Some(profile.uuid.clone()))
+                } else {
+                    ("Player".to_string(), None)
+                }
+            } else {
+                ("Player".to_string(), None)
+            }
+        }
     };
 
     emit_status(
@@ -1122,6 +1149,7 @@ pub(crate) async fn run_offline_flow(
         .launch_offline_with_options(
             &launch_data,
             &player_name,
+            player_uuid.as_deref(),
             &java_args,
             &game_dir,
             Some(display_opts),

@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "ذخیره",
+    "saving": "در حال ذخیره…",
+    "cancel": "لغو",
+    "close": "بستن",
+    "refresh": "بارگذاری مجدد",
+    "copy": "کپی",
+    "copied": "در کلیپ‌بورد کپی شد!",
+    "delete": "حذف",
+    "loading": "در حال بارگذاری…",
+    "apply": "اعمال",
+    "edit": "ویرایش",
+    "search": "جستجو…",
+    "online": "آنلاین",
+    "offline": "آفلاین",
+    "sleeping": "در حالت خواب",
+    "booting": "در حال بوت…",
+    "falling_asleep": "در حال رفتن به حالت خواب…",
+    "shutting_down": "در حال خاموش شدن…",
+    "start": "شروع",
+    "stop": "توقف",
+    "restart": "راه‌اندازی مجدد",
+    "wake": "بیدار کردن سرور",
+    "detecting": "در حال شناسایی…"
+  },
+  "nav": {
+    "global_stats": "آمار کلی",
+    "servers": "سرورها",
+    "create_server": "ایجاد سرور",
+    "import_server": "وارد کردن سرور (.zip)",
+    "mods": "مدها",
+    "shaders": "شیدرها",
+    "files": "فایل‌ها",
+    "console": "کنسول",
+    "players": "بازیکنان",
+    "backups": "پشتیبان‌گیری‌ها",
+    "world": "جهان",
+    "settings": "تنظیمات",
+    "disk_storage": "فضای ذخیره‌سازی دیسک",
+    "server_manager": "مدیریت سرور"
+  },
+  "stats": {
+    "title": "تله‌متری و معیارهای سیستم",
+    "subtitle": "فعالیت لحظه‌ای CPU، RAM میزبان، RSS پروسه و دیسک",
+    "host_ram": "RAM سیستم‌عامل میزبان",
+    "process_rss": "RSS پروسه جاوا",
+    "cpu_usage": "بار پردازنده (CPU)",
+    "disk_allocation": "تخصیص فضای NVMe",
+    "uptime": "زمان فعالیت سیستم",
+    "active_instances": "نمونه‌های در حال اجرا",
+    "sleeping_instances": "نمونه‌های در حالت خواب"
+  },
+  "instances": {
+    "no_servers": "هنوز سروری وجود ندارد — روی «ایجاد سرور» کلیک کنید.",
+    "create_title": "ایجاد سرور ماینکرفت",
+    "name_label": "نام نمونه (Instance)",
+    "version_label": "نسخه ماینکرفت",
+    "loader_label": "لودر ماد",
+    "port_label": "پورت",
+    "memory_label": "حافظه اختصاص‌داده‌شده (گیگابایت)",
+    "start_server": "راه‌اندازی سرور",
+    "wake_server": "بیدار کردن سرور",
+    "stop_server": "توقف سرور",
+    "restart_server": "راه‌اندازی مجدد سرور",
+    "players_online": "{count} بازیکن آنلاین",
+    "sleeps_in": "خواب در {time}",
+    "idle_wakes": "خاموشی خودکار در حالت بیکاری — با پیوستن بازیکن، سرور بیدار می‌شود"
+  },
+  "mods": {
+    "title": "مادهای نصب‌شده",
+    "count": "مادهای نصب‌شده ({count})",
+    "search_placeholder": "جستجوی مادهای نصب‌شده…",
+    "loader_filter": "فیلتر لودر",
+    "all_loaders": "همه لودرها",
+    "active_loader": "لودر فعال ({loader})",
+    "export_mrpack": "خروجی .mrpack",
+    "copy_mrpack_url": "کپی لینک .mrpack",
+    "copy_mrpack_tooltip": "کپی لینک دانلود عمومی .mrpack برای بازیکنان غیر Zircon",
+    "add_mod": "افزودن ماد",
+    "install_update": "به‌روزرسانی",
+    "no_mods": "هنوز مادی نصب نشده است."
+  },
+  "console": {
+    "title": "کنسول و ترمینال سرور",
+    "placeholder": "ارسال دستور (مثلاً /say Hello، /op Player)...",
+    "send": "ارسال",
+    "clear": "پاک کردن"
+  },
+  "players": {
+    "title": "مدیریت بازیکنان",
+    "online": "بازیکنان آنلاین",
+    "whitelist": "لیست سفید",
+    "ops": "اپراتورها",
+    "bans": "بازیکنان بن‌شده",
+    "kick": "اخراج",
+    "ban": "بن کردن",
+    "op": "تبدیل به اپراتور",
+    "deop": "حذف دسترسی اپراتور"
+  },
+  "backups": {
+    "title": "اسنپ‌شات‌های جهان و نمونه",
+    "create": "ایجاد پشتیبان",
+    "restore": "بازیابی",
+    "download": "دانلود",
+    "delete": "حذف"
+  },
+  "security": {
+    "online_mode": "حالت آنلاین (احراز هویت Mojang)",
+    "online_mode_warning": "هشدار: غیرفعال کردن حالت آنلاین به بازیکنان آفلاین/تأییدنشده با شناسه‌های جعلی اجازه اتصال می‌دهد.",
+    "whitelist_enforced": "اجرای لیست سفید"
+  }
+}

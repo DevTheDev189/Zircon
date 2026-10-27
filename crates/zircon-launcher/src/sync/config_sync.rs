@@ -15,6 +15,7 @@ use tracing::{info, warn};
 
 use zircon_core::model::BillOfMaterials;
 use zircon_core::security::path_validator::validate_config_relative_path;
+use zircon_core::security::ssrf;
 
 use super::mod_sync::HashVerifier;
 
@@ -54,6 +55,7 @@ impl ConfigSyncEngine {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(15))
+            .timeout(std::time::Duration::from_secs(60))
             .redirect(reqwest::redirect::Policy::limited(10))
             .build()
             .expect("failed to build reqwest client for config sync");
@@ -114,9 +116,14 @@ impl ConfigSyncEngine {
             }
 
             // Needs download
-            let download_url = entry.download_url.clone().unwrap_or_else(|| {
-                format!("{base}/files/configs/{}", sanitized_rel)
-            });
+            let download_url = match entry.download_url.as_deref() {
+                Some(u) if ssrf::is_safe_cdn_url(u) => u.to_string(),
+                Some(u) => {
+                    warn!("Ignoring unsafe config download_url '{u}'; falling back to server base");
+                    format!("{base}/files/configs/{sanitized_rel}")
+                }
+                None => format!("{base}/files/configs/{sanitized_rel}"),
+            };
 
             emit_status(
                 listener,
@@ -165,6 +172,12 @@ impl ConfigSyncEngine {
         dest: &Path,
         expected_sha1: &str,
     ) -> Result<(), String> {
+        const MAX_CONFIG_BYTES: u64 = 10 * 1024 * 1024; // 10 MiB max per config file
+        let expected_clean = expected_sha1.trim();
+        if expected_clean.len() != 40 || !expected_clean.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err("Invalid or empty expected SHA-1 in BOM config entry".to_string());
+        }
+
         let resp = self
             .http
             .get(url)
@@ -182,9 +195,16 @@ impl ConfigSyncEngine {
 
         let mut stream = resp.bytes_stream();
         let mut hasher = Sha1::new();
+        let mut total_written: u64 = 0;
 
         while let Some(chunk) = stream.next().await {
             let data = chunk.map_err(|e| format!("Download stream error: {e}"))?;
+            total_written += data.len() as u64;
+            if total_written > MAX_CONFIG_BYTES {
+                return Err(format!(
+                    "Config file exceeded maximum allowed size of {MAX_CONFIG_BYTES} bytes"
+                ));
+            }
             hasher.update(&data);
             file.write_all(&data)
                 .await
@@ -197,7 +217,7 @@ impl ConfigSyncEngine {
         drop(file);
 
         let actual_sha1 = hex::encode(hasher.finalize());
-        if !expected_sha1.eq_ignore_ascii_case(&actual_sha1) {
+        if !expected_clean.eq_ignore_ascii_case(&actual_sha1) {
             return Err(format!(
                 "SHA-1 mismatch: expected {expected_sha1}, got {actual_sha1}"
             ));

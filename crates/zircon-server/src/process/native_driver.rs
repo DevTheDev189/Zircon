@@ -10,11 +10,11 @@ use tokio::sync::{mpsc, watch};
 use tracing::{info, warn};
 
 use crate::installer;
-use super::driver::{ProcessDriver, ProcessLaunchOptions};
+use super::driver::{sanitize_server_java_args, ProcessDriver, ProcessLaunchOptions};
 
 struct RunningChild {
     child: Child,
-    stdin: Option<ChildStdin>,
+    stdin: Option<Arc<tokio::sync::Mutex<ChildStdin>>>,
     kill_tx: watch::Sender<bool>,
     log_broadcaster: tokio::sync::broadcast::Sender<String>,
 }
@@ -64,8 +64,10 @@ impl ProcessDriver for NativeDriver {
             }
         }
 
-        let java_bin = installer::java_bin_for_version(opts.java_version);
-        let mut cmd = Command::new(java_bin);
+        let java_bin = installer::ensure_java_installed(opts.java_version)
+            .await
+            .map_err(|e| io::Error::new(io::ErrorKind::NotFound, e.to_string()))?;
+        let mut cmd = Command::new(&java_bin);
         cmd.current_dir(&opts.server_dir);
 
         // Sanitize environment variables
@@ -78,11 +80,7 @@ impl ProcessDriver for NativeDriver {
             )
         }));
 
-        let mut args: Vec<String> = opts
-            .memory_args
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect();
+        let mut args: Vec<String> = sanitize_server_java_args(&opts.memory_args)?;
 
         // Determine JAR target
         let quilt_jar = opts.server_dir.join("quilt-server-launch.jar");
@@ -114,7 +112,21 @@ impl ProcessDriver for NativeDriver {
             opts.instance_id, cmd
         );
 
-        let mut child = cmd.spawn()?;
+        let mut child = cmd.spawn().map_err(|e| {
+            if e.kind() == io::ErrorKind::NotFound {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(
+                        "Java runtime executable '{java_bin}' was not found on this system. \
+                         This server instance requires Java {}. \
+                         Please install Java from https://adoptium.net/ or configure JAVA_HOME in settings.",
+                        opts.java_version
+                    ),
+                )
+            } else {
+                e
+            }
+        })?;
         let stdin = child.stdin.take();
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
@@ -150,7 +162,7 @@ impl ProcessDriver for NativeDriver {
             instance_id,
             RunningChild {
                 child,
-                stdin,
+                stdin: stdin.map(|s| Arc::new(tokio::sync::Mutex::new(s))),
                 kill_tx,
                 log_broadcaster: log_tx,
             },
@@ -202,23 +214,22 @@ impl ProcessDriver for NativeDriver {
     }
 
     async fn send_command(&self, instance_id: &str, command: &str) -> io::Result<()> {
-        let stdin_opt = {
-            let mut children = self.children.lock().unwrap();
-            children.get_mut(instance_id).and_then(|c| c.stdin.take())
+        if command.contains(['\n', '\r', '\0']) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Server console command must not contain newline or NUL characters",
+            ));
+        }
+        let stdin_arc = {
+            let children = self.children.lock().unwrap();
+            children.get(instance_id).and_then(|c| c.stdin.clone())
         };
 
-        if let Some(mut stdin) = stdin_opt {
+        if let Some(stdin_mutex) = stdin_arc {
+            let mut stdin = stdin_mutex.lock().await;
             let formatted = format!("{command}\n");
-            let res = stdin.write_all(formatted.as_bytes()).await;
-            let flush_res = stdin.flush().await;
-
-            // Put stdin back
-            if let Some(c) = self.children.lock().unwrap().get_mut(instance_id) {
-                c.stdin = Some(stdin);
-            }
-
-            res?;
-            flush_res?;
+            stdin.write_all(formatted.as_bytes()).await?;
+            stdin.flush().await?;
             Ok(())
         } else {
             Err(io::Error::new(

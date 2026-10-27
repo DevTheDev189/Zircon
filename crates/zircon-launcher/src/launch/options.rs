@@ -40,7 +40,8 @@ impl OptionsFileUtil {
             Vec::new()
         };
 
-        let new_line = format!("{key_prefix}{value}");
+        let clean_value: String = value.chars().filter(|&c| c != '\n' && c != '\r' && c != '\0').collect();
+        let new_line = format!("{key_prefix}{clean_value}");
         let mut found = false;
         for line in lines.iter_mut() {
             if line.starts_with(key_prefix) {
@@ -149,6 +150,10 @@ fn apply_resourcepacks(game_dir: &Path, selection: &PackSelection) -> std::io::R
     let options = game_dir.join("options.txt");
     let mut entries = vec!["\"vanilla\"".to_string()];
     for filename in selection.active_resourcepacks.iter().rev() {
+        if filename.contains(['"', '\\', '/', '\n', '\r', '\0']) || filename.contains("..") {
+            tracing::warn!("Skipping invalid resourcepack filename in pack-selection.json: {filename}");
+            continue;
+        }
         entries.push(format!("\"file/{filename}\""));
     }
     OptionsFileUtil::upsert_line(
@@ -313,6 +318,16 @@ mod tests {
         PackOptionsWriter::apply(&dir).unwrap();
         let iris = std::fs::read_to_string(dir.join("config").join("iris.properties")).unwrap();
         assert_eq!("enableShaders=false\nshaderPack=\n", iris);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn upsert_line_strips_newlines_and_null_bytes() {
+        let dir = temp_dir("newlines");
+        let file = dir.join("options.txt");
+        OptionsFileUtil::upsert_line(&file, "testKey:", "value\ninjected:true\r\0more").unwrap();
+        let content = std::fs::read_to_string(&file).unwrap();
+        assert_eq!(content, "testKey:valueinjected:truemore\n");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

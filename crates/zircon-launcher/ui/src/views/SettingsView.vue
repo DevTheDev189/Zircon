@@ -929,6 +929,36 @@
         </div>
       </div>
 
+            <!-- ================= SECTION: KEYBINDS ================= -->
+      <div v-show="activeCategory === 'all' || activeCategory === 'keybinds'" class="mb-4 p-4 rounded-2xl bg-well/40 border border-slate-800/80 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800/60">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shadow-[0_0_12px_rgba(71,210,201,0.2)]">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-white block">Keybind Library &amp; Sync</span>
+              <span class="text-[10px] text-slate-400">Manage control presets and synchronize across all instances</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="px-3 py-1 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            @click="showKeybindModal = true"
+          >
+            <span>Open Keybind Manager</span>
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          Create named keybind layouts (e.g. Competitive FPS, Standard Modded, Handedness presets) and apply them to any instance in one click with automated non-destructive options backup.
+        </p>
+      </div>
+
       <!-- ================= SECTION 4: CLOUD & INTEGRATIONS ================= -->
       <div v-show="activeCategory === 'all' || activeCategory === 'integrations'" class="mb-4 p-4 rounded-2xl bg-well/40 border border-slate-800/80 space-y-4">
         <div class="flex items-center justify-between pb-2 border-b border-slate-800/60">
@@ -1330,6 +1360,28 @@
         <p v-if="copiedAt" class="z-label text-cyan-300 font-medium text-xs">{{ copiedAt }}</p>
       </div>
 
+      <!-- Legal & EULA Information -->
+      <div class="mb-4 p-4 rounded-2xl bg-well/40 border border-slate-800/80 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+          <div>
+            <span class="text-xs font-bold text-white block">Licensing &amp; Legal Terms</span>
+            <span class="text-[10px] text-slate-400">Business Source License 1.1 (BSL-1.1)</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="z-btn-ghost text-xs px-3 py-1.5 rounded-xl border border-slate-700/80 hover:border-cyan-500/40 text-cyan-300 hover:text-white transition cursor-pointer"
+          @click="openEulaModal"
+        >
+          View EULA
+        </button>
+      </div>
+
     </div>
 
     <!-- Right Column: Last Played Minecraft Instance Log -->
@@ -1387,7 +1439,11 @@
             :key="idx"
             :class="mcLogColor(line)"
           >{{ line }}</div>
-        </template>
+              <KeybindManagerModal
+      :open="showKeybindModal"
+      @close="showKeybindModal = false"
+    />
+</template>
         <p v-else-if="mcLogLines.length > 0" class="text-slate-500 text-xs italic">
           No log lines match current filters.
         </p>
@@ -1402,6 +1458,10 @@
       </div>
     </div>
   </div>
+      <KeybindManagerModal
+      :open="showKeybindModal"
+      @close="showKeybindModal = false"
+    />
 </template>
 
 <script setup>
@@ -1412,12 +1472,15 @@ import { relaunch } from '@tauri-apps/plugin-process';
 import { THEME_PRESETS, BG_THEME_PRESETS, BUTTON_STYLES, GLASS_EFFECTS, CURATED_THEMES, detectCuratedTheme, applyTheme } from '../lib/theme';
 import { applyAccessibilitySettings as applyAccessibilityHelper } from '../lib/accessibility';
 import { t, currentLocale, setLocale, AVAILABLE_LOCALES } from '../lib/i18n';
+import { askConfirm } from '../lib/confirm';
+import KeybindManagerModal from '../components/KeybindManagerModal.vue';
 
 // OneDrive Cloud Sync state & helpers
 const cloudSyncStatus = ref(null);
 const cloudBackups = ref([]);
 const syncingCloud = ref(false);
 const restoringCloud = ref(false);
+const showKeybindModal = ref(false);
 
 function formatRelativeTime(timestamp) {
   if (!timestamp) return 'Never';
@@ -1464,9 +1527,13 @@ async function triggerCloudBackup() {
 }
 
 async function restoreCloudBackup(filename) {
-  if (!window.confirm(`Restore settings and configuration from '${filename}'? This will restore your saved launcher options and servers.`)) {
-    return;
-  }
+  const ok = await askConfirm({
+    title: 'Restore Cloud Backup',
+    message: `Restore settings and configuration from '${filename}'? This will restore your saved launcher options and servers.`,
+    confirmText: 'Restore Backup',
+    isDanger: false,
+  });
+  if (!ok) return;
   restoringCloud.value = true;
   try {
     await api.restoreFromCloudBackup(filename);
@@ -1539,6 +1606,7 @@ const activeGpuLabel = computed(() => {
 const activeCategory = ref('all');
 const categories = [
   { id: 'all', label: 'All Settings', icon: 'M4 6h16M4 12h16M4 18h16' },
+  { id: 'keybinds', label: 'Keybinds', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
   { id: 'performance', label: 'Performance', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
   { id: 'display', label: 'Display', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
   { id: 'appearance', label: 'Appearance', icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01' },
@@ -1971,5 +2039,9 @@ async function copyMcLogs() {
 
 function clearMcLogs() {
   mcLogLines.value = [];
+}
+
+function openEulaModal() {
+  window.dispatchEvent(new CustomEvent('zircon-open-eula'));
 }
 </script>

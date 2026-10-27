@@ -240,6 +240,12 @@ window.Zircon.preview = {
         this.addPreviewLog("Interactive 60 FPS tile engine initialized in standby mode.");
     },
 
+    getTileKey(rx, rz, dim = null) {
+        const instId = this.selectedInstance ? this.selectedInstance.id : 'default';
+        const d = dim || this.previewDimension || 'overworld';
+        return `${instId}:${d}:${rx},${rz}`;
+    },
+
     renderWorldMapFrame(canvas) {
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
@@ -294,9 +300,10 @@ window.Zircon.preview = {
 
         // 3. Render region tiles
         const instId = this.selectedInstance ? this.selectedInstance.id : 'default';
+        const dim = this.previewDimension || 'overworld';
         for (let rx = minRx; rx <= maxRx; rx++) {
             for (let rz = minRz; rz <= maxRz; rz++) {
-                const tileKey = `${instId}:${rx},${rz}`;
+                const tileKey = this.getTileKey(rx, rz, dim);
                 const tileWorldX = rx * 512;
                 const tileWorldZ = rz * 512;
 
@@ -679,7 +686,8 @@ window.Zircon.preview = {
     async fetchRegionTile(rx, rz, force = false) {
         if (!this.selectedInstance) return;
         const instId = this.selectedInstance.id;
-        const tileKey = `${instId}:${rx},${rz}`;
+        const dim = this.previewDimension || 'overworld';
+        const tileKey = this.getTileKey(rx, rz, dim);
         this.mapPendingTiles.add(tileKey);
 
         try {
@@ -692,8 +700,9 @@ window.Zircon.preview = {
             const shouldForce = force || this.mapForceTileRefresh;
             const seed = this.previewSeedInput || (this.serverProps && this.serverProps['level-seed']) || '';
             const seedParam = seed ? `&seed=${encodeURIComponent(seed)}` : '';
+            const dimParam = dim !== 'overworld' ? `&dimension=${encodeURIComponent(dim)}` : '';
             const cacheBuster = shouldForce ? `&_t=${Date.now()}` : '';
-            const url = `/api/instances/${instId}/world-map/tile?rx=${rx}&rz=${rz}${shouldForce ? '&force=true' : ''}${seedParam}${cacheBuster}`;
+            const url = `/api/instances/${instId}/world-map/tile?rx=${rx}&rz=${rz}${shouldForce ? '&force=true' : ''}${seedParam}${dimParam}${cacheBuster}`;
             
             console.log(`[Zircon WorldGen] Fetching tile for instance "${instId}" (r.${rx}.${rz}.mca) -> ${url}`);
             const res = await fetch(url, { headers });
@@ -938,6 +947,7 @@ window.Zircon.preview = {
                 center_x: this.previewCenterX || 0,
                 center_z: this.previewCenterZ || 0,
                 radius_chunks: this.previewRadiusChunks || 24,
+                dimension: this.previewDimension || 'overworld',
                 selected_mods: this.selectedTerrainMods || []
             };
             console.log(`[Zircon WorldGen] POST /api/instances/${this.selectedInstance.id}/preview-seed payload:`, postBody);
@@ -963,6 +973,14 @@ window.Zircon.preview = {
             this.previewStage = '';
             setTimeout(() => { this.mapForceTileRefresh = false; }, 3000);
         }
+    },
+
+    setMapDimension(dim) {
+        if (this.previewDimension === dim) return;
+        this.previewDimension = dim;
+        if (this.mapTileCache) this.mapTileCache.clear();
+        this.addPreviewLog(`Switched preview dimension to: ${dim}`);
+        this.generatePreview();
     },
 
     randomizePreviewSeed() {
@@ -1338,15 +1356,18 @@ window.Zircon.preview = {
 
     isServerSleeping() {
         const inst = this.selectedInstance;
-        if (!inst) return false;
-        if (inst.wakeable) return true;
-        if (typeof this.isFallingAsleep === 'function' && this.isFallingAsleep(inst)) return true;
+        if (inst && inst.wakeable) return true;
+        if (inst && typeof this.isFallingAsleep === 'function' && this.isFallingAsleep(inst)) return true;
+        if (this.systemStats?.current?.isServerSleeping) return true;
+        if (this.systemStats?.isServerSleeping) return true;
         return false;
     },
 
     hasRenderedWorldMap() {
         if (!this.mapTileCache) return false;
-        for (const [_, val] of this.mapTileCache.entries()) {
+        const instId = this.selectedInstance ? this.selectedInstance.id : null;
+        for (const [key, val] of this.mapTileCache.entries()) {
+            if (instId && !key.startsWith(`${instId}:`)) continue;
             if (val && val !== 'none') return true;
         }
         return false;
@@ -1473,7 +1494,7 @@ window.Zircon.preview = {
         const affectedRegions = [];
         for (let rx = minRx; rx <= maxRx; rx++) {
             for (let rz = minRz; rz <= maxRz; rz++) {
-                const tileKey = `${instId}:${rx},${rz}`;
+                const tileKey = this.getTileKey(rx, rz);
                 this.mapGeneratingTiles.add(tileKey);
                 affectedRegions.push({ rx, rz, tileKey });
             }
@@ -1500,7 +1521,7 @@ window.Zircon.preview = {
                 if (!this.selectedInstance || this.selectedInstance.id !== instId) return;
                 let anyStillPending = false;
                 for (const r of regionsToPoll) {
-                    const key = `${instId}:${r.rx},${r.rz}`;
+                    const key = r.tileKey || this.getTileKey(r.rx, r.rz);
                     await this.fetchRegionTile(r.rx, r.rz, true);
                     const updated = this.mapTileCache ? this.mapTileCache.get(key) : null;
                     if (updated && updated !== 'none') {
@@ -1513,7 +1534,7 @@ window.Zircon.preview = {
                     setTimeout(() => pollAffected(attempt + 1), 1500);
                 } else {
                     for (const r of regionsToPoll) {
-                        const key = `${instId}:${r.rx},${r.rz}`;
+                        const key = r.tileKey || this.getTileKey(r.rx, r.rz);
                         if (this.mapGeneratingTiles) this.mapGeneratingTiles.delete(key);
                     }
                 }
@@ -1574,7 +1595,7 @@ window.Zircon.preview = {
         const unrenderedRegions = [];
         for (let rx = minRx; rx <= maxRx; rx++) {
             for (let rz = minRz; rz <= maxRz; rz++) {
-                const tileKey = `${instId}:${rx},${rz}`;
+                const tileKey = this.getTileKey(rx, rz);
                 const cached = this.mapTileCache ? this.mapTileCache.get(tileKey) : undefined;
                 if (!cached || cached === 'none') {
                     if (!this.mapGeneratingTiles.has(tileKey)) {

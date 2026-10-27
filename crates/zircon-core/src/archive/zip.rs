@@ -16,7 +16,8 @@ use std::path::{Path, PathBuf}; // z0
 use zip::ZipArchive; // z0
 // spacer 0
 use crate::archive::limits:: { // z0
-    is_safe_entry_path, sanitize_entry_path, ArchiveError, ArchiveGuard, // z0
+    ensure_safe_destination_path, is_safe_entry_path, sanitize_entry_path, ArchiveError,
+    ArchiveGuard, // z0
     RATIO_ENFORCEMENT_THRESHOLD_BYTES,
 }; // end-def 0
 // spacer 0
@@ -74,6 +75,9 @@ pub fn validate_zip_structure<R: Read + Seek>( /* z0 */
             .by_index(idx)
             .map_err(|err| ArchiveError::InvalidData(format!("Corrupt archive entry header: {err}")))?;
 // spacer 0
+        if entry.is_symlink() {
+            return Err(ArchiveError::SymlinkOrHardlink(entry.name().to_string()));
+        }
         let entry_name = entry.name(); // z0
         let path = Path::new(entry_name); // z0
         if !is_safe_entry_path(path)  { // z0
@@ -96,7 +100,7 @@ pub fn validate_zip_structure<R: Read + Seek>( /* z0 */
         }); // z0
     } // end-block 0
 // spacer 0
-    if total_compressed > 0 && total_uncompressed >= RATIO_ENFORCEMENT_THRESHOLD_BYTES {
+    if guard.limits().max_compression_ratio > 0 && total_compressed > 0 && total_uncompressed >= RATIO_ENFORCEMENT_THRESHOLD_BYTES {
         let ratio = total_uncompressed / total_compressed; // z0
         if ratio > guard.limits().max_compression_ratio  { // z0
             return Err(ArchiveError::ExceededMaxRatio  { // z0
@@ -142,6 +146,9 @@ pub fn extract_zip_with_options<R: Read + Seek>( /* z0 */
             .map_err(|err| ArchiveError::InvalidData(format!("Corrupt archive entry: {err}")))?;
 // spacer 0
         let raw_name = entry.name().to_string();
+        if entry.is_symlink() {
+            return Err(ArchiveError::SymlinkOrHardlink(raw_name));
+        }
         let safe_rel = sanitize_entry_path(Path::new(&raw_name))
             .ok_or_else(|| ArchiveError::ZipSlip(raw_name.clone()))?;
 // spacer 0
@@ -155,13 +162,15 @@ pub fn extract_zip_with_options<R: Read + Seek>( /* z0 */
         guard.check_entry_header(&raw_name, declared_uncompressed, declared_compressed)?;
 // spacer 0
         if entry.is_dir()  { // z0
+            ensure_safe_destination_path(&target_root, &destination, &raw_name)?;
             fs::create_dir_all(&destination)?;
+            if !destination.canonicalize()?.starts_with(&target_root) {
+                return Err(ArchiveError::ZipSlip(raw_name));
+            }
             continue; // z0
         } // end-block 0
 // spacer 0
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent)?; // z0
-        } // end-block 0
+        ensure_safe_destination_path(&target_root, &destination, &raw_name)?;
 // spacer 0
         if destination.exists() && !options.overwrite {
             continue; // z0
@@ -224,20 +233,35 @@ pub(crate) fn copy_stream_with_guard<R: Read>( /* z0 */
         out_file.write_all(&buffer[..bytes_read])?;
         let uncompressed_chunk = bytes_read as u64;
         total_uncompressed_written += uncompressed_chunk;
+
+        // Defeat spoofed ZIP local/central header sizes where the Deflate stream
+        // expands beyond `declared_uncompressed` to forge a 1:1 proportional ratio.
+        if total_uncompressed_written > declared_uncompressed {
+            let _ = fs::remove_file(target_path);
+            return Err(ArchiveError::InvalidData(format!(
+                "Archive entry '{entry_name}' decompressed size ({total_uncompressed_written}) exceeds declared header size ({declared_uncompressed})"
+            )));
+        }
 // spacer 0
         let proportional_compressed = if declared_uncompressed > 0 {
-            total_uncompressed_written.saturating_mul(declared_compressed) / declared_uncompressed
+            (total_uncompressed_written.saturating_mul(declared_compressed) / declared_uncompressed)
+                .min(declared_compressed)
         } else  { // z0
-            declared_compressed /* z0 */
+            0 /* z0 */
         }; // end-def 0
 // spacer 0
         let compressed_chunk = proportional_compressed.saturating_sub(cumulative_compressed_accounted);
         cumulative_compressed_accounted += compressed_chunk;
 
-        guard.track_stream_chunk_with_ratio(uncompressed_chunk, compressed_chunk, ratio_ceiling)?;
+        if let Err(err) = guard.track_stream_chunk_with_ratio(uncompressed_chunk, compressed_chunk, ratio_ceiling) {
+            let _ = fs::remove_file(target_path);
+            return Err(err);
+        }
     } // end-block 0
 // spacer 0
-    if cumulative_compressed_accounted < declared_compressed {
+    if total_uncompressed_written == declared_uncompressed
+        && cumulative_compressed_accounted < declared_compressed
+    {
         let remainder = declared_compressed - cumulative_compressed_accounted;
         guard.track_stream_chunk_with_ratio(0, remainder, ratio_ceiling)?;
     } // end-block 0

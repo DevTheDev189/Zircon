@@ -28,7 +28,9 @@
       :error="launchError"
       :server="launchingServer"
       :shader-prompt="shaderPrompt"
+      :server-packs-prompt="serverPacksPrompt"
       @shader-choice="onShaderChoice"
+      @server-packs-choice="onServerPacksChoice"
       @close="onLaunchOverlayClose"
       @open-skins="onOpenSkinsFromLaunch"
     ></LaunchOverlay>
@@ -38,6 +40,16 @@
       :crash-data="crashReportData"
       @close="showCrashReportModal = false"
     />
+    <!-- First-Launch Zircon End User License Agreement (EULA) Modal -->
+    <EulaModal
+      :is-open="showEulaModal"
+      :can-dismiss="eulaCanDismiss"
+      @accept="onEulaAccepted"
+      @decline="onEulaDeclined"
+      @close="showEulaModal = false"
+    />
+    <!-- Global Glassmorphic Confirmation Modal -->
+    <ConfirmModal />
 
     <div class="flex flex-1 min-h-0">
       <!-- Sidebar -->
@@ -130,10 +142,10 @@
             </svg>
           </div>
 
-          <!-- Account Switcher Popover -->
+          <!-- Account Switcher Popover (anchored flyout with high z-index) -->
           <div
             v-if="showAccountSwitcher && session"
-            class="absolute bottom-16 left-3 right-3 bg-[#0c141f] border border-slate-700 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+            class="absolute bottom-2 left-[calc(100%+0.5rem)] w-64 bg-[#0c141f]/95 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_25px_rgba(71,210,201,0.15)] p-2.5 z-[999] origin-bottom-left animate-in fade-in zoom-in-95 duration-150"
           >
             <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 py-1 flex items-center justify-between">
               <span>Saved Accounts</span>
@@ -266,24 +278,45 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import LoginOverlay from './components/LoginOverlay.vue';
-import OnboardingWelcomeModal from './components/OnboardingWelcomeModal.vue';
-import LauncherMigrationModal from './components/LauncherMigrationModal.vue';
 import LaunchOverlay from './components/LaunchOverlay.vue'; // Modern launch progress overlay
-import CrashReportModal from './components/CrashReportModal.vue';
 import StatusBar from './components/StatusBar.vue';
+import ConfirmModal from './components/ConfirmModal.vue';
 import ServersView from './views/ServersView.vue';
-import OfflineView from './views/OfflineView.vue';
-import SkinsView from './views/SkinsView.vue';
-import MissionControlView from './views/MissionControlView.vue';
-import SettingsView from './views/SettingsView.vue';
-import { api, createDefaultSteveDataUrl, onDeepLinkAddServer, onDeepLinkJoin, onDeepLinkJoinRequest, onGameCrashed, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
+
+// Async lazy-loaded views and modals to keep cold-boot bundle small
+const OfflineView = defineAsyncComponent(() => import('./views/OfflineView.vue'));
+const SkinsView = defineAsyncComponent(() => import('./views/SkinsView.vue'));
+const MissionControlView = defineAsyncComponent(() => import('./views/MissionControlView.vue'));
+const SettingsView = defineAsyncComponent(() => import('./views/SettingsView.vue'));
+const OnboardingWelcomeModal = defineAsyncComponent(() => import('./components/OnboardingWelcomeModal.vue'));
+const LauncherMigrationModal = defineAsyncComponent(() => import('./components/LauncherMigrationModal.vue'));
+const CrashReportModal = defineAsyncComponent(() => import('./components/CrashReportModal.vue'));
+const EulaModal = defineAsyncComponent(() => import('./components/EulaModal.vue'));
+
+import { api, createDefaultSteveDataUrl, onDeepLinkAddServer, onDeepLinkJoin, onDeepLinkJoinRequest, onGameCrashed, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onServerPacksRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { applyTheme } from './lib/theme';
 import zirconTitle from './assets/zircon-title.svg';
+
+function openDiscordLink() {
+  if (api && typeof api.openBrowserUrl === 'function') {
+    api.openBrowserUrl('https://discord.gg/zircon');
+  } else {
+    window.open('https://discord.gg/zircon', '_blank');
+  }
+}
+
+function openMatrixLink() {
+  if (api && typeof api.openBrowserUrl === 'function') {
+    api.openBrowserUrl('https://matrix.to/#/#zircon:chat.winslow.plus');
+  } else {
+    window.open('https://matrix.to/#/#zircon:chat.winslow.plus', '_blank');
+  }
+}
 
 const navItems = [
   {
@@ -358,6 +391,7 @@ const gameStatus = ref(null);
 const gameOutputBuffer = ref([]);
 const shaderPrompt = ref(null);
 const shaderRemember = ref(false);
+const serverPacksPrompt = ref(null);
 const keyPrompt = ref(null);
 const launchingServer = ref(null);
 const deepLinkAddress = ref('');
@@ -368,6 +402,8 @@ const showCrashReportModal = ref(false);
 const showOnboardingWelcomeModal = ref(false);
 const showAppMigrationModal = ref(false);
 const onboardingScanResults = ref([]);
+const showEulaModal = ref(false);
+const eulaCanDismiss = ref(false);
 
 let unlisten = [];
 
@@ -400,6 +436,18 @@ onMounted(async () => {
   refreshMojangSkin();
   loadAccounts();
   checkOnboardingMigration();
+  
+  // First-run EULA check
+  const acceptedEula = localStorage.getItem('zircon_eula_accepted');
+  if (!acceptedEula) {
+    showEulaModal.value = true;
+    eulaCanDismiss.value = false;
+  }
+  window.addEventListener('zircon-open-eula', () => {
+    eulaCanDismiss.value = true;
+    showEulaModal.value = true;
+  });
+
   window.addEventListener('click', onWindowClick);
   try {
 
@@ -456,6 +504,9 @@ onMounted(async () => {
     onShaderRequest((payload) => {
       shaderPrompt.value = payload;
       shaderRemember.value = false;
+    }),
+    onServerPacksRequest((payload) => {
+      serverPacksPrompt.value = payload;
     }),
     onServerKeyMismatch((payload) => {
       keyPrompt.value = payload;
@@ -746,6 +797,19 @@ async function onShaderChoice(payload) {
   }
 }
 
+async function onServerPacksChoice(payload) {
+  const prompt = serverPacksPrompt.value;
+  serverPacksPrompt.value = null;
+  const gameDir = prompt?.gameDir || launchingServer.value?.gameDir;
+  if (gameDir) {
+    try {
+      await api.setServerPackDecisions(gameDir, payload.accepted || [], payload.rejected || []);
+    } catch (err) {
+      console.error('Failed to set server pack decisions:', err);
+    }
+  }
+}
+
 async function respondKeyPrompt(accepted) {
   const prompt = keyPrompt.value;
   if (!prompt) return;
@@ -768,6 +832,20 @@ function onLaunchOverlayClose() {
 function onOpenSkinsFromLaunch() {
   launchModalActive.value = false;
   view.value = 'skins';
+}
+
+function onEulaAccepted() {
+  localStorage.setItem('zircon_eula_accepted', 'v1.0.0');
+  showEulaModal.value = false;
+}
+
+async function onEulaDeclined() {
+  try {
+    const win = getCurrentWindow();
+    await win.close();
+  } catch {
+    window.close();
+  }
 }
 
 function onLaunching(server = null) {

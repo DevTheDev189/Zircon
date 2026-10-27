@@ -57,6 +57,11 @@ pub fn settings_file() -> PathBuf {
     mcmanager_dir().join("settings.json")
 }
 
+/// `~/.mcmanager/keybind_library` — saved global keybind profiles.
+pub fn keybinds_dir() -> PathBuf {
+    mcmanager_dir().join("keybind_library")
+}
+
 /// `~/.mcmanager/skins` — active skin + history folder.
 pub fn skins_dir() -> PathBuf {
     mcmanager_dir().join("skins")
@@ -155,5 +160,78 @@ pub fn validate_subfolder_name(subfolder: Option<&str>) -> Result<Option<String>
 /// `~/.mcmanager/cache/mods` — shared mods cache across instances and P2P sessions.
 pub fn mods_cache_dir() -> PathBuf {
     mcmanager_dir().join("cache").join("mods")
+}
+
+/// Validates that the drive hosting `target_dir` has at least `required_bytes` free space.
+///
+/// Returns an error if disk space is below `required_bytes`, avoiding failed downloads
+/// or corrupted partial extractions mid-flight.
+pub fn check_available_disk_space(target_dir: &std::path::Path, required_bytes: u64) -> Result<(), LauncherError> {
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    if disks.is_empty() {
+        return Ok(());
+    }
+
+    let target_abs = if target_dir.is_absolute() {
+        target_dir.to_path_buf()
+    } else if let Ok(abs) = std::fs::canonicalize(target_dir) {
+        abs
+    } else {
+        home_dir().join(target_dir)
+    };
+
+    let target_str = target_abs.to_string_lossy().to_lowercase();
+    let mut best_match: Option<(&sysinfo::Disk, usize)> = None;
+
+    for disk in &disks {
+        let mount_str = disk.mount_point().to_string_lossy().to_lowercase();
+        let trimmed = mount_str.trim_end_matches(['\\', '/']);
+        if target_str.starts_with(&mount_str) || (!trimmed.is_empty() && target_str.starts_with(trimmed)) {
+            let match_len = mount_str.len();
+            if best_match.as_ref().map_or(true, |(_, len)| match_len > *len) {
+                best_match = Some((disk, match_len));
+            }
+        }
+    }
+
+    let disk = best_match.map(|(d, _)| d).or_else(|| {
+        disks.iter().max_by_key(|d| d.total_space())
+    });
+
+    if let Some(d) = disk {
+        let available = d.available_space();
+        if available < required_bytes {
+            let mount_display = d.mount_point().display();
+            let avail_gb = available as f64 / (1024.0 * 1024.0 * 1024.0);
+            let req_gb = required_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+            return Err(LauncherError::InvalidInput(format!(
+                "Insufficient disk space on {mount_display}: {avail_gb:.2} GB available, {req_gb:.2} GB required"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_available_disk_space_success() {
+        let home = home_dir();
+        // 1 KB should easily pass on any working system
+        assert!(check_available_disk_space(&home, 1024).is_ok());
+    }
+
+    #[test]
+    fn test_check_available_disk_space_exceeded() {
+        let home = home_dir();
+        // 100 Petabytes should fail unless someone is running on a datacenter SAN
+        let res = check_available_disk_space(&home, 100 * 1024 * 1024 * 1024 * 1024 * 1024);
+        assert!(res.is_err());
+        let err = res.unwrap_err().to_string();
+        assert!(err.contains("Insufficient disk space"));
+    }
 }
 

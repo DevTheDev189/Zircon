@@ -1,30 +1,19 @@
-use std::sync::Arc;
 
-use axum::extract::{Multipart, Path, Query, State};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::extract::{Path, State};
 use axum::Json;
 
-use serde::{Deserialize, Serialize};
-use tokio::time::Duration;
-use zircon_core::model::{BillOfMaterials, InstanceConfig, ModLoaderType};
 
 use crate::web::controllers::config_helpers::{
     command_result, read_player_json, sanitize_command_param, validate_minecraft_username,
     PlayerActionRequest,
 };
 use crate::web::controllers::vanilla_player_files;
-use crate::instance::ModSyncSummary;
-use crate::services::bom::BomService;
-use crate::services::mods::ModManagementService;
-use crate::services::packs::PackManagementService;
 use crate::tickets::TICKET_TTL_SECONDS;
 use crate::web::app::{ApiError, AppState, RealIp};
 use crate::web::config_routes::resolve_wake_target;
 use crate::web::views;
 
 use super::helpers::*;
-use super::*;
 pub async fn online_players(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -180,6 +169,31 @@ pub async fn remove_ban(
         Ok(Json(
             serde_json::json!({ "ok": true, "offline": true, "removed": removed }),
         ))
+    }
+}
+
+/// POST /api/instances/{id}/players/kick — kick a player currently on this server instance.
+pub async fn kick_player(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<PlayerActionRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let raw_name = body
+        .name
+        .ok_or_else(|| ApiError::BadRequest("name is required".to_string()))?;
+    let name = validate_minecraft_username(&raw_name)?;
+    let reason_clean = sanitize_command_param(body.reason.as_deref());
+
+    state.instances.get_instance(&id)?;
+    if state.instances.is_running(&id) {
+        let reason_arg = if reason_clean.is_empty() {
+            String::new()
+        } else {
+            format!(" {reason_clean}")
+        };
+        Ok(send_instance_command(&state, &id, &format!("kick {name}{reason_arg}")).await)
+    } else {
+        Ok(command_result("kick", false, Some("Server is not running".to_string())))
     }
 }
 

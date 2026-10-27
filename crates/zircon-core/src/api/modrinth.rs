@@ -55,14 +55,34 @@ impl ModrinthApiClient {
         if sha1_list.is_empty() {
             return Ok(HashMap::new());
         }
+        let normalized: Vec<String> = sha1_list
+            .iter()
+            .map(|h| h.trim().to_ascii_lowercase())
+            .filter(|h| h.len() == 40 && h.bytes().all(|b| b.is_ascii_hexdigit()))
+            .collect();
+        if normalized.is_empty() {
+            return Ok(HashMap::new());
+        }
         let body = serde_json::json!({
-            "hashes": sha1_list,
+            "hashes": normalized,
             "algorithm": "sha1",
         });
         let text = self
             .post_json(&format!("{BASE_URL}/version_files"), &body)
             .await?;
-        let result: HashMap<String, ModrinthVersion> = serde_json::from_str(&text)?;
+        let raw: HashMap<String, ModrinthVersion> = serde_json::from_str(&text)?;
+        let mut result = HashMap::with_capacity(raw.len());
+        for (hash_key, version) in raw {
+            let key_lower = hash_key.trim().to_ascii_lowercase();
+            let has_matching_file = version.files.iter().any(|f| {
+                f.sha1()
+                    .map(|s| s.eq_ignore_ascii_case(&key_lower))
+                    .unwrap_or(false)
+            });
+            if has_matching_file {
+                result.insert(key_lower, version);
+            }
+        }
         Ok(result)
     }
 
@@ -90,13 +110,16 @@ impl ModrinthApiClient {
         let mut url = format!("{BASE_URL}/search?query={}", form_encode(query));
         let mut facet_groups: Vec<String> = Vec::new();
         if let Some(v) = mc_version.filter(|v| !v.trim().is_empty()) {
-            facet_groups.push(format!("[\"versions:{v}\"]"));
+            let v_clean = v.trim();
+            facet_groups.push(format!("[\"versions:{v_clean}\"]"));
         }
         if let Some(l) = loader_type.filter(|l| !l.trim().is_empty()) {
-            facet_groups.push(format!("[\"categories:{l}\"]"));
+            let l_clean = l.trim().to_ascii_lowercase();
+            facet_groups.push(format!("[\"categories:{l_clean}\"]"));
         }
         if let Some(p) = project_type.filter(|p| !p.trim().is_empty()) {
-            facet_groups.push(format!("[\"project_type:{p}\"]"));
+            let p_clean = p.trim().to_ascii_lowercase();
+            facet_groups.push(format!("[\"project_type:{p_clean}\"]"));
         }
         if !facet_groups.is_empty() {
             url.push_str(&format!(
@@ -147,13 +170,15 @@ impl ModrinthApiClient {
         let mut url = format!("{BASE_URL}/project/{}/version", form_encode(project_id));
         let mut filters: Vec<String> = Vec::new();
         if let Some(v) = mc_version.filter(|v| !v.trim().is_empty()) {
+            let v_clean = v.trim();
             filters.push(format!(
                 "game_versions={}",
-                form_encode(&format!("[\"{v}\"]"))
+                form_encode(&format!("[\"{v_clean}\"]"))
             ));
         }
         if let Some(l) = loader_type.filter(|l| !l.trim().is_empty()) {
-            filters.push(format!("loaders={}", form_encode(&format!("[\"{l}\"]"))));
+            let l_clean = l.trim().to_ascii_lowercase();
+            filters.push(format!("loaders={}", form_encode(&format!("[\"{l_clean}\"]"))));
         }
         if !filters.is_empty() {
             url.push('?');
@@ -350,7 +375,17 @@ pub struct ModrinthFile {
 
 impl ModrinthFile {
     pub fn sha1(&self) -> Option<&str> {
-        self.hashes.get("sha1").map(|s| s.as_str())
+        self.hashes
+            .get("sha1")
+            .map(|s| s.trim())
+            .filter(|s| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+    }
+
+    pub fn sha512(&self) -> Option<&str> {
+        self.hashes
+            .get("sha512")
+            .map(|s| s.trim())
+            .filter(|s| s.len() == 128 && s.bytes().all(|b| b.is_ascii_hexdigit()))
     }
 }
 
@@ -373,6 +408,10 @@ pub struct ModrinthSearchHit {
     pub icon_url: String,
     #[serde(default)]
     pub versions: Vec<String>,
+    #[serde(default)]
+    pub categories: Vec<String>,
+    #[serde(default)]
+    pub display_categories: Vec<String>,
     #[serde(default)]
     pub client_side: Option<String>,
     #[serde(default)]

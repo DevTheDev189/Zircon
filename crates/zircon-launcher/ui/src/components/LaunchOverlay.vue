@@ -41,6 +41,159 @@
         <!-- Top Animated Holographic Accent Line -->
         <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-500 via-cyan-300 to-emerald-400 animate-shimmer" />
 
+        <!-- PRE-LAUNCH PROMPTS FULL-CARD OVERLAY (covers entire card & 2048 with backdrop-blur-xl bg-black/85) -->
+        <Transition name="overlay-fade">
+          <div
+            v-if="promptStep"
+            class="absolute inset-0 z-30 flex items-center justify-center p-6 bg-black/85 backdrop-blur-xl rounded-3xl animate-fade-in"
+          >
+            <!-- Step 1: Server Resource Packs Prompt -->
+            <div
+              v-if="promptStep === 'packs'"
+              class="w-full max-w-lg bg-[#0b0f19]/95 border border-cyan-500/35 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 ring-1 ring-cyan-500/20"
+            >
+              <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-sm font-bold text-white">{{ $t('server_packs_modal.title') }}</h3>
+                      <span v-if="hasShaderPrompt" class="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Step 1 of 2</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">{{ $t('server_packs_modal.subtitle') }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pack list -->
+              <div class="max-h-[200px] overflow-y-auto flex flex-col gap-2 pr-1">
+                <div
+                  v-for="pack in (serverPacksPrompt?.packs || [])"
+                  :key="pack.filename"
+                  class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-3"
+                >
+                  <div class="min-w-0">
+                    <div class="text-xs font-bold text-slate-100 truncate">{{ pack.title || pack.filename }}</div>
+                    <div class="text-[10px] text-slate-400 truncate">{{ pack.description || pack.filename }}</div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-[10px] font-mono font-bold uppercase" :class="packDecisions[pack.filename] ? 'text-cyan-400' : 'text-slate-500'">
+                      {{ packDecisions[pack.filename] ? $t('server_packs_modal.accept') : $t('server_packs_modal.decline') }}
+                    </span>
+                    <button
+                      type="button"
+                      class="w-10 h-5 rounded-full transition-colors relative focus:outline-none"
+                      :class="packDecisions[pack.filename] ? 'bg-cyan-500' : 'bg-slate-800 border border-slate-700'"
+                      @click="packDecisions[pack.filename] = !packDecisions[pack.filename]"
+                    >
+                      <span
+                        class="block w-3.5 h-3.5 rounded-full bg-white transition-transform transform shadow-sm"
+                        :class="packDecisions[pack.filename] ? 'translate-x-5' : 'translate-x-1'"
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Remember Choice -->
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                <input type="checkbox" v-model="rememberPacks" class="zircon-check" />
+                <span class="text-[11px]">Remember my choice for this server</span>
+              </label>
+
+              <!-- Actions -->
+              <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  class="text-xs text-slate-400 hover:text-slate-200 transition"
+                  @click="declineAllPacks"
+                >
+                  {{ $t('server_packs_modal.decline_all') }}
+                </button>
+                <button
+                  type="button"
+                  class="z-btn-primary text-xs px-5 py-2 rounded-xl font-bold flex items-center gap-1.5"
+                  @click="confirmPacksStep"
+                >
+                  <span>{{ hasShaderPrompt ? 'Next: Shaders →' : $t('server_packs_modal.accept_selection') }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 2 (or standalone): Shaders Prompt -->
+            <div
+              v-else-if="promptStep === 'shaders'"
+              class="w-full max-w-lg rounded-2xl border border-amber-500/40 bg-gradient-to-b from-[#160f06]/95 to-[#0b0c10]/95 p-6 text-amber-200 shadow-2xl backdrop-blur-xl ring-1 ring-amber-500/20"
+            >
+              <div class="flex items-center justify-between gap-2 mb-3 border-b border-amber-500/20 pb-3">
+                <div class="flex items-center gap-3">
+                  <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-sm font-bold text-white">{{ $t('overlay.shader_recommended') }}</h3>
+                      <span v-if="hasServerPacksPrompt" class="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Step 2 of 2</span>
+                    </div>
+                    <p class="text-[11px] text-amber-300/80">{{ $t('overlay.iris_oculus') }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="my-3 rounded-xl bg-black/50 border border-amber-500/20 p-3.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">
+                    {{ shaderPrompt?.shaderName || $t('overlay.iris_recommended_shaders') }}
+                  </span>
+                  <span v-if="shaderPrompt?.shaderAuthor" class="text-[10px] text-amber-300/80 font-medium">
+                    {{ $t('mods.by_author', { author: shaderPrompt.shaderAuthor }) }}
+                  </span>
+                </div>
+                <p class="mt-1.5 text-[11px] text-amber-100/80 leading-relaxed">
+                  {{ $t('overlay.shader_desc') }}
+                </p>
+              </div>
+
+              <!-- Remember Choice Toggle -->
+              <label class="flex items-center gap-2.5 text-xs text-amber-200/90 cursor-pointer my-3 select-none">
+                <input
+                  type="checkbox"
+                  v-model="rememberShaders"
+                  class="rounded border-amber-500/40 bg-amber-950/50 text-amber-400 focus:ring-0 focus:ring-offset-0 cursor-pointer h-4 w-4"
+                />
+                <span class="font-medium text-[11px]">{{ $t('overlay.remember_shaders') }}</span>
+              </label>
+
+              <!-- Actions -->
+              <div class="flex items-center justify-end gap-2.5 mt-4 pt-3 border-t border-amber-500/20">
+                <button
+                  type="button"
+                  class="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+                  @click="confirmShaderStep(false)"
+                >
+                  {{ $t('overlay.play_without_shaders') }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 px-5 py-2 text-xs font-black text-slate-950 shadow-md shadow-amber-500/30 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5"
+                  @click="confirmShaderStep(true)"
+                >
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>{{ $t('overlay.enable_shaders') }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+
         <!-- Card Header Banner Specular Ambient Reflection -->
         <div
           v-if="bannerSource"
@@ -135,6 +288,29 @@
               </span>
             </button>
 
+            <!-- Live Console Drawer Toggle Button -->
+            <button
+              type="button"
+              class="relative inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200"
+              :class="showConsole
+                ? 'border-cyan-400/60 bg-cyan-500/20 text-cyan-200 shadow-[0_0_14px_rgba(71,210,201,0.35)]'
+                : 'border-white/10 bg-white/5 text-slate-300 hover:border-cyan-500/40 hover:text-cyan-200 hover:bg-cyan-500/10'"
+              title="Toggle Live Console Output"
+              @click="showConsole = !showConsole"
+            >
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
+              <span>Console</span>
+              <span
+                v-if="consoleLines.length > 0"
+                class="rounded-full bg-cyan-400/20 px-1.5 py-0.2 text-[9px] font-mono font-bold text-cyan-300 border border-cyan-400/30"
+              >
+                {{ consoleLines.length }}
+              </span>
+            </button>
+
             <!-- Character Forge Quick Access Button -->
             <button
               type="button"
@@ -213,73 +389,8 @@
               </p>
             </div>
 
-            <!-- High-Tech Shader Engine Opt-In Card (Clean 2026 aesthetics without emojis) -->
-            <div
-              v-else-if="shaderPrompt"
-              class="mb-6 rounded-2xl border border-amber-500/35 bg-gradient-to-b from-amber-950/40 to-[#120e06]/80 p-5 text-amber-200 shadow-xl shadow-black/40 backdrop-blur-md"
-            >
-              <div class="flex items-center justify-between gap-2 mb-2">
-                <div class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-300">
-                  <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </span>
-                  <span>{{ $t('overlay.shader_recommended') }}</span>
-                </div>
-                <span class="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] font-extrabold text-amber-300 uppercase">
-                  {{ $t('overlay.iris_oculus') }}
-                </span>
-              </div>
-
-              <div class="my-3 rounded-xl bg-black/40 border border-amber-500/20 p-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-white">
-                    {{ shaderPrompt.shaderName || $t('overlay.iris_recommended_shaders') }}
-                  </span>
-                  <span v-if="shaderPrompt.shaderAuthor" class="text-[10px] text-amber-300/80 font-medium">
-                    {{ $t('mods.by_author', { author: shaderPrompt.shaderAuthor }) }}
-                  </span>
-                </div>
-                <p class="mt-1.5 text-[11px] text-amber-100/80 leading-relaxed">
-                  {{ $t('overlay.shader_desc') }}
-                </p>
-              </div>
-
-              <!-- Remember Choice Toggle -->
-              <label class="flex items-center gap-2.5 text-xs text-amber-200/90 cursor-pointer my-3 select-none">
-                <input
-                  type="checkbox"
-                  v-model="rememberShaders"
-                  class="rounded border-amber-500/40 bg-amber-950/50 text-amber-400 focus:ring-0 focus:ring-offset-0 cursor-pointer h-4 w-4"
-                />
-                <span class="font-medium text-[11px]">{{ $t('overlay.remember_shaders') }}</span>
-              </label>
-
-              <!-- Actions: Skip or Enable (Clean SVG icons, no emojis) -->
-              <div class="flex items-center justify-end gap-2.5 mt-4 pt-3 border-t border-amber-500/15">
-                <button
-                  type="button"
-                  class="rounded-xl border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
-                  @click="submitShaderChoice(false)"
-                >
-                  {{ $t('overlay.play_without_shaders') }}
-                </button>
-                <button
-                  type="button"
-                  class="rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 px-4 py-1.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/30 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5"
-                  @click="submitShaderChoice(true)"
-                >
-                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <span>{{ $t('overlay.enable_shaders') }}</span>
-                </button>
-              </div>
-            </div>
-
             <!-- Standard Launch Lifecycle View -->
-            <template v-else>
+            <template v-if="!error">
               <!-- 2026 Stage Timeline Pipeline with Isolated Interconnects (no line through checkboxes) -->
               <div class="relative mb-6 rounded-2xl bg-[#070c14]/80 border border-teal-500/15 p-4 shadow-inner">
                 <div class="grid grid-cols-5 gap-1 items-start">
@@ -387,6 +498,56 @@
                   />
                 </div>
               </div>
+
+              <!-- Live Minecraft Console Drawer -->
+              <Transition name="drawer-expand">
+                <div
+                  v-if="showConsole"
+                  class="mt-4 rounded-2xl border border-cyan-500/30 bg-[#060a12]/95 p-3.5 shadow-2xl flex flex-col gap-2 ring-1 ring-cyan-500/20"
+                >
+                  <div class="flex items-center justify-between border-b border-slate-800 pb-2 px-1">
+                    <div class="flex items-center gap-2">
+                      <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                      <span class="text-xs font-bold text-slate-200 font-mono">Live Minecraft Console</span>
+                      <span class="text-[10px] text-slate-500 font-mono">({{ consoleLines.length }} lines)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <label class="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 cursor-pointer select-none">
+                        <input type="checkbox" v-model="consoleAutoScroll" class="zircon-check" /> Auto-scroll
+                      </label>
+                      <button
+                        type="button"
+                        class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                        @click="copyConsoleLogs"
+                      >
+                        {{ copiedConsole ? 'Copied!' : 'Copy' }}
+                      </button>
+                      <button
+                        type="button"
+                        class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                        @click="consoleLines = []"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    ref="consoleBoxRef"
+                    class="bg-black/60 rounded-xl p-3 font-mono text-[10px] leading-relaxed text-slate-300 max-h-[170px] overflow-y-auto whitespace-pre-wrap space-y-0.5 select-text shadow-inner"
+                  >
+                    <template v-if="consoleLines.length > 0">
+                      <div
+                        v-for="(line, idx) in consoleLines"
+                        :key="idx"
+                        :class="getConsoleLineClass(line)"
+                      >{{ line }}</div>
+                    </template>
+                    <div v-else class="text-slate-500 italic text-[11px] py-4 text-center">
+                      Awaiting child process stdout/stderr stream...
+                    </div>
+                  </div>
+                </div>
+              </Transition>
             </template>
 
             <!-- Minigame Teaser Banner (shown only when 2048 is not expanded) -->
@@ -465,8 +626,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { api } from '../lib/api';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { api, onGameOutput } from '../lib/api';
 import zirconTitle from '../assets/zircon-title.svg';
 import Game2048 from './Game2048.vue';
 
@@ -503,9 +664,157 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  serverPacksPrompt: {
+    type: Object,
+    default: null,
+  },
 });
 
-const emit = defineEmits(['close', 'shader-choice', 'open-skins']);
+const emit = defineEmits(['close', 'shader-choice', 'server-packs-choice', 'open-skins']);
+
+const promptStep = ref(null); // 'packs' | 'shaders' | null
+const rememberPacks = ref(false);
+const packDecisions = ref({});
+
+const hasServerPacksPrompt = computed(() => Boolean(props.serverPacksPrompt?.packs?.length));
+const hasShaderPrompt = computed(() => Boolean(props.shaderPrompt));
+
+// Live Console Drawer State & Output Streaming
+const showConsole = ref(false);
+const consoleLines = ref([]);
+const consoleAutoScroll = ref(true);
+const copiedConsole = ref(false);
+const consoleBoxRef = ref(null);
+let unlistenOutput = null;
+
+function getConsoleLineClass(line) {
+  if (!line) return 'text-slate-400';
+  const lower = line.toLowerCase();
+  if (lower.includes('error') || lower.includes('fatal') || lower.includes('exception') || lower.includes('crash')) {
+    return 'text-red-400 font-semibold';
+  }
+  if (lower.includes('warn')) {
+    return 'text-yellow-400';
+  }
+  if (lower.includes('info') || lower.includes('mixin') || lower.includes('loading')) {
+    return 'text-teal-300';
+  }
+  return 'text-slate-300';
+}
+
+async function copyConsoleLogs() {
+  if (!consoleLines.value.length) return;
+  try {
+    await navigator.clipboard.writeText(consoleLines.value.join('\n'));
+    copiedConsole.value = true;
+    setTimeout(() => { copiedConsole.value = false; }, 2000);
+  } catch (err) {
+    console.error('Failed to copy console logs:', err);
+  }
+}
+
+async function setupGameOutputListener() {
+  if (unlistenOutput) return;
+  try {
+    unlistenOutput = await onGameOutput((line) => {
+      consoleLines.value.push(line);
+      if (consoleLines.value.length > 300) {
+        consoleLines.value.shift();
+      }
+      if (consoleAutoScroll.value) {
+        nextTick(() => {
+          if (consoleBoxRef.value) {
+            consoleBoxRef.value.scrollTop = consoleBoxRef.value.scrollHeight;
+          }
+        });
+      }
+    });
+  } catch (err) {
+    console.warn('Failed to attach game-output listener:', err);
+  }
+}
+
+function cleanupGameOutputListener() {
+  if (typeof unlistenOutput === 'function') {
+    unlistenOutput();
+    unlistenOutput = null;
+  }
+}
+
+watch(
+  () => props.visible,
+  (isVisible) => {
+    if (isVisible) {
+      consoleLines.value = [];
+      setupGameOutputListener();
+    } else {
+      cleanupGameOutputListener();
+    }
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(() => {
+  cleanupGameOutputListener();
+});
+
+watch(
+  [() => props.serverPacksPrompt, () => props.shaderPrompt],
+  ([packs, shaders]) => {
+    if (packs && packs.packs && packs.packs.length > 0) {
+      promptStep.value = 'packs';
+      const map = {};
+      packs.packs.forEach((p) => {
+        map[p.filename] = true;
+      });
+      packDecisions.value = map;
+    } else if (shaders) {
+      promptStep.value = 'shaders';
+    } else {
+      promptStep.value = null;
+    }
+  },
+  { immediate: true }
+);
+
+function declineAllPacks() {
+  const map = {};
+  (props.serverPacksPrompt?.packs || []).forEach((p) => {
+    map[p.filename] = false;
+  });
+  packDecisions.value = map;
+}
+
+function confirmPacksStep() {
+  const accepted = [];
+  const rejected = [];
+  Object.keys(packDecisions.value).forEach((filename) => {
+    if (packDecisions.value[filename]) {
+      accepted.push(filename);
+    } else {
+      rejected.push(filename);
+    }
+  });
+  emit('server-packs-choice', {
+    accepted,
+    rejected,
+    remember: Boolean(rememberPacks.value),
+  });
+
+  if (hasShaderPrompt.value) {
+    promptStep.value = 'shaders';
+  } else {
+    promptStep.value = null;
+  }
+}
+
+function confirmShaderStep(enabled) {
+  emit('shader-choice', {
+    enabled: Boolean(enabled),
+    remember: Boolean(rememberShaders.value),
+  });
+  promptStep.value = null;
+}
 
 const stopping = ref(false);
 const activeTipIndex = ref(0);
@@ -776,5 +1085,15 @@ onBeforeUnmount(() => {
 
 .animate-fade-in {
   animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.drawer-expand-enter-active,
+.drawer-expand-leave-active {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.drawer-expand-enter-from,
+.drawer-expand-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 </style>

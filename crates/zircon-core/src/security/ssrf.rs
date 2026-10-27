@@ -11,6 +11,8 @@
 //!
 //! Port of `com.mcmanager.core.util.SecurityUtil`.
 
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
+
 /// Hosts the wrapper is allowed to fetch from. A URL is safe when its host
 /// equals one of these or is a strict subdomain of one.
 pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
@@ -31,6 +33,9 @@ pub const ALLOWED_CDN_DOMAINS: &[&str] = &[
     "launchermeta.mojang.com",
     // Adoptium JDK metadata API (Phase 2: supply-chain-verified Java toolchain).
     "api.adoptium.net",
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
 ];
 
 /// Returns `true` if the URL is strictly HTTPS, has no custom port, and its
@@ -46,19 +51,108 @@ pub fn is_safe_cdn_url(url: &str) -> bool {
         return false;
     }
 
-    // 2. Disallow explicit custom ports (prevent internal network scanning).
-    if parsed.port().is_some() {
+    // 2. Disallow explicit custom ports and embedded userinfo credentials.
+    if parsed.port().is_some() || !parsed.username().is_empty() || parsed.password().is_some() {
         return false;
+    }
+
+    // 3. Reject raw IPv4/IPv6 literals (including decimal, octal, and IPv4-mapped IPv6).
+    match parsed.host() {
+        Some(url::Host::Domain(_)) => {}
+        _ => return false,
     }
 
     let host = match parsed.host_str() {
         Some(host) if !host.is_empty() => host,
         _ => return false,
     };
-    let host_lower = host.to_ascii_lowercase();
+    let host_lower = host.trim_end_matches('.').to_ascii_lowercase();
+    if host_lower.parse::<IpAddr>().is_ok() {
+        return false;
+    }
+
     ALLOWED_CDN_DOMAINS
         .iter()
         .any(|allowed| host_lower == *allowed || host_lower.ends_with(&format!(".{allowed}")))
+}
+
+/// Returns `true` if `ip` is a globally routable public unicast IP address.
+/// Strictly blocks loopback, RFC1918 private, link-local (`169.254.0.0/16`, `fe80::/10`),
+/// CGNAT (`100.64.0.0/10`), AWS/cloud metadata (`169.254.169.254`, `fd00:ec2::254`),
+/// unique local (`fc00::/7`), multicast, broadcast, unspecified, and IPv4-mapped/compatible IPv6.
+pub fn is_public_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => is_public_ipv4(v4),
+        IpAddr::V6(v6) => {
+            if let Some(mapped_v4) = v6.to_ipv4_mapped().or_else(|| v6.to_ipv4()) {
+                return is_public_ipv4(mapped_v4);
+            }
+            let segs = v6.segments();
+            !v6.is_loopback()
+                && !v6.is_unspecified()
+                && !v6.is_multicast()
+                // Unique Local Addresses (fc00::/7, includes fd00:ec2::254 AWS IPv6 metadata)
+                && (segs[0] & 0xfe00) != 0xfc00
+                // Link-local unicast (fe80::/10)
+                && (segs[0] & 0xffc0) != 0xfe80
+                // Documentation (2001:db8::/32)
+                && !(segs[0] == 0x2001 && segs[1] == 0x0db8)
+        }
+    }
+}
+
+fn is_public_ipv4(v4: Ipv4Addr) -> bool {
+    let octets = v4.octets();
+    !v4.is_private()
+        && !v4.is_loopback()
+        && !v4.is_link_local()
+        && !v4.is_broadcast()
+        && !v4.is_documentation()
+        && !v4.is_unspecified()
+        && !v4.is_multicast()
+        // 0.0.0.0/8 ("this" network)
+        && octets[0] != 0
+        // 100.64.0.0/10 (Carrier-Grade NAT / RFC 6598)
+        && !(octets[0] == 100 && (octets[1] & 0b1100_0000) == 64)
+        // 192.0.0.0/24 (IETF Protocol Assignments)
+        && !(octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
+        // 198.18.0.0/15 (Benchmarking)
+        && !(octets[0] == 198 && (octets[1] & 0xfe) == 18)
+        // 240.0.0.0/4 (Reserved)
+        && octets[0] >= 1 && octets[0] < 240
+}
+
+/// Resolves the CDN URL's hostname once, verifies every resolved IP is a public
+/// unicast address, and returns `(host, validated_socket_addrs)` so the caller can
+/// pin them on `reqwest::ClientBuilder::resolve_to_addrs` to eliminate DNS rebinding TOCTOU.
+pub fn resolve_and_validate_cdn_url(url: &str) -> Result<(String, Vec<SocketAddr>), String> {
+    if !is_safe_cdn_url(url) {
+        return Err(format!("URL failed CDN allowlist check: {url}"));
+    }
+    let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL {url}: {e}"))?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| format!("Missing host in URL: {url}"))?
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    let port = parsed.port_or_known_default().unwrap_or(443);
+
+    let addrs: Vec<SocketAddr> = (host.as_str(), port)
+        .to_socket_addrs()
+        .map_err(|e| format!("DNS resolution failed for {host}: {e}"))?
+        .collect();
+    if addrs.is_empty() {
+        return Err(format!("DNS resolution returned no addresses for {host}"));
+    }
+    for addr in &addrs {
+        if !is_public_ip(addr.ip()) {
+            return Err(format!(
+                "SSRF protection blocked non-public IP {} resolved for host {host}",
+                addr.ip()
+            ));
+        }
+    }
+    Ok((host, addrs))
 }
 
 #[cfg(test)]
@@ -138,6 +232,8 @@ mod tests {
         ));
         assert!(!is_safe_cdn_url("https://modrinth.com.evil.com/x.jar"));
         assert!(!is_safe_cdn_url("https://notmodrinth.com/x.jar"));
+        assert!(!is_safe_cdn_url("https://user:pass@cdn.modrinth.com/x.jar"));
+        assert!(!is_safe_cdn_url("https://127.0.0.1/"));
     }
 
     #[test]
@@ -145,5 +241,21 @@ mod tests {
         assert!(!is_safe_cdn_url("not a url"));
         assert!(!is_safe_cdn_url("file:///etc/passwd"));
         assert!(!is_safe_cdn_url(""));
+    }
+
+    #[test]
+    fn test_is_public_ip() {
+        use std::str::FromStr;
+        assert!(!is_public_ip(IpAddr::from_str("127.0.0.1").unwrap()));
+        assert!(!is_public_ip(IpAddr::from_str("10.0.0.1").unwrap()));
+        assert!(!is_public_ip(IpAddr::from_str("172.16.0.1").unwrap()));
+        assert!(!is_public_ip(IpAddr::from_str("192.168.1.1").unwrap()));
+        assert!(!is_public_ip(IpAddr::from_str("169.254.169.254").unwrap()));
+        assert!(!is_public_ip(IpAddr::from_str("::1").unwrap()));
+        assert!(!is_public_ip(IpAddr::from_str("fc00::1").unwrap()));
+        assert!(!is_public_ip(IpAddr::from_str("fe80::1").unwrap()));
+        assert!(!is_public_ip(IpAddr::from_str("::ffff:127.0.0.1").unwrap()));
+        assert!(is_public_ip(IpAddr::from_str("8.8.8.8").unwrap()));
+        assert!(is_public_ip(IpAddr::from_str("1.1.1.1").unwrap()));
     }
 }

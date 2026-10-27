@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
-use tauri::{AppHandle, State};
+use tauri::State;
 
 use zircon_core::api::modrinth::ModrinthSearchHit;
 use zircon_core::model::{BillOfMaterials, ModLoaderType};
@@ -23,6 +23,7 @@ pub async fn search_mods(
     origin: Option<String>,
     project_type: Option<String>,
     all_versions: Option<bool>,
+    loader_filter: Option<String>,
 ) -> Result<Vec<UnifiedSearchHit>, String> {
     let (inst_mc_ver, inst_loader) = resolve_mc_and_loader(&state, &instance_id);
     let mc_ver = if all_versions.unwrap_or(false) {
@@ -30,7 +31,11 @@ pub async fn search_mods(
     } else {
         inst_mc_ver.as_deref()
     };
-    let loader = inst_loader.as_deref();
+    let loader = match loader_filter.as_deref() {
+        Some("all") => None,
+        Some(custom) if !custom.trim().is_empty() => Some(custom.trim()),
+        _ => inst_loader.as_deref(),
+    };
     let p_type = project_type.as_deref().unwrap_or("mod");
     let provider = origin.as_deref().unwrap_or("modrinth");
 
@@ -78,6 +83,19 @@ pub async fn search_mods(
                         }
                     });
                 let author = m.authors_string();
+
+                let mut loaders_set = std::collections::HashSet::new();
+                for f in &m.latest_files {
+                    for gv in &f.game_versions {
+                        let low = gv.to_lowercase();
+                        if low == "fabric" || low == "quilt" || low == "forge" || low == "neoforge" {
+                            loaders_set.insert(low);
+                        }
+                    }
+                }
+                let mut loaders: Vec<String> = loaders_set.into_iter().collect();
+                loaders.sort();
+
                 UnifiedSearchHit {
                     id: m.id.to_string(),
                     project_id: m.id.to_string(),
@@ -93,6 +111,7 @@ pub async fn search_mods(
                     project_url: website_url.clone(),
                     website_url,
                     origin: "curseforge".to_string(),
+                    loaders,
                 }
             })
             .collect();
@@ -118,6 +137,16 @@ pub async fn search_mods(
                 } else {
                     &h.project_id
                 };
+
+                let known_loaders = ["fabric", "quilt", "neoforge", "forge"];
+                let mut loaders = Vec::new();
+                for c in h.categories.iter().chain(h.display_categories.iter()) {
+                    let low = c.to_lowercase();
+                    if known_loaders.contains(&low.as_str()) && !loaders.contains(&low) {
+                        loaders.push(low);
+                    }
+                }
+
                 UnifiedSearchHit {
                     id: h.project_id.clone(),
                     project_id: h.project_id.clone(),
@@ -137,6 +166,7 @@ pub async fn search_mods(
                     project_url: format!("https://modrinth.com/project/{slug_or_id}"),
                     website_url: format!("https://modrinth.com/project/{slug_or_id}"),
                     origin: "modrinth".to_string(),
+                    loaders,
                 }
             })
             .collect();
@@ -315,88 +345,6 @@ pub async fn install_modrinth_pack(
     .await
 }
 
-/// Applies the 1-Click Cinematic Graphics Preset:
-/// Installs Sodium/Embeddium + Iris/Oculus matching the instance's loader and MC version,
-/// downloads Complementary Shaders Reimagined into shaderpacks/, and configures optionsshaders.txt.
-#[tauri::command]
-pub async fn apply_cinematic_graphics_preset(
-    app: AppHandle,
-    state: State<'_, LauncherState>,
-    instance_id: String,
-) -> Result<String, String> {
-    let Some(instance) = state.offline.load(&instance_id) else {
-        return Err("Instance not found".to_string());
-    };
-
-    let loader = instance.mod_loader.r#type.to_ascii_lowercase();
-    let is_fabric_or_quilt = loader == "fabric" || loader == "quilt";
-    let is_forge = loader == "forge";
-    let is_neoforge = loader == "neoforge" || loader == "neo_forge";
-
-    // 1. Determine rendering and shader mods
-    let (rendering_mod_id, shaders_mod_id) = if is_fabric_or_quilt {
-        ("AANobbMI", "YL57xq9U") // Sodium + Iris
-    } else if is_neoforge {
-        // NeoForge 1.21+ supports Sodium and Iris natively
-        ("AANobbMI", "YL57xq9U")
-    } else if is_forge {
-        ("sk9e56i6", "A53hv2m5") // Embeddium + Oculus
-    } else {
-        return Err("Cinematic Shaders require a mod loader (Fabric, Quilt, NeoForge, or Forge). Please install Fabric on this instance.".to_string());
-    };
-
-    emit_status(&app, "Installing Sodium / Embeddium rendering engine...".to_string());
-    let _ = install_modrinth_pack_inner(
-        &state,
-        &instance_id,
-        rendering_mod_id,
-        None,
-        Some("mod"),
-    )
-    .await;
-
-    emit_status(&app, "Installing Iris / Oculus shader pipeline...".to_string());
-    let _ = install_modrinth_pack_inner(
-        &state,
-        &instance_id,
-        shaders_mod_id,
-        None,
-        Some("mod"),
-    )
-    .await;
-
-    emit_status(&app, "Downloading Complementary Shaders (Reimagined)...".to_string());
-    let shader_filename = match install_modrinth_pack_inner(
-        &state,
-        &instance_id,
-        "R2Fr3SZJ", // Complementary Reimagined
-        None,
-        Some("shader"),
-    )
-    .await {
-        Ok(name) => name,
-        Err(_) => {
-            install_modrinth_pack_inner(
-                &state,
-                &instance_id,
-                "complementary-unbound",
-                None,
-                Some("shader"),
-            )
-            .await
-            .unwrap_or_else(|_| "ComplementaryReimagined.zip".to_string())
-        }
-    };
-
-    // Configure optionsshaders.txt
-    let instance_dir = state.offline.instance_dir(&instance.id);
-    let options_shaders_path = instance_dir.join("optionsshaders.txt");
-    let options_content = format!("shaderPack={shader_filename}\nantialiasing=0\nshadowDistance=12\n");
-    let _ = tokio::fs::write(&options_shaders_path, options_content).await;
-
-    emit_status(&app, format!("Cinematic Graphics preset enabled with {shader_filename}!"));
-    Ok(shader_filename)
-}
 
 /// Searches Modrinth for mods compatible with an offline instance's Minecraft
 /// version + loader. (Preserved for compatibility)

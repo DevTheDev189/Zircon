@@ -27,6 +27,22 @@ pub(crate) const MAX_CONNS_PER_IP: usize = 25;
 /// Cap on buffered HTTP head bytes during `X-Zircon-Real-IP` injection.
 pub(crate) const MAX_HTTP_HEAD_BYTES: usize = 16 * 1024;
 
+/// Canonicalizes IPv4-mapped IPv6 addresses (`::ffff:a.b.c.d` -> `a.b.c.d`)
+/// and masks global IPv6 addresses to their `/64` prefix so a single IPv6
+/// `/64` host allocation cannot bypass `MAX_CONNS_PER_IP`.
+fn normalize_quota_ip(ip: std::net::IpAddr) -> std::net::IpAddr {
+    match ip.to_canonical() {
+        std::net::IpAddr::V4(v4) => std::net::IpAddr::V4(v4),
+        std::net::IpAddr::V6(v6) if v6.is_loopback() => std::net::IpAddr::V6(v6),
+        std::net::IpAddr::V6(v6) => {
+            let segs = v6.segments();
+            std::net::IpAddr::V6(std::net::Ipv6Addr::new(
+                segs[0], segs[1], segs[2], segs[3], 0, 0, 0, 0,
+            ))
+        }
+    }
+}
+
 impl TcpMultiplexer {
     pub(crate) fn spawn_listener(&self, port: u16, fixed_instance: Option<InstanceConfig>) -> JoinHandle<()> {
         let this = self.clone();
@@ -115,7 +131,7 @@ impl TcpMultiplexer {
                         // every other player.
                         let peer_ip = socket
                             .peer_addr()
-                            .map(|addr| addr.ip())
+                            .map(|addr| normalize_quota_ip(addr.ip()))
                             .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
                         let this = this.clone();
                         let ip_conns = this.ip_conns.clone();
@@ -190,19 +206,37 @@ impl TcpMultiplexer {
     /// target is the admin web server, the real client IP is injected into the
     /// request head so the web layer can key rate limits on it.
     pub(crate) async fn proxy(&self, client: TcpStream, initial: Vec<u8>, port: u16) -> io::Result<()> {
+        let mut client = client;
+        let mut to_write = initial;
+        if port == self.web_port {
+            let peer_ip = client
+                .peer_addr()
+                .map(|addr| addr.ip().to_canonical())
+                .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
+            to_write = tokio::time::timeout(
+                PROTOCOL_DETECTION_TIMEOUT,
+                prepare_http_forward(to_write, &mut client, peer_ip),
+            )
+            .await
+            .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "HTTP header read timed out"))??;
+        }
+
         // Annotate the connect failure with the backend target so the accept
         // loop's warning says *which* backend refused — e.g. the web server
         // (25564, a real problem) vs a sleeping Minecraft instance's internal
         // port (expected until the launcher wakes it).
-        let mut backend = TcpStream::connect((BACKEND_HOST, port))
-            .await
-            .map_err(|e| {
-                io::Error::new(
-                    e.kind(),
-                    format!("connect to backend {BACKEND_HOST}:{port}: {e}"),
-                )
-            })?;
-        let mut client = client;
+        let mut backend = tokio::time::timeout(
+            PROTOCOL_DETECTION_TIMEOUT,
+            TcpStream::connect((BACKEND_HOST, port)),
+        )
+        .await
+        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, format!("connect to backend {BACKEND_HOST}:{port} timed out")))?
+        .map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("connect to backend {BACKEND_HOST}:{port}: {e}"),
+            )
+        })?;
 
         // Disable Nagle's algorithm on both legs of the proxy so small game packets
         // (movement, combat, clicks, position updates) are sent immediately with
@@ -210,13 +244,10 @@ impl TcpMultiplexer {
         let _ = client.set_nodelay(true);
         let _ = backend.set_nodelay(true);
 
-        let mut to_write = initial;
-        if port == self.web_port {
-            if let Ok(peer) = client.peer_addr() {
-                to_write = prepare_http_forward(to_write, &mut client, peer.ip()).await;
-            }
-        }
-        backend.write_all(&to_write).await?;
+        tokio::time::timeout(PROTOCOL_DETECTION_TIMEOUT, backend.write_all(&to_write))
+            .await
+            .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "write to backend timed out"))??;
+
         tokio::io::copy_bidirectional(&mut client, &mut backend).await?;
         Ok(())
     }
@@ -244,37 +275,14 @@ impl Drop for IpConnGuard {
     }
 }
 
-/// Rewrites the head of an HTTP request being proxied to the loopback web
-/// server so the web layer sees the real client address:
-///
-/// * completes the request head by reading from `client` until `\r\n\r\n`
-///   (bounded), then
-/// * strips any attacker-supplied `X-Zircon-Real-IP` header (and, for non-
-///   WebSocket requests, `Connection` headers too), then
-/// * injects the multiplexer's own `X-Zircon-Real-IP: <client ip>` — the web
-///   server binds loopback-only, so only this trusted proxy may set that
-///   header — and
-/// * forces `Connection: close` so every proxied request is the first (and
-///   only) request on its connection and therefore always carries the header
-///   (no keep-alive reuse that could bypass the rate limiter's IP keying).
-///
-/// WebSocket upgrade requests keep their original `Connection: Upgrade`
-/// header — replacing it with `Connection: close` makes the upstream server
-/// reject the handshake with HTTP 400.
-///
-/// Without the strip step, a remote client could send its own
-/// `X-Zircon-Real-IP` header; because it appears before the injected header,
-/// the web layer's single-header lookup would trust the spoofed value and
-/// the attacker could bypass per-IP rate limits and poison audit trails.
-///
-/// Falls back to the buffered bytes unchanged when the head cannot be
-/// completed within the cap, so a stalled or oversized request is still
-/// forwarded (unmodified) rather than dropped.
+/// Fails closed with `InvalidData` when the HTTP header block cannot be
+/// completed within `MAX_HTTP_HEAD_BYTES` so an oversized or stalled request
+/// can never bypass header sanitization.
 pub(crate) async fn prepare_http_forward(
     mut buf: Vec<u8>,
     client: &mut TcpStream,
     client_ip: std::net::IpAddr,
-) -> Vec<u8> {
+) -> io::Result<Vec<u8>> {
     while !buf.windows(4).any(|w| w == b"\r\n\r\n") && buf.len() < MAX_HTTP_HEAD_BYTES {
         let mut tmp = [0u8; 2048];
         let n = match client.read(&mut tmp).await {
@@ -284,7 +292,10 @@ pub(crate) async fn prepare_http_forward(
         buf.extend_from_slice(&tmp[..n]);
     }
     let Some(head_end) = buf.windows(4).position(|w| w == b"\r\n\r\n") else {
-        return buf;
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "incomplete or oversized HTTP request header",
+        ));
     };
 
     let head_str = String::from_utf8_lossy(&buf[..head_end]);
@@ -292,26 +303,40 @@ pub(crate) async fn prepare_http_forward(
 
     // WebSocket handshakes need their `Connection: Upgrade` header preserved;
     // forcing `Connection: close` here makes Axum/Hyper reject the upgrade
-    // with HTTP 400 Bad Request.
-    let is_ws = head_str.lines().any(|line| {
-        let lower = line.to_ascii_lowercase();
-        lower.starts_with("upgrade:") && lower.contains("websocket")
+    // with HTTP 400 Bad Request. Only GET requests with Sec-WebSocket-Key are
+    // valid RFC 6455 WebSocket upgrades.
+    let is_get_request = head_str
+        .split("\r\n")
+        .next()
+        .map(|req| req.starts_with("GET "))
+        .unwrap_or(false);
+    let has_ws_upgrade = head_str.split("\r\n").skip(1).any(|line| {
+        let Some((name, val)) = line.split_once(':') else { return false };
+        name.trim().eq_ignore_ascii_case("upgrade")
+            && val.to_ascii_lowercase().contains("websocket")
     });
+    let has_ws_key = head_str.split("\r\n").skip(1).any(|line| {
+        let Some((name, _)) = line.split_once(':') else { return false };
+        name.trim().eq_ignore_ascii_case("sec-websocket-key")
+    });
+    let is_ws = is_get_request && has_ws_upgrade && has_ws_key;
 
-    for (i, line) in head_str.lines().enumerate() {
+    for (i, line) in head_str.split("\r\n").enumerate() {
         if i == 0 {
             // Preserve the request line, e.g. "GET /index.html HTTP/1.1".
             sanitized_lines.push(line.to_string());
             continue;
         }
-        let lower = line.to_ascii_lowercase();
-        // Drop attacker-injected real-IP overrides.
-        if lower.starts_with("x-zircon-real-ip:") {
+        // Reject obs-fold / bare-CR or malformed header lines without a colon.
+        let Some((raw_name, _)) = line.split_once(':') else {
+            continue;
+        };
+        if raw_name.starts_with([' ', '\t', '\r']) || line.contains('\r') {
             continue;
         }
-        // Keep the original `Connection: Upgrade` for WebSocket handshakes,
-        // but strip any other Connection header so we stay in control below.
-        if !is_ws && lower.starts_with("connection:") {
+        let name = raw_name.trim().to_ascii_lowercase();
+        // Drop attacker-injected real-IP overrides and Connection/Upgrade headers.
+        if name == "x-zircon-real-ip" || name == "connection" || (!is_ws && name == "upgrade") {
             continue;
         }
         sanitized_lines.push(line.to_string());
@@ -319,14 +344,16 @@ pub(crate) async fn prepare_http_forward(
 
     // Append our verified headers.
     sanitized_lines.push(format!("X-Zircon-Real-IP: {client_ip}"));
-    if !is_ws {
+    if is_ws {
+        sanitized_lines.push("Connection: Upgrade".to_string());
+    } else {
         sanitized_lines.push("Connection: close".to_string());
     }
 
     let mut out = sanitized_lines.join("\r\n").into_bytes();
     out.extend_from_slice(b"\r\n\r\n");
     out.extend_from_slice(&buf[head_end + 4..]); // Append any body bytes already buffered
-    out
+    Ok(out)
 }
 
 

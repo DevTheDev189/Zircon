@@ -225,10 +225,13 @@ pub struct ConfigService {
 
 impl ConfigService {
     /// Loads the wrapper config. The data dir comes from the
-    /// `MC_MANAGER_DATA_DIR` environment variable when set, otherwise
-    /// `<cwd>/server-data`.
+    /// `ZIRCON_DATA_DIR` or `MC_MANAGER_DATA_DIR` environment variables when set,
+    /// otherwise `<cwd>/server-data`.
     pub fn load() -> std::io::Result<Self> {
-        Self::load_with_data_dir(std::env::var("MC_MANAGER_DATA_DIR").ok())
+        let dir = std::env::var("ZIRCON_DATA_DIR")
+            .or_else(|_| std::env::var("MC_MANAGER_DATA_DIR"))
+            .ok();
+        Self::load_with_data_dir(dir)
     }
 
     pub fn load_with_data_dir(override_dir: Option<String>) -> std::io::Result<Self> {

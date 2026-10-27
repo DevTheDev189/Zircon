@@ -22,14 +22,14 @@
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <h2 class="text-sm font-bold text-slate-100 tracking-wide truncate">
-                {{ crashData?.analysis?.title || $t('crash_dialog.title_default') }}
+                {{ crashData?.analysis?.title || $t('crash_dialog.default_title') }}
               </h2>
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
                 {{ $t('crash_dialog.exit_code', { code: crashData?.code ?? 1 }) }}
               </span>
             </div>
             <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2 font-sans">
-              <span>{{ $t('crash_dialog.instance_label') }} <span class="text-slate-200 font-medium">{{ crashData?.label || $t('crash_dialog.game_default') }}</span></span>
+              <span>{{ $t('crash_dialog.instance_label', { name: crashData?.label || 'Minecraft' }) }}</span>
               <span v-if="crashData?.analysis?.category" class="text-slate-600">•</span>
               <span v-if="crashData?.analysis?.category" class="text-cyan-400 font-mono">{{ crashData.analysis.category }}</span>
             </div>
@@ -56,10 +56,10 @@
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>{{ $t('crash_dialog.plain_english_diagnosis') }}</span>
+              <span>{{ $t('crash_dialog.diagnosis_title') }}</span>
             </div>
             <p class="text-slate-300 leading-relaxed font-sans text-xs">
-              {{ crashData?.analysis?.plainEnglishSummary || crashData?.analysis?.explanation || $t('crash_dialog.plain_english_default') }}
+              {{ crashData?.analysis?.plainEnglishSummary || crashData?.analysis?.explanation || $t('crash_dialog.default_summary') }}
             </p>
           </div>
 
@@ -74,14 +74,14 @@
               </svg>
             </div>
             <div class="min-w-0">
-              <span class="font-bold text-cyan-300 block text-xs mb-0.5">{{ $t('crash_dialog.recommended_solution') }}</span>
+              <span class="font-bold text-cyan-300 block text-xs mb-0.5">{{ $t('crash_dialog.solution_title') }}</span>
               <span class="text-slate-300 leading-relaxed">{{ crashData.analysis.suggestedFix }}</span>
             </div>
           </div>
 
           <!-- 1-Click Action Buttons -->
           <div class="flex flex-col gap-2 mt-1">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ $t('crash_dialog.automated_remedies_title') }}</span>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ $t('crash_dialog.remedies_title') }}</span>
 
             <!-- Primary Action Button -->
             <button
@@ -102,7 +102,7 @@
                 </svg>
                 <span class="truncate">{{ primaryActionLabel }}</span>
               </div>
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/20 group-hover:bg-black/30 shrink-0">{{ $t('crash_dialog.one_click_fix_badge') }}</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/20 group-hover:bg-black/30 shrink-0">{{ $t('crash_dialog.one_click_tag') }}</span>
             </button>
 
             <!-- Secondary Actions (e.g. Rollback Snapshot) -->
@@ -119,13 +119,13 @@
                   </svg>
                   <span class="truncate">{{ getActionLabel(secAction) }}</span>
                 </div>
-                <span class="text-[10px] text-slate-400 font-mono">{{ $t('crash_dialog.rollback_badge') }}</span>
+                <span class="text-[10px] text-slate-400 font-mono">{{ $t('crash_dialog.rollback_tag') }}</span>
               </button>
             </div>
 
             <!-- Fallback if no automated actions were detected -->
             <div v-if="!primaryAction && !secondaryActions.length" class="text-slate-400 text-xs italic p-3 rounded-xl bg-slate-900/50 border border-slate-800">
-              {{ $t('crash_dialog.no_remedy_fallback') }}
+              {{ $t('crash_dialog.no_automated_fix') }}
             </div>
 
             <!-- Remediation Feedback Status Banner -->
@@ -154,7 +154,7 @@
                 <span class="w-2 h-2 rounded-full bg-amber-500/80"></span>
                 <span class="w-2 h-2 rounded-full bg-emerald-500/80"></span>
               </div>
-              <span class="text-xs font-semibold text-slate-300 ml-1">{{ $t('crash_dialog.crash_log_trace') }}</span>
+              <span class="text-xs font-semibold text-slate-300 ml-1">{{ $t('crash_dialog.trace_title') }}</span>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -169,7 +169,7 @@
                 class="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 transition"
                 @click="toggleFullLog"
               >
-                <span>{{ showFullLog ? $t('crash_dialog.show_snippet') : $t('crash_dialog.show_full_log') }}</span>
+                <span>{{ showFullLog ? $t('crash_dialog.show_snippet') : $t('crash_dialog.show_full') }}</span>
               </button>
             </div>
           </div>
@@ -191,32 +191,50 @@
               {{ line }}
             </div>
             <div v-if="!displayedLogLines.length" class="text-slate-500 italic">
-              {{ $t('crash_dialog.no_logs_recorded') }}
+              {{ $t('crash_dialog.no_log_lines') }}
             </div>
           </div>
         </div>
       </div>
 
       <!-- Footer Actions -->
-      <div class="px-6 py-3.5 border-t border-slate-800/80 bg-slate-950/70 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          class="z-btn-ghost text-xs px-3.5 py-1.5 rounded-xl border border-slate-700 hover:border-slate-600 flex items-center gap-2 transition text-slate-300 hover:text-white"
-          @click="copyDiagnostics"
-        >
-          <svg v-if="!copied" class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-          </svg>
-          <svg v-else class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <span>{{ copied ? $t('crash_dialog.copied') : $t('crash_dialog.copy_crash_log') }}</span>
-        </button>
+      <div class="px-6 py-3.5 border-t border-slate-800/80 bg-slate-950/70 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            class="z-btn-ghost text-xs px-3.5 py-1.5 rounded-xl border border-slate-700 hover:border-slate-600 flex items-center gap-2 transition text-slate-300 hover:text-white"
+            @click="copyDiagnostics"
+          >
+            <svg v-if="!copied" class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+            <svg v-else class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{{ copied ? $t('crash_dialog.copied') : $t('crash_dialog.copy_log') }}</span>
+          </button>
+
+          <!-- 1-Click Discord Bug Reporting Button -->
+          <button
+            type="button"
+            class="text-xs px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-2 transition text-white bg-[#5865F2] hover:bg-[#4752C4] shadow-[0_0_12px_rgba(88,101,242,0.35)]"
+            :title="$t('crash_dialog.discord_tooltip')"
+            @click="copyDiagnosticReportToDiscord"
+          >
+            <svg v-if="!copiedDiscord" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+            </svg>
+            <svg v-else class="w-3.5 h-3.5 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>{{ copiedDiscord ? $t('crash_dialog.copied_discord') : $t('crash_dialog.copy_discord') }}</span>
+          </button>
+        </div>
 
         <div class="flex items-center gap-2">
           <button
             type="button"
-            class="z-btn-primary text-xs px-5 py-1.5 rounded-xl font-bold transition"
+            class="z-btn-primary text-xs px-5 py-1.5 rounded-xl font-bold transition cursor-pointer"
             @click="dismiss"
           >
             {{ $t('crash_dialog.dismiss') }}
@@ -244,6 +262,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'relaunch']);
 const copied = ref(false);
+const copiedDiscord = ref(false);
 const remediating = ref(false);
 const remediationResult = ref(null);
 const showFullLog = ref(false);
@@ -378,6 +397,58 @@ async function copyDiagnostics() {
     }, 2500);
   } catch (err) {
     console.error('Failed to copy to clipboard:', err);
+  }
+}
+
+function sanitizePath(str) {
+  if (!str) return '';
+  return str
+    .replace(/[A-Za-z]:\\Users\\[^\\]+/gi, '%USERPROFILE%')
+    .replace(/\/home\/[^/]+/gi, '~')
+    .replace(/\/Users\/[^/]+/gi, '~');
+}
+
+async function copyDiagnosticReportToDiscord() {
+  if (!props.crashData) return;
+  const analysis = props.crashData.analysis || {};
+  const rawLines = analysis.relevantLines || [];
+  const sanitizedLines = rawLines.map((l) => sanitizePath(l)).slice(-30);
+
+  const text = [
+    `**Minecraft Crash Report (Zircon v0.9.0)**`,
+    `- **Instance**: ${sanitizePath(props.crashData.label || 'Minecraft')}`,
+    `- **Exit Code**: \`${props.crashData.code ?? 1}\``,
+    `- **Category**: \`${analysis.category || 'General Crash'}\``,
+    `- **Title**: ${analysis.title || 'Unknown Error'}`,
+    `- **Diagnosis**: ${analysis.plainEnglishSummary || analysis.explanation || 'No detailed explanation available.'}`,
+    analysis.suggestedFix ? `- **Suggested Fix**: ${analysis.suggestedFix}` : '',
+    '',
+    '```log',
+    ...sanitizedLines,
+    '```',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedDiscord.value = true;
+    setTimeout(() => {
+      copiedDiscord.value = false;
+    }, 3000);
+  } catch (err) {
+    console.error('Failed to copy diagnostics:', err);
+  }
+
+  // Open official Discord #bug-reports channel
+  try {
+    if (api && typeof api.openBrowserUrl === 'function') {
+      await api.openBrowserUrl('https://discord.gg/zircon');
+    } else {
+      window.open('https://discord.gg/zircon', '_blank');
+    }
+  } catch {
+    window.open('https://discord.gg/zircon', '_blank');
   }
 }
 </script>

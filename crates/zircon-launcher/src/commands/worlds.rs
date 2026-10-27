@@ -28,8 +28,15 @@ pub async fn get_world_seed_radar_preview(
     center_z: Option<i32>,
     radius_blocks: Option<i32>,
     zoom: Option<f32>,
+    dimension: Option<String>,
 ) -> Result<zircon_core::world::WorldPreviewResult, String> {
     let game_dir = resolve_instance_game_dir(&state, &instance_id)?;
+    let parsed_dim = dimension.and_then(|d| match d.to_lowercase().as_str() {
+        "nether" | "the_nether" | "thenether" | "minecraft:the_nether" => Some(zircon_core::world::Dimension::TheNether),
+        "end" | "the_end" | "theend" | "minecraft:the_end" => Some(zircon_core::world::Dimension::TheEnd),
+        _ => Some(zircon_core::world::Dimension::Overworld),
+    });
+
     tokio::task::spawn_blocking(move || {
         crate::worlds::get_world_radar_preview(
             &game_dir,
@@ -39,6 +46,37 @@ pub async fn get_world_seed_radar_preview(
             center_z.unwrap_or(0),
             radius_blocks.unwrap_or(384),
             zoom.unwrap_or(1.0),
+            parsed_dim,
+        )
+        .map_err(err_string)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {e}"))?
+}
+
+#[tauri::command]
+pub async fn get_instance_world_region_tile(
+    state: State<'_, LauncherState>,
+    instance_id: String,
+    world_folder: Option<String>,
+    dimension: Option<String>,
+    rx: i32,
+    rz: i32,
+) -> Result<Option<String>, String> {
+    let game_dir = resolve_instance_game_dir(&state, &instance_id)?;
+    let parsed_dim = dimension.and_then(|d| match d.to_lowercase().as_str() {
+        "nether" | "the_nether" | "thenether" | "minecraft:the_nether" => Some(zircon_core::world::Dimension::TheNether),
+        "end" | "the_end" | "theend" | "minecraft:the_end" => Some(zircon_core::world::Dimension::TheEnd),
+        _ => Some(zircon_core::world::Dimension::Overworld),
+    });
+
+    tokio::task::spawn_blocking(move || {
+        crate::worlds::get_world_region_tile(
+            &game_dir,
+            world_folder.as_deref(),
+            parsed_dim,
+            rx,
+            rz,
         )
         .map_err(err_string)
     })

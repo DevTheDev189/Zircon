@@ -38,6 +38,61 @@ pub fn create_offline_instance(
 }
 
 #[tauri::command]
+pub fn update_offline_instance(
+    state: State<'_, LauncherState>,
+    id: String,
+    name: Option<String>,
+    mc_version: Option<String>,
+    loader_type: Option<String>,
+    loader_version: Option<String>,
+    java_args: Option<String>,
+) -> Result<OfflineInstance, String> {
+    let Some(mut instance) = state.offline.load(&id) else {
+        return Err("Instance not found".to_string());
+    };
+
+    if let Some(n) = name {
+        if !n.trim().is_empty() {
+            instance.name = n.trim().to_string();
+        }
+    }
+
+    if let Some(mc) = mc_version {
+        let clean = mc.trim().to_string();
+        if !clean.is_empty() {
+            if !zircon_core::api::versions::is_supported_mc_version(&clean) {
+                return Err(format!(
+                    "Minecraft version '{clean}' is not supported. The minimum supported version is 1.7."
+                ));
+            }
+            instance.minecraft_version = clean;
+        }
+    }
+
+    if let Some(lt) = loader_type {
+        let clean_lt = lt.trim().to_lowercase();
+        if clean_lt == "vanilla" {
+            instance.mod_loader.r#type = "vanilla".to_string();
+            instance.mod_loader.version = String::new();
+        } else if let Some(loader_enum) = zircon_core::model::ModLoaderType::from_id(&clean_lt) {
+            instance.mod_loader.r#type = loader_enum.id().to_string();
+            if let Some(lv) = loader_version {
+                instance.mod_loader.version = lv.trim().to_string();
+            }
+        }
+    } else if let Some(lv) = loader_version {
+        instance.mod_loader.version = lv.trim().to_string();
+    }
+
+    if let Some(args) = java_args {
+        instance.java_args = args;
+    }
+
+    state.offline.save(&instance).map_err(err_string)?;
+    Ok(instance)
+}
+
+#[tauri::command]
 pub fn delete_offline_instance(state: State<'_, LauncherState>, id: String) -> Result<(), String> {
     let Some(instance) = state.offline.load(&id) else {
         return Err("Instance not found".to_string());
@@ -187,6 +242,11 @@ pub async fn install_modrinth_modpack(
     let primary = version
         .primary_file()
         .ok_or_else(|| "No downloadable file in modpack version".to_string())?;
+
+    // Pre-flight check on destination drive before initiating download
+    let required_preflight = std::cmp::max(primary.size as u64 * 4, 1024 * 1024 * 1024);
+    crate::paths::check_available_disk_space(state.offline.base_dir(), required_preflight)
+        .map_err(err_string)?;
 
     emit_status(&app, format!("Downloading modpack archive ({})...", primary.filename));
     let resp = state

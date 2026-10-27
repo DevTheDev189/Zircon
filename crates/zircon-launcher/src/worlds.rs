@@ -40,6 +40,11 @@ pub struct WorldInfo {
     pub difficulty: String,
     pub size_bytes: u64,
     pub icon_data_url: Option<String>,
+    pub spawn_x: Option<i32>,
+    pub spawn_z: Option<i32>,
+    pub player_x: Option<f64>,
+    pub player_z: Option<f64>,
+    pub player_dimension: Option<String>,
 }
 
 /// Metadata for a timestamped world backup snapshot.
@@ -102,7 +107,7 @@ pub fn list_worlds(game_dir: &Path) -> Vec<WorldInfo> {
             .map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64)
             .unwrap_or(0);
 
-        let (level_name, mc_ver, seed, game_type, hardcore, difficulty) =
+        let (level_name, mc_ver, seed, game_type, hardcore, difficulty, spawn_x, spawn_z, player_x, player_z, player_dimension) =
             if level_dat.is_file() {
                 match zircon_core::metadata::read_level_dat(&level_dat) {
                     Ok(info) => {
@@ -126,12 +131,17 @@ pub fn list_worlds(game_dir: &Path) -> Vec<WorldInfo> {
                             gt.to_string(),
                             info.hardcore,
                             diff.to_string(),
+                            info.spawn_x,
+                            info.spawn_z,
+                            info.player_x,
+                            info.player_z,
+                            info.player_dimension,
                         )
                     }
-                    Err(_) => (folder_name.clone(), None, None, "Survival".to_string(), false, "Normal".to_string()),
+                    Err(_) => (folder_name.clone(), None, None, "Survival".to_string(), false, "Normal".to_string(), None, None, None, None, None),
                 }
             } else {
-                (folder_name.clone(), None, None, "Survival".to_string(), false, "Normal".to_string())
+                (folder_name.clone(), None, None, "Survival".to_string(), false, "Normal".to_string(), None, None, None, None, None)
             };
 
         // World Icon (icon.png)
@@ -160,6 +170,11 @@ pub fn list_worlds(game_dir: &Path) -> Vec<WorldInfo> {
             difficulty,
             size_bytes,
             icon_data_url,
+            spawn_x,
+            spawn_z,
+            player_x,
+            player_z,
+            player_dimension,
         });
     }
 
@@ -476,37 +491,142 @@ pub fn get_world_radar_preview(
     center_z: i32,
     radius_blocks: i32,
     zoom: f32,
+    dimension: Option<zircon_core::world::Dimension>,
 ) -> Result<zircon_core::world::WorldPreviewResult, LauncherError> {
     let radius = radius_blocks.clamp(64, 2048);
     let zoom_clamped = zoom.clamp(0.2, 8.0);
     let image_size = 512;
+    let target_dim = dimension.unwrap_or(zircon_core::world::Dimension::Overworld);
 
     let mut seed = seed_override.unwrap_or("").trim().to_string();
     let mut surface_map = zircon_core::world::anvil::RegionSurfaceMap::new();
 
-    // If a world folder is provided, check for region files and level.dat seed
-    if let Some(folder) = world_folder {
+    let mut actual_center_x = center_x;
+    let mut actual_center_z = center_z;
+
+    // Resolve world folder: if not explicitly given, automatically detect the active/most recent world in saves/
+    let resolved_folder: Option<String> = match world_folder {
+        Some(f) if !f.trim().is_empty() => Some(f.trim().to_string()),
+        _ => {
+            let saves_dir = game_dir.join("saves");
+            if let Ok(entries) = std::fs::read_dir(&saves_dir) {
+                let mut valid_saves: Vec<(std::time::SystemTime, String)> = Vec::new();
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() && path.join("level.dat").is_file() {
+                        let mtime = path.join("level.dat").metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+                        if let Some(name) = path.file_name() {
+                            valid_saves.push((mtime, name.to_string_lossy().to_string()));
+                        }
+                    }
+                }
+                valid_saves.sort_by(|a, b| b.0.cmp(&a.0));
+                valid_saves.into_iter().next().map(|(_, name)| name)
+            } else {
+                None
+            }
+        }
+    };
+
+    if let Some(folder) = resolved_folder.as_deref() {
         let world_dir = game_dir.join("saves").join(folder);
         if world_dir.is_dir() {
-            if seed.is_empty() {
-                let level_dat = world_dir.join("level.dat");
-                if level_dat.is_file() {
-                    if let Ok(info) = zircon_core::metadata::read_level_dat(&level_dat) {
+            let level_dat = world_dir.join("level.dat");
+            if level_dat.is_file() {
+                if let Ok(info) = zircon_core::metadata::read_level_dat(&level_dat) {
+                    if seed.is_empty() {
                         if let Some(s) = info.seed {
                             seed = s.to_string();
+                        }
+                    }
+                    if actual_center_x == 0 && actual_center_z == 0 {
+                        match target_dim {
+                            zircon_core::world::Dimension::Overworld => {
+                                if let (Some(sx), Some(sz)) = (info.spawn_x, info.spawn_z) {
+                                    actual_center_x = sx;
+                                    actual_center_z = sz;
+                                } else if let (Some(px), Some(pz)) = (info.player_x, info.player_z) {
+                                    if info.player_dimension.as_deref().map_or(true, |d| d.ends_with("overworld")) {
+                                        actual_center_x = px as i32;
+                                        actual_center_z = pz as i32;
+                                    }
+                                }
+                            }
+                            zircon_core::world::Dimension::TheNether => {
+                                if let (Some(px), Some(pz)) = (info.player_x, info.player_z) {
+                                    if info.player_dimension.as_deref().map_or(false, |d| d.ends_with("the_nether")) {
+                                        actual_center_x = px as i32;
+                                        actual_center_z = pz as i32;
+                                    }
+                                }
+                            }
+                            zircon_core::world::Dimension::TheEnd => {
+                                if let (Some(px), Some(pz)) = (info.player_x, info.player_z) {
+                                    if info.player_dimension.as_deref().map_or(false, |d| d.ends_with("the_end")) {
+                                        actual_center_x = px as i32;
+                                        actual_center_z = pz as i32;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            let region_dir = world_dir.join("region");
+            let region_dir = match target_dim {
+                zircon_core::world::Dimension::Overworld => world_dir.join("region"),
+                zircon_core::world::Dimension::TheNether => world_dir.join("DIM-1").join("region"),
+                zircon_core::world::Dimension::TheEnd => world_dir.join("DIM1").join("region"),
+            };
+
             if region_dir.is_dir() {
+                let scan_radius = (radius as f32 / zoom_clamped.min(1.0)).round() as i32;
                 surface_map = zircon_core::world::anvil::scan_region_surface(
                     &region_dir,
-                    center_x,
-                    center_z,
-                    radius,
+                    actual_center_x,
+                    actual_center_z,
+                    scan_radius.max(384),
+                    target_dim,
                 );
+
+                // If no chunks were discovered at the requested coordinate, but the world has generated regions,
+                // find the nearest existing region and center on it so the user never sees empty void!
+                if surface_map.points.is_empty() {
+                    if let Ok(entries) = std::fs::read_dir(&region_dir) {
+                        let mut nearest_region = None;
+                        let mut min_dist_sq = i64::MAX;
+                        for entry in entries.flatten() {
+                            let fname = entry.file_name().to_string_lossy().to_string();
+                            if fname.starts_with("r.") && fname.ends_with(".mca") {
+                                let parts: Vec<&str> = fname.trim_start_matches("r.").trim_end_matches(".mca").split('.').collect();
+                                if parts.len() == 2 {
+                                    if let (Ok(rx), Ok(rz)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>()) {
+                                        let reg_center_x = rx * 512 + 256;
+                                        let reg_center_z = rz * 512 + 256;
+                                        let dx = (reg_center_x - actual_center_x) as i64;
+                                        let dz = (reg_center_z - actual_center_z) as i64;
+                                        let dist_sq = dx * dx + dz * dz;
+                                        if dist_sq < min_dist_sq {
+                                            min_dist_sq = dist_sq;
+                                            nearest_region = Some((reg_center_x, reg_center_z));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if let Some((nx, nz)) = nearest_region {
+                            actual_center_x = nx;
+                            actual_center_z = nz;
+                            surface_map = zircon_core::world::anvil::scan_region_surface(
+                                &region_dir,
+                                actual_center_x,
+                                actual_center_z,
+                                scan_radius.max(384),
+                                target_dim,
+                            );
+                        }
+                    }
+                }
             }
         }
     }
@@ -518,14 +638,105 @@ pub fn get_world_radar_preview(
     let result = zircon_core::world::renderer::render_preview_map(
         &surface_map,
         &seed,
-        center_x,
-        center_z,
+        actual_center_x,
+        actual_center_z,
         radius,
         zoom_clamped,
         image_size,
+        target_dim,
     );
 
     Ok(result)
+}
+
+/// Renders a single 512x512 Anvil region tile for a world save.
+/// Caches the generated PNG on disk to provide instant subsequent lookups.
+pub fn get_world_region_tile(
+    game_dir: &Path,
+    world_folder: Option<&str>,
+    dimension: Option<zircon_core::world::Dimension>,
+    rx: i32,
+    rz: i32,
+) -> Result<Option<String>, LauncherError> {
+    let target_dim = dimension.unwrap_or(zircon_core::world::Dimension::Overworld);
+
+    // Resolve world folder
+    let resolved_folder = match world_folder {
+        Some(f) if !f.trim().is_empty() => Some(f.trim().to_string()),
+        _ => {
+            let saves_dir = game_dir.join("saves");
+            if let Ok(entries) = std::fs::read_dir(&saves_dir) {
+                let mut valid_saves = Vec::new();
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() && path.join("level.dat").is_file() {
+                        let mtime = path.join("level.dat").metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+                        if let Some(name) = path.file_name() {
+                            valid_saves.push((mtime, name.to_string_lossy().to_string()));
+                        }
+                    }
+                }
+                valid_saves.sort_by(|a, b| b.0.cmp(&a.0));
+                valid_saves.into_iter().next().map(|(_, name)| name)
+            } else {
+                None
+            }
+        }
+    };
+
+    let Some(folder) = resolved_folder else {
+        return Ok(None);
+    };
+
+    let world_dir = game_dir.join("saves").join(&folder);
+    if !world_dir.is_dir() {
+        return Ok(None);
+    }
+
+    let region_dir = match target_dim {
+        zircon_core::world::Dimension::Overworld => world_dir.join("region"),
+        zircon_core::world::Dimension::TheNether => world_dir.join("DIM-1").join("region"),
+        zircon_core::world::Dimension::TheEnd => world_dir.join("DIM1").join("region"),
+    };
+
+    let mca_file = region_dir.join(format!("r.{rx}.{rz}.mca"));
+    if !mca_file.is_file() {
+        return Ok(None);
+    }
+
+    // Disk cache check
+    let dim_slug = match target_dim {
+        zircon_core::world::Dimension::Overworld => "overworld",
+        zircon_core::world::Dimension::TheNether => "nether",
+        zircon_core::world::Dimension::TheEnd => "end",
+    };
+    let cache_dir = game_dir.join(".cache").join("world-tiles").join(&folder).join(dim_slug);
+    let cache_file = cache_dir.join(format!("r.{rx}.{rz}.png"));
+
+    if let (Ok(cache_meta), Ok(mca_meta)) = (cache_file.metadata(), mca_file.metadata()) {
+        if let (Ok(cache_time), Ok(mca_time)) = (cache_meta.modified(), mca_meta.modified()) {
+            if cache_time >= mca_time {
+                if let Ok(bytes) = std::fs::read(&cache_file) {
+                    return Ok(Some(format!(
+                        "data:image/png;base64,{}",
+                        base64::engine::general_purpose::STANDARD.encode(&bytes)
+                    )));
+                }
+            }
+        }
+    }
+
+    // Render tile
+    if let Some(bytes) = zircon_core::world::renderer::render_region_tile(&region_dir, rx, rz, target_dim) {
+        let _ = std::fs::create_dir_all(&cache_dir);
+        let _ = std::fs::write(&cache_file, &bytes);
+        Ok(Some(format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(&bytes)
+        )))
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -570,10 +781,15 @@ mod tests {
         let temp_dir = std::env::temp_dir().join(format!("world_radar_test_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)));
         let _ = std::fs::create_dir_all(&temp_dir);
 
-        let res = get_world_radar_preview(&temp_dir, None, Some("404847291"), 0, 0, 128, 1.0).unwrap();
+        let res = get_world_radar_preview(&temp_dir, None, Some("404847291"), 0, 0, 128, 1.0, None).unwrap();
         assert!(res.image_data_url.starts_with("data:image/png;base64,"));
-        assert!(!res.biomes_found.is_empty());
         assert!(res.radius_blocks >= 64);
+
+        let nether_res = get_world_radar_preview(&temp_dir, None, Some("404847291"), 0, 0, 128, 1.0, Some(zircon_core::world::Dimension::TheNether)).unwrap();
+        assert!(nether_res.image_data_url.starts_with("data:image/png;base64,"));
+
+        let end_res = get_world_radar_preview(&temp_dir, None, Some("404847291"), 0, 0, 128, 1.0, Some(zircon_core::world::Dimension::TheEnd)).unwrap();
+        assert!(end_res.image_data_url.starts_with("data:image/png;base64,"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

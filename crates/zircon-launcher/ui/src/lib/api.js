@@ -136,6 +136,15 @@ export const api = {
     });
   },
   deleteOfflineInstance: (id) => invoke('delete_offline_instance', { id }),
+  updateOfflineInstance: (id, updates = {}) =>
+    invoke('update_offline_instance', {
+      id,
+      name: updates.name ?? null,
+      mcVersion: updates.mcVersion ?? updates.minecraftVersion ?? null,
+      loaderType: updates.loaderType ?? null,
+      loaderVersion: updates.loaderVersion ?? null,
+      javaArgs: updates.javaArgs ?? null,
+    }),
   cloneOfflineInstance: (id, newName, loaderType = null, loaderVersion = null, copyWorld = true, copyMods = true) =>
     invoke('clone_offline_instance', { id, newName, loaderType, loaderVersion, copyWorld, copyMods }),
   getOfflineInstanceDir: (id) => invoke('get_offline_instance_dir', { id }),
@@ -164,6 +173,16 @@ export const api = {
   onMigrationProgress: (callback) =>
     listen('migration-progress', (event) => callback(event.payload)),
 
+  // Global Keybind Library & Sync
+  listKeybindProfiles: () => invoke('list_keybind_profiles'),
+  getKeybindProfile: (id) => invoke('get_keybind_profile', { id }),
+  saveKeybindProfile: (profile) => invoke('save_keybind_profile', { profile }),
+  deleteKeybindProfile: (id) => invoke('delete_keybind_profile', { id }),
+  extractInstanceKeybinds: (instanceId) => invoke('extract_instance_keybinds', { instanceId }),
+  extractOptionsFileKeybinds: (filePath) => invoke('extract_options_file_keybinds', { filePath }),
+  applyKeybindProfileToInstance: (profileId, instanceId) =>
+    invoke('apply_keybind_profile_to_instance', { profileId, instanceId }),
+
   // Mod Metadata Export, Social Sharing, Snapshots & Repair
   exportInstanceSetup: (instanceId, format = 'share_code', customTitle = null) =>
     invoke('export_instance_setup', { instanceId, format, customTitle }),
@@ -186,7 +205,7 @@ export const api = {
 
   // Worlds, Backups & Screenshots
   listInstanceWorlds: (instanceId) => invoke('list_instance_worlds', { instanceId }),
-  getWorldSeedRadarPreview: (instanceId, worldFolder = null, seed = null, centerX = 0, centerZ = 0, radiusBlocks = 384, zoom = 1.0) =>
+  getWorldSeedRadarPreview: (instanceId, worldFolder = null, seed = null, centerX = 0, centerZ = 0, radiusBlocks = 384, zoom = 1.0, dimension = 'overworld') =>
     invoke('get_world_seed_radar_preview', {
       instanceId,
       worldFolder,
@@ -195,6 +214,15 @@ export const api = {
       centerZ,
       radiusBlocks,
       zoom,
+      dimension,
+    }),
+  getInstanceWorldRegionTile: (instanceId, worldFolder, dimension, rx, rz) =>
+    invoke('get_instance_world_region_tile', {
+      instanceId,
+      worldFolder,
+      dimension,
+      rx,
+      rz,
     }),
   backupInstanceWorld: (instanceId, worldFolder) =>
     invoke('backup_instance_world', { instanceId, worldFolder }),
@@ -311,6 +339,9 @@ export const api = {
   deletePresetSkin: (filename) => invoke('delete_history_skin', { filename }),
   renameSkin: (filename, newName) => invoke('rename_skin', { filename, newName }),
   uploadSkinToMojang: (variant = 'classic') => invoke('upload_skin_to_mojang', { variant }),
+  getUserCapes: () => invoke('get_user_capes'),
+  setActiveCape: (capeId) => invoke('set_active_cape', { capeId }),
+  unequipCape: () => invoke('unequip_cape'),
 
   // AI Skin Concept & Draft Studio (100% Local, Private & Secure)
   getSkinAiStatus: () => invoke('get_skin_ai_status'),
@@ -343,8 +374,8 @@ export const api = {
     invoke('toggle_resourcepack', { gameDir, filename }),
 
   // Unified Mod & Pack Discovery (Modrinth & CurseForge)
-  searchMods: (instanceId, query, origin = 'modrinth', projectType = 'mod', allVersions = false) =>
-    invoke('search_mods', { instanceId, query, origin, projectType, allVersions }),
+  searchMods: (instanceId, query, origin = 'modrinth', projectType = 'mod', allVersions = false, loaderFilter = null) =>
+    invoke('search_mods', { instanceId, query, origin, projectType, allVersions, loaderFilter }),
   searchModrinthMods: (query, mcVersion, loader) =>
     invoke('search_mods', { instanceId: '', query, origin: 'modrinth', projectType: 'mod', allVersions: true }),
   searchModrinth: (instanceId, query, projectType = 'mod', allVersions = false) =>
@@ -371,8 +402,6 @@ export const api = {
     invoke('update_instance_mods', { instanceId, updates }),
   rollbackModUpdate: (instanceId, snapshotFilename) =>
     invoke('rollback_mod_update', { instanceId, snapshotFilename }),
-  applyCinematicGraphicsPreset: (instanceId) =>
-    invoke('apply_cinematic_graphics_preset', { instanceId }),
   listMinecraftVersions: () => invoke('list_minecraft_versions'),
 
   // Couch Co-Op Split-Screen
@@ -416,6 +445,10 @@ export const api = {
   // LAN Discovery & Beacons
   getDiscoveredLanServers: () => invoke('get_discovered_lan_servers'),
   broadcastLanBeacon: (payload) => invoke('broadcast_lan_beacon', { payload }),
+
+  // System & Browser Navigation
+  openBrowserUrl: (url) => invoke('open_browser_url', { url }),
+  openExternalUrl: (url) => invoke('open_external_url', { url }),
 };
 
 // Launch-flow events emitted from Rust while a game is being prepared/run.
@@ -440,28 +473,53 @@ export const onSkinUpdated = (cb) => listen('skin-updated', () => cb());
 // the player's choice has not been remembered yet. Respond via
 // `respondShaderChoice` to continue the launch.
 export const onShaderRequest = (cb) => listen('shader-request', (e) => cb(e.payload));
+export const onServerPacksRequest = (cb) => listen('server-packs-request', (e) => cb(e.payload));
 
 // Emitted by Rust during a server launch when the server presents a different
 // Ed25519 key than the one pinned on first contact (reinstall or takeover).
 // Respond via `respondKeyPrompt` to accept or reject the rotation.
 export const onServerKeyMismatch = (cb) => listen('server-key-mismatch', (e) => cb(e.payload));
 
+function normalizeDialogFilters(input) {
+  if (!input) return [];
+  if (Array.isArray(input)) {
+    const flat = input.flat(Infinity);
+    return flat.filter(f => f && typeof f === 'object' && f.extensions);
+  }
+  if (typeof input === 'object') {
+    if (input.filters) {
+      return normalizeDialogFilters(input.filters);
+    }
+    if (input.extensions) {
+      return [input];
+    }
+  }
+  return [];
+}
+
 // Native file dialogs (WebView2 file inputs only expose a fake path).
-export async function pickFile(filters) {
+export async function pickFile(filtersOrOptions) {
   const { open } = await import('@tauri-apps/plugin-dialog');
-  const picked = await open({ multiple: false, filters });
+  const filters = normalizeDialogFilters(filtersOrOptions);
+  const picked = await open({ multiple: false, filters: filters.length ? filters : undefined });
   return typeof picked === 'string' ? picked : null;
 }
 
-export async function pickFiles(filters) {
+export async function pickFiles(filtersOrOptions) {
   const { open } = await import('@tauri-apps/plugin-dialog');
-  const picked = await open({ multiple: true, filters });
-  return Array.isArray(picked) ? picked : [];
+  const filters = normalizeDialogFilters(filtersOrOptions);
+  const picked = await open({ multiple: true, filters: filters.length ? filters : undefined });
+  if (!picked) return [];
+  return Array.isArray(picked) ? picked : [picked];
 }
 
 export async function saveFile(options = {}) {
   const { save } = await import('@tauri-apps/plugin-dialog');
-  return await save(options);
+  const opts = { ...options };
+  if (opts.filters) {
+    opts.filters = normalizeDialogFilters(opts.filters);
+  }
+  return await save(opts);
 }
 
 // Shared filter presets.

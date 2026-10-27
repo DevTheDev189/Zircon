@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha1::Digest;
 use uuid::Uuid;
 
-use zircon_core::archive::limits::{ArchiveError, ArchiveGuard};
+use zircon_core::archive::limits::{sanitize_entry_path, ArchiveError, ArchiveGuard};
 use zircon_core::archive::zip::extract_zip;
 use zircon_core::crypto::murmur3::curse_forge_fingerprint_of_file;
 use zircon_core::metadata::extractor::extract;
@@ -192,7 +192,10 @@ impl ServerImportService {
             HashMap::new()
         };
 
-        let level_name = props_map.get("level-name").map(String::as_str);
+        let safe_level_name_buf = props_map
+            .get("level-name")
+            .and_then(|raw| sanitize_entry_path(Path::new(raw)));
+        let level_name = safe_level_name_buf.as_deref().and_then(|p| p.to_str());
         let motd = props_map.get("motd").cloned();
         let server_name_prop = props_map.get("server-name").cloned();
 
@@ -240,9 +243,48 @@ impl ServerImportService {
             }
         }
 
+        // Check for CurseForge modpack manifest (manifest.json)
+        let curseforge_manifest_path = unpacked_dir.join("manifest.json");
+        if curseforge_manifest_path.is_file() {
+            if let Ok(content) = fs::read_to_string(&curseforge_manifest_path) {
+                if let Ok(manifest) = serde_json::from_str::<zircon_core::archive::curseforge_pack::CurseForgeManifest>(&content) {
+                    if mrpack_name.is_none() && !manifest.name.is_empty() {
+                        mrpack_name = Some(manifest.name.clone());
+                    }
+                    if mrpack_mc.is_none() && !manifest.minecraft.version.is_empty() {
+                        mrpack_mc = Some(manifest.minecraft.version.clone());
+                    }
+                    if mrpack_loader.is_none() {
+                        for ml in &manifest.minecraft.mod_loaders {
+                            let (l_type, l_ver) = zircon_core::archive::curseforge_pack::parse_loader_id(&ml.id);
+                            mrpack_loader = Some(l_type);
+                            mrpack_loader_version = Some(l_ver);
+                            break;
+                        }
+                    }
+                    let overrides_name = if manifest.overrides.is_empty() {
+                        "overrides"
+                    } else {
+                        &manifest.overrides
+                    };
+                    if let Some(safe_overrides_rel) = sanitize_entry_path(Path::new(overrides_name)) {
+                        let custom_overrides = unpacked_dir.join(&safe_overrides_rel);
+                        if custom_overrides != unpacked_dir
+                            && is_strictly_contained_dir(&custom_overrides, unpacked_dir)
+                        {
+                            let _ = move_directory_contents(&custom_overrides, unpacked_dir);
+                            let _ = fs::remove_dir_all(&custom_overrides);
+                        }
+                    } else {
+                        return Err(ImportError::Archive(ArchiveError::ZipSlip(overrides_name.to_string())));
+                    }
+                }
+            }
+        }
+
         // If an overrides folder exists from an .mrpack archive, merge it into the root
         let overrides_dir = unpacked_dir.join("overrides");
-        if overrides_dir.is_dir() {
+        if is_strictly_contained_dir(&overrides_dir, unpacked_dir) {
             let _ = move_directory_contents(&overrides_dir, unpacked_dir);
             let _ = fs::remove_dir_all(&overrides_dir);
         }
@@ -433,7 +475,8 @@ impl ServerImportService {
 
     /// Commits the staged import session: moves world, configs, and verified mods into the new instance folder and registers the instance.
     pub fn commit_import(&self, req: ImportCommitRequest) -> Result<InstanceConfig, ImportError> {
-        let session_dir = self.staging_base_dir.join(&req.import_id);
+        let valid_id = validate_import_id(&req.import_id)?;
+        let session_dir = self.staging_base_dir.join(&valid_id);
         let unpacked_dir = session_dir.join("unpacked");
 
         if !unpacked_dir.is_dir() {
@@ -450,7 +493,10 @@ impl ServerImportService {
         } else {
             HashMap::new()
         };
-        let level_name = props_map.get("level-name").map(String::as_str);
+        let safe_level_name_buf = props_map
+            .get("level-name")
+            .and_then(|raw| sanitize_entry_path(Path::new(raw)));
+        let level_name = safe_level_name_buf.as_deref().and_then(|p| p.to_str());
         let world_dir_opt = discover_world_dir(&unpacked_dir, level_name);
         let world_summary = world_dir_opt.as_ref().map(|w| analyze_world(&unpacked_dir, w));
 
@@ -541,7 +587,7 @@ impl ServerImportService {
                         }
                     }
                 }
-            } else {
+            } else if is_strictly_contained_dir(&w_dir, &unpacked_dir) {
                 let _ = move_directory_contents(&w_dir, &target_world);
                 let _ = fs::remove_dir_all(&w_dir);
             }
@@ -687,13 +733,37 @@ impl ServerImportService {
 
     /// Discards temporary unpacked files for an import session.
     pub fn cancel_import(&self, import_id: &str) -> Result<bool, ImportError> {
-        let session_dir = self.staging_base_dir.join(import_id);
+        let valid_id = validate_import_id(import_id)?;
+        let session_dir = self.staging_base_dir.join(&valid_id);
         if session_dir.is_dir() {
             fs::remove_dir_all(&session_dir)?;
             Ok(true)
         } else {
             Ok(false)
         }
+    }
+}
+
+/// Ensures `import_id` is a canonical UUID v4 string and cannot traverse directories.
+fn validate_import_id(import_id: &str) -> Result<String, ImportError> {
+    let parsed = Uuid::parse_str(import_id.trim())
+        .map_err(|_| ImportError::Invalid(format!("Invalid import session ID: {import_id}")))?;
+    Ok(parsed.to_string())
+}
+
+/// Verifies that `candidate` is an existing non-symlink directory strictly inside `root`.
+fn is_strictly_contained_dir(candidate: &Path, root: &Path) -> bool {
+    let Ok(meta) = fs::symlink_metadata(candidate) else {
+        return false;
+    };
+    if meta.file_type().is_symlink() || !meta.is_dir() {
+        return false;
+    }
+    match (candidate.canonicalize(), root.canonicalize()) {
+        (Ok(canon_cand), Ok(canon_root)) => {
+            canon_cand != canon_root && canon_cand.starts_with(&canon_root)
+        }
+        _ => false,
     }
 }
 

@@ -40,7 +40,7 @@ pub fn create_status_response_frame(json_status: &str) -> Vec<u8> {
 /// triggered a server wake-from-sleep sequence.
 pub fn build_wake_disconnect_json(username: &str, est_seconds: u32) -> String {
     let payload = serde_json::json!({
-        "text": "§e⚡ [Zircon] Waking Server From Sleep!\n\n",
+        "text": "§e⚡ [Zircon] Waking Server From Sleep... (Loading terrain)\n\n",
         "bold": true,
         "extra": [
             {
@@ -49,7 +49,7 @@ pub fn build_wake_disconnect_json(username: &str, est_seconds: u32) -> String {
                 "bold": false
             },
             {
-                "text": format!("Booting modded environment (estimated: ~{est_seconds}s)...\n\n"),
+                "text": format!("⚡ Java server environment is booting (estimated: ~{est_seconds}s)...\n\n"),
                 "color": "white",
                 "bold": false
             },

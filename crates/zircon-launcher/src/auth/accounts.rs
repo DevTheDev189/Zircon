@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 use keyring::Entry;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
 
 use crate::auth::session::{now_millis, SessionData};
 use crate::error::LauncherError;
@@ -64,8 +65,31 @@ impl AccountManager {
         Entry::new(KEYRING_SERVICE, user).map_err(|e| LauncherError::Auth(e.to_string()))
     }
 
-    fn account_cache_file(&self, uuid: &str) -> PathBuf {
-        paths::mcmanager_dir().join(format!("auth_cache_{}.json", uuid.replace('-', "")))
+    /// Validates and normalizes an account UUID by stripping hyphens and ensuring
+    /// only ASCII alphanumeric characters remain (preventing path traversal).
+    fn sanitize_uuid(uuid: &str) -> Result<String, LauncherError> {
+        let clean = uuid.trim().replace('-', "");
+        if clean.is_empty()
+            || clean.len() > 64
+            || !clean.chars().all(|c| c.is_ascii_alphanumeric())
+        {
+            return Err(LauncherError::Auth("Invalid account UUID format".to_string()));
+        }
+        Ok(clean)
+    }
+
+    fn sanitize_avatar_data_url(url: Option<String>) -> Option<String> {
+        url.filter(|u| {
+            (u.starts_with("data:image/png;base64,")
+                || u.starts_with("data:image/jpeg;base64,")
+                || u.starts_with("data:image/webp;base64,"))
+                && u.len() <= 256 * 1024
+        })
+    }
+
+    fn account_cache_file(&self, uuid: &str) -> Result<PathBuf, LauncherError> {
+        let clean = Self::sanitize_uuid(uuid)?;
+        Ok(paths::mcmanager_dir().join(format!("auth_cache_{clean}.json")))
     }
 
     /// Loads all accounts, automatically migrating any existing legacy single-session
@@ -113,58 +137,99 @@ impl AccountManager {
 
     /// Persists `accounts.json`.
     pub fn save_accounts(&self, data: &AccountsData) -> Result<(), LauncherError> {
-        if let Some(parent) = self.accounts_file.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
         let json = serde_json::to_string_pretty(data)?;
-        std::fs::write(&self.accounts_file, json.as_bytes())
-            .map_err(|e| LauncherError::Io(e))?;
-
+        Self::write_protected_file(&self.accounts_file, json.as_bytes())?;
         Ok(())
     }
 
-    /// Stores credentials for an account (into keyring per-UUID, plus fallback cache file,
-    /// and mirrors to the legacy active slot).
+    /// Writes a file atomically with owner-only (`0o600`) permissions on Unix.
+    fn write_protected_file(path: &std::path::Path, bytes: &[u8]) -> Result<(), LauncherError> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(LauncherError::Io)?;
+        }
+        let tmp_path = path.with_extension("json.tmp");
+        #[cfg(unix)]
+        {
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&tmp_path)
+                .map_err(LauncherError::Io)?;
+            file.write_all(bytes).map_err(LauncherError::Io)?;
+            file.sync_all().map_err(LauncherError::Io)?;
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&tmp_path, bytes).map_err(LauncherError::Io)?;
+        }
+        std::fs::rename(&tmp_path, path).map_err(LauncherError::Io)?;
+        Ok(())
+    }
+
+    /// Stores credentials for an account into the OS keyring per-UUID (and mirrors
+    /// to the legacy active slot). Only falls back to owner-only (`0o600`) cache
+    /// files when keyring storage is disabled or unavailable.
     pub fn store_session_credentials(&self, session: &SessionData) -> Result<(), LauncherError> {
-        let uuid = &session.uuid;
-        let uuid_clean = uuid.replace('-', "");
+        let uuid_clean = Self::sanitize_uuid(&session.uuid)?;
         let session_slot = format!("auth-session-{uuid_clean}");
         let refresh_slot = format!("auth-refresh-{uuid_clean}");
+        let file_slot = self.account_cache_file(&session.uuid)?;
+        let legacy_file = paths::auth_cache_file();
 
         if self.use_keyring {
             let mut session_without_refresh = session.clone();
             session_without_refresh.refresh_token.clear();
-            let session_json = serde_json::to_string(&session_without_refresh)?;
+            let mut session_json = serde_json::to_string(&session_without_refresh)?;
 
-            if let Ok(entry) = Self::keyring_entry(&session_slot) {
-                let _ = entry.set_password(&session_json);
-            }
-            if let Ok(entry) = Self::keyring_entry(&refresh_slot) {
-                let _ = entry.set_password(&session.refresh_token);
-            }
+            let per_uuid_ok = Self::keyring_entry(&session_slot)
+                .and_then(|e| e.set_password(&session_json).map_err(|err| LauncherError::Auth(err.to_string())))
+                .and_then(|()| {
+                    Self::keyring_entry(&refresh_slot)
+                        .and_then(|e| e.set_password(&session.refresh_token).map_err(|err| LauncherError::Auth(err.to_string())))
+                });
 
             // Mirror to active legacy slot
-            if let Ok(entry) = Self::keyring_entry(KEYRING_SESSION_USER) {
-                let _ = entry.set_password(&session_json);
+            let legacy_ok = Self::keyring_entry(KEYRING_SESSION_USER)
+                .and_then(|e| e.set_password(&session_json).map_err(|err| LauncherError::Auth(err.to_string())))
+                .and_then(|()| {
+                    Self::keyring_entry(KEYRING_REFRESH_USER)
+                        .and_then(|e| e.set_password(&session.refresh_token).map_err(|err| LauncherError::Auth(err.to_string())))
+                });
+
+            session_json.zeroize();
+
+            if per_uuid_ok.is_ok() && legacy_ok.is_ok() {
+                // Keyring is authoritative — remove any plaintext fallback files.
+                let _ = std::fs::remove_file(&file_slot);
+                let _ = std::fs::remove_file(&legacy_file);
+                return Ok(());
             }
-            if let Ok(entry) = Self::keyring_entry(KEYRING_REFRESH_USER) {
-                let _ = entry.set_password(&session.refresh_token);
-            }
+
+            // Clean up any partial keyring writes before falling back to protected files.
+            let _ = Self::keyring_entry(&session_slot).map(|e| e.delete_credential());
+            let _ = Self::keyring_entry(&refresh_slot).map(|e| e.delete_credential());
+            let _ = Self::keyring_entry(KEYRING_SESSION_USER).map(|e| e.delete_credential());
+            let _ = Self::keyring_entry(KEYRING_REFRESH_USER).map(|e| e.delete_credential());
         }
 
-        // Also write file backups
-        let file_slot = self.account_cache_file(uuid);
-        let json = serde_json::to_string(session)?;
-        let _ = std::fs::write(&file_slot, json.as_bytes());
-        let _ = std::fs::write(paths::auth_cache_file(), json.as_bytes());
+        // Fallback to owner-only cache files when keyring is disabled or unavailable
+        let mut json = serde_json::to_string(session)?;
+        let res_slot = Self::write_protected_file(&file_slot, json.as_bytes());
+        let res_legacy = Self::write_protected_file(&legacy_file, json.as_bytes());
+        json.zeroize();
+        res_slot?;
+        res_legacy?;
 
         Ok(())
     }
 
-
     /// Loads the stored `SessionData` for a specific UUID.
     pub fn load_session_for_uuid(&self, uuid: &str) -> Option<SessionData> {
-        let uuid_clean = uuid.replace('-', "");
+        let uuid_clean = Self::sanitize_uuid(uuid).ok()?;
         let session_slot = format!("auth-session-{uuid_clean}");
         let refresh_slot = format!("auth-refresh-{uuid_clean}");
 
@@ -188,11 +253,11 @@ impl AccountManager {
         }
 
         // Fallback to per-account file
-        let file = self.account_cache_file(uuid);
+        let file = self.account_cache_file(uuid).ok()?;
         if file.is_file() {
             if let Ok(content) = std::fs::read_to_string(&file) {
                 if let Ok(data) = serde_json::from_str::<SessionData>(&content) {
-                    if data.is_valid() {
+                    if data.is_valid() && data.uuid == uuid {
                         return Some(data);
                     }
                 }
@@ -217,6 +282,8 @@ impl AccountManager {
         session: &SessionData,
         avatar_data_url: Option<String>,
     ) -> Result<AccountsData, LauncherError> {
+        let _ = Self::sanitize_uuid(&session.uuid)?;
+        let avatar_data_url = Self::sanitize_avatar_data_url(avatar_data_url);
         let mut data = self.load_accounts(Some(session));
         let now = now_millis();
 
@@ -253,6 +320,7 @@ impl AccountManager {
 
     /// Switches the active account to the specified UUID and returns its stored session.
     pub fn switch_account(&self, target_uuid: &str) -> Result<SessionData, LauncherError> {
+        let _ = Self::sanitize_uuid(target_uuid)?;
         let mut data = self.load_accounts(None);
         let account = data
             .accounts
@@ -283,19 +351,21 @@ impl AccountManager {
 
     /// Removes an account by UUID. Returns the newly active session (if any).
     pub fn remove_account(&self, target_uuid: &str) -> Result<Option<SessionData>, LauncherError> {
+        let uuid_clean = Self::sanitize_uuid(target_uuid)?;
         let mut data = self.load_accounts(None);
         let was_active = data.active_uuid.as_deref() == Some(target_uuid);
         data.accounts.retain(|a| a.uuid != target_uuid);
 
         // Delete keyring entries
-        let uuid_clean = target_uuid.replace('-', "");
         if self.use_keyring {
             let _ = Self::keyring_entry(&format!("auth-session-{uuid_clean}"))
                 .map(|e| e.delete_credential());
             let _ = Self::keyring_entry(&format!("auth-refresh-{uuid_clean}"))
                 .map(|e| e.delete_credential());
         }
-        let _ = std::fs::remove_file(self.account_cache_file(target_uuid));
+        if let Ok(cache_file) = self.account_cache_file(target_uuid) {
+            let _ = std::fs::remove_file(cache_file);
+        }
 
         let next_session = if was_active {
             if let Some(next_acc) = data.accounts.first_mut() {
@@ -304,6 +374,12 @@ impl AccountManager {
                 let session = self.load_session_for_uuid(&next_acc.uuid);
                 if let Some(ref s) = session {
                     let _ = self.store_session_credentials(s);
+                } else {
+                    if self.use_keyring {
+                        let _ = Self::keyring_entry(KEYRING_SESSION_USER).map(|e| e.delete_credential());
+                        let _ = Self::keyring_entry(KEYRING_REFRESH_USER).map(|e| e.delete_credential());
+                    }
+                    let _ = std::fs::remove_file(paths::auth_cache_file());
                 }
                 session
             } else {

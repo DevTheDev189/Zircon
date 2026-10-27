@@ -30,13 +30,59 @@ pub fn create_status_response_packet(json_status: &str) -> Vec<u8> {
     create_disconnect_packet(json_status)
 }
 
+/// Creates a framed Minecraft 1.20.5+ (Protocol 766+) `ClientboundTransferPacket` (packet ID `0x0B`).
+///
+/// Instructs modern clients (Vanilla, Prism, CurseForge, Modrinth App on MC 1.20.5+) to seamlessly
+/// transfer to the target host and port without a disconnect screen.
+///
+/// Frame layout: `[VarInt frameLen][VarInt 0x0B][VarInt hostLen][host bytes][VarInt port]`.
+pub fn create_transfer_packet(host: &str, port: u16) -> Vec<u8> {
+    let host_bytes = host.as_bytes();
+    let mut packet = Vec::with_capacity(host_bytes.len() + 10);
+    write_varint(&mut packet, 0x0B); // Packet ID for Clientbound Transfer
+    write_varint(&mut packet, host_bytes.len() as i32); // Host string length
+    packet.extend_from_slice(host_bytes); // Host string payload
+    write_varint(&mut packet, port as i32); // Target port as VarInt
+
+    let mut frame = Vec::with_capacity(packet.len() + 5);
+    write_varint(&mut frame, packet.len() as i32); // Total frame length
+    frame.extend_from_slice(&packet);
+    frame
+}
+
+/// Creates a framed Minecraft `Login Success` packet (packet ID `0x02` in login state).
+///
+/// Advancing the client to Configuration state allows modern 1.20.5+ clients to receive
+/// `ClientboundTransferPacket (0x0B)` or limbo holding packets without crashing with a Netty DecoderException.
+///
+/// Frame layout: `[VarInt frameLen][VarInt 0x02][UUID 16 bytes][VarInt usernameLen][username bytes][VarInt 0]`.
+pub fn create_login_success_packet(username: &str, uuid_bytes: &[u8; 16]) -> Vec<u8> {
+    let username_bytes = username.as_bytes();
+    let mut packet = Vec::with_capacity(16 + username_bytes.len() + 10);
+    write_varint(&mut packet, 0x02); // Packet ID for Login Success
+    packet.extend_from_slice(uuid_bytes); // 16-byte UUID
+    write_varint(&mut packet, username_bytes.len() as i32); // Username string length
+    packet.extend_from_slice(username_bytes); // Username payload
+    write_varint(&mut packet, 0); // Number of properties (0)
+
+    let mut frame = Vec::with_capacity(packet.len() + 5);
+    write_varint(&mut frame, packet.len() as i32);
+    frame.extend_from_slice(&packet);
+    frame
+}
+
 /// The in-game message shown when a connection is rejected by the join gate.
 pub fn build_custom_error_message(server_url: &str) -> String {
-    let clean_url = server_url.trim();
-    let display_url = if clean_url.is_empty() {
+    let sanitized: String = server_url
+        .trim()
+        .chars()
+        .filter(|c| !c.is_control() && *c != '§')
+        .take(128)
+        .collect();
+    let display_url = if sanitized.is_empty() {
         "this server's address"
     } else {
-        clean_url
+        sanitized.as_str()
     };
 
     let payload = serde_json::json!({

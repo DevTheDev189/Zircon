@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "Salvesta",
+    "saving": "Salvestamine…",
+    "cancel": "Tühista",
+    "close": "Sulge",
+    "refresh": "Värskenda",
+    "copy": "Kopeeri",
+    "copied": "Kopeeritud lõikelauale!",
+    "delete": "Kustuta",
+    "loading": "Laadimine…",
+    "apply": "Rakenda",
+    "edit": "Muuda",
+    "search": "Otsi…",
+    "online": "Võrgus",
+    "offline": "Võrguühenduseta",
+    "sleeping": "Uinub",
+    "booting": "Käivitamine…",
+    "falling_asleep": "Uinumine…",
+    "shutting_down": "Seiskumine…",
+    "start": "Käivita",
+    "stop": "Peata",
+    "restart": "Taaskäivita",
+    "wake": "Ärata server",
+    "detecting": "Avastamine…"
+  },
+  "nav": {
+    "global_stats": "Ülemaailmsed statistika",
+    "servers": "Serverid",
+    "create_server": "Loo server",
+    "import_server": "Impordi server (.zip)",
+    "mods": "Modid",
+    "shaders": "Varjutajad",
+    "files": "Failid",
+    "console": "Konsool",
+    "players": "Mängijad",
+    "backups": "Varukoopiad",
+    "world": "Maailm",
+    "settings": "Seaded",
+    "disk_storage": "Kettaruum",
+    "server_manager": "Serverihaldur"
+  },
+  "stats": {
+    "title": "Süsteemi telemetria ja näitajad",
+    "subtitle": "Reaalajas CPU-, hosti RAM-i, protsessi RSS- ja kettaaktiivsuse andmed",
+    "host_ram": "Host OS RAM",
+    "process_rss": "Java protsessi RSS",
+    "cpu_usage": "CPU koormus",
+    "disk_allocation": "NVMe salvestusruumi eraldamine",
+    "uptime": "Süsteemi tööaeg",
+    "active_instances": "Töötavad instantsid",
+    "sleeping_instances": "Uinuvad instantsid"
+  },
+  "instances": {
+    "no_servers": "Ühtegi serverit veel pole — klõpsa „Loo server“.",
+    "create_title": "Loo Minecrafti server",
+    "name_label": "Instantsi nimi",
+    "version_label": "Minecrafti versioon",
+    "loader_label": "Modilaadur",
+    "port_label": "Port",
+    "memory_label": "Eraldatud mälu (GB)",
+    "start_server": "Käivita server",
+    "wake_server": "Ärata server",
+    "stop_server": "Peata server",
+    "restart_server": "Taaskäivita server",
+    "players_online": "{count} võrgus",
+    "sleeps_in": "Uinub {time} pärast",
+    "idle_wakes": "Tühja käivituse sulgemine — ärkab mängija liitumisel"
+  },
+  "mods": {
+    "title": "Installitud modid",
+    "count": "Installitud modid ({count})",
+    "search_placeholder": "Otsi installitud mode…",
+    "loader_filter": "Laaduri filter",
+    "all_loaders": "Kõik laadurid",
+    "active_loader": "Aktiivne laadur ({loader})",
+    "export_mrpack": "Ekspordi .mrpack",
+    "copy_mrpack_url": "Kopeeri .mrpack URL",
+    "copy_mrpack_tooltip": "Kopeeri avalik .mrpack allalaadimise link mitte-Zirky mängijatele",
+    "add_mod": "Lisa mod",
+    "install_update": "Uuenda",
+    "no_mods": "Ühtegi modi pole veel installitud."
+  },
+  "console": {
+    "title": "Serverikonsool ja terminal",
+    "placeholder": "Saada käsk (nt /say Tere, /op Mängija)...",
+    "send": "Saada",
+    "clear": "Tühjenda"
+  },
+  "players": {
+    "title": "Mängijate haldus",
+    "online": "Võrgus olevad mängijad",
+    "whitelist": "Valge nimekiri",
+    "ops": "Operaatorid",
+    "bans": "Keelatud mängijad",
+    "kick": "Eemalda",
+    "ban": "Keela",
+    "op": "Tee operaatoriks",
+    "deop": "Eemalda operaatori õigused"
+  },
+  "backups": {
+    "title": "Maailma ja instantside hetktõmmised",
+    "create": "Loo varukoopia",
+    "restore": "Taasta",
+    "download": "Laadi alla",
+    "delete": "Kustuta"
+  },
+  "security": {
+    "online_mode": "Veebirežiim (Mojangi autentimine)",
+    "online_mode_warning": "Hoiatus: Veebirežiimi väljalülitamine lubab võrguühenduseta/verifitseerimata mängijatel, kellel on võltsitud UUID-d, ühenduda.",
+    "whitelist_enforced": "Kehtesta valiknimekiri"
+  }
+}

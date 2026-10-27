@@ -32,6 +32,8 @@ pub struct UnifiedSearchHit {
     pub project_url: String,
     pub website_url: String,
     pub origin: String,
+    #[serde(default)]
+    pub loaders: Vec<String>,
 }
 
 /// Unified version option structure for the version dropdown picker.

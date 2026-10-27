@@ -187,26 +187,42 @@ impl JavaRuntimeSelector {
         if let Some(home) = find_java_home_in(&cached) {
             return java_executable(&home);
         }
-        // Best effort: the resolvers/provisioners will fix this up later.
-        if cfg!(target_os = "windows") {
-            PathBuf::from("java.exe")
+        // Best effort: probe PATH entries for an absolute java binary
+        let exe = if cfg!(target_os = "windows") {
+            "java.exe"
         } else {
-            PathBuf::from("java")
+            "java"
+        };
+        if let Some(path_var) = std::env::var_os("PATH") {
+            for dir in std::env::split_paths(&path_var) {
+                let candidate = dir.join(exe);
+                if candidate.is_file() {
+                    return candidate;
+                }
+            }
         }
+        PathBuf::from(exe)
     }
 }
 
 /// Resolves `<javaHome>/bin/java(.exe)`, `<javaHome>/Contents/Home/bin/java(.exe)` (macOS),
 /// or `<javaHome>/java(.exe)` for the current platform.
 pub fn java_executable(java_home: &Path) -> PathBuf {
-    if java_home.is_file() {
-        return java_home.to_path_buf();
-    }
     let exe = if cfg!(target_os = "windows") {
         "java.exe"
     } else {
         "java"
     };
+    if java_home.is_file() {
+        // Only accept a direct file path if its filename is strictly `java` or `java.exe`.
+        if java_home
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.eq_ignore_ascii_case(exe))
+        {
+            return java_home.to_path_buf();
+        }
+    }
     let with_bin = java_home.join("bin").join(exe);
     if with_bin.is_file() {
         ensure_executable(&with_bin);
@@ -235,7 +251,8 @@ fn ensure_executable(_path: &Path) {
             let mode = meta.permissions().mode();
             if mode & 0o111 == 0 {
                 let mut perms = meta.permissions();
-                perms.set_mode(mode | 0o755);
+                // Grant owner/group execute without making the binary world-writable (0o755 & !0o022)
+                perms.set_mode((mode | 0o755) & !0o022);
                 let _ = std::fs::set_permissions(_path, perms);
             }
         }
@@ -423,8 +440,16 @@ impl JavaRuntimeResolver {
     ) -> Result<PathBuf, LauncherError> {
         if let Some(p) = override_path {
             if p.exists() {
-                tracing::info!("Using custom Java runtime override at {}", p.display());
-                return Ok(p.to_path_buf());
+                let exe = java_executable(p);
+                if exe.is_file() && probe_java_major(&exe).await.is_some() {
+                    let canonical = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+                    tracing::info!("Using verified custom Java runtime override at {}", canonical.display());
+                    return Ok(canonical);
+                }
+                return Err(LauncherError::InvalidInput(format!(
+                    "Custom Java override path '{}' is not a valid Java runtime executable",
+                    p.display()
+                )));
             } else if !p.as_os_str().is_empty() {
                 tracing::warn!(
                     "Custom Java override path does not exist: {}, falling back to auto-resolution",
@@ -495,6 +520,11 @@ impl JavaRuntimeResolver {
         // Resolve the canonical download URL and its SHA-256 from Adoptium's
         // metadata API *before* fetching anything.
         let (download_url, expected_sha256) = self.fetch_adoptium_release(pref).await?;
+        if !zircon_core::security::ssrf::is_safe_cdn_url(&download_url) {
+            return Err(LauncherError::InvalidInput(
+                "Adoptium package download URL rejected by SSRF guard".into(),
+            ));
+        }
 
         if let Some(l) = listener {
             l.on_status(&format!("Downloading Java {pref} from Adoptium..."));
@@ -599,10 +629,21 @@ impl JavaRuntimeResolver {
 /// Probes a `java` executable for its major version by running `java -version`.
 /// Probe failures and unparseable output are treated as insufficient.
 async fn probe_java_major(java_exe: &Path) -> Option<i32> {
-    let output = tokio::process::Command::new(java_exe)
+    let mut cmd = tokio::process::Command::new(java_exe);
+    cmd.env_clear()
+        .envs(std::env::vars().filter(|(k, _)| {
+            matches!(
+                k.to_ascii_uppercase().as_str(),
+                "PATH" | "SYSTEMROOT" | "USERPROFILE" | "HOME" | "TMP" | "TEMP"
+            )
+        }))
         .arg("-version")
-        .output()
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let output = tokio::time::timeout(std::time::Duration::from_secs(5), cmd.output())
         .await
+        .ok()?
         .ok()?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     parse_java_version_output(&stderr)

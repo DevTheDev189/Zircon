@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ…",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "refresh": "تحديث",
+    "copy": "نسخ",
+    "copied": "تم النسخ إلى الحافظة!",
+    "delete": "حذف",
+    "loading": "جارٍ التحميل…",
+    "apply": "تطبيق",
+    "edit": "تعديل",
+    "search": "بحث…",
+    "online": "متصل",
+    "offline": "غير متصل",
+    "sleeping": "في وضع السكون",
+    "booting": "جارٍ التشغيل…",
+    "falling_asleep": "جارٍ الدخول في وضع السكون…",
+    "shutting_down": "جارٍ الإيقاف…",
+    "start": "بدء",
+    "stop": "إيقاف",
+    "restart": "إعادة تشغيل",
+    "wake": "إيقاظ الخادم",
+    "detecting": "جارٍ الاكتشاف…"
+  },
+  "nav": {
+    "global_stats": "الإحصائيات العامة",
+    "servers": "الخوادم",
+    "create_server": "إنشاء خادم",
+    "import_server": "استيراد خادم (.zip)",
+    "mods": "التعديلات (Mods)",
+    "shaders": "الشيدرز",
+    "files": "الملفات",
+    "console": "وحدة التحكم",
+    "players": "اللاعبون",
+    "backups": "النسخ الاحتياطية",
+    "world": "العالم",
+    "settings": "الإعدادات",
+    "disk_storage": "تخزين القرص",
+    "server_manager": "مدير الخادم"
+  },
+  "stats": {
+    "title": "قياسات النظام والأداء",
+    "subtitle": "نشاط المعالج (CPU)، ذاكرة الوصول العشوائي للنظام، استخدام الذاكرة للعمليات (RSS)، والنشاط على القرص في الوقت الفعلي",
+    "host_ram": "ذاكرة RAM للنظام المضيف",
+    "process_rss": "استخدام RSS لعملية Java",
+    "cpu_usage": "حمل المعالج (CPU)",
+    "disk_allocation": "تخصيص التخزين NVMe",
+    "uptime": "مدة تشغيل النظام",
+    "active_instances": "النسخ النشطة",
+    "sleeping_instances": "النسخ الخاملة"
+  },
+  "instances": {
+    "no_servers": "لا توجد خوادم بعد — انقر على إنشاء خادم.",
+    "create_title": "إنشاء خادم Minecraft",
+    "name_label": "اسم النسخة",
+    "version_label": "إصدار Minecraft",
+    "loader_label": "محمّل التعديلات",
+    "port_label": "المنفذ",
+    "memory_label": "الذاكرة المخصصة (جيجابايت)",
+    "start_server": "تشغيل الخادم",
+    "wake_server": "إيقاظ الخادم",
+    "stop_server": "إيقاف الخادم",
+    "restart_server": "إعادة تشغيل الخادم",
+    "players_online": "{count} متصل",
+    "sleeps_in": "يدخل في وضع السكون خلال {time}",
+    "idle_wakes": "إيقاف بسبب الخمول — يستيقظ عند انضمام لاعب"
+  },
+  "mods": {
+    "title": "التعديلات المثبتة",
+    "count": "التعديلات المثبتة ({count})",
+    "search_placeholder": "البحث في التعديلات المثبتة…",
+    "loader_filter": "مرشح المحمل",
+    "all_loaders": "جميع المحامل",
+    "active_loader": "المحمل النشط ({loader})",
+    "export_mrpack": "تصدير .mrpack",
+    "copy_mrpack_url": "نسخ رابط .mrpack",
+    "copy_mrpack_tooltip": "نسخ رابط تنزيل .mrpack العام للاعبين غير مستخدمي Zircon",
+    "add_mod": "إضافة تعديل",
+    "install_update": "تحديث",
+    "no_mods": "لم يتم تثبيت أي تعديلات بعد."
+  },
+  "console": {
+    "title": "وحدة تحكم الخادم والطرفية",
+    "placeholder": "أرسل أمرًا (مثل /say Hello، /op Player)...",
+    "send": "إرسال",
+    "clear": "مسح"
+  },
+  "players": {
+    "title": "إدارة اللاعبين",
+    "online": "اللاعبون المتصلون",
+    "whitelist": "القائمة البيضاء",
+    "ops": "المشرفون",
+    "bans": "اللاعبون المحظورون",
+    "kick": "طرد",
+    "ban": "حظر",
+    "op": "منح صلاحية مشرف",
+    "deop": "سحب صلاحية المشرف"
+  },
+  "backups": {
+    "title": "لقطات النسخ الاحتياطي للعالم والجلسات",
+    "create": "إنشاء نسخة احتياطية",
+    "restore": "استعادة",
+    "download": "تنزيل",
+    "delete": "حذف"
+  },
+  "security": {
+    "online_mode": "الوضع عبر الإنترنت (مصادقة Mojang)",
+    "online_mode_warning": "تحذير: تعطيل وضع الاتصال عبر الإنترنت يسمح للاعبين غير المتصلين أو غير المُتحقق منهم، والذين يستخدمون معرّفات UUID مزيفة، بالاتصال.",
+    "whitelist_enforced": "فرض القائمة البيضاء"
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "common": {
+    "save": "I-save",
+    "saving": "Sine-save…",
+    "cancel": "Kanselahin",
+    "close": "Isara",
+    "refresh": "I-refresh",
+    "copy": "Kopyahin",
+    "copied": "Nakopya sa clipboard!",
+    "delete": "Burahin",
+    "loading": "Naglo-load…",
+    "apply": "I-apply",
+    "edit": "I-edit",
+    "search": "Maghanap…",
+    "online": "Online",
+    "offline": "Offline",
+    "sleeping": "Natutulog",
+    "booting": "Pinapatakbo…",
+    "falling_asleep": "Hinahugas ang tulog…",
+    "shutting_down": "Pinapatay…",
+    "start": "Simulan",
+    "stop": "Itigil",
+    "restart": "I-restart",
+    "wake": "Gisingin ang Server",
+    "detecting": "Dinidetect…"
+  },
+  "nav": {
+    "global_stats": "Global Stats",
+    "servers": "Mga Server",
+    "create_server": "Gumawa ng Server",
+    "import_server": "Mag-import ng Server (.zip)",
+    "mods": "Mga Mod",
+    "shaders": "Shaders",
+    "files": "Mga File",
+    "console": "Console",
+    "players": "Mga Manlalaro",
+    "backups": "Mga Backup",
+    "world": "Mundo",
+    "settings": "Mga Setting",
+    "disk_storage": "Disk Storage",
+    "server_manager": "Server Manager"
+  },
+  "stats": {
+    "title": "System Telemetry & Metrics",
+    "subtitle": "Real-time CPU, Host RAM, Process RSS, and Disk activity",
+    "host_ram": "Host OS RAM",
+    "process_rss": "Java Process RSS",
+    "cpu_usage": "CPU Load",
+    "disk_allocation": "NVMe Storage Allocation",
+    "uptime": "System Uptime",
+    "active_instances": "Running Instances",
+    "sleeping_instances": "Sleeping Instances"
+  },
+  "instances": {
+    "no_servers": "Wala pang mga server — pindutin ang Lumikha ng Server.",
+    "create_title": "Lumikha ng Minecraft Server",
+    "name_label": "Pangalan ng Instance",
+    "version_label": "Bersyon ng Minecraft",
+    "loader_label": "Mod Loader",
+    "port_label": "Port",
+    "memory_label": "Naka-allocate na Memory (GB)",
+    "start_server": "Simulan ang Server",
+    "wake_server": "Gisingin ang Server",
+    "stop_server": "Ihinto ang Server",
+    "restart_server": "I-restart ang Server",
+    "players_online": "{count} online",
+    "sleeps_in": "Matutulog sa {time}",
+    "idle_wakes": "Pagpapatulog kapag idle — gagisingin kapag may sumali"
+  },
+  "mods": {
+    "title": "Mga Naka-install na Mod",
+    "count": "Mga Naka-install na Mod ({count})",
+    "search_placeholder": "Hanapin ang mga naka-install na mod…",
+    "loader_filter": "Filter ng Loader",
+    "all_loaders": "Lahat ng Loader",
+    "active_loader": "Aktibong Loader ({loader})",
+    "export_mrpack": "I-export ang .mrpack",
+    "copy_mrpack_url": "Kopyahin ang URL ng .mrpack",
+    "copy_mrpack_tooltip": "Kopyahin ang pampublikong link sa pag-download ng .mrpack para sa mga manlalaro na hindi gumagamit ng Zircon",
+    "add_mod": "Magdagdag ng Mod",
+    "install_update": "I-update",
+    "no_mods": "Wala pang naka-install na mod."
+  },
+  "console": {
+    "title": "Server Console at Terminal",
+    "placeholder": "Magpadala ng command (hal. /say Hello, /op Player)...",
+    "send": "Ipadala",
+    "clear": "Burahin"
+  },
+  "players": {
+    "title": "Pamamahala ng Manlalaro",
+    "online": "Mga Online na Manlalaro",
+    "whitelist": "Whitelist",
+    "ops": "Mga Operator",
+    "bans": "Mga Na-ban na Manlalaro",
+    "kick": "Kick",
+    "ban": "Ban",
+    "op": "Gawing Op",
+    "deop": "Alisin ang Op"
+  },
+  "backups": {
+    "title": "Mga Snapshot ng Mundo at Instance",
+    "create": "Gumawa ng Backup",
+    "restore": "Ibalik",
+    "download": "I-download",
+    "delete": "Burahin"
+  },
+  "security": {
+    "online_mode": "Online Mode (Mojang Authentication)",
+    "online_mode_warning": "Babala: Ang pag-disable ng online-mode ay nagpapahintulot sa mga offline o hindi-beripikadong manlalaro na may spoofed UUID na makakonekta.",
+    "whitelist_enforced": "Ipatupad ang Whitelist"
+  }
+}
