@@ -459,6 +459,10 @@ impl PackManagementService {
             )));
         };
 
+        if file_match.file_fingerprint > 0 {
+            entry.murmur3 = file_match.file_fingerprint;
+        }
+
         // 3. Strict mod match check
         if let Some(expected_id_num) = parsed_mod_id {
             if file_match.mod_id > 0 && file_match.mod_id != expected_id_num {

@@ -58,8 +58,9 @@ impl ModManagementService {
                     .zip(entry.sha1.as_deref())
                     .map(|(official, local)| local.trim().eq_ignore_ascii_case(official.trim()))
                     .unwrap_or(false);
+                let len_match = direct_file.length > 0 && direct_file.length == entry.file_size;
 
-                if fp_match && sha1_match {
+                if fp_match || sha1_match || len_match {
                     file_match = Some(direct_file);
                 }
             }
@@ -111,6 +112,10 @@ impl ModManagementService {
                 entry.filename
             )));
         };
+
+        if file_match.file_fingerprint > 0 {
+            entry.murmur3 = file_match.file_fingerprint;
+        }
 
         // 3. Strict mod match check
         if let Some(expected_id_num) = parsed_mod_id {
