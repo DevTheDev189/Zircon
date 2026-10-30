@@ -5,6 +5,38 @@ use zircon_core::model::ModEntry;
 
 use super::*;
 
+pub const CF_CATEGORY_SERVER_UTILITY: i64 = 435;
+pub const CF_CONTENT_CATEGORIES: &[i64] = &[
+    406, // World Gen
+    407, // Biomes
+    408, // Ores and Resources
+    409, // Structures
+    410, // Dimensions
+    411, // Mobs
+    412, // Technology
+    413, // Processing
+    414, // Player Transport
+    415, // Energy, Fluid, and Item Transport
+    416, // Farming
+    417, // Energy
+    418, // Genetics
+    419, // Magic
+    420, // Storage
+    422, // Adventure and RPG
+    424, // Cosmetic (furniture, decorations, skins, clothing)
+    426, // Addons
+    434, // Armor, Tools, and Weapons
+    436, // Food
+];
+
+/// Determines if a CurseForge mod's categories indicate a purely server-side utility.
+/// Content mods, cosmetics (furniture/decorations), worldgen, tech, etc. are NEVER server-only.
+pub fn is_curseforge_server_only(categories: &[zircon_core::api::curseforge::CurseForgeCategory]) -> bool {
+    let has_server_utility = categories.iter().any(|c| c.id == CF_CATEGORY_SERVER_UTILITY);
+    let has_content_or_cosmetic = categories.iter().any(|c| CF_CONTENT_CATEGORIES.contains(&c.id));
+    has_server_utility && !has_content_or_cosmetic
+}
+
 impl ModManagementService {
     /// Replaces the BOM entry for `entry.filename` with this entry and
     /// persists it, so provider metadata (id, icon, title) survives restarts.
@@ -191,12 +223,16 @@ impl ModManagementService {
                 if !website.is_empty() {
                     entry.project_url = Some(website);
                 }
+                if entry.side == zircon_core::model::ModSide::Both && is_curseforge_server_only(&mod_info.categories) {
+                    entry.side = zircon_core::model::ModSide::Server;
+                }
                 entry.origin = Some(ORIGIN_CURSEFORGE.to_string());
                 tracing::info!(
-                    "Strictly verified and enriched CurseForge mod {} -> '{}' (id: {})",
+                    "Strictly verified and enriched CurseForge mod {} -> '{}' (id: {}, side: {:?})",
                     entry.filename,
                     entry.display_title(),
-                    file_match.mod_id
+                    file_match.mod_id,
+                    entry.side
                 );
             }
         }
@@ -301,11 +337,6 @@ impl ModManagementService {
                 if !website.is_empty() {
                     entry.project_url = Some(website);
                 }
-                if mod_info.categories.iter().any(|c| c.id == 424) {
-                    entry.side = zircon_core::model::ModSide::Server;
-                } else if mod_info.categories.iter().any(|c| c.id == 423 || c.id == 425) {
-                    entry.side = zircon_core::model::ModSide::Client;
-                }
                 entry.origin = Some(ORIGIN_CURSEFORGE.to_string());
                 tracing::info!(
                     "Enriched CurseForge mod {} -> '{}' (icon: {:?}, side: {:?})",
@@ -366,16 +397,6 @@ impl ModManagementService {
         if !project.slug.is_empty() {
             entry.slug = Some(project.slug.clone());
             entry.project_url = Some(format!("https://modrinth.com/mod/{}", project.slug));
-        }
-        if let Some(ref server_side) = project.server_side {
-            if server_side.eq_ignore_ascii_case("unsupported") {
-                entry.side = zircon_core::model::ModSide::Client;
-            }
-        }
-        if let Some(ref client_side) = project.client_side {
-            if client_side.eq_ignore_ascii_case("unsupported") {
-                entry.side = zircon_core::model::ModSide::Server;
-            }
         }
         true
     }
@@ -450,16 +471,6 @@ impl ModManagementService {
                 if !project.author.is_empty() {
                     entry.author = Some(project.author);
                 }
-                if let Some(ref server_side) = project.server_side {
-                    if server_side.eq_ignore_ascii_case("unsupported") {
-                        entry.side = zircon_core::model::ModSide::Client;
-                    }
-                }
-                if let Some(ref client_side) = project.client_side {
-                    if client_side.eq_ignore_ascii_case("unsupported") {
-                        entry.side = zircon_core::model::ModSide::Server;
-                    }
-                }
             }
             Err(e) => {
                 tracing::warn!("Could not enrich metadata for mod {}: {e}", entry.filename);
@@ -506,14 +517,16 @@ impl ModManagementService {
                                 entry.slug = Some(project.slug.clone());
                                 entry.project_url = Some(format!("https://modrinth.com/mod/{}", project.slug));
                             }
-                            if let Some(ref server_side) = project.server_side {
-                                if server_side.eq_ignore_ascii_case("unsupported") {
-                                    entry.side = zircon_core::model::ModSide::Client;
+                            if entry.side == zircon_core::model::ModSide::Both {
+                                if let Some(ref server_side) = project.server_side {
+                                    if server_side.eq_ignore_ascii_case("unsupported") {
+                                        entry.side = zircon_core::model::ModSide::Client;
+                                    }
                                 }
-                            }
-                            if let Some(ref client_side) = project.client_side {
-                                if client_side.eq_ignore_ascii_case("unsupported") {
-                                    entry.side = zircon_core::model::ModSide::Server;
+                                if let Some(ref client_side) = project.client_side {
+                                    if client_side.eq_ignore_ascii_case("unsupported") {
+                                        entry.side = zircon_core::model::ModSide::Server;
+                                    }
                                 }
                             }
                         }
@@ -578,10 +591,8 @@ impl ModManagementService {
                             if !website.is_empty() {
                                 entry.project_url = Some(website);
                             }
-                            if mod_info.categories.iter().any(|c| c.id == 424) {
+                            if entry.side == zircon_core::model::ModSide::Both && is_curseforge_server_only(&mod_info.categories) {
                                 entry.side = zircon_core::model::ModSide::Server;
-                            } else if mod_info.categories.iter().any(|c| c.id == 423 || c.id == 425) {
-                                entry.side = zircon_core::model::ModSide::Client;
                             }
                         }
                     }

@@ -601,6 +601,10 @@ window.Zircon.instances = {
             });
             alert(`Instance updated! ${res.updatedCount || 0} mods auto-updated, ${res.incompatibleCount || 0} flagged incompatible.`);
             await this.loadInstances();
+            if (this.selectedInstance) {
+                const fresh = this.instances.find(i => i.id === this.selectedInstance.id);
+                if (fresh) this.selectInstance(fresh);
+            }
             await this.loadMods();
         } catch (e) { alert('Update failed: ' + e.message); }
     },
@@ -761,10 +765,15 @@ window.Zircon.instances = {
             if (!token) continue;
             const lower = token.toLowerCase();
             if (lower.startsWith('-xmx')) {
-                const value = parseFloat(token.slice(4));
-                // Guard against MB-unit values (e.g. -Xmx2048M) — cap at the
-                // slider ceiling so the round-trip stays sane.
-                if (Number.isFinite(value) && value > 0) gb = Math.max(1, Math.min(64, Math.round(value)));
+                let rawVal = parseFloat(token.slice(4));
+                if (Number.isFinite(rawVal) && rawVal > 0) {
+                    if (lower.endsWith('m')) {
+                        rawVal = Math.round(rawVal / 1024);
+                    } else if (lower.endsWith('k')) {
+                        rawVal = Math.round(rawVal / (1024 * 1024));
+                    }
+                    gb = Math.max(1, Math.min(64, Math.round(rawVal)));
+                }
             } else if (lower.startsWith('-xms')) {
                 // Derived from the slider; ignored when parsing.
             } else if (lower.includes('maxrampercentage') || lower.includes('initialrampercentage')) {
@@ -779,10 +788,15 @@ window.Zircon.instances = {
     // Renders slider state back into a JVM args string: a fixed heap when a
     // GB value is picked, or percentage flags so the JVM sizes itself when
     // "auto" is chosen. Extra flags are always preserved.
-    buildJavaArgs({ auto, gb, extra }) {
+    buildJavaArgs(form) {
+        if (!form) return '-Xms2G -Xmx4G';
+        const auto = form.ramAuto !== undefined ? !!form.ramAuto : !!form.auto;
+        const rawGb = form.ramGB !== undefined ? form.ramGB : form.gb;
+        const extra = form.extraJvmArgs !== undefined ? form.extraJvmArgs : form.extra;
+
         // Coerce/clamp the slider value so a missing or non-numeric value can
         // never emit something like -XmsNaNG (which the JVM rejects at launch).
-        const gbNum = Number(gb);
+        const gbNum = Number(rawGb);
         const gbSafe = Number.isFinite(gbNum) ? Math.max(1, Math.min(64, Math.round(gbNum))) : 4;
         const heap = auto
             ? '-XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=75.0'

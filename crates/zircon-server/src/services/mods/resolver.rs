@@ -367,6 +367,7 @@ impl ModManagementService {
                 .map(|(idx, mut entry)| {
                     let this = self.clone();
                     async move {
+                        let original_side = entry.side;
                         let is_corrupted_modrinth = (entry.download_url.as_deref().unwrap_or("").contains("modrinth.com")
                             || entry.download_url.as_deref().unwrap_or("").contains("cdn.modrinth.com"))
                             && (entry.origin.as_deref() == Some(ORIGIN_CURSEFORGE)
@@ -401,6 +402,8 @@ impl ModManagementService {
                         } else {
                             this.repair_modrinth_metadata(&mut entry).await
                         };
+                        // Strict guarantee: read-time metadata repair must never overwrite the user-configured mod side.
+                        entry.side = original_side;
                         (idx, entry, changed)
                     }
                 })

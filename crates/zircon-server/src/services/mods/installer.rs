@@ -124,8 +124,35 @@ impl ModManagementService {
             }
         } else if normalized_origin == ORIGIN_MODRINTH {
             self.enrich_metadata(&mut entry).await;
+            if entry.side == zircon_core::model::ModSide::Both {
+                if let Some(ref project_id) = entry.id {
+                    if let Ok(project) = self.modrinth.get_project(project_id).await {
+                        if let Some(ref server_side) = project.server_side {
+                            if server_side.eq_ignore_ascii_case("unsupported") {
+                                entry.side = zircon_core::model::ModSide::Client;
+                            }
+                        }
+                        if let Some(ref client_side) = project.client_side {
+                            if client_side.eq_ignore_ascii_case("unsupported") {
+                                entry.side = zircon_core::model::ModSide::Server;
+                            }
+                        }
+                    }
+                }
+            }
         } else if self.has_curse_forge_key() && normalized_origin == ORIGIN_DIRECT {
             self.enrich_curseforge_metadata(&mut entry).await;
+            if entry.side == zircon_core::model::ModSide::Both {
+                if let Some(ref cf_id_str) = entry.id {
+                    if let Ok(cf_id) = cf_id_str.parse::<i64>() {
+                        if let Ok(mod_info) = self.curse_forge.get_mod(cf_id).await {
+                            if is_curseforge_server_only(&mod_info.categories) {
+                                entry.side = zircon_core::model::ModSide::Server;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Apply fallback metadata if API enrichment didn't populate them

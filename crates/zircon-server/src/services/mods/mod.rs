@@ -9,6 +9,8 @@ pub mod resolver;
 #[cfg(test)]
 mod tests;
 
+pub use cache::is_curseforge_server_only;
+
 
 use std::fmt;
 use std::path::PathBuf;

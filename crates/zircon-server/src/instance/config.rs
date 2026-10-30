@@ -399,7 +399,7 @@ pub fn sanitize_java_args(java_args: &str) -> String {
     }
     let sanitized: String = java_args
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-' | '+' | ' '))
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-' | '+' | ' ' | ':' | '=' | '%'))
         .collect();
     sanitized.trim().to_string()
 }

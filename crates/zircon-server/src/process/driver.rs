@@ -50,6 +50,7 @@ impl ProcessLimits {
         const MAX_HEAP_MB: u64 = 65_536; // 64 GB safety ceiling
         let mut heap_mb: u64 = 4096; // fallback 4GB
         for part in args.split_whitespace() {
+            let lower = part.to_ascii_lowercase();
             if part.len() > 4 && part[..4].eq_ignore_ascii_case("-xmx") {
                 let rest = &part[4..];
                 let upper = rest.to_ascii_uppercase();
@@ -64,6 +65,17 @@ impl ProcessLimits {
                 } else if let Some(num) = upper.strip_suffix('K') {
                     if let Ok(k) = num.parse::<u64>() {
                         heap_mb = (k / 1024).max(512);
+                    }
+                }
+            } else if lower.contains("maxrampercentage=") {
+                if let Some(pct_str) = lower.split("maxrampercentage=").nth(1) {
+                    if let Ok(pct) = pct_str.parse::<f64>() {
+                        let mut sys = sysinfo::System::new_all();
+                        sys.refresh_memory();
+                        let total_mb = sys.total_memory() / (1024 * 1024);
+                        if total_mb > 0 {
+                            heap_mb = ((total_mb as f64 * (pct / 100.0)) as u64).clamp(512, MAX_HEAP_MB);
+                        }
                     }
                 }
             }

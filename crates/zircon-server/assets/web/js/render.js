@@ -2701,17 +2701,8 @@ return function render(_ctx, _cache) {
                                       value: installedModsFilterQuery,
                                       onInput: ($event) => { installedModsFilterQuery = $event.target.value },
                                       placeholder: "Filter installed mods... (Press '/' or Ctrl+F to focus)",
-                                      class: "w-full z-search-input border border-slate-700/80 rounded-xl px-3.5 pr-10 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 transition-all"
-                                    }, null, 40 /* PROPS, NEED_HYDRATION */, ["value", "onInput"]),
-                                  (installedModsFilterQuery)
-                                    ? (_openBlock(), _createElementBlock("button", {
-                                        key: 0,
-                                        type: "button",
-                                        onClick: () => clearInstalledModsFilter(),
-                                        title: "Clear filter",
-                                        class: "absolute right-2 px-1.5 py-0.5 text-xs text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
-                                      }, "✕"))
-                                    : _createCommentVNode("v-if", true)
+                                      class: "w-full z-search-input border border-slate-700/80 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                                    }, null, 40 /* PROPS, NEED_HYDRATION */, ["value", "onInput"])
                                 ]),
                                 (installedModsFilterQuery)
                                   ? (_openBlock(), _createElementBlock("div", {

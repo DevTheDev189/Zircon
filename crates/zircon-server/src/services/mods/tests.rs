@@ -292,3 +292,78 @@ use super::*;
         let _ = fs::remove_dir_all(&dir);
     }
 
+    #[test]
+    fn curseforge_side_detection_cozyhome_not_serverside() {
+        use zircon_core::api::curseforge::CurseForgeCategory;
+
+        // Cozy Home: Category 424 (Cosmetic)
+        let cozyhome_categories = vec![
+            CurseForgeCategory { id: 424, name: "Cosmetic".to_string() },
+        ];
+        assert!(
+            !is_curseforge_server_only(&cozyhome_categories),
+            "Cozy Home (Cosmetic category 424) must NEVER be detected as a server-only mod!"
+        );
+
+        // Server utility: Category 435 (Server Utility)
+        let spark_categories = vec![
+            CurseForgeCategory { id: 435, name: "Server Utility".to_string() },
+        ];
+        assert!(
+            is_curseforge_server_only(&spark_categories),
+            "Pure server utilities (category 435) should be detected as server-only."
+        );
+
+        // Mod with both Server Utility and a content/cosmetic category
+        let hybrid_categories = vec![
+            CurseForgeCategory { id: 435, name: "Server Utility".to_string() },
+            CurseForgeCategory { id: 424, name: "Cosmetic".to_string() },
+        ];
+        assert!(
+            !is_curseforge_server_only(&hybrid_categories),
+            "Mods with content or cosmetic categories must never be treated as server-only."
+        );
+    }
+
+    #[tokio::test]
+    async fn list_mods_enriched_never_overwrites_user_side() {
+        let dir = temp_dir();
+        let bom = Arc::new(BomService::new(
+            dir.join("bom.json"),
+            Some(zircon_core::model::BillOfMaterials::new("1.20.4", None, None)),
+        ));
+        let mods_dir = dir.join("mods");
+        let service = ModManagementService::new(bom.clone(), mods_dir.clone(), "");
+
+        // Add a mod and explicitly set its side to Both
+        let _ = service
+            .add_mod(std::io::Cursor::new(b"fake-jar-data"), "cozy-home.jar", Some(ORIGIN_MODRINTH))
+            .await
+            .unwrap();
+
+        let updated = service
+            .set_mod_side("cozy-home.jar", zircon_core::model::ModSide::Both)
+            .unwrap();
+        assert_eq!(zircon_core::model::ModSide::Both, updated.side);
+
+        // Run list_mods_enriched
+        let list = service.list_mods_enriched().await;
+        let entry = list.iter().find(|m| m.filename == "cozy-home.jar").unwrap();
+        assert_eq!(
+            zircon_core::model::ModSide::Both,
+            entry.side,
+            "list_mods_enriched must NEVER mutate or overwrite the user-configured mod side!"
+        );
+
+        // Check BOM on disk as well
+        let saved_bom = bom.get_bom();
+        assert_eq!(
+            zircon_core::model::ModSide::Both,
+            saved_bom.mods[0].side,
+            "BOM on disk must retain the user's mod side setting across listing"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+

@@ -1,7 +1,7 @@
 use super::*;
 use std::time::Duration;
 use zircon_core::model::{SHUTDOWN_REASON_IDLE, SHUTDOWN_REASON_MANUAL};
-use crate::process::NativeDriver;
+
 
     fn temp_dir() -> PathBuf {
         crate::test_util::temp_dir("instances")
@@ -223,6 +223,14 @@ use crate::process::NativeDriver;
         assert_eq!("-Xmx4G rm -rf", sanitize_java_args("-Xmx4G; rm -rf /"));
         assert_eq!("-Xms2G -Xmx4G", sanitize_java_args("-Xms2G -Xmx4G"));
         assert_eq!("-Xms2G -Xmx4G", sanitize_java_args("  "));
+        assert_eq!(
+            "-XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=75.0",
+            sanitize_java_args("-XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=75.0")
+        );
+        assert_eq!(
+            "-Xms2G -Xmx8G -XX:+UseG1GC",
+            sanitize_java_args("-Xms2G -Xmx8G -XX:+UseG1GC")
+        );
     }
 
     #[test]
