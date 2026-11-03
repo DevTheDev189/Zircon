@@ -1,0 +1,539 @@
+/**
+ * Zircon Cyber-Obsidian Design System — Components
+ * Canonical component classes for Launcher and Server Web App.
+ * Uses tokens defined in tokens.css and dynamically mutated by theme.js.
+ */
+
+/* ==========================================================================
+   1. Surface Components
+   ========================================================================== */
+
+/* Standard Panel / Card */
+.z-card,
+.z-glass-card,
+.zircon-glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), rgba(var(--color-card-rgb), var(--card-opacity));
+  backdrop-filter: blur(var(--card-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--card-blur)) saturate(140%);
+  border: 1px solid rgba(var(--color-border-rgb), var(--border-opacity));
+  border-radius: var(--border-radius-card);
+  padding: 1.25rem;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 8px 32px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Interactive Card (Hover lift & Accent Glow) */
+.z-card-interactive {
+  cursor: pointer;
+}
+.z-card-interactive:hover {
+  border-color: var(--color-accent-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 20px var(--color-accent-glow);
+  transform: translateY(-2px);
+}
+.z-card-interactive:active {
+  transform: translateY(0);
+}
+
+/* Recessed Container / Log Well */
+.z-well {
+  background-color: var(--color-well);
+  border: 1px solid rgba(var(--color-border-rgb), 0.6);
+  border-radius: var(--border-radius-card);
+  padding: 1rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Modals */
+.z-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 1rem;
+}
+
+.z-modal-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 42rem;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--border-radius-card);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 30px var(--color-accent-glow);
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   2. Button Components
+   ========================================================================== */
+
+.z-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--border-radius-btn);
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+.z-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Primary Accent Button (Radiant Gradient) */
+.z-btn-primary,
+.z-btn-accent,
+.zircon-cta-btn {
+  background: linear-gradient(135deg, var(--color-accent-bright) 0%, var(--color-accent) 50%, var(--color-accent-deep) 100%);
+  color: var(--color-accent-ink) !important;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 18px var(--color-accent-glow);
+}
+.z-btn-primary:hover:not(:disabled),
+.z-btn-accent:hover:not(:disabled),
+.zircon-cta-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 24px var(--color-accent-glow-strong);
+  transform: translateY(-1px);
+}
+.z-btn-primary:active:not(:disabled),
+.z-btn-accent:active:not(:disabled),
+.zircon-cta-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px var(--color-accent-glow);
+}
+
+/* Secondary Button */
+.z-btn-secondary {
+  background: rgba(var(--color-btn-secondary-rgb), 0.8);
+  color: #e2e8f0;
+  border: 1px solid rgba(var(--color-border-rgb), 0.75);
+  backdrop-filter: blur(8px);
+}
+.z-btn-secondary:hover:not(:disabled) {
+  background: rgba(var(--color-btn-secondary-rgb), 1);
+  border-color: var(--color-accent-border);
+  color: var(--color-accent-bright);
+  box-shadow: 0 0 12px var(--color-accent-glow);
+}
+.z-btn-secondary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Ghost / Transparent Button */
+.z-btn-ghost {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid transparent;
+}
+.z-btn-ghost:hover:not(:disabled) {
+  background: rgba(var(--color-btn-secondary-rgb), 0.6);
+  border-color: rgba(var(--color-border-rgb), 0.6);
+  color: #ffffff;
+}
+
+/* Danger Button */
+.z-btn-danger {
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.38);
+}
+.z-btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   3. Form Inputs & Selects
+   ========================================================================== */
+
+.z-input,
+.z-select,
+.z-textarea {
+  background: rgba(var(--color-bg-rgb), 0.85);
+  border: 1px solid rgba(var(--color-border-rgb), 0.8);
+  border-radius: var(--border-radius-input);
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: #f1f5f9;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+select.z-select,
+.z-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+select.z-select option,
+.z-select option {
+  background-color: var(--color-card, #0e1622);
+  color: #f1f5f9;
+}
+.z-input::placeholder,
+.z-textarea::placeholder {
+  color: #64748b;
+}
+.z-input:hover,
+.z-select:hover,
+.z-textarea:hover {
+  border-color: var(--color-accent-border);
+  background: rgba(var(--color-card-rgb), 0.95);
+}
+.z-input:focus,
+.z-select:focus,
+.z-textarea:focus {
+  outline: none !important;
+  background: rgba(var(--color-card-rgb), 1) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 2px var(--color-accent-focus), inset 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Toggle Switch */
+.z-toggle {
+  position: relative;
+  display: inline-flex;
+  height: 1.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  border-radius: var(--border-radius-pill);
+  background: rgba(var(--color-border-rgb), 0.8);
+  border: 1px solid rgba(var(--color-border-rgb), 0.9);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.z-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent-glow);
+}
+.z-toggle-on {
+  background: var(--color-accent);
+  border-color: var(--color-accent-bright);
+  box-shadow: 0 0 12px var(--color-accent-glow);
+}
+.z-toggle-thumb {
+  display: inline-block;
+  height: 0.875rem;
+  width: 0.875rem;
+  transform: translateX(2px);
+  border-radius: var(--border-radius-pill);
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.z-toggle-on .z-toggle-thumb {
+  transform: translateX(1.15rem);
+  background-color: var(--color-accent-ink);
+}
+
+/* Typography & Section Headings */
+.z-label {
+  font-size: 0.75rem;
+  color: #8b949e;
+}
+.z-section {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #f0f6fc;
+  letter-spacing: 0.025em;
+}
+
+/* Checkboxes */
+.zircon-check,
+input[type="checkbox"].zircon-check,
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  background-color: transparent;
+  border: 1px solid rgba(71, 85, 105, 0.8);
+  border-radius: 4px;
+  display: inline-block;
+  position: relative;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.zircon-check:hover,
+input[type="checkbox"].zircon-check:hover,
+input[type="checkbox"]:hover {
+  border-color: var(--color-accent-border);
+}
+.zircon-check:checked,
+input[type="checkbox"].zircon-check:checked,
+input[type="checkbox"]:checked {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+.zircon-check:checked::after,
+input[type="checkbox"].zircon-check:checked::after,
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-accent-ink);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.zircon-check:focus-visible,
+input[type="checkbox"].zircon-check:focus-visible,
+input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent-glow-strong);
+}
+
+/* Segmented Pill Selector */
+.z-segmented-track {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: var(--border-radius-btn);
+  background-color: var(--color-well);
+  border: 1px solid rgba(var(--color-border-rgb), 0.7);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  gap: 3px;
+}
+.z-segmented-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 14px;
+  font-size: 12px;
+  line-height: 16px;
+  border-radius: var(--border-radius-btn);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #94a3b8;
+  background-color: transparent;
+  border: none;
+}
+.z-segmented-pill:hover:not(.active) {
+  color: #f1f5f9;
+  background-color: rgba(var(--color-border-rgb), 0.5);
+}
+.z-segmented-pill.active {
+  background-color: var(--color-accent) !important;
+  color: var(--color-accent-ink) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 14px var(--color-accent-glow);
+  outline: 1px solid var(--color-accent-bright);
+}
+
+/* ==========================================================================
+   4. Status Badges & Indicators
+   ========================================================================== */
+
+.z-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--border-radius-pill);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-family: var(--font-family-mono);
+}
+
+.z-badge-live,
+.z-badge-success {
+  background: rgba(var(--color-success-rgb), 0.15);
+  color: #34d399;
+  border: 1px solid rgba(var(--color-success-rgb), 0.35);
+  box-shadow: 0 0 8px rgba(var(--color-success-rgb), 0.2);
+}
+
+.z-badge-accent {
+  background: rgba(var(--color-accent-rgb), 0.15);
+  color: var(--color-accent-bright);
+  border: 1px solid var(--color-accent-border);
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
+.z-badge-warn {
+  background: rgba(var(--color-warning-rgb), 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(var(--color-warning-rgb), 0.35);
+}
+
+.z-badge-danger {
+  background: rgba(var(--color-danger-rgb), 0.15);
+  color: #f87171;
+  border: 1px solid rgba(var(--color-danger-rgb), 0.35);
+}
+
+/* Sleek Universal Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--color-border-rgb), 0.45);
+  border-radius: var(--border-radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-border);
+}
+
+/* ==========================================================================
+   5. Light Mode Component Adaptations
+   ========================================================================== */
+
+html.theme-light body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+}
+
+html.theme-light .z-card {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 1);
+  color: #0f172a;
+}
+html.theme-light .z-card:hover {
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04), 0 0 18px var(--color-accent-glow);
+}
+
+html.theme-light .z-well {
+  background-color: var(--color-well);
+  border-color: rgba(var(--color-border-rgb), 0.7);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+html.theme-light .z-btn-secondary {
+  background: rgba(var(--color-btn-secondary-rgb), 0.9);
+  color: #1e293b;
+  border-color: rgba(var(--color-border-rgb), 0.85);
+}
+html.theme-light .z-btn-secondary:hover:not(:disabled) {
+  background: #ffffff;
+  color: var(--color-accent-deep);
+  border-color: var(--color-accent);
+}
+
+html.theme-light .z-btn-ghost {
+  color: #475569;
+}
+html.theme-light .z-btn-ghost:hover:not(:disabled) {
+  background: rgba(var(--color-border-rgb), 0.4);
+  color: #0f172a;
+}
+
+html.theme-light .z-input,
+html.theme-light .z-select,
+html.theme-light .z-textarea {
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+  border-color: rgba(var(--color-border-rgb), 0.85);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+html.theme-light .z-input::placeholder,
+html.theme-light .z-textarea::placeholder {
+  color: #94a3b8;
+}
+
+html.theme-light .z-segmented-track {
+  background-color: var(--color-well);
+  border-color: rgba(var(--color-border-rgb), 0.6);
+}
+html.theme-light .z-segmented-pill {
+  color: #64748b;
+}
+html.theme-light .z-segmented-pill:hover:not(.active) {
+  color: #0f172a;
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+html.theme-light .z-modal-backdrop {
+  background-color: rgba(15, 23, 42, 0.45);
+}
+html.theme-light .z-modal-dialog {
+  background-color: #ffffff;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 30px var(--color-accent-glow);
+}
+
+/* Light Theme Text Hierarchy Inversion */
+html.theme-light .text-white {
+  color: #0f172a !important;
+}
+html.theme-light .text-slate-100 {
+  color: #1e293b !important;
+}
+html.theme-light .text-slate-200 {
+  color: #1e293b !important;
+}
+html.theme-light .text-slate-300 {
+  color: #334155 !important;
+}
+html.theme-light .text-slate-400 {
+  color: #475569 !important;
+}
+html.theme-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Explicit Overlays & Media Guards: Retain crisp white on dark banners & primary buttons */
+html.theme-light .banner-text-overlay .text-white,
+html.theme-light .banner-text-overlay .text-slate-100,
+html.theme-light .banner-text-overlay .text-slate-200,
+html.theme-light .z-force-white,
+html.theme-light .z-force-white * {
+  color: #ffffff !important;
+}
+
+html.theme-light .z-btn-accent,
+html.theme-light .z-btn-accent span,
+html.theme-light .z-btn-accent svg {
+  color: var(--color-accent-ink) !important;
+}
+
+html.theme-light .z-btn-danger,
+html.theme-light .z-btn-danger span,
+html.theme-light .z-btn-danger svg {
+  color: #ffffff !important;
+}
+html.theme-light .border-slate-800,
+html.theme-light .border-slate-700,
+html.theme-light [class*="border-slate-800"],
+html.theme-light [class*="border-slate-700"] {
+  border-color: rgba(var(--color-border-rgb), 0.6) !important;
+}
+html.theme-light .bg-slate-900,
+html.theme-light .bg-slate-950 {
+  background-color: var(--color-well) !important;
+}
+

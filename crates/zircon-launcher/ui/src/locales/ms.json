@@ -771,6 +771,7 @@
     "language_desc": "Bahasa antara muka untuk menu, dialog, dan pemberitahuan",
     "categories": {
       "all": "Semua Tetapan",
+      "keybinds": "Keybinds",
       "performance": "Prestasi",
       "display": "Paparan",
       "appearance": "Penampilan",

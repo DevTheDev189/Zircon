@@ -40,12 +40,9 @@
       :crash-data="crashReportData"
       @close="showCrashReportModal = false"
     />
-    <!-- First-Launch Zircon End User License Agreement (EULA) Modal -->
+    <!-- Zircon End User License Agreement (EULA) Modal -->
     <EulaModal
       :is-open="showEulaModal"
-      :can-dismiss="eulaCanDismiss"
-      @accept="onEulaAccepted"
-      @decline="onEulaDeclined"
       @close="showEulaModal = false"
     />
     <!-- Global Glassmorphic Confirmation Modal -->
@@ -201,9 +198,8 @@
       <main
         class="relative flex-1 min-w-0 flex flex-col bg-gradient-to-br from-card/85 via-bg to-well overflow-hidden"
       >
-        <!-- Dynamic ambient radial glow layers (top center beam + corner aura, gradually animated) -->
-        <div class="z-ambient-glow-top"></div>
-        <div class="z-ambient-glow-corner"></div>
+        <!-- Animated Background & Wallpaper Engine Layer -->
+        <ZirconBackground :game-running="Boolean(gameStatus?.running)" />
 
         <div class="relative z-10 flex-1 min-h-0 overflow-hidden">
           <KeepAlive>
@@ -295,6 +291,7 @@ const OnboardingWelcomeModal = defineAsyncComponent(() => import('./components/O
 const LauncherMigrationModal = defineAsyncComponent(() => import('./components/LauncherMigrationModal.vue'));
 const CrashReportModal = defineAsyncComponent(() => import('./components/CrashReportModal.vue'));
 const EulaModal = defineAsyncComponent(() => import('./components/EulaModal.vue'));
+import ZirconBackground from './components/ZirconBackground.vue';
 
 import { api, createDefaultSteveDataUrl, onDeepLinkAddServer, onDeepLinkJoin, onDeepLinkJoinRequest, onGameCrashed, onGameOutput, onGameStatus, onGameWindowReady, onLaunchProgress, onLaunchStatus, onServerKeyMismatch, onShaderRequest, onServerPacksRequest, onSkinUpdated, skinFaceDataUrl } from './lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
@@ -403,11 +400,21 @@ const showOnboardingWelcomeModal = ref(false);
 const showAppMigrationModal = ref(false);
 const onboardingScanResults = ref([]);
 const showEulaModal = ref(false);
-const eulaCanDismiss = ref(false);
 
 let unlisten = [];
 
 onMounted(async () => {
+  // Failsafe timer: guarantee window is revealed even if auth resolution stalls
+  const revealTimer = setTimeout(async () => {
+    try {
+      const win = getCurrentWindow();
+      await win.show();
+      await win.setFocus();
+    } catch {
+      await api.showMainWindow().catch(() => {});
+    }
+  }, 400);
+
   // Automatically restore active session from keychain/cache on launch
   try {
     const cached = await api.getCachedSession();
@@ -422,6 +429,7 @@ onMounted(async () => {
   }
 
   // Reveal window once auth check has settled so login overlay doesn't flash preemptively
+  clearTimeout(revealTimer);
   try {
     const win = getCurrentWindow();
     await win.show();
@@ -437,14 +445,7 @@ onMounted(async () => {
   loadAccounts();
   checkOnboardingMigration();
   
-  // First-run EULA check
-  const acceptedEula = localStorage.getItem('zircon_eula_accepted');
-  if (!acceptedEula) {
-    showEulaModal.value = true;
-    eulaCanDismiss.value = false;
-  }
   window.addEventListener('zircon-open-eula', () => {
-    eulaCanDismiss.value = true;
     showEulaModal.value = true;
   });
 
@@ -832,20 +833,6 @@ function onLaunchOverlayClose() {
 function onOpenSkinsFromLaunch() {
   launchModalActive.value = false;
   view.value = 'skins';
-}
-
-function onEulaAccepted() {
-  localStorage.setItem('zircon_eula_accepted', 'v1.0.0');
-  showEulaModal.value = false;
-}
-
-async function onEulaDeclined() {
-  try {
-    const win = getCurrentWindow();
-    await win.close();
-  } catch {
-    window.close();
-  }
 }
 
 function onLaunching(server = null) {

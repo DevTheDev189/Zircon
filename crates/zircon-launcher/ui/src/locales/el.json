@@ -669,6 +669,7 @@
     "language_desc": "Γλώσσα διεπαφής για μενού, διαλόγους και ειδοποιήσεις",
     "categories": {
       "all": "Όλες οι Ρυθμίσεις",
+      "keybinds": "Keybinds",
       "performance": "Απόδοση",
       "display": "Οθόνη",
       "appearance": "Εμφάνιση",

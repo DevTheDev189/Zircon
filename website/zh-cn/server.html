@@ -104,8 +104,8 @@
   </script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Zircon Server Manager — Self-Hosted Modded Minecraft Management</title>
-<meta content="Download Zircon Server Manager. Self-hosted Minecraft server management with single-port multiplexing, integrated Modrinth &amp; CurseForge mod browsing, live web console, and player mod syncing." name="description"/>
+<title>Zircon Server Manager — 面向服主与托管方</title>
+<meta content="Zircon 背后的自托管引擎：向玩家发布精确的模组清单，在单一端口上复用游戏与 Web 流量，并包含完整的浏览器控制面板。" name="description"/>
 <meta content="zircon server manager, minecraft server manager, self-hosted minecraft server, single port minecraft multiplexer, auto mod sync server" name="keywords"/>
 <meta content="Zircon Contributors" name="author"/>
 <meta content="index, follow" name="robots"/>
@@ -124,6 +124,7 @@
 <link href="../site.webmanifest" rel="manifest"/>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700;800&family=JetBrains+Mono:wght@450;600&display=swap" rel="stylesheet"/>
 <link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
 </head>
 <body>
@@ -191,7 +192,7 @@
 <div class="frame-title" data-i18n="server.system_stats_multiinstance"><span data-i18n="server.system_stats_multiinstance_1">系统统计与多实例管理</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Server Performance Stats" height="600" loading="eager" src="../assets/img/performance_server.png" width="1000"/>
+<img alt="Server Performance Stats" height="600" loading="eager" src="../assets/img/performance_server.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.dashboard_statsrealtime_cpu_ram"><b data-i18n="server.dashboard_stats">仪表盘与统计：</b> 实时监控所有服务器实例的 CPU、RAM 和 Tick 速率。</div>
 </div>
@@ -203,7 +204,7 @@
 <div class="frame-title" data-i18n="server.curseforge_modrinth_search"><span data-i18n="server.curseforge_modrinth_search_1">CurseForge 与 Modrinth 搜索</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Server Mod Browser" height="600" loading="lazy" src="../assets/img/mod_browser_server.png" width="1000"/>
+<img alt="Server Mod Browser" height="600" loading="lazy" src="../assets/img/mod_browser_server.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.integrated_mod_browsersearch_and"><b data-i18n="server.integrated_mod_browser">集成模组浏览器：</b> 从 Modrinth 和 CurseForge 搜索并一键安装模组，自动解析依赖项，无需任何 API 密钥。</div>
 </div>
@@ -215,7 +216,7 @@
 <div class="frame-title" data-i18n="server.live_interactive_terminal"><span data-i18n="server.live_interactive_terminal_1">实时交互终端</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Live Console" height="600" loading="lazy" src="../assets/img/console_log_server.png" width="1000"/>
+<img alt="Live Console" height="600" loading="lazy" src="../assets/img/console_log_server.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.live_consolesend_commands_review"><b data-i18n="server.live_console">实时控制台：</b> 发送命令，查看颜色编码的日志，并筛选警告或错误堆栈。</div>
 </div>
@@ -227,7 +228,7 @@
 <div class="frame-title" data-i18n="server.shaders_resource_packs"><span data-i18n="server.shaders_resource_packs_1">光影与资源包</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Shaders and Texture Packs" height="600" loading="lazy" src="../assets/img/shaders_server.png" width="1000"/>
+<img alt="Shaders and Texture Packs" height="600" loading="lazy" src="../assets/img/shaders_server.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.visual_packsmanage_recommended_shaders"><b data-i18n="server.visual_packs">视觉包：</b> 管理推荐的光影和材质包，自动同步给加入的玩家。</div>
 </div>
@@ -239,7 +240,7 @@
 <div class="frame-title" data-i18n="server.web_file_manager_bom"><span data-i18n="server.web_file_manager_bom_1">Web 文件管理器与 BOM 同步</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Server File Manager" height="600" loading="lazy" src="../assets/img/files_server.png" width="1000"/>
+<img alt="Server File Manager" height="600" loading="lazy" src="../assets/img/files_server.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.file_managerbrowse_server_directory"><b data-i18n="server.file_manager">文件管理器：</b> 浏览服务器目录，上传文件，并通过“同步至 BOM”标记需客户端同步的项目。</div>
 </div>
@@ -251,7 +252,7 @@
 <div class="frame-title" data-i18n="server.inbrowser_config_editor"><span data-i18n="server.inbrowser_config_editor_1">浏览器内配置编辑器</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="In-Browser File Editor" height="600" loading="lazy" src="../assets/img/files_text_editor.png" width="1000"/>
+<img alt="In-Browser File Editor" height="600" loading="lazy" src="../assets/img/files_text_editor.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.web_code_editoredit_serverproperties"><b data-i18n="server.web_code_editor">Web 代码编辑器：</b> 使用快捷键编辑 server.properties、JSON 配置文件和游戏文件，并即时同步至客户端。</div>
 </div>
@@ -263,7 +264,7 @@
 <div class="frame-title" data-i18n="server.players_operators_whitelist"><span data-i18n="server.players_operators_whitelist_1">玩家、管理员与白名单</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Player Management" height="600" loading="lazy" src="../assets/img/players_server.png" width="1000"/>
+<img alt="Player Management" height="600" loading="lazy" src="../assets/img/players_server.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.player_controlmanage_whitelisted_users"><b data-i18n="server.player_control">玩家控制：</b> 可视化管理白名单用户、管理员权限等级和封禁列表。</div>
 </div>
@@ -275,7 +276,7 @@
 <div class="frame-title" data-i18n="server.automated_backups_world_zip"><span data-i18n="server.automated_backups_world_zip_1">自动备份与世界 ZIP 导入</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Server Backups" height="600" loading="lazy" src="../assets/img/backups_server.png" width="1000"/>
+<img alt="Server Backups" height="600" loading="lazy" src="../assets/img/backups_server.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.automated_snapshots_zipscheduled_lz4"><b data-i18n="server.automated_snapshots_zip">自动快照与 ZIP：</b> 支持可配置保留策略的计划 LZ4 备份，拖放式 .zip 世界导入，以及一键恢复。</div>
 </div>
@@ -287,7 +288,7 @@
 <div class="frame-title" data-i18n="server.live_2d3d_world_map"><span data-i18n="server.live_2d3d_world_map_1">实时 2D/3D 世界地图与玩家雷达</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Live Server World Map" height="600" loading="lazy" src="../assets/img/world_seed_radar.png" width="1000"/>
+<img alt="Live Server World Map" height="600" loading="lazy" src="../assets/img/world_seed_radar.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.live_world_mapexplore_rendered"><b data-i18n="server.live_world_map">实时世界地图：</b> 直接在浏览器中探索渲染后的地形、生物群系和实时玩家位置标记。</div>
 </div>
@@ -299,7 +300,7 @@
 <div class="frame-title" data-i18n="server.server_settings_sleep_trigger"><span data-i18n="server.server_settings_sleep_trigger_1">服务器设置与休眠触发</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline></svg></button></div>
 </div>
-<img alt="Server Settings" height="600" loading="lazy" src="../assets/img/settings_server.png" width="1000"/>
+<img alt="Server Settings" height="600" loading="lazy" src="../assets/img/settings_server.webp" width="1000"/>
 </div>
 <div class="carousel-caption" data-i18n="server.server_settingsport_multiplexing_configuration"><b data-i18n="server.server_settings">服务器设置：</b> 端口复用配置，内置 Modrinth 与 CurseForge 集成，以及空闲休眠超时规则。</div>
 </div>
@@ -328,16 +329,16 @@
 </div>
 <!-- Carousel Thumbnails -->
 <div class="carousel-thumbs">
-<button aria-label="View Stats" class="carousel-thumb active"><img alt="Stats" src="../assets/img/performance_server.png"/></button>
-<button aria-label="View Mod Browser" class="carousel-thumb"><img alt="Mod Browser" src="../assets/img/mod_browser_server.png"/></button>
-<button aria-label="View Live Console" class="carousel-thumb"><img alt="Console" src="../assets/img/console_log_server.png"/></button>
-<button aria-label="View Shaders" class="carousel-thumb"><img alt="Shaders" src="../assets/img/shaders_server.png"/></button>
-<button aria-label="View Files" class="carousel-thumb"><img alt="Files" src="../assets/img/files_server.png"/></button>
-<button aria-label="View Config Editor" class="carousel-thumb"><img alt="Editor" src="../assets/img/files_text_editor.png"/></button>
-<button aria-label="View Players" class="carousel-thumb"><img alt="Players" src="../assets/img/players_server.png"/></button>
-<button aria-label="View Backups" class="carousel-thumb"><img alt="Backups" src="../assets/img/backups_server.png"/></button>
-<button aria-label="View World Map" class="carousel-thumb"><img alt="World Map" src="../assets/img/world_seed_radar.png"/></button>
-<button aria-label="View Settings" class="carousel-thumb"><img alt="Settings" src="../assets/img/settings_server.png"/></button>
+<button aria-label="View Stats" class="carousel-thumb active"><img alt="Stats" src="../assets/img/performance_server.webp"/></button>
+<button aria-label="View Mod Browser" class="carousel-thumb"><img alt="Mod Browser" src="../assets/img/mod_browser_server.webp"/></button>
+<button aria-label="View Live Console" class="carousel-thumb"><img alt="Console" src="../assets/img/console_log_server.webp"/></button>
+<button aria-label="View Shaders" class="carousel-thumb"><img alt="Shaders" src="../assets/img/shaders_server.webp"/></button>
+<button aria-label="View Files" class="carousel-thumb"><img alt="Files" src="../assets/img/files_server.webp"/></button>
+<button aria-label="View Config Editor" class="carousel-thumb"><img alt="Editor" src="../assets/img/files_text_editor.webp"/></button>
+<button aria-label="View Players" class="carousel-thumb"><img alt="Players" src="../assets/img/players_server.webp"/></button>
+<button aria-label="View Backups" class="carousel-thumb"><img alt="Backups" src="../assets/img/backups_server.webp"/></button>
+<button aria-label="View World Map" class="carousel-thumb"><img alt="World Map" src="../assets/img/world_seed_radar.webp"/></button>
+<button aria-label="View Settings" class="carousel-thumb"><img alt="Settings" src="../assets/img/settings_server.webp"/></button>
 </div>
 </div>
 </div>
@@ -364,7 +365,7 @@
 <div class="frame-title" data-i18n="server.live_terminal_console"><span data-i18n="server.live_terminal_console_1">实时终端控制台</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="Live Console" height="500" loading="lazy" src="../assets/img/console_log_server.png" width="800"/>
+<img alt="Live Console" height="500" loading="lazy" src="../assets/img/console_log_server.webp" width="800"/>
 </div>
 </div>
 </div>
@@ -391,7 +392,7 @@
 <div class="frame-title" data-i18n="server.serverproperties_editor"><span data-i18n="server.serverproperties_editor_1">server.properties 编辑器</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="Config Editor" height="500" loading="lazy" src="../assets/img/files_text_editor.png" width="800"/>
+<img alt="Config Editor" height="500" loading="lazy" src="../assets/img/files_text_editor.webp" width="800"/>
 </div>
 </div>
 </div>

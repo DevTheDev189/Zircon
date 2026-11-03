@@ -43,7 +43,7 @@
 
         <div
           v-if="servers.length === 0"
-          class="flex flex-col items-center justify-center p-8 bg-[#0a0f14]/60 border border-dashed border-slate-800 rounded-2xl text-center my-4"
+          class="flex flex-col items-center justify-center p-8 z-card border-dashed border-slate-800 text-center my-4"
         >
           <div class="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent mb-3 shadow-[0_0_15px_var(--color-accent-glow)]">
             <svg class="w-6 h-6 text-accent-bright" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -97,7 +97,10 @@
           </div>
 
           <!-- Server Row Details -->
-          <div class="relative z-10 flex items-center gap-4 p-4">
+          <div
+            class="relative z-10 flex items-center gap-4 p-4"
+            :class="isHeroBanner(server) ? 'banner-text-overlay' : ''"
+          >
             <div
               class="relative w-11 h-11 rounded-xl bg-slate-900 border border-slate-700/80 overflow-hidden flex items-center justify-center text-lg shrink-0 select-none shadow-[0_0_12px_var(--color-accent-glow)]"
             >
@@ -434,9 +437,9 @@
     </div>
 
     <!-- Right: 3D player preview -->
-    <div class="hidden lg:flex w-72 xl:w-80 2xl:w-96 z-card flex-col p-4 bg-[#0e1622]/90 border border-slate-800/80 shrink-0">
+    <div class="hidden lg:flex w-72 xl:w-80 2xl:w-96 z-card flex-col p-4 shrink-0">
       <span class="z-label mb-2 text-center font-bold tracking-wider uppercase text-[10px] text-accent/80">{{ $t('servers.player_preview_title') }}</span>
-      <div class="flex-1 min-h-0 rounded-xl overflow-hidden bg-[#070b10] border border-slate-800/80 relative shadow-inner">
+      <div class="flex-1 min-h-0 rounded-xl overflow-hidden z-well relative shadow-inner">
         <Player3DPreview :image-uri="previewSkin" :variant="previewVariant" />
       </div>
     </div>
@@ -444,10 +447,10 @@
     <!-- Add Server & Quick Play Modal -->
     <div
       v-if="showAddDialog"
-      class="absolute inset-0 z-40 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
+      class="z-modal-backdrop"
       @click.self="closeAddDialog"
     >
-      <div class="w-full max-w-lg p-6 overflow-hidden shadow-2xl relative border border-neutral-800 rounded-2xl bg-[#0c0d12]">
+      <div class="z-modal-dialog p-6">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h3 class="text-white font-bold text-base">{{ $t('servers.add_dialog_title') }}</h3>
@@ -520,7 +523,7 @@
         <!-- Live Server Discovery Card -->
         <div
           v-if="probeResult || isProbing"
-          class="mb-4 bg-slate-950/90 border border-slate-800 rounded-xl p-4 transition-all"
+          class="mb-4 z-well p-4 transition-all"
         >
           <div v-if="isProbing && !probeResult" class="flex items-center gap-3 py-2">
             <div class="w-9 h-9 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent shrink-0 animate-pulse shadow-[0_0_10px_var(--color-accent-glow)]">
@@ -674,7 +677,7 @@
           </button>
           <div class="flex items-center gap-2.5">
             <button
-              class="z-btn-ghost text-xs px-4 py-2 rounded-xl font-semibold text-cyan-300 border border-slate-700/80 hover:border-cyan-400 hover:bg-[#142230]"
+              class="z-btn-secondary text-xs px-4 py-2 font-semibold"
               :disabled="!newServerAddress.trim()"
               @click="saveServerOnly"
             >
@@ -705,10 +708,10 @@
     <!-- Join via Code Modal -->
     <div
       v-if="showJoinCodeModal"
-      class="fixed inset-0 z-50 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4"
+      class="z-modal-backdrop"
       @click.self="showJoinCodeModal = false"
     >
-      <div class="z-card w-full max-w-sm flex flex-col p-6 shadow-2xl relative border border-cyan-500/40 rounded-2xl bg-[#0e1622]">
+      <div class="z-modal-dialog max-w-sm p-6">
         <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
           <h3 class="text-white font-bold text-base">{{ $t('join_by_code.title') }}</h3>
           <button class="text-slate-400 hover:text-white text-lg leading-none" @click="showJoinCodeModal = false">✕</button>

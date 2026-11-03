@@ -925,6 +925,7 @@
     "language_desc": "Язык меню, диалогов и уведомлений",
     "categories": {
       "all": "Все настройки",
+      "keybinds": "Keybinds",
       "performance": "Производительность",
       "display": "Экран",
       "appearance": "Внешний вид",

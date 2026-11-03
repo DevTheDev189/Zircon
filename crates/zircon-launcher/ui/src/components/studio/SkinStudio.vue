@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full flex flex-col bg-[#070b10] overflow-hidden select-none relative">
+  <div class="w-full h-full flex flex-col bg-[#070b10] rounded-2xl border border-edge overflow-hidden select-none relative shadow-2xl">
     <!-- TIER 1: Document & File Action Bar (Spacious 2026 Glassmorphism) -->
     <div class="h-11 px-4 bg-gradient-to-r from-[#0e1622]/95 via-[#0e1622]/90 to-[#070b10]/95 border-b border-white/10 flex items-center justify-between gap-3 shrink-0 z-20 backdrop-blur-xl">
       <!-- Left: File / Skin Name & Model Variant (Never squished) -->

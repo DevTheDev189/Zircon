@@ -803,6 +803,7 @@
     "language_desc": "Idioma da interface para menus, diálogos e notificações",
     "categories": {
       "all": "Todas as Definições",
+      "keybinds": "Keybinds",
       "performance": "Desempenho",
       "display": "Ecrã",
       "appearance": "Aparência",

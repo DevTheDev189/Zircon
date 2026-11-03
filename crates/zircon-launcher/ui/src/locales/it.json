@@ -963,6 +963,7 @@
     "language_desc": "Lingua dell'interfaccia per menu, finestre di dialogo e notifiche",
     "categories": {
       "all": "Tutte le impostazioni",
+      "keybinds": "Keybinds",
       "performance": "Prestazioni",
       "display": "Schermo",
       "appearance": "Aspetto",

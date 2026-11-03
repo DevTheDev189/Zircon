@@ -111,7 +111,7 @@ export const THEME_PRESETS = [
 export const BG_THEME_PRESETS = [
   {
     id: 'deep-void',
-    name: 'Deep Void',
+    name: 'Zircon Dark',
     description: 'Signature Zircon cosmic dark space',
     bg: '#070b0f',
     bgRgb: '7 11 15',
@@ -125,6 +125,24 @@ export const BG_THEME_PRESETS = [
     borderRgb: '38 53 69',
     btnSecondary: '#1c2530',
     btnSecondaryRgb: '28 37 48',
+  },
+  {
+    id: 'zircon-light',
+    name: 'Zircon Light',
+    description: 'Signature frosted crystalline light canvas',
+    isLight: true,
+    bg: '#f8fafc',
+    bgRgb: '248 250 252',
+    sidebar: '#f1f5f9',
+    sidebarRgb: '241 245 249',
+    card: '#ffffff',
+    cardRgb: '255 255 255',
+    well: '#e2e8f0',
+    wellRgb: '226 232 240',
+    border: '#cbd5e1',
+    borderRgb: '203 213 225',
+    btnSecondary: '#f1f5f9',
+    btnSecondaryRgb: '241 245 249',
   },
   {
     id: 'oled-black',
@@ -144,23 +162,6 @@ export const BG_THEME_PRESETS = [
     btnSecondaryRgb: '20 20 20',
   },
   {
-    id: 'abyssal-navy',
-    name: 'Abyssal Navy',
-    description: 'Deep maritime twilight oceanic depths',
-    bg: '#050a14',
-    bgRgb: '5 10 20',
-    sidebar: '#081020',
-    sidebarRgb: '8 16 32',
-    card: '#0c1830',
-    cardRgb: '12 24 48',
-    well: '#060d1a',
-    wellRgb: '6 13 26',
-    border: '#1d3050',
-    borderRgb: '29 48 80',
-    btnSecondary: '#13223d',
-    btnSecondaryRgb: '19 34 61',
-  },
-  {
     id: 'carbon-slate',
     name: 'Carbon Slate',
     description: 'Modern stealth graphite slate',
@@ -176,6 +177,23 @@ export const BG_THEME_PRESETS = [
     borderRgb: '51 65 85',
     btnSecondary: '#283548',
     btnSecondaryRgb: '40 53 72',
+  },
+  {
+    id: 'abyssal-navy',
+    name: 'Abyssal Navy',
+    description: 'Deep maritime twilight oceanic depths',
+    bg: '#050a14',
+    bgRgb: '5 10 20',
+    sidebar: '#081020',
+    sidebarRgb: '8 16 32',
+    card: '#0c1830',
+    cardRgb: '12 24 48',
+    well: '#060d1a',
+    wellRgb: '6 13 26',
+    border: '#1d3050',
+    borderRgb: '29 48 80',
+    btnSecondary: '#13223d',
+    btnSecondaryRgb: '19 34 61',
   },
   {
     id: 'royal-obsidian',
@@ -210,6 +228,51 @@ export const BG_THEME_PRESETS = [
     borderRgb: '28 66 47',
     btnSecondary: '#122e20',
     btnSecondaryRgb: '18 46 32',
+  },
+  {
+    id: 'solar-sand',
+    name: 'Solar Sand (Light)',
+    description: 'Warm cream canvas with soft natural contrast',
+    isLight: true,
+    bg: '#faf8f5',
+    bgRgb: '250 248 245',
+    sidebar: '#f3ede4',
+    sidebarRgb: '243 237 228',
+    card: '#ffffff',
+    cardRgb: '255 255 255',
+    well: '#f1ebe0',
+    wellRgb: '241 235 224',
+    border: '#e4d8c7',
+    borderRgb: '228 216 199',
+    btnSecondary: '#f0e6d6',
+    btnSecondaryRgb: '240 230 214',
+  },
+];
+
+export const BACKGROUND_MOTION_PRESETS = [
+  {
+    id: 'cyber-orbs',
+    name: 'Cyber Aurora',
+    description: 'Dynamic ambient glowing spheres synced to your accent color',
+    category: 'animated',
+  },
+  {
+    id: 'voxel-wave',
+    name: 'Voxel Dot Wave',
+    description: 'Smooth undulating digital terrain mesh of subtle illuminated voxels',
+    category: 'animated',
+  },
+  {
+    id: 'static-minimal',
+    name: 'Static Void',
+    description: 'Still canvas with zero animations (maximum battery life)',
+    category: 'static',
+  },
+  {
+    id: 'custom-wallpaper',
+    name: 'Custom Wallpaper',
+    description: 'Your uploaded image (.png, .jpg, .webp) or looping video (.webm, .mp4)',
+    category: 'custom',
   },
 ];
 
@@ -270,13 +333,25 @@ export const GLASS_EFFECTS = [
 export const CURATED_THEMES = [
   {
     id: 'default',
-    name: 'Zircon Cyan',
+    name: 'Zircon Dark',
     subtitle: 'Classic Void & Crystal',
     accent: '#47d2c9',
     bg: '#070b0f',
     card: '#0e1622',
     theme: 'zircon-cyan',
     bgTheme: 'deep-void',
+    buttonStyle: 'rounded',
+    glassEffect: 'standard',
+  },
+  {
+    id: 'zircon-light',
+    name: 'Zircon Light',
+    subtitle: 'Frosted Quartz & Crystal',
+    accent: '#20b2aa',
+    bg: '#f8fafc',
+    card: '#ffffff',
+    theme: 'zircon-cyan',
+    bgTheme: 'zircon-light',
     buttonStyle: 'rounded',
     glassEffect: 'standard',
   },
@@ -354,6 +429,10 @@ const LOCAL_STORAGE_CUSTOM_BG_KEY = 'zircon-custom-bg';
 const LOCAL_STORAGE_CUSTOM_CARD_KEY = 'zircon-custom-card';
 const LOCAL_STORAGE_BUTTON_STYLE_KEY = 'zircon-button-style';
 const LOCAL_STORAGE_GLASS_EFFECT_KEY = 'zircon-glass-effect';
+const LOCAL_STORAGE_MOTION_PRESET_KEY = 'zircon-motion-preset';
+const LOCAL_STORAGE_WALLPAPER_DIM_KEY = 'zircon-wallpaper-dim';
+const LOCAL_STORAGE_WALLPAPER_SRC_KEY = 'zircon-wallpaper-src';
+const LOCAL_STORAGE_WALLPAPER_TYPE_KEY = 'zircon-wallpaper-type';
 
 /**
  * Parses 3 or 6 digit hex string to {r, g, b}.
@@ -479,6 +558,10 @@ export function applyTheme(options = {}) {
   let customCardBg = options.customCardBg;
   let buttonStyleId = options.buttonStyle || 'rounded';
   let glassEffectId = options.glassEffect || 'standard';
+  let motionPresetId = options.motionPreset || 'cyber-orbs';
+  let wallpaperDim = options.wallpaperDim !== undefined ? options.wallpaperDim : 0.65;
+  let wallpaperSrc = options.wallpaperSrc || null;
+  let wallpaperType = options.wallpaperType || 'image';
 
   // 1. Accent color
   let accentObj = null;
@@ -507,6 +590,10 @@ export function applyTheme(options = {}) {
   root.dataset.bgTheme = bgObj.id;
   root.dataset.buttonStyle = btnObj.id;
   root.dataset.glassEffect = glassObj.id;
+  root.dataset.motionPreset = motionPresetId;
+
+  // Toggle Light Mode Class
+  root.classList.toggle('theme-light', Boolean(bgObj.isLight));
 
   // Set Accent CSS variables
   root.style.setProperty('--color-accent', accentObj.hex);
@@ -546,6 +633,23 @@ export function applyTheme(options = {}) {
   root.style.setProperty('--card-opacity', glassObj.cardOpacity);
   root.style.setProperty('--border-opacity', glassObj.borderOpacity);
 
+  // Set Wallpaper Dimmer
+  root.style.setProperty('--bg-dim-opacity', String(wallpaperDim));
+
+  // Dispatch custom event for reactive background update
+  window.dispatchEvent(new CustomEvent('zircon-theme-changed', {
+    detail: {
+      accent: accentObj,
+      bg: bgObj,
+      button: btnObj,
+      glass: glassObj,
+      motionPreset: motionPresetId,
+      wallpaperDim,
+      wallpaperSrc,
+      wallpaperType,
+    }
+  }));
+
   // Cache to localStorage for instantaneous zero-flicker reload
   try {
     localStorage.setItem(LOCAL_STORAGE_THEME_KEY, themeId);
@@ -555,6 +659,10 @@ export function applyTheme(options = {}) {
     if (customCardBg) localStorage.setItem(LOCAL_STORAGE_CUSTOM_CARD_KEY, customCardBg);
     localStorage.setItem(LOCAL_STORAGE_BUTTON_STYLE_KEY, buttonStyleId);
     localStorage.setItem(LOCAL_STORAGE_GLASS_EFFECT_KEY, glassEffectId);
+    localStorage.setItem(LOCAL_STORAGE_MOTION_PRESET_KEY, motionPresetId);
+    localStorage.setItem(LOCAL_STORAGE_WALLPAPER_DIM_KEY, String(wallpaperDim));
+    if (wallpaperSrc !== null) localStorage.setItem(LOCAL_STORAGE_WALLPAPER_SRC_KEY, wallpaperSrc);
+    localStorage.setItem(LOCAL_STORAGE_WALLPAPER_TYPE_KEY, wallpaperType);
   } catch {
     // ignore
   }
@@ -564,7 +672,26 @@ export function applyTheme(options = {}) {
     bg: bgObj,
     button: btnObj,
     glass: glassObj,
+    motionPreset: motionPresetId,
+    wallpaperDim,
+    wallpaperSrc,
+    wallpaperType,
   };
+}
+
+/**
+ * Retrieves the currently saved motion preset & wallpaper options.
+ */
+export function getSavedWallpaperConfig() {
+  try {
+    const motionPreset = localStorage.getItem(LOCAL_STORAGE_MOTION_PRESET_KEY) || 'cyber-orbs';
+    const wallpaperDim = parseFloat(localStorage.getItem(LOCAL_STORAGE_WALLPAPER_DIM_KEY) || '0.65');
+    const wallpaperSrc = localStorage.getItem(LOCAL_STORAGE_WALLPAPER_SRC_KEY) || null;
+    const wallpaperType = localStorage.getItem(LOCAL_STORAGE_WALLPAPER_TYPE_KEY) || 'image';
+    return { motionPreset, wallpaperDim, wallpaperSrc, wallpaperType };
+  } catch {
+    return { motionPreset: 'cyber-orbs', wallpaperDim: 0.65, wallpaperSrc: null, wallpaperType: 'image' };
+  }
 }
 
 /**
@@ -572,13 +699,24 @@ export function applyTheme(options = {}) {
  */
 export function initTheme() {
   try {
-    const savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY) || 'zircon-cyan';
-    const savedCustomHex = localStorage.getItem(LOCAL_STORAGE_CUSTOM_HEX_KEY) || '#47d2c9';
-    const savedBgTheme = localStorage.getItem(LOCAL_STORAGE_BG_THEME_KEY) || 'deep-void';
-    const savedCustomBg = localStorage.getItem(LOCAL_STORAGE_CUSTOM_BG_KEY) || '#070b0f';
-    const savedCustomCard = localStorage.getItem(LOCAL_STORAGE_CUSTOM_CARD_KEY) || '#0e1622';
-    const savedButtonStyle = localStorage.getItem(LOCAL_STORAGE_BUTTON_STYLE_KEY) || 'rounded';
-    const savedGlassEffect = localStorage.getItem(LOCAL_STORAGE_GLASS_EFFECT_KEY) || 'standard';
+    let savedTheme = localStorage.getItem(LOCAL_STORAGE_THEME_KEY) || 'zircon-cyan';
+    let savedCustomHex = localStorage.getItem(LOCAL_STORAGE_CUSTOM_HEX_KEY) || '#47d2c9';
+    let savedBgTheme = localStorage.getItem(LOCAL_STORAGE_BG_THEME_KEY) || 'deep-void';
+    let savedCustomBg = localStorage.getItem(LOCAL_STORAGE_CUSTOM_BG_KEY) || '#070b0f';
+    let savedCustomCard = localStorage.getItem(LOCAL_STORAGE_CUSTOM_CARD_KEY) || '#0e1622';
+    let savedButtonStyle = localStorage.getItem(LOCAL_STORAGE_BUTTON_STYLE_KEY) || 'rounded';
+    let savedGlassEffect = localStorage.getItem(LOCAL_STORAGE_GLASS_EFFECT_KEY) || 'standard';
+    let savedMotionPreset = localStorage.getItem(LOCAL_STORAGE_MOTION_PRESET_KEY) || 'cyber-orbs';
+    let savedWallpaperDim = parseFloat(localStorage.getItem(LOCAL_STORAGE_WALLPAPER_DIM_KEY) || '0.65');
+    let savedWallpaperSrc = localStorage.getItem(LOCAL_STORAGE_WALLPAPER_SRC_KEY) || null;
+    let savedWallpaperType = localStorage.getItem(LOCAL_STORAGE_WALLPAPER_TYPE_KEY) || 'image';
+
+    if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get('bg')) savedBgTheme = q.get('bg');
+      if (q.get('theme')) savedTheme = q.get('theme');
+      if (q.get('motion')) savedMotionPreset = q.get('motion');
+    }
 
     return applyTheme({
       theme: savedTheme,
@@ -588,6 +726,10 @@ export function initTheme() {
       customCardBg: savedCustomCard,
       buttonStyle: savedButtonStyle,
       glassEffect: savedGlassEffect,
+      motionPreset: savedMotionPreset,
+      wallpaperDim: savedWallpaperDim,
+      wallpaperSrc: savedWallpaperSrc,
+      wallpaperType: savedWallpaperType,
     });
   } catch {
     return applyTheme('zircon-cyan');

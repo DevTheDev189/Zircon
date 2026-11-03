@@ -647,6 +647,7 @@
     "language_desc": "שפת הממשק עבור תפריטים, חלונות הודעה והתראות",
     "categories": {
       "all": "כל ההגדרות",
+      "keybinds": "Keybinds",
       "performance": "ביצועים",
       "display": "תצוגה",
       "appearance": "מראה",

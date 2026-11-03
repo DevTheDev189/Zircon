@@ -647,6 +647,7 @@
     "language_desc": "Језик интерфејса за меније, дијалошке прозоре и обавештења",
     "categories": {
       "all": "Сва подешавања",
+      "keybinds": "Keybinds",
       "performance": "Перформансе",
       "display": "Приказ",
       "appearance": "Изглед",

@@ -580,6 +580,7 @@
     "language_desc": "메뉴, 대화 상자 및 알림의 인터페이스 언어",
     "categories": {
       "all": "모든 설정",
+      "keybinds": "Keybinds",
       "performance": "성능",
       "display": "디스플레이",
       "appearance": "외관",

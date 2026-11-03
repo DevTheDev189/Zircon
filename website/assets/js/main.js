@@ -33,8 +33,88 @@ document.addEventListener('DOMContentLoaded', () => {
     osPills.forEach((btn) => {
       btn.addEventListener('click', () => {
         setOS(btn.dataset.os);
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
   }
 
   // ---------------------------------------------------------------------------
@@ -43,15 +123,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const heroPrimaryBtn = document.getElementById('hero-primary-download');
   if (heroPrimaryBtn) {
     if (detectedOS === 'macos') {
-      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.3_aarch64.dmg';
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.4_aarch64.dmg';
       const label = heroPrimaryBtn.querySelector('.download-label');
       if (label) label.textContent = 'Download for macOS (.dmg)';
     } else if (detectedOS === 'linux') {
-      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.3_amd64.AppImage';
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.4_amd64.AppImage';
       const label = heroPrimaryBtn.querySelector('.download-label');
       if (label) label.textContent = 'Download for Linux (.AppImage)';
     } else {
-      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.3_x64-setup.exe';
+      heroPrimaryBtn.href = 'https://downloads.zirconmc.net/updates/launcher/Zircon_0.9.4_x64-setup.exe';
       const label = heroPrimaryBtn.querySelector('.download-label');
       if (label) label.textContent = 'Download for Windows (.exe)';
     }
@@ -66,7 +146,47 @@ document.addEventListener('DOMContentLoaded', () => {
     toggle.addEventListener('click', () => {
       const open = links.classList.toggle('open');
       toggle.setAttribute('aria-expanded', String(open));
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
     // Close the menu when a link is chosen.
     links.querySelectorAll('a').forEach((a) =>
       a.addEventListener('click', () => {
@@ -90,17 +210,137 @@ document.addEventListener('DOMContentLoaded', () => {
         if (on) found = true;
         btn.classList.toggle('active', on);
         btn.setAttribute('aria-selected', String(on));
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
       tabPanels.forEach((p) => {
         const on = p.dataset.panel === name;
         p.classList.toggle('active', on);
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
       if (shouldScroll && found) {
         const targetPanel = document.querySelector(`.tab-panel[data-panel="${name}"]`) || document.querySelector('.tabs');
         if (targetPanel) {
-          targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start'   // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
         }
       }
     };
@@ -112,8 +352,88 @@ document.addEventListener('DOMContentLoaded', () => {
         const tabName = btn.dataset.tab;
         activateTab(tabName, false);
         history.replaceState(null, '', '#' + tabName);
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
     // Intercept any link on the page that links to #players or #server-owners
     document.addEventListener('click', (e) => {
@@ -129,7 +449,47 @@ document.addEventListener('DOMContentLoaded', () => {
           history.pushState(null, '', '#' + targetTab);
         }
       }
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
 
     // Handle browser back/forward and hash changes
     window.addEventListener('hashchange', () => {
@@ -137,7 +497,47 @@ document.addEventListener('DOMContentLoaded', () => {
       if (wanted && document.querySelector(`.tab-btn[data-tab="${wanted}"]`)) {
         activateTab(wanted, false);
       }
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
 
     // Honour hash on load (#server-owners or #players), else default to first tab
     const wanted = window.location.hash.slice(1);
@@ -176,8 +576,88 @@ document.addEventListener('DOMContentLoaded', () => {
       tab.addEventListener('click', () => {
         activateShowcase(index);
         resetShowcaseTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
     const startShowcaseTimer = () => {
       stopShowcaseTimer();
@@ -216,8 +696,88 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetDeck = tab.dataset.deck;
         deckTabs.forEach((t) => t.classList.toggle('active', t === tab));
         deckPanels.forEach((p) => p.classList.toggle('active', p.dataset.deck === targetDeck));
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
   }
 
   // ---------------------------------------------------------------------------
@@ -249,9 +809,89 @@ document.addEventListener('DOMContentLoaded', () => {
           thumbsContainer.scrollTo({
             left: thumbLeft - (containerWidth / 2) + (thumbWidth / 2),
             behavior: 'smooth'
-          });
+            // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
         }
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
     };
 
     if (prevBtn) {
@@ -259,29 +899,269 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         showSlide(currentIndex - 1);
         resetAutoTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
     }
     if (nextBtn) {
       nextBtn.addEventListener('click', (e) => {
         e.preventDefault();
         showSlide(currentIndex + 1);
         resetAutoTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
     }
     dots.forEach((dot, i) => {
       dot.addEventListener('click', (e) => {
         e.preventDefault();
         showSlide(i);
         resetAutoTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
     thumbs.forEach((thumb, i) => {
       thumb.addEventListener('click', (e) => {
         e.preventDefault();
         showSlide(i);
         resetAutoTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
     const startAutoTimer = () => {
       if (carousel.dataset.auto !== 'false') {
@@ -307,7 +1187,47 @@ document.addEventListener('DOMContentLoaded', () => {
     carousel.addEventListener('mouseenter', stopAutoTimer);
     carousel.addEventListener('mouseleave', startAutoTimer);
     startAutoTimer();
-  });
+    // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
   // ---------------------------------------------------------------------------
   // 6b. Delight Features Slideshow Handler
@@ -333,22 +1253,222 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         showSlide(i);
         resetTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
     dots.forEach((dot, i) => {
       dot.addEventListener('click', () => {
         showSlide(i);
         resetTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
     if (prevBtn) {
       prevBtn.addEventListener('click', (e) => {
         e.preventDefault();
         showSlide(currentIndex - 1);
         resetTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
     }
 
     if (nextBtn) {
@@ -356,7 +1476,47 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         showSlide(currentIndex + 1);
         resetTimer();
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
     }
 
     const startTimer = () => {
@@ -396,9 +1556,129 @@ document.addEventListener('DOMContentLoaded', () => {
         docPills.forEach((p) => p.classList.toggle('active', p === pill));
         docSections.forEach((s) => {
           s.style.display = (targetGuide === 'all' || s.dataset.guide === targetGuide) ? 'block' : 'none';
-        });
-      });
+          // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
   }
 
   // ---------------------------------------------------------------------------
@@ -460,13 +1740,93 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === lightbox || e.target.classList.contains('lightbox-body')) {
       closeLightbox();
     }
-  });
+    // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && lightbox.classList.contains('active')) {
       closeLightbox();
     }
-  });
+    // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
   // Attach zoom trigger to screenshots across the site
   const setupZoomableImages = () => {
@@ -478,8 +1838,88 @@ document.addEventListener('DOMContentLoaded', () => {
         if (img) {
           openLightbox(img.src, img.alt);
         }
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
   };
   setupZoomableImages();
 
@@ -496,9 +1936,129 @@ document.addEventListener('DOMContentLoaded', () => {
         faqItems.forEach((item) => {
           const match = cat === 'all' || item.dataset.category === cat;
           item.style.display = match ? 'block' : 'none';
-        });
-      });
+          // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
   }
 
   // ---------------------------------------------------------------------------
@@ -513,11 +2073,91 @@ document.addEventListener('DOMContentLoaded', () => {
           entry.target.classList.add('revealed');
           observer.unobserve(entry.target);
         }
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
     }, {
       rootMargin: '0px 0px -30px 0px',
       threshold: 0.05,
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
+  }
+});
 
     revealElements.forEach((el) => revealObserver.observe(el));
   }
@@ -539,9 +2179,129 @@ document.addEventListener('DOMContentLoaded', () => {
           block.style.borderColor = originalBorder;
           block.setAttribute('title', originalText);
         }, 1200);
-      });
+        // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
     });
-  });
+  }
+});
+      // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
+    // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
+});
 
   // ---------------------------------------------------------------------------
   // 12. Manual Language Selection & Override Persistence
@@ -570,4 +2330,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.location.href = p + window.location.search + window.location.hash;
   };
+  // ---------------------------------------------------------------------------
+  // 13. Interactive Hero Benchmark Slider
+  // ---------------------------------------------------------------------------
+  const benchmarkSlider = document.getElementById('benchmarkSlider');
+  const benchmarkPlayerCount = document.getElementById('benchmarkPlayerCount');
+  const benchmarkManualTime = document.getElementById('benchmarkManualTime');
+  const benchmarkManualBar = document.getElementById('benchmarkManualBar');
+  const benchmarkManualSubText = document.getElementById('benchmarkManualSubText');
+  const benchmarkSliderNote = document.getElementById('benchmarkSliderNote');
+
+  if (benchmarkSlider && benchmarkPlayerCount) {
+    const scenarios = [
+      { players: 1, time: '12 min', bar: '35%', note: '"Missing dependency cloth-config. Why won\'t this jar load?"', sub: 'Manual folder hunt & missing dependencies' },
+      { players: 2, time: '25 min', bar: '55%', note: '"Wait, are you on Fabric 0.15 or 0.16? My client is crashing."', sub: 'Version mismatch & config conflict' },
+      { players: 3, time: '35 min', bar: '70%', note: '"Someone downloaded the Forge build instead of Fabric. Redownloading..."', sub: 'Wrong mod loader build downloaded' },
+      { players: 4, time: '45 min', bar: '82%', note: '"One friend has Java 17, server needs Java 21. Discord screenshare begins."', sub: 'Java runtime version mismatch' },
+      { players: 6, time: '1.2 hrs', bar: '92%', note: '"Zip file from Google Drive exceeded download quota. Uploading to MediaFire..."', sub: 'Broken links & cloud download quotas' },
+      { players: 8, time: '2.0 hrs', bar: '97%', note: '"Two friends gave up and logged off. Game night effectively canceled."', sub: 'Friend fatigue & canceled game night' },
+      { players: 12, time: '3.5 hrs', bar: '100%', note: '"Nobody is playing. You spent the entire Friday night troubleshooting in Discord."', sub: 'Complete group failure & wasted evening' },
+    ];
+
+    const updateBenchmark = (val) => {
+      const num = parseInt(val, 10);
+      benchmarkPlayerCount.textContent = num === 1 ? '1 Player' : `${num} Players`;
+
+      let closest = scenarios[0];
+      for (const s of scenarios) {
+        if (num >= s.players) closest = s;
+      }
+
+      if (benchmarkManualTime) benchmarkManualTime.textContent = closest.time;
+      if (benchmarkManualBar) benchmarkManualBar.style.width = closest.bar;
+      if (benchmarkManualSubText) benchmarkManualSubText.textContent = closest.sub;
+      if (benchmarkSliderNote) benchmarkSliderNote.textContent = closest.note;
+    };
+
+    benchmarkSlider.addEventListener('input', (e) => {
+      updateBenchmark(e.target.value);
+    });
+  }
 });

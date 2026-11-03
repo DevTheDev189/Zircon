@@ -950,6 +950,7 @@
     "language_desc": "Idioma da interface para menus, diálogos e notificações",
     "categories": {
       "all": "Todas as Configurações",
+      "keybinds": "Keybinds",
       "performance": "Desempenho",
       "display": "Tela",
       "appearance": "Aparência",

@@ -4,8 +4,8 @@
     :class="[
       activeDropdown ? 'z-30 overflow-visible' : 'overflow-hidden',
       selected
-        ? 'border-accent/80 bg-[#101b2a] shadow-[0_0_24px_-4px_var(--color-accent-glow)]'
-        : 'border-slate-800/80 bg-gradient-to-br from-card/90 via-bg/85 to-well/90 hover:border-accent/40 hover:shadow-[0_12px_28px_-6px_rgba(0,0,0,0.6),0_0_20px_-6px_var(--color-accent-glow)] hover:-translate-y-0.5'
+        ? 'border-accent bg-accent/10 shadow-[0_0_24px_-4px_var(--color-accent-glow)]'
+        : 'border-edge bg-card/90 hover:border-accent/40 hover:shadow-[0_12px_28px_-6px_rgba(0,0,0,0.2),0_0_20px_-6px_var(--color-accent-glow)] hover:-translate-y-0.5'
     ]"
     @click="$emit('select', instance)"
   >
@@ -154,7 +154,7 @@
           {{ instance.name }}
         </h3>
         <div class="flex items-center gap-2 mt-1 text-[11px] font-mono text-slate-400">
-          <span class="bg-[#070b10] px-2 py-0.5 rounded border border-slate-800 text-slate-300">
+          <span class="bg-well px-2 py-0.5 rounded border border-edge text-slate-300">
             MC {{ instance.minecraftVersion }}
           </span>
           <span v-if="instance.lastPlayed" class="text-slate-500 truncate">
@@ -168,13 +168,13 @@
     </div>
 
     <!-- Bottom Actions: Manage + Play -->
-    <div class="relative z-10 pt-3 mt-3 border-t border-slate-800/80 flex items-center gap-2">
+    <div class="relative z-10 pt-3 mt-3 border-t border-edge flex items-center gap-2">
       <button
-        class="flex-1 py-1.5 px-2.5 rounded-xl border border-slate-700/80 hover:border-slate-600 bg-slate-900/60 hover:bg-slate-800/80 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+        class="z-btn z-btn-secondary text-xs font-semibold flex-1 py-1.5 px-2.5 justify-center gap-1.5 cursor-pointer"
         :title="$t('instance_card.manage_tooltip')"
         @click.stop="$emit('manage', instance)"
       >
-        <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="w-3.5 h-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>

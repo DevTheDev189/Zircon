@@ -580,6 +580,7 @@
     "language_desc": "Interface language for menus, dialogs, and notifications",
     "categories": {
       "all": "All Settings",
+      "keybinds": "Keybinds",
       "performance": "Performance",
       "display": "Display",
       "appearance": "Appearance",

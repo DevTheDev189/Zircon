@@ -647,6 +647,7 @@
     "language_desc": "زبان رابط کاربری برای منوها، پنجره‌های گفتگو و اعلان‌ها",
     "categories": {
       "all": "همه تنظیمات",
+      "keybinds": "Keybinds",
       "performance": "عملکرد",
       "display": "نمایش",
       "appearance": "ظاهر",

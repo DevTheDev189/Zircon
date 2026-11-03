@@ -3,7 +3,7 @@
 
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use base64::Engine;
@@ -64,6 +64,7 @@ pub struct ScreenshotInfo {
     pub filename: String,
     pub timestamp: i64,
     pub size_bytes: u64,
+    pub file_path: String,
     pub data_url: String,
 }
 
@@ -359,18 +360,14 @@ pub fn list_screenshots(game_dir: &Path) -> Vec<ScreenshotInfo> {
                     .map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64)
                     .unwrap_or(0);
 
-                if let Ok(bytes) = std::fs::read(&path) {
-                    let data_url = format!(
-                        "data:image/png;base64,{}",
-                        base64::engine::general_purpose::STANDARD.encode(&bytes)
-                    );
-                    screenshots.push(ScreenshotInfo {
-                        filename,
-                        timestamp,
-                        size_bytes,
-                        data_url,
-                    });
-                }
+                let file_path = path.to_string_lossy().to_string();
+                screenshots.push(ScreenshotInfo {
+                    filename,
+                    timestamp,
+                    size_bytes,
+                    file_path,
+                    data_url: String::new(),
+                });
             }
         }
     }
@@ -439,12 +436,29 @@ pub fn get_instance_artwork(game_dir: &Path, client_jar_path: Option<&Path>) -> 
         }
     }
 
-    // 3. Check screenshots for high-res banner
-    let screenshots = list_screenshots(game_dir);
-    if let Some(ss) = screenshots.first() {
-        if banner_data_url.is_none() {
-            banner_data_url = Some(ss.data_url.clone());
-            source = "screenshot".to_string();
+    // 3. Check screenshots for high-res banner if not already found from world icon
+    if banner_data_url.is_none() {
+        let screenshots_dir = game_dir.join("screenshots");
+        if let Ok(entries) = std::fs::read_dir(&screenshots_dir) {
+            let mut latest_screenshot: Option<(PathBuf, std::time::SystemTime)> = None;
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_file() && p.extension().map_or(false, |ext| ext.eq_ignore_ascii_case("png")) {
+                    let mtime = p.metadata().and_then(|m| m.modified()).unwrap_or(UNIX_EPOCH);
+                    if latest_screenshot.as_ref().map_or(true, |(_, best)| mtime > *best) {
+                        latest_screenshot = Some((p, mtime));
+                    }
+                }
+            }
+            if let Some((first_path, _)) = latest_screenshot {
+                if let Ok(bytes) = std::fs::read(&first_path) {
+                    banner_data_url = Some(format!(
+                        "data:image/png;base64,{}",
+                        base64::engine::general_purpose::STANDARD.encode(&bytes)
+                    ));
+                    source = "screenshot".to_string();
+                }
+            }
         }
     }
 

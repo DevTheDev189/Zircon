@@ -168,64 +168,77 @@
 /* ---------------- Hero Section ---------------- */
 
 .hero {
-  padding: 56px 0 36px;
+  padding: 68px 0 44px;
   text-align: center;
   position: relative;
+  background: radial-gradient(ellipse 70% 40% at 50% 20%, rgba(71, 210, 201, 0.08) 0%, rgba(7, 11, 15, 0) 70%);
 }
 
 .hero-title {
-  max-width: 440px !important;
-  width: 85% !important;
+  max-width: 240px !important;
+  width: 60% !important;
   height: auto !important;
   margin: 0 auto 18px !important;
   display: block !important;
-  filter: drop-shadow(0 0 24px rgba(71, 210, 201, 0.55));
+  filter: drop-shadow(0 0 18px rgba(71, 210, 201, 0.45));
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.hero-title:hover {
+  transform: scale(1.02);
+  filter: drop-shadow(0 0 24px rgba(71, 210, 201, 0.7));
 }
 
 .eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.28em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: 16px;
+  color: var(--accent-bright);
+  background: rgba(71, 210, 201, 0.08);
+  border: 1px solid rgba(71, 210, 201, 0.25);
+  padding: 6px 16px;
+  border-radius: 999px;
+  margin-bottom: 22px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 20px rgba(71, 210, 201, 0.1);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.eyebrow:hover {
+  background: rgba(71, 210, 201, 0.12);
+  border-color: rgba(71, 210, 201, 0.4);
 }
 
 .eyebrow::before,
 .eyebrow::after {
-  content: "";
-  width: 28px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent));
-}
-
-.eyebrow::after {
-  background: linear-gradient(90deg, var(--accent), transparent);
+  display: none;
 }
 
 .hero h1 {
-  font-size: clamp(34px, 5.8vw, 58px);
-  line-height: 1.14;
+  font-size: clamp(34px, 5.2vw, 54px);
+  line-height: 1.15;
   color: var(--white);
-  margin: 0 0 18px;
+  margin: 0 auto 20px;
+  max-width: 860px;
   font-weight: 800;
   letter-spacing: -0.025em;
 }
 
 .hero h1 .hl {
-  background: linear-gradient(120deg, var(--accent-bright), var(--accent-deep), #81ecec);
+  background: linear-gradient(120deg, #5adfd5 0%, #47d2c9 50%, #20b2aa 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 2px 16px rgba(71, 210, 201, 0.28));
+  filter: drop-shadow(0 2px 20px rgba(71, 210, 201, 0.35));
 }
 
 .hero p.lede {
-  max-width: 740px;
-  margin: 0 auto 26px;
+  max-width: 700px;
+  margin: 0 auto 30px;
   color: var(--text-secondary);
   font-size: 18px;
   font-weight: 450;
@@ -234,20 +247,28 @@
 
 .hero-actions {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   justify-content: center;
   flex-wrap: wrap;
 }
 
 .hero-foot {
-  margin-top: 22px;
-  font-size: 13.5px;
+  margin: 28px auto 0;
+  font-size: 13px;
   font-weight: 500;
   color: var(--muted);
   display: flex;
-  gap: 20px;
+  gap: 22px;
   justify-content: center;
   flex-wrap: wrap;
+  padding: 10px 24px;
+  background: rgba(11, 17, 26, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  max-width: fit-content;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
 .hero-foot span {
@@ -257,8 +278,8 @@
 }
 
 .hero-foot .dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--accent);
   display: inline-block;
@@ -488,5 +509,6 @@
   .footer-grid { grid-template-columns: 1fr; }
   .section { padding: 44px 0; }
   .hero { padding: 44px 0 32px; }
+  .hero-foot { border-radius: 16px; padding: 12px 16px; gap: 12px; }
   .page-hero { padding: 44px 0 28px; }
 }

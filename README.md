@@ -25,6 +25,11 @@
   <a href="https://github.com/DevTheDev189/Zircon/releases"><strong> GitHub Releases</strong></a>
 </p>
 
+<p align="center">
+  <img src="website/assets/img/main_launcher.png" alt="Zircon Companion Launcher" width="48%">
+  <img src="website/assets/img/performance_server.png" alt="Zircon Server Manager Dashboard" width="48%">
+</p>
+
 > [!NOTE]
 > This is the **Rust rewrite** of Zircon (formerly a Java 21 / JavaFX / Javalin /
 > Netty codebase). The complete Java reference implementation is preserved on the
@@ -55,6 +60,7 @@
 | ♟ | **Player tools** | Live player tracking, whitelist, ops, bans — applied instantly on a running server, offline-safe otherwise. |
 | ⌨ | **Live console** | Stream the server console in real time over WebSocket and run commands from the browser. |
 | ◫ | **Backups** | LZ4-compressed tar snapshots on a schedule (`daily`/`weekly`/`monthly`) with retention pruning and one-click restore. |
+| 🗺 | **Slippy World Map Studio** | High-performance interactive canvas radar & world explorer with real-time biome inspection, seed preview, and chunk pre-generation. |
 | ☾ | **Idle shutdown** | Per-instance toggle that shuts a server down gracefully after a configurable window with no players online — the launcher wakes it automatically on the next join, so resources are only used while people are playing. |
 | ▮ | **System stats** | CPU, RAM, and disk telemetry with a live history graph. |
 | ⚔ | **Admin auth** | BCrypt users + JWT-secured admin API with a bundled single-page dashboard and a generated first-run password. |
@@ -68,6 +74,9 @@
 | ☰ | **Saved servers** | Persistent server list (`~/.mcmanager/servers.json`), most-recently-played first, plus a curated recommendations panel. |
 | ☺ | **Skin customizer** | 64×64 PNG skins with a WebGL 3D preview (Three.js), history gallery, and Mojang fetch/upload integration. Stored at `~/.mcmanager/skins/active_skin.png`. |
 | ◐ | **Offline instances** | Create and launch single-player instances with their own mods, shaderpacks, and texture packs. |
+| ⤓ | **Universal Migration** | 1-click import from CurseForge, Prism Launcher, and Modrinth — imports mods, configs, saves, and keybinds instantly. |
+| 🎮 | **4-Player Split-Screen Co-op** | Play with up to 4 players simultaneously on a single PC with native controller / gamepad mapping and dynamic viewport partitioning. |
+| 📡 | **LAN Auto-Discovery** | Instant auto-detection of local servers running on your home network with zero configuration. |
 | ⚙ | **Launcher settings** | RAM slider. Mod downloads are always hash-verified against Modrinth/CurseForge (no opt-out). |
 | ► | **One-click join** | Fetches the server BOM, resolves the exact Minecraft + loader runtime (Fabric/Quilt/Forge/NeoForge), registers the pre-join ticket, and auto-connects in fullscreen. |
 | ⏻ | **Auto-wake asleep servers** | If a Zircon server is sleeping (idle shutdown), PLAY wakes it via the wrapper and waits for it to come online before connecting. |

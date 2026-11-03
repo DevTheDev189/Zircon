@@ -1,7 +1,7 @@
 <template>
   <div class="h-full p-5 overflow-y-auto flex flex-col xl:flex-row gap-6 items-start">
     <!-- Left Column: Launcher Settings & Diagnostics -->
-    <div class="w-full xl:w-[500px] 2xl:w-[540px] z-card flex flex-col p-6 bg-[#0e1622]/90 border border-slate-800/80 shrink-0 min-w-0">
+    <div class="w-full xl:w-[500px] 2xl:w-[540px] z-card flex flex-col p-6 shrink-0 min-w-0">
       
       <!-- Top Header: Title, Version Tag, Inline Update Check & Save CTA -->
       <div class="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-slate-800/80">
@@ -93,7 +93,7 @@
           <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" :d="cat.icon" />
           </svg>
-          <span>{{ $t('settings.categories.' + cat.id) }}</span>
+          <span>{{ $te('settings.categories.' + cat.id) ? $t('settings.categories.' + cat.id) : (cat.label || cat.id) }}</span>
         </button>
       </div>
 
@@ -381,7 +381,7 @@
         <!-- Curated Themes Selector (Clean, 1-Click Cards) -->
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           <button
-            v-for="curated in CURATED_THEMES"
+            v-for="curated in visibleCuratedThemes"
             :key="curated.id"
             type="button"
             class="flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all group relative overflow-hidden cursor-pointer"
@@ -568,7 +568,7 @@
               <span class="text-xs font-semibold text-slate-300 block mb-2">Background &amp; Surface Tone</span>
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2.5">
                 <button
-                  v-for="bgPreset in BG_THEME_PRESETS"
+                  v-for="bgPreset in visibleBgPresets"
                   :key="bgPreset.id"
                   type="button"
                   class="flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all group relative overflow-hidden cursor-pointer"
@@ -723,27 +723,170 @@
               </div>
             </div>
 
-            <!-- Interactive Live Theme Showcase -->
-            <div class="pt-3 border-t border-edge/60 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-200">Live Preview Showcase</span>
-                <span class="text-[10px] text-slate-500 font-mono">Dynamic CSS Variables</span>
+            <!-- Granular 4: Animated Background & Motion Studio -->
+            <div class="pt-3 border-t border-edge/60">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-300">Animated Motion &amp; Wallpaper</span>
+                <span class="text-[10px] text-accent font-mono uppercase font-bold tracking-wider">GPU Accelerated</span>
               </div>
 
-              <div class="flex flex-wrap items-center gap-2">
-                <button type="button" class="z-btn z-btn-accent text-xs px-3.5 py-1.5">Primary CTA</button>
-                <button type="button" class="z-btn z-btn-secondary text-xs px-3 py-1.5">Secondary</button>
-                <button type="button" class="z-btn z-btn-danger text-xs px-3 py-1.5">Danger</button>
-                <label class="inline-flex items-center gap-2 cursor-pointer ml-1">
-                  <input type="checkbox" checked class="zircon-check" />
-                  <span class="text-xs text-slate-300">Checked</span>
-                </label>
-                <span class="z-toggle z-toggle-on !h-5 !w-9"><span class="z-toggle-thumb !h-3.5 !w-3.5 !translate-x-4"></span></span>
+              <!-- Motion Presets Grid -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                <button
+                  v-for="mPreset in BACKGROUND_MOTION_PRESETS"
+                  :key="mPreset.id"
+                  type="button"
+                  class="flex items-center gap-2 p-2 rounded-xl border text-left transition-all group relative overflow-hidden cursor-pointer"
+                  :class="
+                    settings.motionPreset === mPreset.id
+                      ? 'border-accent bg-accent/10 shadow-[0_0_12px_var(--color-accent-glow)]'
+                      : 'border-edge bg-well/60 hover:border-accent/40 hover:bg-well'
+                  "
+                  @click="selectMotionPreset(mPreset.id)"
+                >
+                  <div class="min-w-0 flex-1">
+                    <div
+                      class="text-xs font-semibold truncate transition-colors"
+                      :class="settings.motionPreset === mPreset.id ? 'text-white' : 'text-slate-300 group-hover:text-white'"
+                    >
+                      {{ mPreset.name }}
+                    </div>
+                    <div class="text-[10px] text-slate-500 truncate capitalize">{{ mPreset.category }}</div>
+                  </div>
+                  <svg
+                    v-if="settings.motionPreset === mPreset.id"
+                    class="w-3.5 h-3.5 text-accent shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="3"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
               </div>
 
-              <!-- Mini Progress Bar -->
-              <div class="w-full h-1.5 bg-well rounded-full overflow-hidden border border-edge">
-                <div class="h-full w-2/3 zircon-progress-bar rounded-full"></div>
+              <!-- Rethought Custom Wallpaper Studio UI -->
+              <div
+                v-if="settings.motionPreset === 'custom-wallpaper'"
+                class="p-4 rounded-xl bg-well/90 border border-edge mb-3 space-y-4 shadow-sm"
+              >
+                <!-- Active Wallpaper Showcase with In-Situ Contrast Tester -->
+                <div v-if="settings.wallpaperSrc" class="space-y-3">
+                  <div class="relative aspect-video w-full max-h-48 rounded-xl overflow-hidden border border-edge/80 shadow-inner group bg-black">
+                    <!-- Media Preview -->
+                    <video
+                      v-if="settings.wallpaperType === 'video'"
+                      :src="settings.wallpaperSrc"
+                      autoplay
+                      loop
+                      muted
+                      class="w-full h-full object-cover"
+                    ></video>
+                    <div
+                      v-else
+                      class="w-full h-full bg-cover bg-center"
+                      :style="{ backgroundImage: `url('${settings.wallpaperSrc}')` }"
+                    ></div>
+
+                    <!-- Live Dimmer Overlay Preview -->
+                    <div
+                      class="absolute inset-0 bg-black pointer-events-none transition-opacity"
+                      :style="{ opacity: settings.wallpaperDim || 0.65 }"
+                    ></div>
+
+                    <!-- Mini UI Mock Card in Center to show actual readability -->
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-4">
+                      <div class="px-3 py-1.5 rounded-lg bg-card/90 border border-edge shadow-lg backdrop-blur-sm text-center">
+                        <span class="text-[11px] font-bold text-white block">Readability Preview</span>
+                        <span class="text-[9px] text-accent block">Dimmer: {{ Math.round((settings.wallpaperDim || 0.65) * 100) }}%</span>
+                      </div>
+                    </div>
+
+                    <!-- Media Type Badge -->
+                    <div class="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-[10px] font-mono font-bold uppercase text-slate-200">
+                      {{ settings.wallpaperType === 'video' ? '🎬 Looping Video' : '🖼️ Custom Image' }}
+                    </div>
+
+                    <!-- Action Hover Pills -->
+                    <div class="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                      <label class="z-btn z-btn-secondary text-[11px] py-1 px-2.5 cursor-pointer shadow-md bg-card/80 hover:bg-card">
+                        <span>Change File</span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,video/mp4,video/webm"
+                          class="hidden"
+                          @change="onWallpaperFileChange"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        class="z-btn z-btn-danger text-[11px] py-1 px-2.5 shadow-md"
+                        @click="clearCustomWallpaper"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Empty State Dropzone -->
+                <div v-else>
+                  <label class="border-2 border-dashed border-edge hover:border-accent/60 bg-card/40 hover:bg-card/70 transition-all rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer group">
+                    <div class="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent mb-2 group-hover:scale-110 transition-transform shadow-[0_0_12px_var(--color-accent-glow)]">
+                      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <span class="text-xs font-bold text-white group-hover:text-accent transition-colors">Choose Image or Video Wallpaper</span>
+                    <span class="text-[11px] text-slate-400 mt-0.5">Supports PNG, JPG, WebP images or MP4, WebM looping videos</span>
+                    <span class="mt-2.5 z-btn z-btn-secondary text-[11px] py-1 px-3">Browse File...</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,video/mp4,video/webm"
+                      class="hidden"
+                      @change="onWallpaperFileChange"
+                    />
+                  </label>
+                </div>
+
+                <!-- Contrast Dimmer Slider -->
+                <div class="space-y-1.5 pt-1 border-t border-edge/60">
+                  <div class="flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-1.5">
+                      <svg class="w-3.5 h-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                      <span class="font-semibold text-slate-200">Contrast Dimmer</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        class="text-[10px] text-slate-400 hover:text-accent transition-colors underline"
+                        @click="resetWallpaperDim"
+                      >
+                        Reset (65%)
+                      </button>
+                      <span class="font-mono text-accent font-bold px-1.5 py-0.5 rounded bg-accent/10 border border-accent/20 text-[11px]">
+                        {{ Math.round((settings.wallpaperDim || 0.65) * 100) }}%
+                      </span>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="0.9"
+                    step="0.05"
+                    :value="settings.wallpaperDim || 0.65"
+                    class="w-full accent-accent cursor-pointer"
+                    @input="onWallpaperDimInput"
+                  />
+                  <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>Bright (20%)</span>
+                    <span>Balanced (65%)</span>
+                    <span>Deep Shadow (90%)</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1385,7 +1528,7 @@
     </div>
 
     <!-- Right Column: Last Played Minecraft Instance Log -->
-    <div class="w-full xl:flex-1 z-card flex flex-col p-6 bg-[#0e1622]/90 border border-slate-800/80 min-w-[360px]">
+    <div class="w-full xl:flex-1 z-card flex flex-col p-6 min-w-[360px]">
       <div class="flex items-center justify-between mb-3">
         <div>
           <h3 class="text-white font-bold text-base">{{ $t('settings.mc_log.title') }}</h3>
@@ -1410,7 +1553,7 @@
           v-model="mcSearchQuery"
           type="text"
           :placeholder="$t('settings.mc_log.filter_placeholder')"
-          class="bg-[#070b10] border border-slate-700/80 rounded-xl px-3.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 flex-1 min-w-[160px]"
+          class="z-input px-3.5 py-1.5 text-xs text-white placeholder-slate-500 flex-1 min-w-[160px]"
         />
         <div class="flex items-center gap-3 text-xs">
           <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
@@ -1469,7 +1612,7 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import { api, onGameOutput, pickFile, EXE_FILTER, fmtBytes } from '../lib/api';
 import { check as checkUpdate } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
-import { THEME_PRESETS, BG_THEME_PRESETS, BUTTON_STYLES, GLASS_EFFECTS, CURATED_THEMES, detectCuratedTheme, applyTheme } from '../lib/theme';
+import { THEME_PRESETS, BG_THEME_PRESETS, BUTTON_STYLES, GLASS_EFFECTS, BACKGROUND_MOTION_PRESETS, getSavedWallpaperConfig, CURATED_THEMES, detectCuratedTheme, applyTheme } from '../lib/theme';
 import { applyAccessibilitySettings as applyAccessibilityHelper } from '../lib/accessibility';
 import { t, currentLocale, setLocale, AVAILABLE_LOCALES } from '../lib/i18n';
 import { askConfirm } from '../lib/confirm';
@@ -1570,6 +1713,10 @@ const settings = ref({
   customCardBg: '#0e1622',
   buttonStyle: 'rounded',
   glassEffect: 'standard',
+  motionPreset: 'cyber-orbs',
+  wallpaperDim: 0.65,
+  wallpaperSrc: null,
+  wallpaperType: 'image',
   // Accessibility
   fontFamily: (typeof localStorage !== 'undefined' && localStorage.getItem('zircon_font')) || 'default',
   uiScale: (typeof localStorage !== 'undefined' && Number(localStorage.getItem('zircon_ui_scale'))) || 1.0,
@@ -1618,6 +1765,14 @@ const categories = [
 
 const showAdvancedTheme = ref(false);
 
+const visibleCuratedThemes = computed(() => {
+  return CURATED_THEMES.filter(c => c.id !== 'zircon-light' && !c.isLight);
+});
+
+const visibleBgPresets = computed(() => {
+  return BG_THEME_PRESETS.filter(b => b.id !== 'zircon-light' && !b.isLight);
+});
+
 const activeCuratedId = computed(() => {
   return detectCuratedTheme(settings.value.theme, settings.value.bgTheme);
 });
@@ -1644,6 +1799,10 @@ function applyActiveTheme() {
     customCardBg: settings.value.customCardBg,
     buttonStyle: settings.value.buttonStyle,
     glassEffect: settings.value.glassEffect,
+    motionPreset: settings.value.motionPreset,
+    wallpaperDim: settings.value.wallpaperDim,
+    wallpaperSrc: settings.value.wallpaperSrc,
+    wallpaperType: settings.value.wallpaperType,
   });
 }
 
@@ -1725,6 +1884,41 @@ function selectGlassEffect(effectId) {
   applyActiveTheme();
 }
 
+function selectMotionPreset(presetId) {
+  settings.value.motionPreset = presetId;
+  applyActiveTheme();
+}
+
+function onWallpaperDimInput(e) {
+  settings.value.wallpaperDim = parseFloat(e.target.value);
+  applyActiveTheme();
+}
+
+function resetWallpaperDim() {
+  settings.value.wallpaperDim = 0.65;
+  applyActiveTheme();
+}
+
+function onWallpaperFileChange(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const isVideo = file.type.startsWith('video/');
+  settings.value.wallpaperType = isVideo ? 'video' : 'image';
+  settings.value.motionPreset = 'custom-wallpaper';
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    settings.value.wallpaperSrc = ev.target.result;
+    applyActiveTheme();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearCustomWallpaper() {
+  settings.value.wallpaperSrc = null;
+  settings.value.motionPreset = 'cyber-orbs';
+  applyActiveTheme();
+}
+
 function applyJvmPreset(preset) {
   if (preset === 'default') {
     settings.value.customJvmArgs = '-XX:+UseG1GC';
@@ -1793,20 +1987,45 @@ const copiedMcAt = ref('');
 
 onMounted(async () => {
   try {
-    const loaded = await api.getSettings();
+    const savedWp = getSavedWallpaperConfig();
+    settings.value.motionPreset = savedWp.motionPreset;
+    settings.value.wallpaperDim = savedWp.wallpaperDim;
+    settings.value.wallpaperSrc = savedWp.wallpaperSrc;
+    settings.value.wallpaperType = savedWp.wallpaperType;
+
+    const activeBg = (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined')
+      ? (new URLSearchParams(window.location.search).get('bg') || localStorage.getItem('zircon-bg-theme') || 'deep-void')
+      : (localStorage.getItem('zircon-bg-theme') || 'deep-void');
+
+    const loaded = await api.getSettings().catch(() => null);
     if (loaded) {
       settings.value = {
         ...settings.value,
         ...loaded,
-        theme: loaded.theme || 'zircon-cyan',
-        bgTheme: loaded.bgTheme || 'deep-void',
-        buttonStyle: loaded.buttonStyle || 'rounded',
-        glassEffect: loaded.glassEffect || 'standard',
+        theme: loaded.theme || localStorage.getItem('zircon-theme') || 'zircon-cyan',
+        bgTheme: loaded.bgTheme || activeBg,
+        buttonStyle: loaded.buttonStyle || localStorage.getItem('zircon-button-style') || 'rounded',
+        glassEffect: loaded.glassEffect || localStorage.getItem('zircon-glass-effect') || 'standard',
+        motionPreset: savedWp.motionPreset,
+        wallpaperDim: savedWp.wallpaperDim,
+        wallpaperSrc: savedWp.wallpaperSrc,
+        wallpaperType: savedWp.wallpaperType,
       };
+    } else {
+      settings.value.bgTheme = activeBg;
     }
     applyActiveTheme();
     applyAccessibilitySettings();
   } catch {
+    const activeBg = (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined')
+      ? (new URLSearchParams(window.location.search).get('bg') || localStorage.getItem('zircon-bg-theme') || 'deep-void')
+      : (localStorage.getItem('zircon-bg-theme') || 'deep-void');
+    settings.value.bgTheme = activeBg;
+    const savedWp = getSavedWallpaperConfig();
+    settings.value.motionPreset = savedWp.motionPreset;
+    settings.value.wallpaperDim = savedWp.wallpaperDim;
+    settings.value.wallpaperSrc = savedWp.wallpaperSrc;
+    settings.value.wallpaperType = savedWp.wallpaperType;
     applyActiveTheme();
     applyAccessibilitySettings();
   }

@@ -909,6 +909,7 @@
     "language_desc": "メニュー、ダイアログ、通知のインターフェース言語",
     "categories": {
       "all": "すべての設定",
+      "keybinds": "Keybinds",
       "performance": "パフォーマンス",
       "display": "ディスプレイ",
       "appearance": "外観",

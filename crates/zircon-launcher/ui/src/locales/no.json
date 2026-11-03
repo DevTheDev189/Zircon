@@ -647,6 +647,7 @@
     "language_desc": "Grensesnittsspråk for menyer, dialoger og varsler",
     "categories": {
       "all": "Alle innstillinger",
+      "keybinds": "Keybinds",
       "performance": "Ytelse",
       "display": "Skjerm",
       "appearance": "Utseende",

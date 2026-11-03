@@ -179,3 +179,30 @@ If staging specific fixes manually:
 ### Issue 3: LaunchWrapper `ClassNotFoundException: net.minecraft.client.Minecraft` (Legacy Forge)
 * **Cause**: Pre-1.13 Forge uses `minecraftArguments` containing `--tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker`. If passed as a single string with spaces, Java's JOpt option parser fails to detect the flag and falls back to `VanillaTweaker`.
 * **Fix**: Tokenize legacy arguments using `.split_whitespace()` so each flag and value is an individual command line argument (`argv[N]`).
+
+---
+
+## 6. Website Localized Screenshot Automation
+
+To showcase the Zircon Launcher in all 40 supported languages with native UI screenshots on https://zirconmc.net:
+
+### Automated Rendering Pipeline
+1. Compile the Launcher UI dist:
+   ```powershell
+   npm --prefix crates/zircon-launcher/ui run build
+   ```
+2. Run the Playwright screenshot pipeline:
+   ```powershell
+   # Capture English only:
+   python scripts/capture_screenshots.py --lang en
+
+   # Or render all 40 languages at high-res 2x Retina with WebP optimization:
+   python scripts/capture_screenshots.py --all
+   ```
+3. Sync website HTML and static pages:
+   ```powershell
+   python scripts/sync_website_i18n.py --build
+   ```
+
+> [!NOTE]
+> Screenshots are rendered locally on-demand via `capture_screenshots.py` (or through the interactive prompt in `release.bat`) rather than on every CI commit to keep GitHub Actions build times under 4 minutes and prevent unnecessary repository bloat. Generated WebP images compress the 280-image set from ~247 MB to ~24 MB, keeping the site lightning fast and well within Cloudflare Pages edge delivery limits.

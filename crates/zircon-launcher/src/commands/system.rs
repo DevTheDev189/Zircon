@@ -17,6 +17,40 @@ pub fn show_main_window(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
+
+
+/// Saves a client-side rendered UI snapshot (base64 PNG) to `scratch/ui_snapshots/`
+/// for automated visual auditing and agent pairing.
+#[tauri::command]
+pub fn save_ui_snapshot(filename: String, data_url: String) -> Result<String, String> {
+    use base64::Engine;
+    let clean_data = if let Some(idx) = data_url.find(',') {
+        &data_url[idx + 1..]
+    } else {
+        &data_url
+    };
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(clean_data)
+        .map_err(|e| format!("Base64 decode failed: {e}"))?;
+
+    let out_dir = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("scratch")
+        .join("ui_snapshots");
+    std::fs::create_dir_all(&out_dir).map_err(|e| format!("Failed to create snapshot dir: {e}"))?;
+
+    let safe_filename = if filename.ends_with(".png") {
+        filename
+    } else {
+        format!("{filename}.png")
+    };
+    let file_path = out_dir.join(&safe_filename);
+    std::fs::write(&file_path, bytes).map_err(|e| format!("Failed to write snapshot: {e}"))?;
+
+    tracing::info!("Saved UI snapshot to {}", file_path.display());
+    Ok(file_path.to_string_lossy().to_string())
+}
+
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------

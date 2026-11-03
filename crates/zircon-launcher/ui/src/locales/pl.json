@@ -1045,6 +1045,7 @@
     "language_desc": "Język interfejsu dla menu, okien dialogowych i powiadomień",
     "categories": {
       "all": "Wszystkie ustawienia",
+      "keybinds": "Keybinds",
       "performance": "Wydajność",
       "display": "Wyświetlanie",
       "appearance": "Wygląd",

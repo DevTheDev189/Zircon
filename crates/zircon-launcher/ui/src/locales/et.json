@@ -668,6 +668,7 @@
     "language_desc": "Menüüde, dialoogide ja teadete liidese keel",
     "categories": {
       "all": "Kõik seaded",
+      "keybinds": "Keybinds",
       "performance": "Jõudlus",
       "display": "Kuva",
       "appearance": "Välimus",

@@ -60,9 +60,73 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            tracing::info!("Secondary instance launched with args: {:?}", argv);
+            use tauri::Manager;
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+            for arg in argv {
+                if arg.starts_with("zircon://") {
+                    if let Ok(url) = url::Url::parse(&arg) {
+                        handle_incoming_deep_link(app, &url);
+                    }
+                }
+            }
+        }))
         .setup(|app| {
             #[cfg(desktop)]
             {
+                use tauri::menu::{Menu, MenuItem};
+                use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+                if let Some(icon) = app.default_window_icon() {
+                    let handle = app.handle().clone();
+                    let show_i = MenuItem::with_id(&handle, "show", "Show Zircon", true, None::<&str>)?;
+                    let quit_i = MenuItem::with_id(&handle, "quit", "Quit", true, None::<&str>)?;
+                    let menu = Menu::with_items(&handle, &[&show_i, &quit_i])?;
+
+                    let tray_handle = handle.clone();
+                    let _tray = TrayIconBuilder::new()
+                        .icon(icon.clone())
+                        .menu(&menu)
+                        .show_menu_on_left_click(false)
+                        .tooltip("Zircon Launcher")
+                        .on_menu_event(move |app_handle: &tauri::AppHandle, event| match event.id.as_ref() {
+                            "show" => {
+                                use tauri::Manager;
+                                if let Some(win) = app_handle.get_webview_window("main") {
+                                    let _ = win.unminimize();
+                                    let _ = win.show();
+                                    let _ = win.set_focus();
+                                }
+                            }
+                            "quit" => {
+                                app_handle.exit(0);
+                            }
+                            _ => {}
+                        })
+                        .on_tray_icon_event(move |_tray: &tauri::tray::TrayIcon, event| {
+                            if let TrayIconEvent::Click {
+                                button: MouseButton::Left,
+                                button_state: MouseButtonState::Up,
+                                ..
+                            } = event
+                            {
+                                use tauri::Manager;
+                                if let Some(win) = tray_handle.get_webview_window("main") {
+                                    let _ = win.unminimize();
+                                    let _ = win.show();
+                                    let _ = win.set_focus();
+                                }
+                            }
+                        })
+                        .build(app)?;
+                }
+
                 use tauri_plugin_deep_link::DeepLinkExt;
                 if let Err(err) = app.deep_link().register_all() {
                     tracing::warn!("Failed to register deep link schemes via register_all: {err}");
@@ -242,6 +306,7 @@ pub fn run() {
             commands::get_gpu_info,
             commands::save_settings,
             commands::show_main_window,
+            commands::save_ui_snapshot,
             commands::get_launcher_version,
             commands::log_debug_message,
             commands::get_launcher_logs,

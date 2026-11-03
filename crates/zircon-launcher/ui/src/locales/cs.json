@@ -818,6 +818,7 @@
     "language_desc": "Jazyk nabídek, dialogů a oznámení",
     "categories": {
       "all": "Všechna nastavení",
+      "keybinds": "Keybinds",
       "performance": "Výkon",
       "display": "Zobrazení",
       "appearance": "Vzhled",

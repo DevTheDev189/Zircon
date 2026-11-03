@@ -1,0 +1,97 @@
+/**
+ * Zircon Cyber-Obsidian Design System — Tokens
+ * Single source of truth for Zircon Launcher & Zircon Server Web App.
+ * Controlled dynamically at runtime by theme.js (UI settings customization).
+ */
+
+:root {
+  /* Typography & Scaling */
+  --font-family-base: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ui-scale: 1;
+
+  /* Text & Foreground Hierarchy */
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+
+  /* Wallpaper & Dimmer */
+  --bg-dim-opacity: 0.65;
+
+  /* Brand Accents (Default: Zircon Cyan) */
+  --color-accent: #47d2c9;
+  --color-accent-rgb: 71 210 201;
+  --color-accent-bright: #5adfd5;
+  --color-accent-bright-rgb: 90 223 213;
+  --color-accent-deep: #20b2aa;
+  --color-accent-deep-rgb: 32 178 170;
+  --color-accent-ink: #022623;
+  --color-accent-ink-rgb: 2 38 35;
+  --color-accent-glow: rgba(71, 210, 201, 0.35);
+  --color-accent-glow-strong: rgba(71, 210, 201, 0.50);
+  --color-accent-border: rgba(71, 210, 201, 0.45);
+  --color-accent-focus: rgba(71, 210, 201, 0.25);
+
+  /* Cyber-Obsidian Surface Palette (Default: Deep Void) */
+  --color-bg: #070b0f;
+  --color-bg-rgb: 7 11 15;
+  --color-sidebar: #0a0f14;
+  --color-sidebar-rgb: 10 15 20;
+  --color-card: #0e1622;
+  --color-card-rgb: 14 22 34;
+  --color-well: #070b10;
+  --color-well-rgb: 7 11 16;
+  --color-border: #263545;
+  --color-border-rgb: 38 53 69;
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-btn-secondary: #1c2530;
+  --color-btn-secondary-rgb: 28 37 48;
+
+  /* Semantic Feedback Palette */
+  --color-success: #10b981;
+  --color-success-rgb: 16 185 129;
+  --color-warning: #f59e0b;
+  --color-warning-rgb: 245 158 11;
+  --color-danger: #ef4444;
+  --color-danger-rgb: 239 68 68;
+  --color-info: #38bdf8;
+  --color-info-rgb: 56 189 248;
+
+  /* Component Geometry & Radii */
+  --border-radius-btn: 0.5rem;
+  --border-radius-card: 0.875rem;
+  --border-radius-input: 0.5rem;
+  --border-radius-pill: 9999px;
+
+  /* Glassmorphism & Translucency */
+  --card-blur: 12px;
+  --card-opacity: 0.85;
+  --border-opacity: 0.55;
+}
+
+/* ==========================================================================
+   Arctic Quartz Light Mode Tokens
+   ========================================================================== */
+html.theme-light {
+  --color-bg: #f8fafc;
+  --color-bg-rgb: 248 250 252;
+  --color-sidebar: #f1f5f9;
+  --color-sidebar-rgb: 241 245 249;
+  --color-card: #ffffff;
+  --color-card-rgb: 255 255 255;
+  --color-well: #e2e8f0;
+  --color-well-rgb: 226 232 240;
+  --color-border: #cbd5e1;
+  --color-border-rgb: 203 213 225;
+  --color-border-subtle: rgba(0, 0, 0, 0.08);
+  --color-btn-secondary: #f1f5f9;
+  --color-btn-secondary-rgb: 241 245 249;
+
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+
+  --card-opacity: 0.92;
+  --border-opacity: 0.85;
+}
+

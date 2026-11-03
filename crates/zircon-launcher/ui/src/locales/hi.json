@@ -803,6 +803,7 @@
     "language_desc": "मेनू, डायलॉग और सूचनाओं के लिए इंटरफ़ेस भाषा",
     "categories": {
       "all": "सभी सेटिंग्स",
+      "keybinds": "Keybinds",
       "performance": "प्रदर्शन",
       "display": "प्रदर्शन",
       "appearance": "दिखावट",

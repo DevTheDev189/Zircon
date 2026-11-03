@@ -668,6 +668,7 @@
     "language_desc": "Limba interfeței pentru meniuri, dialoguri și notificări",
     "categories": {
       "all": "Toate setările",
+      "keybinds": "Keybinds",
       "performance": "Performanță",
       "display": "Afișaj",
       "appearance": "Aspect",

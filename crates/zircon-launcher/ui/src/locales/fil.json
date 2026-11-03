@@ -748,6 +748,7 @@
     "language_desc": "Wika ng interface para sa mga menu, dialog, at notification",
     "categories": {
       "all": "Lahat ng Setting",
+      "keybinds": "Keybinds",
       "performance": "Performance",
       "display": "Display",
       "appearance": "Anyo",

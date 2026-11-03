@@ -580,6 +580,7 @@
     "language_desc": "菜单、对话框和通知的界面语言",
     "categories": {
       "all": "所有设置",
+      "keybinds": "Keybinds",
       "performance": "性能",
       "display": "显示",
       "appearance": "外观",

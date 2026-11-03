@@ -669,6 +669,7 @@
     "language_desc": "ภาษาของอินเทอร์เฟซสำหรับเมนู กล่องโต้ตอบ และการแจ้งเตือน",
     "categories": {
       "all": "การตั้งค่าทั้งหมด",
+      "keybinds": "Keybinds",
       "performance": "ประสิทธิภาพ",
       "display": "การแสดงผล",
       "appearance": "รูปลักษณ์",

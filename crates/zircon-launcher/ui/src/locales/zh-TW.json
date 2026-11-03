@@ -580,6 +580,7 @@
     "language_desc": "選單、對話方塊和通知的介面語言",
     "categories": {
       "all": "所有設定",
+      "keybinds": "Keybinds",
       "performance": "效能",
       "display": "顯示",
       "appearance": "外觀",

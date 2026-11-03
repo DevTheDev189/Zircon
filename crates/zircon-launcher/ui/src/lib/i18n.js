@@ -195,6 +195,16 @@ export function t(key, vars = {}) {
 }
 
 /**
+ * Check if a translation key exists
+ */
+export function te(key) {
+  if (!key) return false;
+  const activeObj = locales[currentLocale.value];
+  const englishObj = locales['en'];
+  return resolveKey(activeObj, key) !== undefined || resolveKey(englishObj, key) !== undefined;
+}
+
+/**
  * Switch active locale dynamically
  */
 export async function setLocale(code) {
@@ -223,8 +233,10 @@ export function registerLocale(code, bundle) {
 export const i18nPlugin = {
   install(app) {
     app.config.globalProperties.$t = t;
+    app.config.globalProperties.$te = te;
     app.provide('i18n', {
       t,
+      te,
       currentLocale,
       setLocale,
       availableLocales: AVAILABLE_LOCALES

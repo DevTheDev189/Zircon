@@ -950,6 +950,7 @@
     "language_desc": "Gränssnittsspråk för menyer, dialoger och aviseringar",
     "categories": {
       "all": "Alla inställningar",
+      "keybinds": "Keybinds",
       "performance": "Prestanda",
       "display": "Skärm",
       "appearance": "Utseende",

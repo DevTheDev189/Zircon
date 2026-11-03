@@ -1,4 +1,38 @@
-import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import { invoke as tauriInvoke, convertFileSrc } from '@tauri-apps/api/core';
+import { domToPng } from 'modern-screenshot';
+
+export async function captureUi(filename = 'ui_view') {
+  if (isMockMode) return '';
+  try {
+    const dataUrl = await domToPng(document.body, {
+      scale: 1,
+      features: {
+        copyStyles: true,
+      },
+    });
+    return await invoke('save_ui_snapshot', { filename, dataUrl });
+  } catch (err) {
+    console.error('Failed to capture UI snapshot:', err);
+    throw err;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.__takeUiScreenshot = captureUi;
+}
+
+export { convertFileSrc };
+
+export function resolveAssetUrl(filePath, fallback = '') {
+  if (filePath && !isMockMode) {
+    try {
+      return convertFileSrc(filePath);
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
 import { listen as tauriListen } from '@tauri-apps/api/event';
 import * as THREE from 'three';
 import { isMockMode, handleMockInvoke } from './mockApi';
@@ -12,7 +46,7 @@ function invoke(cmd, args = {}) {
 
 function listen(event, callback) {
   if (isMockMode) {
-    return Promise.resolve(() => {});
+    return Promise.resolve(() => { });
   }
   return tauriListen(event, callback);
 }
@@ -23,7 +57,7 @@ let cachedActiveSkin = (() => {
   try {
     const raw = localStorage.getItem(ACTIVE_SKIN_CACHE_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch { }
   return null;
 })();
 
@@ -39,7 +73,7 @@ export function setCachedActiveSkin(skin) {
     } else {
       localStorage.removeItem(ACTIVE_SKIN_CACHE_KEY);
     }
-  } catch {}
+  } catch { }
 }
 
 export const api = {
@@ -291,7 +325,7 @@ export const api = {
   getSkinHeadIcon: () => invoke('get_skin_head_icon'),
   saveSkin: async (sourcePath, variant = 'classic') => {
     const res = await invoke('save_skin', { sourcePath, variant });
-    api.getActiveSkin().catch(() => {});
+    api.getActiveSkin().catch(() => { });
     return res;
   },
   importCustomSkin: (sourcePath, variant = 'classic') =>
@@ -312,13 +346,13 @@ export const api = {
   getBundledSkins: () => invoke('get_bundled_skins'),
   saveBundledSkin: async (key, variant) => {
     const res = await invoke('save_bundled_skin', { key, variant });
-    api.getActiveSkin().catch(() => {});
+    api.getActiveSkin().catch(() => { });
     return res;
   },
   fetchMojangSkin: (uuid) => invoke('fetch_mojang_skin', { uuid }),
   fetchMojangSkinActive: async (uuid) => {
     const res = await invoke('fetch_mojang_skin_active', { uuid });
-    api.getActiveSkin().catch(() => {});
+    api.getActiveSkin().catch(() => { });
     return res;
   },
   fetchMojangSkinPreview: (uuid) => invoke('fetch_mojang_skin_preview', { uuid }),
@@ -327,12 +361,12 @@ export const api = {
   fetchSkinByUrl: (url, name) => invoke('fetch_skin_by_url', { url, name }),
   saveSkinBytes: async (name, bytes, variant = 'classic') => {
     const res = await invoke('save_skin_bytes', { name, bytes, variant });
-    api.getActiveSkin().catch(() => {});
+    api.getActiveSkin().catch(() => { });
     return res;
   },
   activateHistorySkin: async (filename, variant) => {
     const res = await invoke('activate_history_skin', { filename, variant });
-    api.getActiveSkin().catch(() => {});
+    api.getActiveSkin().catch(() => { });
     return res;
   },
   deleteHistorySkin: (filename) => invoke('delete_history_skin', { filename }),
@@ -423,6 +457,7 @@ export const api = {
   getGpuInfo: () => invoke('get_gpu_info'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
   showMainWindow: () => invoke('show_main_window'),
+  captureUi: (filename) => captureUi(filename),
   getLauncherVersion: () => invoke('get_launcher_version'),
   logDebug: (message) => invoke('log_debug_message', { message }),
 
@@ -700,12 +735,12 @@ function buildBoxesIntoGeo(builder, boxes) {
     const hx = sx / 2, hy = sy / 2, hz = sz / 2;
     const a = box.atlas;
     const facesList = [
-      { key: 'front', norm: [0, 0, 1], corners: [[Cx-hx, Cy+hy, Cz+hz], [Cx-hx, Cy-hy, Cz+hz], [Cx+hx, Cy+hy, Cz+hz], [Cx+hx, Cy-hy, Cz+hz]] },
-      { key: 'back', norm: [0, 0, -1], corners: [[Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy-hy, Cz-hz], [Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy-hy, Cz-hz]] },
-      { key: 'right', norm: [-1, 0, 0], corners: [[Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy-hy, Cz-hz], [Cx-hx, Cy+hy, Cz+hz], [Cx-hx, Cy-hy, Cz+hz]] },
-      { key: 'left', norm: [1, 0, 0], corners: [[Cx+hx, Cy+hy, Cz+hz], [Cx+hx, Cy-hy, Cz+hz], [Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy-hy, Cz-hz]] },
-      { key: 'top', norm: [0, 1, 0], corners: [[Cx-hx, Cy+hy, Cz-hz], [Cx-hx, Cy+hy, Cz+hz], [Cx+hx, Cy+hy, Cz-hz], [Cx+hx, Cy+hy, Cz+hz]] },
-      { key: 'bottom', norm: [0, -1, 0], corners: [[Cx-hx, Cy-hy, Cz+hz], [Cx-hx, Cy-hy, Cz-hz], [Cx+hx, Cy-hy, Cz+hz], [Cx+hx, Cy-hy, Cz-hz]] },
+      { key: 'front', norm: [0, 0, 1], corners: [[Cx - hx, Cy + hy, Cz + hz], [Cx - hx, Cy - hy, Cz + hz], [Cx + hx, Cy + hy, Cz + hz], [Cx + hx, Cy - hy, Cz + hz]] },
+      { key: 'back', norm: [0, 0, -1], corners: [[Cx + hx, Cy + hy, Cz - hz], [Cx + hx, Cy - hy, Cz - hz], [Cx - hx, Cy + hy, Cz - hz], [Cx - hx, Cy - hy, Cz - hz]] },
+      { key: 'right', norm: [-1, 0, 0], corners: [[Cx - hx, Cy + hy, Cz - hz], [Cx - hx, Cy - hy, Cz - hz], [Cx - hx, Cy + hy, Cz + hz], [Cx - hx, Cy - hy, Cz + hz]] },
+      { key: 'left', norm: [1, 0, 0], corners: [[Cx + hx, Cy + hy, Cz + hz], [Cx + hx, Cy - hy, Cz + hz], [Cx + hx, Cy + hy, Cz - hz], [Cx + hx, Cy - hy, Cz - hz]] },
+      { key: 'top', norm: [0, 1, 0], corners: [[Cx - hx, Cy + hy, Cz - hz], [Cx - hx, Cy + hy, Cz + hz], [Cx + hx, Cy + hy, Cz - hz], [Cx + hx, Cy + hy, Cz + hz]] },
+      { key: 'bottom', norm: [0, -1, 0], corners: [[Cx - hx, Cy - hy, Cz + hz], [Cx - hx, Cy - hy, Cz - hz], [Cx + hx, Cy - hy, Cz + hz], [Cx + hx, Cy - hy, Cz - hz]] },
     ];
     for (const f of facesList) {
       const r = a[f.key];

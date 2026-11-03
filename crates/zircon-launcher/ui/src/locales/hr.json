@@ -787,6 +787,7 @@
     "language_desc": "Jezik sučelja za izbornike, dijaloge i obavijesti",
     "categories": {
       "all": "Sve postavke",
+      "keybinds": "Keybinds",
       "performance": "Performanse",
       "display": "Zaslon",
       "appearance": "Izgled",

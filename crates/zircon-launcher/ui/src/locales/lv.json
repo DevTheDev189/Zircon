@@ -726,6 +726,7 @@
     "language_desc": "Saskarnes valoda izvēlnēm, dialoglodziņiem un paziņojumiem",
     "categories": {
       "all": "Visi iestatījumi",
+      "keybinds": "Keybinds",
       "performance": "Veiktspēja",
       "display": "Displejs",
       "appearance": "Izskats",

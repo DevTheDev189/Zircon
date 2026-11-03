@@ -99,7 +99,7 @@
     <!-- 4 High-Tech Telemetry Cards with Y-Axis Values & Spline Curves (Always visible) -->
     <div class="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-3.5 shrink-0">
       <!-- 1. CPU Dynamics (Host vs Game) -->
-      <div class="z-card bg-[#0a0c10] border border-neutral-800/60 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+      <div class="z-card p-3.5 flex flex-col justify-between relative overflow-hidden group">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-sans">
             <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_var(--color-accent)]"></span>
@@ -158,7 +158,7 @@
       </div>
 
       <!-- 2. Memory & Heap Dynamics (JVM Heap & System RAM) -->
-      <div class="z-card bg-[#0a0c10] border border-neutral-800/60 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+      <div class="z-card p-3.5 flex flex-col justify-between relative overflow-hidden group">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-sans">
             <span class="w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.6)]"></span>
@@ -214,7 +214,7 @@
       </div>
 
       <!-- 3. Network Throughput & Bandwidth (RX / TX) -->
-      <div class="z-card bg-[#0a0c10] border border-neutral-800/60 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+      <div class="z-card p-3.5 flex flex-col justify-between relative overflow-hidden group">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-sans">
             <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span>
@@ -267,10 +267,10 @@
       </div>
 
       <!-- 4. GPU Utilization & Tick Performance -->
-      <div class="z-card bg-[#0a0c10] border border-neutral-800/60 p-3.5 rounded-2xl flex flex-col justify-between relative overflow-hidden group">
+      <div class="z-card p-3.5 flex flex-col justify-between relative overflow-hidden group">
         <div class="flex items-center justify-between mb-1">
           <!-- Toggle Pill: GPU Load % vs Tick MSPT -->
-          <div class="flex items-center gap-1 bg-[#070b10] p-0.5 rounded-lg border border-slate-800">
+          <div class="flex items-center z-segmented-track p-0.5">
             <button
               class="px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer select-none"
               :class="activeCard4Tab === 'gpu' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm' : 'text-slate-400 hover:text-white'"
@@ -365,7 +365,7 @@
 
     <!-- Center/Bottom: Real-Time Filtered Log Terminal (Greyed out when game is idle) -->
     <div
-      class="relative z-10 flex-1 min-h-0 flex flex-col z-card bg-[#0a0c10] border rounded-2xl p-4 overflow-hidden transition-all duration-200"
+      class="relative z-10 flex-1 min-h-0 flex flex-col z-card p-4 overflow-hidden transition-all duration-200"
       :class="isGameRunning ? 'border-neutral-800/80' : 'border-neutral-800/40 opacity-60'"
     >
       <!-- Terminal Controls & Filters Header -->
@@ -444,7 +444,7 @@
       <!-- Log Output Stream Window -->
       <div
         ref="logWindow"
-        class="flex-1 min-h-0 overflow-y-auto font-mono text-[11px] leading-relaxed p-2 space-y-0.5 select-text bg-[#05070c] rounded-xl border border-slate-900/80 shadow-inner relative"
+        class="flex-1 min-h-0 overflow-y-auto font-mono text-[11px] leading-relaxed p-2 space-y-0.5 select-text z-well relative"
       >
         <!-- Standby State when game is NOT running -->
         <div v-if="!isGameRunning" class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">

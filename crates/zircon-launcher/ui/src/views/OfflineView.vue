@@ -4,7 +4,7 @@
     :class="viewMode === 'split' ? 'overflow-hidden' : 'overflow-y-auto'"
   >
     <!-- Master Header & Control Bar -->
-    <div v-if="!isStudioFocused" class="relative z-50 z-card bg-[#0e1622]/90 border border-slate-800/80 px-4 py-3 flex items-center justify-between gap-3 shrink-0 flex-wrap sm:flex-nowrap transition-all duration-300">
+    <div v-if="!isStudioFocused" class="relative z-50 z-card px-4 py-3 flex items-center justify-between gap-3 shrink-0 flex-wrap sm:flex-nowrap transition-all duration-300">
       <!-- Left: Title, Count, Search, Loader Filter Pills -->
       <div class="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
         <div class="flex items-center gap-2 mr-1">
@@ -26,7 +26,7 @@
             v-model="searchQuery"
             type="text"
             :placeholder="$t('offline.search_placeholder')"
-            class="w-full bg-[#070b10]/80 border border-slate-700/80 rounded-xl pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/40 transition-all font-sans"
+            class="z-input pr-7 py-1.5 text-xs text-white placeholder-slate-500 font-sans"
             style="padding-left: 2.35rem !important;"
             @focus="onSearchFocus"
           />
@@ -40,16 +40,12 @@
         </div>
 
         <!-- Loader Filter Pills -->
-        <div class="hidden md:flex items-center gap-1 bg-[#070b10]/80 p-1 rounded-xl border border-slate-800 text-[11px] shadow-inner">
+        <div class="hidden md:flex items-center gap-1 z-segmented-track p-1 text-[11px]">
           <button
             v-for="loader in ['all', 'fabric', 'neoforge', 'forge', 'vanilla']"
             :key="loader"
-            class="px-3 py-1 rounded-lg font-semibold transition-all capitalize cursor-pointer select-none"
-            :class="
-              filterLoader === loader
-                ? 'bg-accent/20 text-accent-bright border border-accent/40 shadow-[0_0_10px_var(--color-accent-glow)] font-bold'
-                : 'text-slate-400 hover:text-white border border-transparent hover:bg-slate-800/40'
-            "
+            class="z-segmented-pill capitalize cursor-pointer select-none"
+            :class="{ active: filterLoader === loader }"
             @click="filterLoader = loader"
           >
             {{ loader }}
@@ -59,26 +55,60 @@
 
       <!-- Right: Sort, View Switcher, Tools Dropdown, New Instance Button -->
       <div class="flex items-center gap-2 shrink-0">
-        <!-- Sort Selector -->
-        <div class="relative hidden sm:inline-flex items-center">
-          <select
-            v-model="sortBy"
-            class="bg-[#070b10]/80 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-medium focus:outline-none focus:border-cyan-500/60 transition-all cursor-pointer appearance-none pr-7"
+        <!-- Sort Dropdown (Recent / Name / Version) -->
+        <div class="relative z-50 hidden sm:inline-flex" data-dropdown="sort">
+          <button
+            type="button"
+            class="z-btn-secondary px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer rounded-xl border border-edge bg-well/70 hover:bg-well hover:border-slate-700 text-slate-200"
+            @click="showSortDropdown = !showSortDropdown"
+            :title="$t('offline.sort_recent')"
           >
-            <option value="recent">{{ $t('offline.sort_recent') }}</option>
-            <option value="name">{{ $t('offline.sort_name') }}</option>
-            <option value="version">{{ $t('offline.sort_version') }}</option>
-          </select>
-          <svg class="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+            </svg>
+            <span>{{ $t('offline.sort_' + sortBy) }}</span>
+            <svg class="w-3 h-3 transition-transform text-slate-400" :class="{ 'rotate-180': showSortDropdown }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <transition name="dropdown-pop">
+            <div
+              v-if="showSortDropdown"
+              class="absolute left-0 top-full mt-2 w-44 bg-[#0c1322] border border-white/15 ring-1 ring-cyan-500/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_25px_rgba(71,210,201,0.2)] p-1.5 z-50 text-xs text-slate-200"
+            >
+              <div class="absolute top-0 inset-x-3 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent pointer-events-none"></div>
+
+              <div class="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/80 font-mono">
+                Sort Instances
+              </div>
+
+              <button
+                v-for="opt in [
+                  { id: 'recent', label: $t('offline.sort_recent') },
+                  { id: 'name', label: $t('offline.sort_name') },
+                  { id: 'version', label: $t('offline.sort_version') }
+                ]"
+                :key="opt.id"
+                type="button"
+                class="w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-all duration-150 cursor-pointer"
+                :class="sortBy === opt.id ? 'bg-cyan-500/15 text-white font-semibold border border-cyan-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/60 border border-transparent'"
+                @click="sortBy = opt.id; showSortDropdown = false;"
+              >
+                <span>{{ opt.label }}</span>
+                <svg v-if="sortBy === opt.id" class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
+            </div>
+          </transition>
         </div>
 
         <!-- View Switcher (Grid vs Split) -->
-        <div class="flex items-center bg-[#070b10]/80 p-1 rounded-xl border border-slate-700/80 shadow-inner">
+        <div class="flex items-center z-segmented-track p-1">
           <button
-            class="p-1.5 rounded-lg transition-all cursor-pointer"
-            :class="viewMode === 'grid' ? 'bg-accent/20 text-accent-bright border border-accent/40 shadow-[0_0_8px_var(--color-accent-glow)]' : 'text-slate-400 hover:text-white border border-transparent hover:bg-slate-800/40'"
+            class="z-segmented-pill p-1.5 cursor-pointer"
+            :class="{ active: viewMode === 'grid' }"
             :title="$t('offline.grid_view')"
             @click="viewMode = 'grid'; isStudioFocused = false;"
           >
@@ -87,8 +117,8 @@
             </svg>
           </button>
           <button
-            class="p-1.5 rounded-lg transition-all cursor-pointer"
-            :class="viewMode === 'split' ? 'bg-accent/20 text-accent-bright border border-accent/40 shadow-[0_0_8px_var(--color-accent-glow)]' : 'text-slate-400 hover:text-white border border-transparent hover:bg-slate-800/40'"
+            class="z-segmented-pill p-1.5 cursor-pointer"
+            :class="{ active: viewMode === 'split' }"
             :title="$t('offline.split_view')"
             @click="viewMode = 'split'"
           >
@@ -101,7 +131,7 @@
         <!-- Tools Dropdown (Migrate, Import, Join) -->
         <div class="relative z-50" data-dropdown="tools">
           <button
-            class="px-2.5 py-1.5 rounded-xl border border-slate-700/80 bg-[#070b10]/80 hover:bg-[#111c2a] hover:border-cyan-500/40 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            class="z-btn-secondary px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
             @click="showToolsDropdown = !showToolsDropdown"
             :title="$t('offline.tools_tooltip')"
           >
@@ -117,7 +147,7 @@
           <transition name="dropdown-pop">
             <div
               v-if="showToolsDropdown"
-              class="absolute right-0 top-full mt-2 w-64 bg-[#0c1322] border border-white/15 ring-1 ring-cyan-500/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_25px_rgba(71,210,201,0.2)] p-1.5 z-50 text-xs backdrop-blur-2xl"
+              class="absolute right-0 top-full mt-2 w-64 bg-[#0c1322] border border-white/15 ring-1 ring-cyan-500/30 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_25px_rgba(71,210,201,0.2)] p-1.5 z-50 text-xs text-slate-200"
             >
               <!-- Ambient Top Accent Glow -->
               <div class="absolute top-0 inset-x-4 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent pointer-events-none"></div>
@@ -208,7 +238,7 @@
           <button
             v-if="!searchQuery"
             type="button"
-            class="group relative z-card bg-[#070b10]/60 hover:bg-[#0e1622]/90 border-2 border-dashed border-slate-700/60 hover:border-accent/60 rounded-2xl p-5 flex flex-col items-center justify-center min-h-[185px] h-full text-center transition-all duration-300 hover:shadow-[0_8px_30px_var(--color-accent-glow)] hover:-translate-y-0.5 cursor-pointer"
+            class="group relative z-card z-card-interactive border-2 border-dashed border-slate-700/60 hover:border-accent/60 p-5 flex flex-col items-center justify-center min-h-[185px] h-full text-center transition-all duration-300 hover:shadow-[0_8px_30px_var(--color-accent-glow)] hover:-translate-y-0.5 cursor-pointer"
             :title="$t('offline.create_tile_tooltip')"
             @click="openNewInstance('scratch')"
           >
@@ -295,7 +325,7 @@
       <!-- MODE B: SPLIT VIEW SIDEBAR (only when viewMode === 'split') -->
       <div
         v-if="viewMode === 'split'"
-        class="w-[300px] min-w-[300px] z-card flex flex-col p-3.5 bg-[#0e1622]/90 border border-slate-800/80 shrink-0"
+        class="w-[300px] min-w-[300px] z-card flex flex-col p-3.5 shrink-0"
       >
         <div class="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2">
           <div
@@ -341,7 +371,7 @@
       <!-- Right / Studio Detail & Management Pane -->
       <div
         v-if="viewMode === 'split' || isStudioFocused"
-        class="z-card flex flex-col p-5 bg-[#0e1622]/90 border border-slate-800/80"
+        class="z-card flex flex-col p-5"
         :class="viewMode === 'split' ? 'flex-1 min-w-0 min-h-0 overflow-y-auto' : 'w-full shrink-0 min-h-fit'"
       >
         <!-- Studio Mode Breadcrumb Header -->
@@ -366,7 +396,7 @@
       <template v-if="selected">
         <!-- Header summary & play action -->
         <div
-          class="relative bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner mb-4 shrink-0 min-h-fit"
+          class="relative z-well p-4 mb-4 shrink-0 min-h-fit"
           :class="(showActionsDropdown || showOpenFolderDropdown) ? 'z-40 overflow-visible' : 'z-20 overflow-hidden'"
         >
           <!-- Static Ambient Wallpaper Backdrop (Matches ServersView) -->
@@ -1810,7 +1840,7 @@
                   @click="openLightbox(s)"
                 >
                   <div class="aspect-video w-full overflow-hidden bg-slate-900 flex items-center justify-center">
-                    <img :src="s.dataUrl" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy" />
+                    <img :src="getScreenshotSrc(s)" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" loading="lazy" />
                   </div>
                   <div class="p-2 bg-slate-900/90 flex items-center justify-between text-[10px] text-slate-400">
                     <span class="truncate font-mono mr-1">{{ s.filename }}</span>
@@ -1942,7 +1972,7 @@
         <button class="text-slate-400 hover:text-white text-xl leading-none" @click="closeLightbox">✕</button>
       </div>
       <div class="max-w-5xl max-h-[80vh] flex items-center justify-center overflow-hidden rounded-2xl border border-slate-800 bg-black shadow-2xl">
-        <img :src="lightboxScreenshot.dataUrl" class="max-w-full max-h-[80vh] object-contain" />
+        <img :src="getScreenshotSrc(lightboxScreenshot)" class="max-w-full max-h-[80vh] object-contain" />
       </div>
     </div>
 
@@ -2177,6 +2207,7 @@ import {
   pickFile,
   saveFile,
   onModpackProgress,
+  resolveAssetUrl,
 } from '../lib/api';
 import { askConfirm } from '../lib/confirm';
 
@@ -2237,6 +2268,7 @@ const isStudioFocused = ref(false);
 const searchQuery = ref('');
 const filterLoader = ref('all'); // 'all' | 'fabric' | 'neoforge' | 'forge' | 'vanilla'
 const sortBy = ref('recent'); // 'recent' | 'name' | 'version'
+const showSortDropdown = ref(false);
 const showToolsDropdown = ref(false);
 const activeCardDropdownId = ref(null);
 
@@ -3785,6 +3817,9 @@ function onWindowClick(e) {
   if (showActionsDropdown.value && !e.target.closest('[data-dropdown="actions"]')) {
     showActionsDropdown.value = false;
   }
+  if (showSortDropdown.value && !e.target.closest('[data-dropdown="sort"]')) {
+    showSortDropdown.value = false;
+  }
   if (showToolsDropdown.value && !e.target.closest('[data-dropdown="tools"]')) {
     showToolsDropdown.value = false;
   }
@@ -3997,6 +4032,11 @@ async function loadScreenshots() {
   } finally {
     loadingScreenshotsState.value = false;
   }
+}
+
+function getScreenshotSrc(s) {
+  if (!s) return '';
+  return resolveAssetUrl(s.filePath, s.dataUrl);
 }
 
 function openLightbox(screenshot) {

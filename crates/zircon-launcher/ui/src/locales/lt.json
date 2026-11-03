@@ -580,6 +580,7 @@
     "language_desc": "Meniu, dialogų langų ir pranešimų sąsajos kalba",
     "categories": {
       "all": "Visi nustatymai",
+      "keybinds": "Keybinds",
       "performance": "Veikimas",
       "display": "Ekranas",
       "appearance": "Išvaizda",

@@ -770,6 +770,7 @@
     "language_desc": "Grænsefladesprog for menuer, dialogbokse og notifikationer",
     "categories": {
       "all": "Alle indstillinger",
+      "keybinds": "Keybinds",
       "performance": "Ydelse",
       "display": "Skærm",
       "appearance": "Udseende",

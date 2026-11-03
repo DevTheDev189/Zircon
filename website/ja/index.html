@@ -51,7 +51,7 @@
   (function() {
     try {
       var ua = (navigator.userAgent || '').toLowerCase();
-      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta/i.test(ua)) return;
+      if (/bot|spider|crawl|slurp|discord|twitter|facebook|slack|telegram|whatsapp|preview|embed|meta|yandex/i.test(ua)) return;
       var override = localStorage.getItem('zircon_locale_override');
       if (override) return;
       var SUPPORTED = {
@@ -104,12 +104,13 @@
   </script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Zircon — Modded Minecraft with friends, without the headache</title>
-<meta content="Zircon is a free, open-source launcher for modded Minecraft. Pick a server, hit PLAY, and the exact mods that server runs install themselves — verified against Modrinth &amp; CurseForge on every launch. Windows 10/11 now; macOS &amp; Linux planned." name="description"/>
+<title>Zircon — 友達とMOD入りMinecraftを遊ぶ、最速の方法</title>
+<meta content="ZirconはMODパックの不一致を永久に解消します。サーバーを選択し、 PLAYボタンを押すだけで、すべてのMODが数秒以内に暗号学的に検証されインストールされます。 さらに: CurseForge & Prismからのワンクリックインポート、4人向けソファCo-op、LAN自動検出。" name="description"/>
 <meta content="modded minecraft launcher, minecraft mod sync, modrinth launcher, curseforge launcher, minecraft server manager, fabric launcher, forge launcher, neoforge, automatic mod installer" name="keywords"/>
 <meta content="Zircon Contributors" name="author"/>
 <meta content="index, follow" name="robots"/>
 <meta content="#0d1117" name="theme-color"/>
+<meta content="e65cacaa35ada795" name="yandex-verification"/>
 <!-- Open Graph / Social Sharing -->
 <meta content="Zircon" property="og:site_name"/>
 <meta content="https://zirconmc.net/" property="og:url"/>
@@ -130,6 +131,7 @@
 <link href="../assets/img/favicon.png" rel="apple-touch-icon"/>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700;800&family=JetBrains+Mono:wght@450;600&display=swap" rel="stylesheet"/>
 <link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
 <!-- Structured Data / JSON-LD -->
 <script type="application/ld+json">
@@ -331,23 +333,23 @@
 </div>
 <!-- View 1: Launcher -->
 <div class="showcase-view active" data-view="launcher">
-<img alt="Zircon Launcher Main Screen" fetchpriority="high" height="600" loading="eager" src="../assets/img/locales/ja/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="1000"/>
+<img alt="Zircon Launcher Main Screen" fetchpriority="high" height="600" loading="eager" src="../assets/img/main_launcher.webp" width="1000"/>
 </div>
 <!-- View 2: Universal Migration -->
 <div class="showcase-view" data-view="migration">
-<img alt="Universal Migration Importer" height="600" loading="lazy" src="../assets/img/locales/ja/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="1000"/>
+<img alt="Universal Migration Importer" height="600" loading="lazy" src="../assets/img/migration_importer.webp" width="1000"/>
 </div>
 <!-- View 3: Couch Co-op -->
 <div class="showcase-view" data-view="coop">
-<img alt="4-Player Split-Screen Couch Co-op" height="600" loading="lazy" src="../assets/img/locales/ja/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="1000"/>
+<img alt="4-Player Split-Screen Couch Co-op" height="600" loading="lazy" src="../assets/img/couch_coop_modal.webp" width="1000"/>
 </div>
 <!-- View 4: 3D Skin Studio -->
 <div class="showcase-view" data-view="skin">
-<img alt="Zircon 3D Skin Studio with Live Preview" height="600" loading="lazy" src="../assets/img/locales/ja/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="1000"/>
+<img alt="Zircon 3D Skin Studio with Live Preview" height="600" loading="lazy" src="../assets/img/skin_selector_launcher.webp" width="1000"/>
 </div>
 <!-- View 5: Server Dashboard -->
 <div class="showcase-view" data-view="server">
-<img alt="Zircon Server Performance Stats" height="600" loading="lazy" src="../assets/img/performance_server.png" width="1000"/>
+<img alt="Zircon Server Performance Stats" height="600" loading="lazy" src="../assets/img/performance_server.webp" width="1000"/>
 </div>
 </div>
 <p class="shot-caption" data-i18n="index.click_any_tab_above">上のタブをクリックするか、画像をクリックして全画面の詳細を確認してください。</p>
@@ -414,7 +416,7 @@
 <div class="frame-title" data-i18n="index.cryptographic_mod_synchronization_verification"><span data-i18n="index.cryptographic_mod_synchronization_verification_1">暗号学的MOD同期 & 検証エンジン</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="Cryptographic Mod Sync Verification Interface" height="540" loading="lazy" src="../assets/img/sync_verification.png" width="900"/>
+<img alt="Cryptographic Mod Sync Verification Interface" height="540" loading="lazy" src="../assets/img/sync_verification.webp" width="900"/>
 </div>
 </div>
 </div>
@@ -477,7 +479,7 @@
 <div class="frame-title" data-i18n="index.universal_launcher_importer"><span data-i18n="index.universal_launcher_importer_1">ユニバーサルランチャーインポーター</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="Zircon Universal Migration Importer Window" height="500" loading="lazy" src="../assets/img/locales/ja/migration_importer.png" onerror="this.onerror=null; this.src='../assets/img/migration_importer.png';" width="800"/>
+<img alt="Zircon Universal Migration Importer Window" height="500" loading="lazy" src="../assets/img/migration_importer.webp" width="800"/>
 </div>
 </div>
 </div>
@@ -541,7 +543,7 @@
 <div class="frame-title" data-i18n="index.4player_couch_coop_gamepad"><span data-i18n="index.4player_couch_coop_gamepad_1">4人向けソファCo-op ゲームパッドセットアップ</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="4-Player Couch Co-op" height="500" loading="lazy" src="../assets/img/locales/ja/couch_coop_modal.png" onerror="this.onerror=null; this.src='../assets/img/couch_coop_modal.png';" width="800"/>
+<img alt="4-Player Couch Co-op" height="500" loading="lazy" src="../assets/img/couch_coop_modal.webp" width="800"/>
 </div>
 </div>
 </div>
@@ -563,7 +565,7 @@
 <div class="frame-title" data-i18n="index.3d_skin_studio_mojang"><span data-i18n="index.3d_skin_studio_mojang_1">3Dスキンスタジオ &amp; Mojang同期</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="3D Skin Studio" height="500" loading="lazy" src="../assets/img/locales/ja/skin_selector_launcher.png" onerror="this.onerror=null; this.src='../assets/img/skin_selector_launcher.png';" width="800"/>
+<img alt="3D Skin Studio" height="500" loading="lazy" src="../assets/img/skin_selector_launcher.webp" width="800"/>
 </div>
 </div>
 </div>
@@ -585,7 +587,7 @@
 <div class="frame-title" data-i18n="index.lan_autodiscovery_nearby_games"><span data-i18n="index.lan_autodiscovery_nearby_games_1">LAN自動検出 &amp; 近くのゲーム</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="LAN Auto-Discovery" height="500" loading="lazy" src="../assets/img/locales/ja/lan_nearby_friends.png" onerror="this.onerror=null; this.src='../assets/img/lan_nearby_friends.png';" width="800"/>
+<img alt="LAN Auto-Discovery" height="500" loading="lazy" src="../assets/img/lan_nearby_friends.webp" width="800"/>
 </div>
 </div>
 </div>
@@ -607,7 +609,7 @@
 <div class="frame-title" data-i18n="index.zircon_launcher_2048_discord"><span data-i18n="index.zircon_launcher_2048_discord_1">Zirconランチャー — 2048 &amp; Discordプレゼンス</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="Zircon Launcher Loading Features" height="500" loading="lazy" src="../assets/img/locales/ja/main_launcher.png" onerror="this.onerror=null; this.src='../assets/img/main_launcher.png';" width="800"/>
+<img alt="Zircon Launcher Loading Features" height="500" loading="lazy" src="../assets/img/main_launcher.webp" width="800"/>
 </div>
 </div>
 </div>
@@ -683,7 +685,7 @@
 <div class="frame-title" data-i18n="index.zircon_server_manager_engine"><span data-i18n="index.zircon_server_manager_engine_1">Zirconサーバーマネージャーエンジン</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="Zircon Server Manager Dashboard" height="500" loading="lazy" src="../assets/img/performance_server.png" width="800"/>
+<img alt="Zircon Server Manager Dashboard" height="500" loading="lazy" src="../assets/img/performance_server.webp" width="800"/>
 </div>
 </div>
 </div>

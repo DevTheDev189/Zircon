@@ -836,6 +836,7 @@
     "language_desc": "Jazyk pre menu, dialógové okná a upozornenia",
     "categories": {
       "all": "Všetky nastavenia",
+      "keybinds": "Keybinds",
       "performance": "Výkon",
       "display": "Zobrazovanie",
       "appearance": "Vzhľad",

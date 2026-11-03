@@ -818,6 +818,7 @@
     "language_desc": "Sprache der Oberfläche für Menüs, Dialoge und Benachrichtigungen",
     "categories": {
       "all": "Alle Einstellungen",
+      "keybinds": "Keybinds",
       "performance": "Leistung",
       "display": "Anzeige",
       "appearance": "Darstellung",

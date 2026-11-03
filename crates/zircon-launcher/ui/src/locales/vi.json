@@ -802,6 +802,7 @@
     "language_desc": "Ngôn ngữ giao diện cho menu, hộp thoại và thông báo",
     "categories": {
       "all": "Tất cả cài đặt",
+      "keybinds": "Keybinds",
       "performance": "Hiệu năng",
       "display": "Màn hình",
       "appearance": "Giao diện",

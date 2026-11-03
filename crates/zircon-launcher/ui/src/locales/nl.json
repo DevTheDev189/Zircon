@@ -883,6 +883,7 @@
     "language_desc": "Interfacetaal voor menu's, dialoogvensters en meldingen",
     "categories": {
       "all": "Alle instellingen",
+      "keybinds": "Keybinds",
       "performance": "Prestaties",
       "display": "Beeldscherm",
       "appearance": "Uiterlijk",

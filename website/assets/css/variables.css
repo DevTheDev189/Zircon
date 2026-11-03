@@ -14,6 +14,8 @@
   --accent-glow-strong: rgba(71, 210, 201, 0.5);
   --accent-border: rgba(71, 210, 201, 0.45);
   --accent-focus: rgba(71, 210, 201, 0.25);
+  --primary: var(--accent);
+  --primary-bright: var(--accent-bright);
 
   /* Cyber-Obsidian Canvas & Surfaces */
   --bg: #070b0f;
@@ -265,6 +267,34 @@ code {
   border-radius: var(--radius);
   letter-spacing: -0.01em;
   box-shadow: 0 8px 30px rgba(71, 210, 201, 0.38);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-xl.btn-primary {
+  background: linear-gradient(135deg, #5adfd5 0%, #47d2c9 50%, #20b2aa 100%);
+  color: #022623;
+  box-shadow: 0 8px 28px rgba(71, 210, 201, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+}
+
+.btn-xl.btn-primary:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 12px 38px rgba(71, 210, 201, 0.55), 0 0 20px rgba(90, 223, 213, 0.45);
+  filter: brightness(1.06);
+}
+
+.btn-xl.btn-secondary {
+  background: rgba(28, 37, 48, 0.85);
+  border: 1px solid rgba(71, 210, 201, 0.25);
+  backdrop-filter: blur(10px);
+  color: var(--text);
+}
+
+.btn-xl.btn-secondary:hover {
+  border-color: var(--accent-bright);
+  color: var(--white);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4), 0 0 16px rgba(71, 210, 201, 0.2);
+  background: rgba(71, 210, 201, 0.12);
 }
 
 .btn-xl svg {

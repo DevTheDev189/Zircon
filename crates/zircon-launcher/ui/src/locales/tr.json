@@ -950,6 +950,7 @@
     "language_desc": "Menüler, iletişim kutuları ve bildirimler için arayüz dili",
     "categories": {
       "all": "Tüm Ayarlar",
+      "keybinds": "Keybinds",
       "performance": "Performans",
       "display": "Görüntü",
       "appearance": "Görünüm",

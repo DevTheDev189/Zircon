@@ -818,6 +818,7 @@
     "language_desc": "Bahasa antarmuka untuk menu, dialog, dan notifikasi",
     "categories": {
       "all": "Semua Pengaturan",
+      "keybinds": "Keybinds",
       "performance": "Performa",
       "display": "Tampilan",
       "appearance": "Tampilan Luar",

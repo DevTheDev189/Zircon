@@ -36,6 +36,78 @@
     --border-opacity: 0.55;
 }
 
+/* ==========================================================================
+   Arctic Quartz Light Mode Tokens & Remapping
+   ========================================================================== */
+html.theme-light {
+    --color-bg: #f8fafc;
+    --color-bg-rgb: 248 250 252;
+    --color-sidebar: #f1f5f9;
+    --color-sidebar-rgb: 241 245 249;
+    --color-card: #ffffff;
+    --color-card-rgb: 255 255 255;
+    --color-well: #e2e8f0;
+    --color-well-rgb: 226 232 240;
+    --color-border: #cbd5e1;
+    --color-border-rgb: 203 213 225;
+    --color-btn-secondary: #f1f5f9;
+    --color-btn-secondary-rgb: 241 245 249;
+
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #475569;
+    --color-text-muted: #64748b;
+
+    --card-opacity: 0.95;
+    --border-opacity: 0.85;
+}
+
+html.theme-light,
+html.theme-light body,
+html.theme-light #app {
+    color: var(--color-text-primary) !important;
+}
+
+html.theme-light .text-white,
+html.theme-light .text-slate-100,
+html.theme-light .text-slate-200 {
+    color: var(--color-text-primary) !important;
+}
+
+html.theme-light .text-slate-300,
+html.theme-light .text-slate-400 {
+    color: var(--color-text-secondary) !important;
+}
+
+html.theme-light .text-slate-500,
+html.theme-light .text-slate-600 {
+    color: var(--color-text-muted) !important;
+}
+
+html.theme-light .bg-slate-900,
+html.theme-light .bg-slate-900\/50,
+html.theme-light .bg-slate-900\/80,
+html.theme-light .bg-slate-800,
+html.theme-light .bg-slate-800\/50,
+html.theme-light .bg-slate-800\/80,
+html.theme-light .bg-slate-800\/90 {
+    background-color: var(--color-card) !important;
+    border-color: var(--color-border) !important;
+}
+
+html.theme-light .bg-slate-950,
+html.theme-light .bg-slate-950\/60,
+html.theme-light .bg-slate-950\/80 {
+    background-color: var(--color-well) !important;
+}
+
+html.theme-light input,
+html.theme-light select,
+html.theme-light textarea {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
 /* Base resets & Dark Obsidian canvas */
 html,
 body,
@@ -106,25 +178,6 @@ header.bg-\[\#080c14\]\/90 {
     background: transparent;
 }
 
-/* 2026 High-Tech Glassmorphism Surfaces */
-/* 2026 High-Tech Glassmorphism Surfaces */
-.z-glass-card,
-.zircon-glass-card {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), rgba(8, 16, 28, 0.68) !important;
-    backdrop-filter: blur(16px) saturate(140%) !important;
-    -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: var(--border-radius-card) !important;
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.45) !important;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease !important;
-}
-
-.z-glass-card:hover,
-.zircon-glass-card:hover {
-    border-color: rgba(71, 210, 201, 0.45) !important;
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 22px rgba(71, 210, 201, 0.2) !important;
-}
-
 /* Brand Title & Typography in Sidebar */
 .z-brand-logo {
     filter: drop-shadow(0 0 12px rgba(71, 210, 201, 0.4));
@@ -154,7 +207,108 @@ header.bg-\[\#080c14\]\/90 {
     box-shadow: 0 0 6px var(--color-accent);
 }
 
-/* Glowing Selected Server / Active Card Backdrop */
+/* Canonical Surface Classes (Parity with Zircon Launcher) */
+.z-card,
+.z-glass-card,
+.zircon-glass-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), rgba(var(--color-card-rgb), var(--card-opacity, 0.85)) !important;
+    backdrop-filter: blur(var(--card-blur, 12px)) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(var(--card-blur, 12px)) saturate(140%) !important;
+    border: 1px solid rgba(var(--color-border-rgb), var(--border-opacity, 0.55)) !important;
+    border-radius: var(--border-radius-card) !important;
+    padding: 1.25rem;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 8px 32px rgba(0, 0, 0, 0.45);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.z-card-interactive {
+    cursor: pointer !important;
+}
+.z-card-interactive:hover {
+    border-color: var(--color-accent-border) !important;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 20px var(--color-accent-glow) !important;
+    transform: translateY(-2px);
+}
+.z-card-interactive:active {
+    transform: translateY(0);
+}
+
+.z-well {
+    background-color: var(--color-well) !important;
+    border: 1px solid rgba(var(--color-border-rgb), 0.6) !important;
+    border-radius: var(--border-radius-card) !important;
+    padding: 1rem;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Modals */
+.z-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.82) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    padding: 1rem;
+}
+
+.z-modal-dialog {
+    position: relative;
+    width: 100%;
+    max-width: 42rem;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-card) !important;
+    border: 1px solid var(--color-accent-border) !important;
+    border-radius: var(--border-radius-card) !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 30px var(--color-accent-glow) !important;
+    overflow: hidden;
+}
+
+/* Badges */
+.z-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-family: monospace;
+}
+
+.z-badge-live,
+.z-badge-success {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #34d399 !important;
+    border: 1px solid rgba(16, 185, 129, 0.35) !important;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.2) !important;
+}
+
+.z-badge-accent {
+    background: rgba(var(--color-accent-rgb), 0.15) !important;
+    color: var(--color-accent-bright) !important;
+    border: 1px solid var(--color-accent-border) !important;
+    box-shadow: 0 0 8px var(--color-accent-glow) !important;
+}
+
+.z-badge-warn {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border: 1px solid rgba(245, 158, 11, 0.35) !important;
+}
+
+.z-badge-danger {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #f87171 !important;
+    border: 1px solid rgba(239, 68, 68, 0.35) !important;
+}
 .z-server-selected,
 .zircon-server-selected {
     background: radial-gradient(circle at 50% 0%, rgba(71, 210, 201, 0.22) 0%, rgba(14, 22, 34, 0.96) 75%), rgba(14, 22, 34, 0.96) !important;
@@ -210,7 +364,10 @@ header.bg-\[\#080c14\]\/90 {
 
 /* Call-to-Action Buttons */
 .zircon-cta-btn,
-.z-btn-accent {
+.z-btn-accent,
+.z-btn-primary,
+.bg-cyan-600,
+button.bg-cyan-600 {
     background: linear-gradient(135deg, var(--color-accent-bright) 0%, var(--color-accent) 50%, var(--color-accent-deep) 100%) !important;
     color: var(--color-accent-ink) !important;
     font-weight: 700 !important;
@@ -222,7 +379,10 @@ header.bg-\[\#080c14\]\/90 {
 }
 
 .zircon-cta-btn:hover:not(:disabled),
-.z-btn-accent:hover:not(:disabled) {
+.z-btn-accent:hover:not(:disabled),
+.z-btn-primary:hover:not(:disabled),
+.bg-cyan-600:hover:not(:disabled),
+button.bg-cyan-600:hover:not(:disabled) {
     background: linear-gradient(135deg, var(--color-accent-bright) 0%, var(--color-accent) 50%, var(--color-accent-deep) 100%) !important;
     filter: brightness(1.1) !important;
     box-shadow: 0 6px 24px var(--color-accent-glow-strong) !important;

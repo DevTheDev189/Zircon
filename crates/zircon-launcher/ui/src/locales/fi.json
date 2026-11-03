@@ -669,6 +669,7 @@
     "language_desc": "Valikoiden, valintaikkunoiden ja ilmoitusten käyttöliittymän kieli",
     "categories": {
       "all": "Kaikki asetukset",
+      "keybinds": "Keybinds",
       "performance": "Suorituskyky",
       "display": "Näyttö",
       "appearance": "Ulkoasu",

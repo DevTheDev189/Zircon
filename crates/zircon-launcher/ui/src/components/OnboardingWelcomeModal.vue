@@ -2,17 +2,17 @@
   <Transition name="onboarding-fade">
     <div
       v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl transition-all duration-300"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 z-modal-backdrop transition-all duration-300"
       @click.self="handleSkip"
     >
       <div
-        class="w-full max-w-xl bg-[#090e17]/95 border border-slate-700/60 rounded-3xl shadow-[0_24px_70px_rgba(0,0,0,0.85),0_0_40px_rgba(71,210,201,0.18)] overflow-hidden relative p-7 before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-cyan-400/80 before:to-transparent animate-modal-pop"
+        class="w-full max-w-xl z-card border border-edge rounded-3xl shadow-2xl overflow-hidden relative p-7 before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-accent/80 before:to-transparent animate-modal-pop"
       >
         <!-- Header: Avatar & Personalized Greeting -->
         <div class="flex items-center gap-4 mb-6">
           <div class="relative shrink-0">
             <div
-              class="w-14 h-14 rounded-2xl bg-gradient-to-b from-[#101b2a] to-[#0a121c] border border-cyan-500/40 p-1 flex items-center justify-center shadow-[0_0_24px_rgba(71,210,201,0.35)]"
+              class="w-14 h-14 rounded-2xl bg-well border border-accent/40 p-1 flex items-center justify-center shadow-[0_0_24px_var(--color-accent-glow)]"
             >
               <img
                 :src="avatarUrl || steveFallback"
@@ -22,8 +22,8 @@
             </div>
             <!-- Online status pip -->
             <span class="absolute -bottom-1 -right-1 flex h-4 w-4">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60"></span>
-              <span class="relative inline-flex rounded-full h-4 w-4 bg-cyan-400 border-2 border-[#090e17]"></span>
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-60"></span>
+              <span class="relative inline-flex rounded-full h-4 w-4 bg-accent border-2 border-card"></span>
             </span>
           </div>
 
@@ -41,7 +41,7 @@
 
         <!-- Discovered Launchers Grid (Staggered Pop-In Badges) -->
         <div class="mb-5">
-          <div class="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-400/80 mb-2.5">
+          <div class="text-[10px] font-mono font-bold uppercase tracking-wider text-accent mb-2.5">
             {{ $t('onboarding.discovered_title') }}
           </div>
 
@@ -49,11 +49,11 @@
             <div
               v-for="(launcher, idx) in activeLaunchers"
               :key="launcher.launcherType"
-              class="launcher-chip p-3 rounded-2xl bg-[#0c1420]/80 border border-slate-800/90 hover:border-cyan-500/50 hover:bg-[#101c2d] transition-all flex items-center gap-3 shadow-inner"
+              class="launcher-chip p-3 rounded-2xl bg-well/80 border border-edge hover:border-accent/50 hover:bg-well transition-all flex items-center gap-3 shadow-inner"
               :style="{ animationDelay: `${idx * 70}ms` }"
             >
               <div
-                class="w-9 h-9 rounded-xl bg-[#070b10] border border-slate-700/60 flex items-center justify-center p-2 shrink-0 shadow-sm"
+                class="w-9 h-9 rounded-xl bg-card border border-edge flex items-center justify-center p-2 shrink-0 shadow-sm"
               >
                 <img
                   :src="getLauncherLogo(launcher.launcherType)"
@@ -65,7 +65,7 @@
                 <div class="text-xs font-bold text-slate-200 truncate">
                   {{ getLauncherDisplayName(launcher.launcherType) }}
                 </div>
-                <div class="text-[10px] font-mono text-cyan-400 font-semibold">
+                <div class="text-[10px] font-mono text-accent font-semibold">
                   {{ launcher.instances.length }} {{ launcher.instances.length === 1 ? 'instance' : 'instances' }}
                 </div>
               </div>
@@ -75,17 +75,17 @@
 
         <!-- Safe Hardlink Feature Callout Banner -->
         <div
-          class="mb-6 rounded-2xl border border-cyan-500/25 bg-gradient-to-r from-cyan-950/30 via-[#0a1625]/60 to-[#07111b]/80 p-3.5 flex items-center gap-3 shadow-inner"
+          class="mb-6 rounded-2xl border border-accent/25 bg-well/70 p-3.5 flex items-center gap-3 shadow-inner"
         >
           <div
-            class="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 shrink-0"
+            class="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/15 border border-accent/30 text-accent shrink-0"
           >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </div>
           <div class="min-w-0 flex-1 text-xs leading-relaxed text-slate-300">
-            <span class="font-bold text-cyan-300">{{ $t('onboarding.hardlink_badge') }}:</span>
+            <span class="font-bold text-accent">{{ $t('onboarding.hardlink_badge') }}:</span>
             {{ $t('onboarding.hardlink_notice') }}
           </div>
         </div>
@@ -94,7 +94,7 @@
         <div class="flex items-center justify-between pt-2">
           <button
             type="button"
-            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-colors"
+            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-well transition-colors"
             @click="handleSkip"
             :title="$t('onboarding.skip_tooltip')"
           >
@@ -103,7 +103,7 @@
 
           <button
             type="button"
-            class="rounded-xl bg-gradient-to-r from-cyan-500 via-teal-400 to-cyan-300 px-6 py-2.5 text-xs font-black text-slate-950 shadow-[0_0_24px_rgba(71,210,201,0.35)] hover:shadow-[0_0_36px_rgba(71,210,201,0.6)] hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 group cursor-pointer"
+            class="z-btn z-btn-accent px-6 py-2.5 text-xs font-black shadow-[0_0_24px_var(--color-accent-glow)] hover:shadow-[0_0_36px_var(--color-accent-glow-strong)] active:scale-95 transition-all flex items-center gap-2 group cursor-pointer"
             @click="handleReview"
           >
             <span>{{ $t('onboarding.review_and_import', { count: totalInstanceCount }) }}</span>

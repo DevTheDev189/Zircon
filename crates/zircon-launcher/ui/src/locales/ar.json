@@ -580,6 +580,7 @@
     "language_desc": "لغة الواجهة للقوائم ونوافذ الحوار والإشعارات",
     "categories": {
       "all": "جميع الإعدادات",
+      "keybinds": "Keybinds",
       "performance": "الأداء",
       "display": "العرض",
       "appearance": "المظهر",

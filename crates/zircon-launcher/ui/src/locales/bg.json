@@ -803,6 +803,7 @@
     "language_desc": "Език на менюта, диалогови прозорци и известия",
     "categories": {
       "all": "Всички настройки",
+      "keybinds": "Keybinds",
       "performance": "Производителност",
       "display": "Дисплей",
       "appearance": "Визуално оформление",

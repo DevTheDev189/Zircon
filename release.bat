@@ -34,8 +34,19 @@ if errorlevel 1 (
 )
 
 echo.
+set /p RENDER_SHOTS="Re-render localized website screenshots across all 40 languages? (y/N): "
+if /i "!RENDER_SHOTS!"=="y" (
+    echo [*] Compiling Launcher frontend for screenshot capture...
+    call npm --prefix "%~dp0crates\zircon-launcher\ui" run build
+    echo [*] Running localized screenshot pipeline (Retina + WebP)...
+    python "%~dp0scripts\capture_screenshots.py" --all
+    echo [*] Re-building static localized website HTML...
+    python "%~dp0scripts\sync_website_i18n.py" --build
+)
+
+echo.
 echo [2/4] Committing version bump and workspace changes...
-git add .gitignore Cargo.toml Cargo.lock README.md DONT_DELETE_GITHUB_ACTIONS.md crates/ website/ scripts/sync-version.ps1 release.bat
+git add .gitignore Cargo.toml Cargo.lock README.md DONT_DELETE_GITHUB_ACTIONS.md crates/ website/ scripts/ shared/ packaging/ release.bat
 git commit -m "Release v%VERSION%"
 
 echo.

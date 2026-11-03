@@ -865,6 +865,7 @@
     "language_desc": "A felület nyelve menükben, párbeszédablakokban és értesítésekben",
     "categories": {
       "all": "Összes beállítás",
+      "keybinds": "Keybinds",
       "performance": "Teljesítmény",
       "display": "Kijelző",
       "appearance": "Megjelenés",

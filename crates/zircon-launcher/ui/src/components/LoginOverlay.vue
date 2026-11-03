@@ -164,6 +164,20 @@
       >
         {{ error }}
       </p>
+
+      <!-- Legal / EULA Notice -->
+      <p class="text-[11px] text-slate-500 mt-6 leading-relaxed border-t border-slate-800/80 pt-4">
+        By continuing, you agree to the
+        <button
+          type="button"
+          class="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition cursor-pointer"
+          @click="openEula"
+        >
+          Zircon EULA
+        </button>
+        and BSL 1.1 licensing terms.<br />
+        <span class="text-[10px] text-slate-600">Not affiliated with Mojang Studios or Microsoft Corporation.</span>
+      </p>
     </div>
   </div>
 </template>
@@ -174,6 +188,10 @@ import { api, onAuthManualUrl } from '../lib/api';
 import zirconTitle from '../assets/zircon-title.svg';
 
 const MINECRAFT_BUY_URL = 'https://www.minecraft.net/store/minecraft-java-bedrock-edition-pc';
+
+function openEula() {
+  window.dispatchEvent(new CustomEvent('zircon-open-eula'));
+}
 
 const emit = defineEmits(['logged-in']);
 

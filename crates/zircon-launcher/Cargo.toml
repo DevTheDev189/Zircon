@@ -1,6 +1,6 @@
 [package]
 name = "zircon-launcher"
-version = "0.9.3"
+version = "0.9.4"
 edition = "2021"
 description = "Zircon companion launcher: Tauri v2 shell + Vue 3 frontend over the Phase 4 launch engine (Microsoft auth, classpath resolver, sync engines, offline instances)"
 license = "BSL-1.1"
@@ -37,11 +37,13 @@ flate2.workspace = true
 semver.workspace = true
 base64.workspace = true
 image.workspace = true
-tauri = { workspace = true }
+tauri = { workspace = true, features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
 regex.workspace = true
 zeroize = { version = "1.8", features = ["derive"] }
 getrandom = "0.3"

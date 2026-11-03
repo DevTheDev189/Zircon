@@ -1,5 +1,7 @@
 import { createApp } from 'vue';
 import App from './App.vue';
+import '../../../../shared/design-system/tokens.css';
+import '../../../../shared/design-system/components.css';
 import './style.css';
 import { initTheme } from './lib/theme';
 import { initAccessibility } from './lib/accessibility';

@@ -681,6 +681,7 @@
     "language_desc": "Jezik vmesnika za menije, pogovorna okna in obvestila",
     "categories": {
       "all": "Vse nastavitve",
+      "keybinds": "Keybinds",
       "performance": "Zmogljivost",
       "display": "Prikaz",
       "appearance": "Videz",

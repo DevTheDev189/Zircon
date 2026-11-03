@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+
+PackageIdentifier: Zircon.Launcher
+PackageVersion: 0.9.4
+PackageLocale: en-US
+Publisher: Zircon Contributors
+PublisherUrl: https://zirconmc.net
+PublisherSupportUrl: https://github.com/DevTheDev189/Zircon/issues
+PrivacyUrl: https://zirconmc.net/privacy.html
+PackageName: Zircon Launcher
+PackageUrl: https://zirconmc.net
+License: BSL-1.1
+LicenseUrl: https://raw.githubusercontent.com/DevTheDev189/Zircon/main/LICENSE
+Copyright: Copyright (c) 2026 Zircon Contributors
+ShortDescription: Free, open-source Minecraft launcher with sub-second cryptographic mod sync and 4-player couch co-op.
+Description: |
+  Zircon is a high-performance open-source companion launcher for modded Minecraft built in Rust and Tauri 2.
+  It automatically synchronizes exact server mods using cryptographic Bill of Materials (BOM) verification against Modrinth and CurseForge,
+  features native 4-player split-screen couch co-op with gamepad support, 3D skin studio, and 1-click universal migration from CurseForge and Prism.
+Moniker: zircon
+Tags:
+  - minecraft
+  - minecraft-launcher
+  - modded
+  - modrinth
+  - curseforge
+  - gaming
+  - rust
+  - tauri
+ReleaseNotesUrl: https://github.com/DevTheDev189/Zircon/releases/tag/v0.9.4
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0
+
