@@ -65,30 +65,17 @@
         class="group/srv flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-700/80 hover:border-emerald-500/50 hover:bg-slate-900 hover:shadow-[0_0_18px_rgba(16,185,129,0.2)] transition-all duration-200"
       >
         <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
-          <!-- Host Head Avatar or Network Beacon Icon -->
-          <div class="relative w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+          <!-- Zircon Diamond Beacon Icon -->
+          <div class="relative w-10 h-10 rounded-xl bg-slate-950 border border-emerald-500/30 overflow-hidden flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.2)] p-2">
             <img
-              v-if="srv.hostUsername"
-              :src="`https://mc-heads.net/avatar/${srv.hostUsername}/40`"
-              class="w-full h-full object-cover image-render-pixel"
-              :alt="srv.hostUsername"
-              @error="(e) => e.target.style.display = 'none'"
+              src="../assets/zircon-icon.svg"
+              class="w-full h-full object-contain filter drop-shadow-[0_0_6px_rgba(71,210,201,0.6)]"
+              alt="Zircon Beacon"
             />
-            <div
-              v-else
-              class="w-full h-full bg-gradient-to-br from-emerald-500/20 to-teal-700/30 flex items-center justify-center text-emerald-400"
-            >
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
             <span
-              v-if="srv.isZirconEnhanced"
-              class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-cyan-500 border-2 border-slate-900 flex items-center justify-center text-[7px] font-bold text-black"
-              title="Zircon Enhanced Beacon"
-            >
-              Z
-            </span>
+              class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 shadow-[0_0_6px_#10b981]"
+              title="Active LAN Beacon"
+            ></span>
           </div>
 
           <!-- Metadata -->

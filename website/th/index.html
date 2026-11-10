@@ -132,7 +132,7 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700;800&family=JetBrains+Mono:wght@450;600&display=swap" rel="stylesheet"/>
-<link href="../assets/css/styles.css?v=3" rel="stylesheet"/>
+<link href="../assets/css/styles.css?v=20261104_release1" rel="stylesheet"/>
 <!-- Structured Data / JSON-LD -->
 <script type="application/ld+json">
   {
@@ -228,8 +228,192 @@
     ]
   }
   </script>
+<style>
+/* Inline Critical Split-Hero Layout Styles (Zero FOUC & Zero Cache Desync) */
+.hero {
+  padding: 68px 0 80px !important;
+  text-align: left !important;
+  position: relative;
+  overflow: visible;
+}
+.hero-split-container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.hero-split-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1.28fr !important;
+  gap: 60px !important;
+  align-items: center !important;
+}
+.hero-split-left {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+  z-index: 2;
+}
+.hero-split-left .hero-logo-img {
+  width: 300px !important;
+  max-width: 100% !important;
+  height: auto !important;
+  margin: 0 0 20px 0 !important;
+  filter: drop-shadow(0 0 36px rgba(71, 210, 201, 0.48));
+  display: block !important;
+}
+.hero-split-left h1 {
+  font-size: clamp(34px, 4vw, 50px) !important;
+  line-height: 1.14 !important;
+  color: #ffffff !important;
+  margin: 0 0 20px 0 !important;
+  max-width: 580px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+  text-align: left !important;
+}
+.hero-split-left p.lede {
+  font-size: 17.5px !important;
+  line-height: 1.72 !important;
+  color: #cbd5e1 !important;
+  margin: 0 0 30px 0 !important;
+  max-width: 540px !important;
+  text-align: left !important;
+}
+.hero-split-left .hero-actions-stacked {
+  align-items: flex-start !important;
+  margin: 0 0 22px 0 !important;
+  width: 100%;
+}
+.hero-split-left .hero-sublinks-row {
+  justify-content: flex-start !important;
+  margin-top: 12px !important;
+}
+.hero-split-left .hero-spec-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 16px !important;
+  flex-wrap: wrap !important;
+  margin-top: 20px !important;
+  font-size: 13px !important;
+  color: #cbd5e1 !important;
+  font-family: 'JetBrains Mono', Consolas, monospace !important;
+  padding: 8px 20px !important;
+  background: rgba(14, 22, 34, 0.65) !important;
+  backdrop-filter: blur(18px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 28px rgba(0, 0, 0, 0.35) !important;
+  border-radius: 999px !important;
+}
+.hero-spec-item {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+.spec-dot {
+  width: 5px !important;
+  height: 5px !important;
+  border-radius: 50% !important;
+  background: #47d2c9 !important;
+  box-shadow: 0 0 8px #47d2c9 !important;
+  display: inline-block !important;
+}
+.hero-split-right {
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  z-index: 2 !important;
+  width: 100% !important;
+}
+.hero-split-right .app-frame {
+  margin: 0 !important;
+  width: 100% !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 24px 64px -12px rgba(0, 0, 0, 0.8),
+    0 0 60px -10px rgba(71, 210, 201, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  background: #090e17 !important;
+}
+.hero-split-tabs {
+  display: inline-flex !important;
+  background: rgba(13, 20, 32, 0.75) !important;
+  backdrop-filter: blur(24px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 36px rgba(0, 0, 0, 0.45) !important;
+  border-radius: 999px !important;
+  padding: 4px !important;
+  gap: 2px !important;
+  margin-top: 18px !important;
+  align-self: center !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+}
+.hero-split-tab-pill {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+  padding: 7px 16px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #94a3b8 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+  transition: all 0.2s ease !important;
+}
+.hero-split-tab-pill:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+.hero-split-tab-pill.active {
+  color: #ffffff !important;
+  background: rgba(71, 210, 201, 0.16) !important;
+  border: 1px solid rgba(71, 210, 201, 0.35) !important;
+  box-shadow: 0 0 16px rgba(71, 210, 201, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  font-weight: 600 !important;
+}
+@media (max-width: 1080px) {
+  .hero-split-grid {
+    grid-template-columns: 1fr !important;
+    gap: 48px !important;
+    text-align: center !important;
+  }
+  .hero-split-left {
+    align-items: center !important;
+    text-align: center !important;
+  }
+  .hero-split-left h1,
+  .hero-split-left p.lede {
+    text-align: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  .hero-split-left .hero-actions-stacked {
+    align-items: center !important;
+  }
+  .hero-split-left .hero-sublinks-row {
+    justify-content: center !important;
+  }
+  .hero-split-left .hero-spec-bar {
+    justify-content: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+</style>
+
 </head>
 <body>
+<!-- Tech Precision Grid Overlay (World-class aesthetic) -->
+<div class="z-bg-grid"></div>
 <!-- Animated Procedural Background Elements -->
 <div class="z-bg-dots"></div>
 <div class="z-orb z-orb-1"></div>
@@ -257,6 +441,7 @@
 <li data-i18n="index.home"><a class="active" data-i18n="index.home_1" href="/">หน้าแรก</a></li>
 <li data-i18n="index.launcher"><a data-i18n="index.launcher_1" href="launcher.html">ตัวเปิดเกม (Launcher)</a></li>
 <li data-i18n="index.server_manager"><a data-i18n="index.server_manager_1" href="server.html">ตัวจัดการเซิร์ฟเวอร์</a></li>
+<li data-i18n="index.cloud"><a data-i18n="index.cloud_1" href="cloud.html">Cloud</a></li>
 <li data-i18n="index.guides"><a data-i18n="index.guides_1" href="docs.html">คู่มือการใช้งาน</a></li>
 <li data-i18n="index.faq"><a data-i18n="index.faq_1" href="faq.html">คำถามที่พบบ่อย</a></li>
 <li data-i18n="index.downloads"><a data-i18n="index.downloads_1" href="downloads.html">ดาวน์โหลด</a></li>
@@ -270,15 +455,19 @@
 </header>
 <!-- ================= HERO ================= -->
 <section class="hero">
-<div class="container">
-<span class="eyebrow" data-i18n="index.the_fastest_way_to">วิธีที่เร็วที่สุดในการเล่นเกม Minecraft แบบ Mod กับเพื่อนๆ</span>
-<img alt="Zircon" class="hero-title" src="../assets/img/zircon-title.svg"/>
-<h1 data-i18n="index.modded_minecraft_with_friendswithout">Minecraft แบบ Mod กับเพื่อนๆ,<br/><span class="hl" data-i18n="index.without_the_headache">โดยไม่มีเรื่องปวดหัว.</span></h1>
-<p class="lede" data-i18n="index.zircon_eliminates_modpack_mismatches">Zircon ช่วยขจัดปัญหา Modpack ที่ไม่ตรงกันตลอดไป เลือกเซิร์ฟเวอร์
+<div class="hero-split-container">
+  <div class="hero-split-grid">
+    <!-- Left Column: Branding, Value Prop & Action -->
+    <div class="hero-split-left">
+      <div class="hero-logo-wrap" style="margin-bottom: 16px;">
+        <img alt="Zircon" class="hero-logo-img" height="64" src="../assets/img/zircon-title.svg" width="310"/>
+      </div>
+      <h1 data-i18n="index.modded_minecraft_with_friendswithout">Minecraft แบบ Mod กับเพื่อนๆ,<br/><span class="hl" data-i18n="index.without_the_headache">โดยไม่มีเรื่องปวดหัว.</span></h1>
+      <p class="lede" data-i18n="index.zircon_eliminates_modpack_mismatches">Zircon ช่วยขจัดปัญหา Modpack ที่ไม่ตรงกันตลอดไป เลือกเซิร์ฟเวอร์
         แล้วกด <strong data-i18n="index.play">PLAY</strong> ทุก Mod จะติดตั้งและตรวจสอบความถูกต้องด้วยการเข้ารหัสภายในไม่กี่วินาที
         นอกจากนี้: นำเข้าจาก CurseForge & Prism ด้วยคลิกเดียว, เล่น Co-op บนโซฟา 4 คน, และค้นหา LAN อัตโนมัติ</p>
-<div class="hero-actions-stacked" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 12px;">
-<div data-i18n="index.download_for_windows_exestar" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><a class="btn btn-primary btn-xl" data-i18n="index.download_for_windows_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe" id="hero-primary-download">
+      <div class="hero-actions-stacked">
+        <div data-i18n="index.download_for_windows_exestar" style="display: flex; gap: 14px; flex-wrap: wrap;"><a class="btn btn-primary btn-xl" data-i18n="index.download_for_windows_exe" href="https://downloads.zirconmc.net/updates/launcher/Zircon_0.4.21_x64-setup.exe" id="hero-primary-download">
 <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
 <span class="download-label" data-i18n="index.download_for_windows_exe_1">ดาวน์โหลดสำหรับ Windows (.exe)</span>
 </a>
@@ -286,74 +475,85 @@
 <svg fill="currentColor" height="20" viewbox="0 0 24 24" width="20"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
             กด Star บน GitHub
           </a></div>
-<div class="hero-sublinks-row" data-i18n="index.also_onmacos_dmglinux_appimagehosting" style="color: var(--muted); font-size: 0.9rem; margin-top: 4px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"><span data-i18n="index.also_onmacos_dmglinux_appimage">มีบน <a data-i18n="index.macos_dmg" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">macOS (.dmg)</a> &amp; <a data-i18n="index.linux_appimage" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">Linux (.AppImage)</a></span>
+        <div class="hero-sublinks-row" data-i18n="index.also_onmacos_dmglinux_appimagehosting"><span data-i18n="index.also_onmacos_dmglinux_appimage">มีบน <a data-i18n="index.macos_dmg" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">macOS (.dmg)</a> &amp; <a data-i18n="index.linux_appimage" href="downloads.html#players" style="color: var(--accent); text-decoration: underline;">Linux (.AppImage)</a></span>
 <span>·</span>
 <span data-i18n="index.hosting_a_serverjump_to">กำลังโฮสต์เซิร์ฟเวอร์? <a data-i18n="index.jump_to_server_engine" href="#server-hosts" style="color: var(--primary); font-weight: 600;">ไปที่ Server Engine ↓</a></span></div>
-</div>
-<div class="hero-foot" data-i18n="index.100_free_open_sourcezero"><span data-i18n="index.100_free_open_source"><i class="dot"></i> ฟรี 100% &amp; โอเพนซอร์ส</span>
-<span data-i18n="index.zero_telemetry"><i class="dot"></i> ไม่มีการเก็บข้อมูลผู้ใช้</span>
-<span data-i18n="index.modrinth_curseforge_integrated"><i class="dot"></i> เชื่อมต่อกับ Modrinth &amp; CurseForge</span>
-<span data-i18n="index.subsecond_verification"><i class="dot"></i> ตรวจสอบในเสี้ยววินาที</span></div>
-<!-- ================= INTERACTIVE SHOWCASE FRAME (70% Launcher Focus) ================= -->
-<div class="hero-shot showcase-container">
-<div class="showcase-tabs" data-i18n="index.launcheruniversal_migration4player_coop3d_skin" role="tablist"><button class="showcase-tab active" data-i18n="index.launcher_2" data-title="Zircon Launcher — One-Click Join &amp; Mod Sync" data-view="launcher">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            ตัวเปิดเกม
-          </button>
-<button class="showcase-tab" data-i18n="index.universal_migration" data-title="Universal Migration — 1-Click Import from Any Launcher" data-view="migration">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
-            การย้ายข้อมูลสากล
-          </button>
-<button class="showcase-tab" data-i18n="index.4player_coop" data-title="4-Player Split-Screen Couch Co-op with Gamepads" data-view="coop">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle><path d="M12 9v6"></path></svg>
-            Co-op 4 ผู้เล่น
-          </button>
-<button class="showcase-tab" data-i18n="index.3d_skin_studio" data-title="Zircon 3D Skin Studio &amp; Mojang Sync" data-view="skin">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-            สตูดิโอสกิน 3D
-          </button>
-<button class="showcase-tab" data-i18n="index.server_engine_preview" data-title="Zircon Server Manager — Single-Port 25565 Engine" data-view="server">
-<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="8" rx="2" width="20" x="2" y="2"></rect><rect height="8" rx="2" width="20" x="2" y="14"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>
-            Server Engine (ตัวอย่าง)
-          </button></div>
-<div class="app-frame">
-<div aria-hidden="true" class="frame-bar">
-<div class="frame-dots">
-<span class="dot dot-red"></span>
-<span class="dot dot-yellow"></span>
-<span class="dot dot-green"></span>
-</div>
-<div class="frame-title" data-i18n="index.zircon_launcher_oneclick_join"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="11" rx="2" ry="2" width="18" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-<span data-i18n="index.zircon_launcher_oneclick_join_1" id="frameTitleText">Zircon Launcher — เข้าร่วมด้วยคลิกเดียว &amp; ซิงค์ Mod</span></div>
-<div class="frame-controls">
-<button aria-label="Zoom image" class="frame-zoom-btn" title="Click to view full screen">
-<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg>
-</button>
-</div>
-</div>
-<!-- View 1: Launcher -->
-<div class="showcase-view active" data-view="launcher">
-<img alt="Zircon Launcher Main Screen" fetchpriority="high" height="600" loading="eager" src="../assets/img/main_launcher.webp" width="1000"/>
-</div>
-<!-- View 2: Universal Migration -->
-<div class="showcase-view" data-view="migration">
-<img alt="Universal Migration Importer" height="600" loading="lazy" src="../assets/img/migration_importer.webp" width="1000"/>
-</div>
-<!-- View 3: Couch Co-op -->
-<div class="showcase-view" data-view="coop">
-<img alt="4-Player Split-Screen Couch Co-op" height="600" loading="lazy" src="../assets/img/couch_coop_modal.webp" width="1000"/>
-</div>
-<!-- View 4: 3D Skin Studio -->
-<div class="showcase-view" data-view="skin">
-<img alt="Zircon 3D Skin Studio with Live Preview" height="600" loading="lazy" src="../assets/img/skin_selector_launcher.webp" width="1000"/>
-</div>
-<!-- View 5: Server Dashboard -->
-<div class="showcase-view" data-view="server">
-<img alt="Zircon Server Performance Stats" height="600" loading="lazy" src="../assets/img/performance_server.webp" width="1000"/>
-</div>
-</div>
-<p class="shot-caption" data-i18n="index.click_any_tab_above">คลิกแท็บด้านบนหรือคลิกที่รูปภาพเพื่อดูรายละเอียดแบบเต็มหน้าจอ</p>
-</div>
+      </div>
+      <div class="hero-spec-bar">
+        <span class="hero-spec-item"><span class="spec-dot"></span> Rust &amp; Tauri 2 Native</span>
+        <span class="hero-spec-item"><span class="spec-dot"></span> ~35MB RAM Footprint</span>
+        <span class="hero-spec-item"><span class="spec-dot"></span> Zero Telemetry</span>
+      </div>
+    </div>
+
+    <!-- Right Column: Live Launcher Showcase Window -->
+    <div class="hero-split-right showcase-container">
+      <div class="app-frame">
+        <div aria-hidden="true" class="frame-bar">
+          <div class="frame-dots">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+          </div>
+          <div class="frame-title">
+            <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="11" rx="2" ry="2" width="18" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span id="frameTitleText">Zircon Launcher — LAN Auto-Discovery &amp; Server Browser</span>
+          </div>
+          <div class="frame-controls">
+            <button aria-label="Zoom image" class="frame-zoom-btn" title="Click to view full screen">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg>
+            </button>
+          </div>
+        </div>
+        <!-- View 1: Servers & LAN Discovery (Default active - Main Servers screen) -->
+        <div class="showcase-view active" data-view="servers">
+          <img alt="Zircon Launcher LAN Auto-Discovery &amp; Server Browser" fetchpriority="high" height="580" loading="eager" src="../assets/img/lan_auto_discovery.webp" width="960"/>
+        </div>
+        <!-- View 2: Modpack Instances Library -->
+        <div class="showcase-view" data-view="instances">
+          <img alt="Zircon Modpack Library &amp; Isolated Instances" height="580" loading="lazy" src="../assets/img/main_launcher.webp" width="960"/>
+        </div>
+        <!-- View 3: Cryptographic Mod Sync -->
+        <div class="showcase-view" data-view="sync">
+          <img alt="Cryptographic Mod Sync &amp; Sub-Second Verification" height="580" loading="lazy" src="../assets/img/sync_verification.webp" width="960"/>
+        </div>
+        <!-- View 4: Universal Migration -->
+        <div class="showcase-view" data-view="migration">
+          <img alt="Universal Migration Importer" height="580" loading="lazy" src="../assets/img/migration_importer.webp" width="960"/>
+        </div>
+        <!-- View 5: Couch Co-op -->
+        <div class="showcase-view" data-view="coop">
+          <img alt="4-Player Split-Screen Couch Co-op" height="580" loading="lazy" src="../assets/img/couch_coop_modal.webp" width="960"/>
+        </div>
+        <!-- View 6: 3D Skin Studio -->
+        <div class="showcase-view" data-view="skin">
+          <img alt="Zircon 3D Skin Studio with Live Preview" height="580" loading="lazy" src="../assets/img/skin_selector_launcher.webp" width="960"/>
+        </div>
+      </div>
+
+      <!-- 2026 Glass Segmented Control Dock -->
+      <div class="hero-split-tabs showcase-tabs" role="tablist">
+        <button class="hero-split-tab-pill showcase-tab active" data-title="Zircon Launcher — LAN Auto-Discovery &amp; Server Browser" data-view="servers">
+          Servers
+        </button>
+        <button class="hero-split-tab-pill showcase-tab" data-title="Zircon Launcher — Isolated Modpacks &amp; Fast Launch" data-view="instances">
+          Instances
+        </button>
+        <button class="hero-split-tab-pill showcase-tab" data-title="Cryptographic Mod Sync &amp; Sub-Second Verification" data-view="sync">
+          Mod Sync
+        </button>
+        <button class="hero-split-tab-pill showcase-tab" data-title="Universal Migration — 1-Click Import from CurseForge &amp; Prism" data-view="migration">
+          Migration
+        </button>
+        <button class="hero-split-tab-pill showcase-tab" data-title="4-Player Split-Screen Couch Co-op with Gamepads" data-view="coop">
+          Couch Co-op
+        </button>
+        <button class="hero-split-tab-pill showcase-tab" data-title="Zircon 3D Skin Studio &amp; Mojang Sync" data-view="skin">
+          3D Skins
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 </section>
 <!-- ================= SECTION 1: THE HOOK — AUTOMATIC MOD SYNC ================= -->
@@ -484,6 +684,87 @@
 </div>
 </div>
 </section>
+<!-- ================= SUPERPOWERS BENTO GRID ================= -->
+<section class="section" id="superpowers">
+<div class="container">
+<div class="section-head">
+<span class="badge" style="background: rgba(71, 210, 201, 0.15); color: var(--accent-bright); border: 1px solid rgba(71, 210, 201, 0.35); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: inline-block;">Engineered Differently</span>
+<h2>Four Superpowers. Zero Compromises.</h2>
+<p>Every feature in Zircon was designed to remove friction so you spend your night playing, not troubleshooting.</p>
+</div>
+
+<div class="bento-grid">
+  <!-- Card 1: Mod Sync (Col 2) -->
+  <div class="bento-card bento-col-2">
+    <div>
+      <div class="bento-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="24" height="24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+      </div>
+      <h3 class="bento-title">Automatic Mod Manifest Sync &amp; Verification</h3>
+      <p class="bento-desc">
+        Zero modpack mismatches. When you hit PLAY, Zircon connects to the server and computes cryptographic SHA-512 hashes against official Modrinth and CurseForge CDNs. Only missing delta files are fetched in parallel. No 1GB Google Drive zip archives ever again.
+      </p>
+    </div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">
+      <span class="pill pill-accent" style="font-size: 12px; padding: 4px 10px;">Sub-second BOM check</span>
+      <span class="pill pill-accent" style="font-size: 12px; padding: 4px 10px;">Modrinth &amp; CurseForge CDNs</span>
+      <span class="pill pill-accent" style="font-size: 12px; padding: 4px 10px;">Zero manual zip dragging</span>
+    </div>
+  </div>
+
+  <!-- Card 2: LAN Wi-Fi Radar (Col 1) -->
+  <div class="bento-card">
+    <div>
+      <div class="bento-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+      </div>
+      <h3 class="bento-title">Local Wi-Fi Radar &amp; UPnP</h3>
+      <p class="bento-desc">
+        Instant zero-config multiplayer. Detects active LAN games on your home Wi-Fi automatically. Playing over the internet? Share a 6-digit Join Code with automated UPnP port forwarding—no Hamachi needed.
+      </p>
+    </div>
+    <div style="margin-top: 12px;">
+      <span class="pill pill-accent" style="font-size: 12px; padding: 4px 10px;">Zero Port Forwarding Hassle</span>
+    </div>
+  </div>
+
+  <!-- Card 3: Universal Migration (Col 1) -->
+  <div class="bento-card">
+    <div>
+      <div class="bento-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="24" height="24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+      </div>
+      <h3 class="bento-title">1-Click Universal Migration</h3>
+      <p class="bento-desc">
+        Switching from CurseForge, Prism, Modrinth, or ATLauncher? Our native Rust importer detects your profiles and copies saves, keybinds, and mod configurations in under 2 seconds.
+      </p>
+    </div>
+    <div style="margin-top: 12px;">
+      <span class="pill pill-accent" style="font-size: 12px; padding: 4px 10px;">100% Offline &amp; Lossless</span>
+    </div>
+  </div>
+
+  <!-- Card 4: 4-Player Couch Co-op (Col 2) -->
+  <div class="bento-card bento-col-2">
+    <div>
+      <div class="bento-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="24" height="24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle><path d="M12 9v6"></path></svg>
+      </div>
+      <h3 class="bento-title">4-Player Split-Screen Couch Co-op</h3>
+      <p class="bento-desc">
+        Turn your PC or TV into a living room console. Connect up to 4 Xbox, PlayStation, or generic Bluetooth gamepads and play modded Java Edition side-by-side with separate player profiles, skins, and viewport tiling.
+      </p>
+    </div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px;">
+      <span class="pill pill-accent" style="font-size: 12px; padding: 4px 10px;">Native Gamepad Support</span>
+      <span class="pill pill-accent" style="font-size: 12px; padding: 4px 10px;">Automatic Split-Screen Tiling</span>
+      <span class="pill pill-accent" style="font-size: 12px; padding: 4px 10px;">Separate Player Inventories</span>
+    </div>
+  </div>
+</div>
+</div>
+</section>
+
 <!-- ================= SECTION 3: DELIGHT FEATURES SLIDESHOW ================= -->
 <section class="section" id="features">
 <div class="container">
@@ -587,7 +868,7 @@
 <div class="frame-title" data-i18n="index.lan_autodiscovery_nearby_games"><span data-i18n="index.lan_autodiscovery_nearby_games_1">ค้นหา LAN อัตโนมัติ &amp; เกมใกล้เคียง</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="LAN Auto-Discovery" height="500" loading="lazy" src="../assets/img/lan_nearby_friends.webp" width="800"/>
+<img alt="LAN Auto-Discovery" height="500" loading="lazy" src="../assets/img/lan_auto_discovery.webp" width="800"/>
 </div>
 </div>
 </div>
@@ -609,7 +890,7 @@
 <div class="frame-title" data-i18n="index.zircon_launcher_2048_discord"><span data-i18n="index.zircon_launcher_2048_discord_1">Zircon Launcher — 2048 &amp; Discord Presence</span></div>
 <div class="frame-controls"><button class="frame-zoom-btn" title="Click to zoom"><svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></button></div>
 </div>
-<img alt="Zircon Launcher Loading Features" height="500" loading="lazy" src="../assets/img/main_launcher.webp" width="800"/>
+<img alt="Zircon Launcher Loading Features" height="500" loading="lazy" src="../assets/img/launch_2048.webp" width="800"/>
 </div>
 </div>
 </div>
@@ -656,6 +937,74 @@
 </div>
 </div>
 </section>
+<!-- ================= COMPARISON MATRIX ================= -->
+<section class="section" id="compare">
+<div class="container">
+<div class="section-head">
+<span class="badge" style="background: rgba(71, 210, 201, 0.15); color: var(--accent-bright); border: 1px solid rgba(71, 210, 201, 0.35); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: inline-block;">Feature Benchmark</span>
+<h2>How Zircon Compares</h2>
+<p>See why players and server communities are switching to Zircon.</p>
+</div>
+
+<div class="comparison-table-wrapper">
+<table class="comparison-table">
+  <thead>
+    <tr>
+      <th style="width: 32%;">Feature</th>
+      <th style="width: 22%;">CurseForge</th>
+      <th style="width: 22%;">Prism Launcher</th>
+      <th class="col-highlight" style="width: 24%;">Zircon</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Automatic Mod Sync on Join</strong><br/><span style="color: var(--muted); font-size: 12px;">Pulls exact server mod list &amp; config on PLAY</span></td>
+      <td style="color: var(--muted);">❌ Manual Export/Import</td>
+      <td style="color: var(--muted);">❌ Manual Export/Import</td>
+      <td class="col-highlight" style="color: var(--accent-bright);">✓ Automatic (Sub-Second)</td>
+    </tr>
+    <tr>
+      <td><strong>Universal 1-Click Migration</strong><br/><span style="color: var(--muted); font-size: 12px;">Auto-detects other launchers &amp; imports saves</span></td>
+      <td style="color: var(--muted);">❌ No Detection</td>
+      <td style="color: var(--muted);">⚠️ Partial Manual Zip</td>
+      <td class="col-highlight" style="color: var(--accent-bright);">✓ 1-Click Native Rust</td>
+    </tr>
+    <tr>
+      <td><strong>4-Player Split-Screen Co-op</strong><br/><span style="color: var(--muted); font-size: 12px;">Gamepad support &amp; window quadrant tiling</span></td>
+      <td style="color: var(--muted);">❌ Not Supported</td>
+      <td style="color: var(--muted);">❌ Not Supported</td>
+      <td class="col-highlight" style="color: var(--accent-bright);">✓ Built-in Gamepad Tiling</td>
+    </tr>
+    <tr>
+      <td><strong>Local Wi-Fi Radar &amp; UPnP</strong><br/><span style="color: var(--muted); font-size: 12px;">Auto-detect LAN friends &amp; 6-digit codes</span></td>
+      <td style="color: var(--muted);">❌ No Auto-Discovery</td>
+      <td style="color: var(--muted);">❌ No Auto-Discovery</td>
+      <td class="col-highlight" style="color: var(--accent-bright);">✓ Zero-Config Radar</td>
+    </tr>
+    <tr>
+      <td><strong>Memory &amp; Startup Footprint</strong><br/><span style="color: var(--muted); font-size: 12px;">Desktop engine memory overhead</span></td>
+      <td style="color: var(--muted);">⚠️ ~400MB+ (Electron)</td>
+      <td>⚡ ~80MB (C++)</td>
+      <td class="col-highlight" style="color: var(--accent-bright);">⚡ ~35MB (Compiled Rust)</td>
+    </tr>
+    <tr>
+      <td><strong>Privacy &amp; Telemetry</strong><br/><span style="color: var(--muted); font-size: 12px;">User tracking &amp; bundled advertisements</span></td>
+      <td style="color: var(--muted);">❌ Ads &amp; Analytics</td>
+      <td>✓ Zero Telemetry</td>
+      <td class="col-highlight" style="color: var(--accent-bright);">✓ Zero Telemetry / Clean</td>
+    </tr>
+    <tr>
+      <td><strong>Official Mojang 3D Skin Studio</strong><br/><span style="color: var(--muted); font-size: 12px;">Real-time 3D model rotation &amp; Mojang sync</span></td>
+      <td style="color: var(--muted);">❌ Not Available</td>
+      <td style="color: var(--muted);">❌ Not Available</td>
+      <td class="col-highlight" style="color: var(--accent-bright);">✓ Built-in 3D Studio</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+</section>
+
 <!-- ================= SECTION 4: FOR SERVER HOSTS (The 30% Slice) ================= -->
 <section class="section" id="server-hosts">
 <div class="container">
@@ -788,19 +1137,27 @@
 </div>
 </section>
 <!-- ================= ENGINEERING & TRUST ================= -->
-<section class="section" style="padding-top: 24px; padding-bottom: 24px;">
+<section class="section" id="trust" style="padding-top: 36px; padding-bottom: 36px;">
 <div class="container">
 <div class="engineering-trust-box">
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px;">
-<div style="max-width: 660px;">
-<span class="badge" data-i18n="index.engineering_standards" style="background: rgba(71, 210, 201, 0.15); color: var(--accent-bright); border: 1px solid rgba(71, 210, 201, 0.35); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: inline-block;">มาตรฐานวิศวกรรม</span>
-<h3 data-i18n="index.built_for_pure_speed" style="color: var(--white); margin: 0 0 8px; font-size: 22px; font-weight: 700;">สร้างขึ้นเพื่อความเร็วล้วนๆ ด้วย Rust & Vue 3 ที่คอมไพล์แล้ว</h3>
-<p data-i18n="index.no_sluggish_electron_runtimes" style="color: var(--text-secondary); margin: 0; font-size: 15px; line-height: 1.65;">ไม่มี Electron Runtime ช้าๆ ที่กินหน่วยความจำพื้นหลังหลายกิกะไบต์ขณะคุณเล่น แกนหลักของ Zircon Desktop Engine เขียนด้วย Rust ที่คอมไพล์ทั้งหมดเพื่อการเริ่มต้นที่ฉับพลัน, การตรวจสอบ Hash ในระดับมิลลิวินาที และ footprint ระบบที่เบาบาง</p>
+<div style="max-width: 680px;">
+<span class="badge" style="background: rgba(71, 210, 201, 0.15); color: var(--accent-bright); border: 1px solid rgba(71, 210, 201, 0.35); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: inline-block;">Open, Private &amp; Cryptographically Verified</span>
+<h3 style="color: var(--white); margin: 0 0 10px; font-size: 24px; font-weight: 700;">Security you don't have to take our word for.</h3>
+<p style="color: var(--text-secondary); margin: 0 0 16px; font-size: 15px; line-height: 1.65;">
+  Zircon connects directly to Microsoft using official browser OAuth 2.0 PKCE authentication. Your credentials are never stored or transmitted to our servers. Every mod file is cryptographically validated with SHA-512 against official Modrinth &amp; CurseForge CDNs.
+</p>
+<div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 13.5px; color: var(--accent-bright); font-weight: 600;">
+  <span>✓ Microsoft OAuth 2.0</span>
+  <span>✓ Zero Telemetry Tracking</span>
+  <span>✓ 100% Free &amp; Open Source</span>
+  <span>✓ SHA-512 Checksums</span>
 </div>
-<div class="reassurance-strip" style="margin: 0; gap: 20px;">
-<div class="reassurance-item" data-i18n="index.blazing_native_rust"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> Native Rust อันทรงพลัง</div>
-<div class="reassurance-item" data-i18n="index.100_free_open_source_1"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> ฟรี 100% & Open Source</div>
-<div class="reassurance-item" data-i18n="index.zero_telemetry_tracking"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> ไม่มีการติดตามข้อมูลผู้ใช้</div>
+</div>
+<div class="reassurance-strip" style="margin: 0; gap: 18px; flex-direction: column; align-items: flex-start;">
+<div class="reassurance-item"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> <strong>Native Rust Engine</strong> (~35MB RAM)</div>
+<div class="reassurance-item"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> <strong>Official CDNs Only</strong> (No re-hosting)</div>
+<div class="reassurance-item"><span style="color: var(--accent-bright); font-weight: 800;">✓</span> <strong>Full BSL 1.1 Source Code</strong> on GitHub</div>
 </div>
 </div>
 </div>
@@ -914,6 +1271,6 @@
 <div class="footer-legal" data-i18n="index.zircon_contributors_v0421_active">ผู้มีส่วนร่วม Zircon v0.4.21 Active</div>
 </div>
 </footer>
-<script src="../assets/js/main.js?v=2"></script>
+<script src="../assets/js/main.js?v=20261104_release1"></script>
 </body>
 </html>

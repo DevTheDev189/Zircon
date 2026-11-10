@@ -1,16 +1,9 @@
 <template>
-
-  <Teleport to="body">
-
-    <div
-
-      v-if="open"
-
-      class="fixed inset-0 z-50 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4 select-none"
-
-      @click.self="close"
-
-    >
+  <div
+    v-if="open"
+    class="fixed inset-0 z-50 bg-[#070b0f]/85 backdrop-blur-md flex items-center justify-center p-4 select-none"
+    @click.self="close"
+  >
 
       <div
 
@@ -282,7 +275,7 @@
 
           >
 
-            {{ $t('server_config.tab_shaders', { count: detailedPacks.shaderpacks?.length || 0 }) }}
+            {{ $t('server_config.tab_shaders', { count: detailedPacks?.shaderpacks?.length || 0 }) }}
 
           </button>
 
@@ -298,7 +291,7 @@
 
           >
 
-            {{ $t('server_config.tab_resourcepacks', { count: detailedPacks.resourcepacks?.length || 0 }) }}
+            {{ $t('server_config.tab_resourcepacks', { count: detailedPacks?.resourcepacks?.length || 0 }) }}
 
           </button>
 
@@ -1179,10 +1172,159 @@
 
               {{ $t('server_config.drop_shaders') }}
 
-              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseShaders">{{ $t('server_config.browse_files') }}</button>)
+              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseShaders">{{ $t('server_config.browse_files') }}</button>
 
             </div>
 
+          </div>
+
+          <!-- Shader Search / Browser Section -->
+          <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="z-section text-white font-bold text-sm">{{ $t('server_config.search_shaders_title') }}</div>
+                <div class="text-xs text-slate-400 mt-0.5">
+                  {{ $t('server_config.search_shaders_subtitle') }}
+                </div>
+              </div>
+
+              <!-- Provider selector toggle -->
+              <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 gap-1">
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all"
+                  :class="shaderProvider === 'modrinth' ? 'bg-[#46d66d]/20 text-[#46d66d] border border-[#46d66d]/40 shadow-sm' : 'text-slate-400 hover:text-white'"
+                  @click="setShaderProvider('modrinth')"
+                >
+                  <img src="../assets/modrinth.svg" class="w-3.5 h-3.5" />
+                  Modrinth
+                </button>
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all"
+                  :class="shaderProvider === 'curseforge' ? 'bg-[#f16436]/20 text-[#f16436] border border-[#f16436]/40 shadow-sm' : 'text-slate-400 hover:text-white'"
+                  @click="setShaderProvider('curseforge')"
+                >
+                  <img src="../assets/curseforge.svg" class="w-3.5 h-3.5" />
+                  CurseForge
+                </button>
+              </div>
+            </div>
+
+            <!-- Search input bar -->
+            <div class="flex gap-2">
+              <input
+                v-model="shaderSearchQuery"
+                class="z-input flex-1 text-xs"
+                :placeholder="$t('server_config.search_shaders_placeholder', { provider: shaderProvider === 'curseforge' ? 'CurseForge' : 'Modrinth' })"
+                @keydown.enter="searchShaders"
+              />
+              <button
+                type="button"
+                class="z-btn-ghost px-4 text-xs font-bold shrink-0"
+                :disabled="shaderSearchBusy"
+                @click="searchShaders"
+              >
+                {{ $t('server_config.search_btn') }}
+              </button>
+            </div>
+
+            <div class="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
+              <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                <input type="checkbox" v-model="shaderSearchAllVersions" class="zircon-check" @change="searchShaders" />
+                <span>{{ $t('server_config.show_all_versions') }}</span>
+              </label>
+
+              <span v-if="shaderSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5 ml-auto">
+                <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
+                {{ $t('server_config.searching') }}
+              </span>
+            </div>
+
+            <!-- Search results list -->
+            <div v-if="shaderResults.length" class="mt-3 flex flex-col gap-2 max-h-[280px] overflow-y-auto pr-1">
+              <div
+                v-for="hit in shaderResults"
+                :key="hit.projectId || hit.id"
+                class="bg-slate-900/70 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 transition hover:border-slate-700"
+              >
+                <div class="flex items-start gap-3">
+                  <img
+                    v-if="hit.iconUrl"
+                    :src="hit.iconUrl"
+                    class="w-10 h-10 rounded-lg shrink-0 mt-0.5 object-cover bg-slate-950"
+                    loading="lazy"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="text-xs font-bold text-white truncate">{{ hit.title || hit.name }}</div>
+                      <button
+                        v-if="hit.origin === 'curseforge' || shaderProvider === 'curseforge'"
+                        type="button"
+                        class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#F16436]/20 text-orange-200 border border-[#F16436]/40 hover:bg-[#F16436]/30 shadow-sm"
+                        @click="openExternalLink(hit.projectUrl || hit.websiteUrl)"
+                      >
+                        Get on CurseForge
+                      </button>
+                      <button
+                        v-else
+                        type="button"
+                        class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#46d66d]/20 text-green-200 border border-[#46d66d]/40 hover:bg-[#46d66d]/30 shadow-sm"
+                        :disabled="installingId === (hit.projectId || hit.id) || hit.versionsLoading"
+                        @click="installPackItem(hit, 'shader')"
+                      >
+                        <svg
+                          v-if="installingId === (hit.projectId || hit.id)"
+                          class="animate-spin h-3.5 w-3.5 text-[#46d66d]"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>{{ installingId === (hit.projectId || hit.id) ? 'Installing…' : 'Install' }}</span>
+                      </button>
+                    </div>
+                    <div v-if="hit.description || hit.summary" class="text-[11px] text-slate-300 line-clamp-2 my-1">
+                      {{ hit.description || hit.summary }}
+                    </div>
+                    <div class="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+                      <span v-if="hit.author">by {{ hit.author }}</span>
+                      <span v-if="hit.downloads">⬇ {{ fmtCount(hit.downloads) }}</span>
+                      <a
+                        v-if="hit.projectUrl || hit.websiteUrl"
+                        :href="hit.projectUrl || hit.websiteUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="font-medium hover:underline inline-flex items-center gap-0.5"
+                        :class="(hit.origin === 'curseforge' || shaderProvider === 'curseforge') ? 'text-[#F16436]' : 'text-[#46d66d]'"
+                        @click.prevent="openExternalLink(hit.projectUrl || hit.websiteUrl)"
+                      >
+                        View on {{ (hit.origin === 'curseforge' || shaderProvider === 'curseforge') ? 'CurseForge' : 'Modrinth' }} ↗
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Version selector -->
+                <div v-if="hit.versionOptions && hit.versionOptions.length > 0" class="flex items-center gap-2 pt-2 border-t border-slate-800/60">
+                  <span class="text-[10px] text-slate-400 shrink-0 font-medium">Version:</span>
+                  <select
+                    v-model="hit.selectedVersionId"
+                    class="bg-slate-950 border border-slate-800 text-slate-200 text-[11px] rounded-lg px-2 py-1 flex-1 min-w-0 font-mono focus:border-cyan-400 outline-none"
+                  >
+                    <option v-for="ver in getFilteredVersionOptions(hit)" :key="ver.id" :value="ver.id">
+                      {{ ver.name || ver.versionNumber }} ({{ ver.fileName || ver.id }})
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div v-else-if="shaderSearchDone" class="mt-4 text-center text-slate-500 text-xs py-4">
+              No shaders found for query on {{ shaderProvider === 'curseforge' ? 'CurseForge' : 'Modrinth' }}.
+            </div>
           </div>
 
         </template>
@@ -1525,7 +1667,7 @@
 
 
 
-            <div v-if="!detailedPacks.resourcepacks || !detailedPacks.resourcepacks.length" class="py-6 text-center text-slate-500 text-xs">
+            <div v-if="!detailedPacks?.resourcepacks || !detailedPacks.resourcepacks.length" class="py-6 text-center text-slate-500 text-xs">
 
               {{ $t('server_config.no_packs_installed') }}
 
@@ -1547,10 +1689,159 @@
 
               {{ $t('server_config.drop_resourcepacks') }}
 
-              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseResources">{{ $t('server_config.browse_files') }}</button>)
+              <button class="text-cyan-400 underline font-semibold hover:text-cyan-300" @click="browseResources">{{ $t('server_config.browse_files') }}</button>
 
             </div>
 
+          </div>
+
+          <!-- Resource Pack Search / Browser Section -->
+          <div class="bg-[#070b10] border border-slate-800/90 rounded-xl p-4 shadow-inner flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="z-section text-white font-bold text-sm">{{ $t('server_config.search_rp_title') }}</div>
+                <div class="text-xs text-slate-400 mt-0.5">
+                  {{ $t('server_config.search_rp_subtitle') }}
+                </div>
+              </div>
+
+              <!-- Provider selector toggle -->
+              <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 gap-1">
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all"
+                  :class="resourceProvider === 'modrinth' ? 'bg-[#46d66d]/20 text-[#46d66d] border border-[#46d66d]/40 shadow-sm' : 'text-slate-400 hover:text-white'"
+                  @click="setResourceProvider('modrinth')"
+                >
+                  <img src="../assets/modrinth.svg" class="w-3.5 h-3.5" />
+                  Modrinth
+                </button>
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all"
+                  :class="resourceProvider === 'curseforge' ? 'bg-[#f16436]/20 text-[#f16436] border border-[#f16436]/40 shadow-sm' : 'text-slate-400 hover:text-white'"
+                  @click="setResourceProvider('curseforge')"
+                >
+                  <img src="../assets/curseforge.svg" class="w-3.5 h-3.5" />
+                  CurseForge
+                </button>
+              </div>
+            </div>
+
+            <!-- Search input bar -->
+            <div class="flex gap-2">
+              <input
+                v-model="resourceSearchQuery"
+                class="z-input flex-1 text-xs"
+                :placeholder="$t('server_config.search_rp_placeholder', { provider: resourceProvider === 'curseforge' ? 'CurseForge' : 'Modrinth' })"
+                @keydown.enter="searchResources"
+              />
+              <button
+                type="button"
+                class="z-btn-ghost px-4 text-xs font-bold shrink-0"
+                :disabled="resourceSearchBusy"
+                @click="searchResources"
+              >
+                {{ $t('server_config.search_btn') }}
+              </button>
+            </div>
+
+            <div class="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
+              <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                <input type="checkbox" v-model="resourceSearchAllVersions" class="zircon-check" @change="searchResources" />
+                <span>{{ $t('server_config.show_all_versions') }}</span>
+              </label>
+
+              <span v-if="resourceSearchBusy" class="text-cyan-400 font-mono flex items-center gap-1.5 ml-auto">
+                <span class="inline-block w-2.5 h-2.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
+                {{ $t('server_config.searching') }}
+              </span>
+            </div>
+
+            <!-- Search results list -->
+            <div v-if="resourceResults.length" class="mt-3 flex flex-col gap-2 max-h-[280px] overflow-y-auto pr-1">
+              <div
+                v-for="hit in resourceResults"
+                :key="hit.projectId || hit.id"
+                class="bg-slate-900/70 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 transition hover:border-slate-700"
+              >
+                <div class="flex items-start gap-3">
+                  <img
+                    v-if="hit.iconUrl"
+                    :src="hit.iconUrl"
+                    class="w-10 h-10 rounded-lg shrink-0 mt-0.5 object-cover bg-slate-950"
+                    loading="lazy"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="text-xs font-bold text-white truncate">{{ hit.title || hit.name }}</div>
+                      <button
+                        v-if="hit.origin === 'curseforge' || resourceProvider === 'curseforge'"
+                        type="button"
+                        class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#F16436]/20 text-orange-200 border border-[#F16436]/40 hover:bg-[#F16436]/30 shadow-sm"
+                        @click="openExternalLink(hit.projectUrl || hit.websiteUrl)"
+                      >
+                        Get on CurseForge
+                      </button>
+                      <button
+                        v-else
+                        type="button"
+                        class="text-xs px-3 py-1.5 rounded-lg font-bold shrink-0 flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed bg-[#46d66d]/20 text-green-200 border border-[#46d66d]/40 hover:bg-[#46d66d]/30 shadow-sm"
+                        :disabled="installingId === (hit.projectId || hit.id) || hit.versionsLoading"
+                        @click="installPackItem(hit, 'resourcepack')"
+                      >
+                        <svg
+                          v-if="installingId === (hit.projectId || hit.id)"
+                          class="animate-spin h-3.5 w-3.5 text-[#46d66d]"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>{{ installingId === (hit.projectId || hit.id) ? 'Installing…' : 'Install' }}</span>
+                      </button>
+                    </div>
+                    <div v-if="hit.description || hit.summary" class="text-[11px] text-slate-300 line-clamp-2 my-1">
+                      {{ hit.description || hit.summary }}
+                    </div>
+                    <div class="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+                      <span v-if="hit.author">by {{ hit.author }}</span>
+                      <span v-if="hit.downloads">⬇ {{ fmtCount(hit.downloads) }}</span>
+                      <a
+                        v-if="hit.projectUrl || hit.websiteUrl"
+                        :href="hit.projectUrl || hit.websiteUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="font-medium hover:underline inline-flex items-center gap-0.5"
+                        :class="(hit.origin === 'curseforge' || resourceProvider === 'curseforge') ? 'text-[#F16436]' : 'text-[#46d66d]'"
+                        @click.prevent="openExternalLink(hit.projectUrl || hit.websiteUrl)"
+                      >
+                        View on {{ (hit.origin === 'curseforge' || resourceProvider === 'curseforge') ? 'CurseForge' : 'Modrinth' }} ↗
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Version selector -->
+                <div v-if="hit.versionOptions && hit.versionOptions.length > 0" class="flex items-center gap-2 pt-2 border-t border-slate-800/60">
+                  <span class="text-[10px] text-slate-400 shrink-0 font-medium">Version:</span>
+                  <select
+                    v-model="hit.selectedVersionId"
+                    class="bg-slate-950 border border-slate-800 text-slate-200 text-[11px] rounded-lg px-2 py-1 flex-1 min-w-0 font-mono focus:border-cyan-400 outline-none"
+                  >
+                    <option v-for="ver in getFilteredVersionOptions(hit)" :key="ver.id" :value="ver.id">
+                      {{ ver.name || ver.versionNumber }} ({{ ver.fileName || ver.id }})
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div v-else-if="resourceSearchDone" class="mt-4 text-center text-slate-500 text-xs py-4">
+              No resource packs found for query on {{ resourceProvider === 'curseforge' ? 'CurseForge' : 'Modrinth' }}.
+            </div>
           </div>
 
         </template>
@@ -1724,8 +2015,6 @@
     />
 
   </div>
-
-</Teleport>
 
 </template>
 
@@ -1912,7 +2201,7 @@ const serverPackDecisions = ref({});
 
 const serverAdvertisedPacks = computed(() => {
 
-  return (detailedPacks.value.resourcepacks || []).filter((p) => !p.isLocal);
+  return (detailedPacks.value?.resourcepacks || []).filter((p) => !p?.isLocal);
 
 });
 
@@ -1982,11 +2271,11 @@ async function onServerPacksAccepted({ accepted, rejected }) {
 
 const activeResourcepacksList = computed(() => {
 
-  const activeNames = packs.value.activeResourcepacks || [];
+  const activeNames = packs.value?.activeResourcepacks || [];
 
-  const allPacks = detailedPacks.value.resourcepacks || [];
+  const allPacks = detailedPacks.value?.resourcepacks || [];
 
-  const map = new Map(allPacks.map((p) => [p.filename, p]));
+  const map = new Map(allPacks.filter(Boolean).map((p) => [p.filename, p]));
 
   return activeNames.map((name) => map.get(name) || { filename: name, title: name });
 
@@ -1996,11 +2285,11 @@ const activeResourcepacksList = computed(() => {
 
 const inactiveResourcepacksList = computed(() => {
 
-  const activeSet = new Set(packs.value.activeResourcepacks || []);
+  const activeSet = new Set(packs.value?.activeResourcepacks || []);
 
-  const allPacks = detailedPacks.value.resourcepacks || [];
+  const allPacks = detailedPacks.value?.resourcepacks || [];
 
-  return allPacks.filter((p) => !activeSet.has(p.filename));
+  return allPacks.filter((p) => p && !activeSet.has(p.filename));
 
 });
 
@@ -2024,6 +2313,25 @@ const modResults = ref([]);
 
 const installingId = ref('');
 
+const shaderProvider = ref('modrinth');
+const shaderSearchQuery = ref('');
+const shaderSearchAllVersions = ref(false);
+const shaderSearchBusy = ref(false);
+const shaderSearchDone = ref(false);
+const shaderResults = ref([]);
+
+const resourceProvider = ref('modrinth');
+const resourceSearchQuery = ref('');
+const resourceSearchAllVersions = ref(false);
+const resourceSearchBusy = ref(false);
+const resourceSearchDone = ref(false);
+const resourceResults = ref([]);
+
+function getFilteredVersionOptions(hit) {
+  if (!hit || !hit.versionOptions) return [];
+  return hit.versionOptions;
+}
+
 
 
 const bomModsCount = computed(() => mods.value.filter((m) => m.isBom).length);
@@ -2046,11 +2354,11 @@ const filteredMods = computed(() => {
 
 watch(
 
-  () => props.open,
+  [() => props.open, () => props.server?.address],
 
-  async (isOpen) => {
+  async ([isOpen, address]) => {
 
-    if (isOpen && props.server?.address) {
+    if (isOpen && address) {
 
       await loadServerMods();
 
@@ -2082,11 +2390,11 @@ async function loadServerMods() {
 
     const res = await api.getServerInstanceMods(props.server.address);
 
-    serverData.value = res;
+    serverData.value = res || null;
 
-    mods.value = res.mods || [];
+    mods.value = res?.mods || [];
 
-    if (res.gameDir) {
+    if (res?.gameDir) {
 
       await loadPacks(res.gameDir);
 
@@ -2128,11 +2436,11 @@ async function loadPacks(gameDir) {
 
     ]);
 
-    packs.value = basicPacks;
+    packs.value = basicPacks || { activeShaderpack: '', activeResourcepacks: [] };
 
-    detailedPacks.value = detailed;
+    detailedPacks.value = detailed || { shaderpacks: [], resourcepacks: [] };
 
-    activeShaderpack.value = basicPacks.activeShaderpack || '';
+    activeShaderpack.value = basicPacks?.activeShaderpack || '';
 
   } catch (err) {
 
@@ -2430,6 +2738,147 @@ async function loadModVersions(hit) {
 
   }
 
+}
+
+function setShaderProvider(provider) {
+  shaderProvider.value = provider;
+  if (shaderSearchQuery.value.trim()) {
+    searchShaders();
+  }
+}
+
+async function searchShaders() {
+  if (!props.server?.address) return;
+  const query = (shaderSearchQuery.value || '').trim();
+  shaderSearchBusy.value = true;
+  shaderSearchDone.value = false;
+  try {
+    const hits = await api.searchMods(
+      `server:${props.server.address}`,
+      query,
+      shaderProvider.value,
+      'shader',
+      shaderSearchAllVersions.value
+    );
+    shaderResults.value = hits.map((hit) => ({
+      ...hit,
+      versionOptions: [],
+      selectedVersionId: '',
+      versionsLoading: true,
+      versionsFailed: false,
+    }));
+    shaderSearchDone.value = true;
+    for (const hit of shaderResults.value) {
+      loadShaderVersions(hit);
+    }
+  } catch (err) {
+    window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Shader search error: ${err}` }));
+  } finally {
+    shaderSearchBusy.value = false;
+  }
+}
+
+async function loadShaderVersions(hit) {
+  if (!props.server?.address) return;
+  try {
+    const versions = await api.listModVersions(
+      `server:${props.server.address}`,
+      hit.projectId || hit.id,
+      hit.origin || shaderProvider.value,
+      shaderSearchAllVersions.value,
+      'shader'
+    );
+    hit.versionOptions = versions;
+    hit.selectedVersionId = versions[0]?.id || '';
+  } catch {
+    hit.versionsFailed = true;
+  } finally {
+    hit.versionsLoading = false;
+  }
+}
+
+function setResourceProvider(provider) {
+  resourceProvider.value = provider;
+  if (resourceSearchQuery.value.trim()) {
+    searchResources();
+  }
+}
+
+async function searchResources() {
+  if (!props.server?.address) return;
+  const query = (resourceSearchQuery.value || '').trim();
+  resourceSearchBusy.value = true;
+  resourceSearchDone.value = false;
+  try {
+    const hits = await api.searchMods(
+      `server:${props.server.address}`,
+      query,
+      resourceProvider.value,
+      'resourcepack',
+      resourceSearchAllVersions.value
+    );
+    resourceResults.value = hits.map((hit) => ({
+      ...hit,
+      versionOptions: [],
+      selectedVersionId: '',
+      versionsLoading: true,
+      versionsFailed: false,
+    }));
+    resourceSearchDone.value = true;
+    for (const hit of resourceResults.value) {
+      loadResourceVersions(hit);
+    }
+  } catch (err) {
+    window.dispatchEvent(new CustomEvent('zircon-status', { detail: `Resource pack search error: ${err}` }));
+  } finally {
+    resourceSearchBusy.value = false;
+  }
+}
+
+async function loadResourceVersions(hit) {
+  if (!props.server?.address) return;
+  try {
+    const versions = await api.listModVersions(
+      `server:${props.server.address}`,
+      hit.projectId || hit.id,
+      hit.origin || resourceProvider.value,
+      resourceSearchAllVersions.value,
+      'resourcepack'
+    );
+    hit.versionOptions = versions;
+    hit.selectedVersionId = versions[0]?.id || '';
+  } catch {
+    hit.versionsFailed = true;
+  } finally {
+    hit.versionsLoading = false;
+  }
+}
+
+async function installPackItem(hit, packType) {
+  if (!props.server?.address) return;
+  const dir = serverData.value?.gameDir;
+  const id = hit.projectId || hit.id;
+  installingId.value = id;
+  try {
+    const filename = await api.installModrinthPack(`server:${props.server.address}`, id, hit.selectedVersionId, packType);
+    if (dir) {
+      if (packType === 'resourcepack' || packType === 'resource') {
+        await enableResourcepack(filename);
+      } else if (packType === 'shader' || packType === 'shaderpack') {
+        await setShaderpack(filename);
+      }
+      await loadPacks(dir);
+    }
+    window.dispatchEvent(new CustomEvent('zircon-status', {
+      detail: `Installed ${hit.title || hit.name} successfully!`
+    }));
+  } catch (e) {
+    window.dispatchEvent(new CustomEvent('zircon-status', {
+      detail: `Install failed: ${e}`
+    }));
+  } finally {
+    installingId.value = '';
+  }
 }
 
 
@@ -2862,13 +3311,23 @@ async function browseShaders() {
 
   if (!picked || !picked.length) return;
 
+  let lastImported = null;
+
   for (const p of picked) {
 
-    await api.importInstancePack(dir, 'shader', p);
+    lastImported = await api.importInstancePack(dir, 'shader', p);
+
+  }
+
+  if (lastImported) {
+
+    await setShaderpack(lastImported);
 
   }
 
   await loadPacks(dir);
+
+  window.dispatchEvent(new CustomEvent('zircon-status', { detail: 'Shader pack added and activated!' }));
 
 }
 
@@ -2884,6 +3343,8 @@ async function onShaderDrop(event) {
 
   if (!files || !files.length) return;
 
+  let lastImported = null;
+
   for (const file of files) {
 
     if (!file.name.endsWith('.zip')) continue;
@@ -2892,11 +3353,19 @@ async function onShaderDrop(event) {
 
     const bytes = Array.from(new Uint8Array(arrayBuffer));
 
-    await api.importInstancePackBytes(dir, 'shader', file.name, bytes);
+    lastImported = await api.importInstancePackBytes(dir, 'shader', file.name, bytes);
+
+  }
+
+  if (lastImported) {
+
+    await setShaderpack(lastImported);
 
   }
 
   await loadPacks(dir);
+
+  window.dispatchEvent(new CustomEvent('zircon-status', { detail: 'Shader pack uploaded and activated!' }));
 
 }
 
@@ -2912,13 +3381,23 @@ async function browseResources() {
 
   if (!picked || !picked.length) return;
 
+  let lastImported = null;
+
   for (const p of picked) {
 
-    await api.importInstancePack(dir, 'resource', p);
+    lastImported = await api.importInstancePack(dir, 'resource', p);
+
+  }
+
+  if (lastImported) {
+
+    await enableResourcepack(lastImported);
 
   }
 
   await loadPacks(dir);
+
+  window.dispatchEvent(new CustomEvent('zircon-status', { detail: 'Resource pack added and enabled!' }));
 
 }
 
@@ -2934,6 +3413,8 @@ async function onResourceDrop(event) {
 
   if (!files || !files.length) return;
 
+  let lastImported = null;
+
   for (const file of files) {
 
     if (!file.name.endsWith('.zip')) continue;
@@ -2942,11 +3423,19 @@ async function onResourceDrop(event) {
 
     const bytes = Array.from(new Uint8Array(arrayBuffer));
 
-    await api.importInstancePackBytes(dir, 'resource', file.name, bytes);
+    lastImported = await api.importInstancePackBytes(dir, 'resource', file.name, bytes);
+
+  }
+
+  if (lastImported) {
+
+    await enableResourcepack(lastImported);
 
   }
 
   await loadPacks(dir);
+
+  window.dispatchEvent(new CustomEvent('zircon-status', { detail: 'Resource pack uploaded and enabled!' }));
 
 }
 

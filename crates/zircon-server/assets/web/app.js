@@ -7,7 +7,7 @@ const { createApp } = Vue;
 // scripts/build-web-ui.js), so the page needs only Vue's runtime build —
 // no template compilation at runtime, which keeps `unsafe-eval` out of
 // the Content-Security-Policy.
-createApp({
+window.zirconApp = createApp({
     render: ZirconRender,
     data() {
         return {

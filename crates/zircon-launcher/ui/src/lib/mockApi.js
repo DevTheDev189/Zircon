@@ -65,6 +65,15 @@ const MOCK_SERVERS = [
     bannerUrl: '/mock_assets/emerald_bg.png',
   },
   {
+    name: 'Beehive SMP',
+    address: 'play.beehivesmp.net',
+    online: true,
+    players: { online: 34, max: 75 },
+    motd: '§6✦ Beehive SMP §7· §fCommunity Adventure & Honey §e[1.20.1]',
+    iconUrl: '/mock_assets/beehive_icon.png',
+    bannerUrl: '/mock_assets/beehive_bg.png',
+  },
+  {
     name: 'Flower-Charm Realm',
     address: 'flowercharm.zirconmc.net',
     online: true,
@@ -189,7 +198,30 @@ export async function handleMockInvoke(cmd, args = {}) {
     }
 
     case 'get_discovered_lan_servers':
-      return [];
+      return [
+        {
+          id: 'lan-1',
+          name: "Alex's Cobblemon Adventure",
+          hostUsername: 'Alex',
+          hostAddress: '192.168.1.142',
+          address: '192.168.1.142:25565',
+          isZirconEnhanced: true,
+          mcVersion: '1.20.1',
+          loaderType: 'Fabric',
+          joinCode: '8942',
+        },
+        {
+          id: 'lan-2',
+          name: "Sarah's Survival World",
+          hostUsername: 'Sarah',
+          hostAddress: '192.168.1.108',
+          address: '192.168.1.108:51820',
+          isZirconEnhanced: true,
+          mcVersion: '1.21',
+          loaderType: 'NeoForge',
+          joinCode: '4190',
+        },
+      ];
 
     case 'scan_installed_launchers':
       return MOCK_MIGRATION;
@@ -294,6 +326,208 @@ export async function handleMockInvoke(cmd, args = {}) {
     case 'get_gamepad_assignments':
     case 'list_connected_gamepads':
       return MOCK_GAMEPADS;
+
+    case 'get_server_instance_mods':
+      return {
+        serverAddress: args.address || 'play.zirconmc.net',
+        gameDir: 'emerald-survival',
+        minecraftVersion: '1.20.1',
+        loaderType: 'Fabric',
+        loaderVersion: '0.15.11',
+        mods: [
+          {
+            filename: 'sodium-fabric-0.5.8+mc1.20.1.jar',
+            name: 'Sodium',
+            version: '0.5.8',
+            author: 'jellysquid',
+            sizeBytes: 1240000,
+            enabled: true,
+            iconUrl: 'https://cdn.modrinth.com/data/AANobbMI/icon.png',
+            isBom: true,
+            isCustom: false,
+            isDownloaded: true,
+            description: 'Modern rendering engine for Minecraft that greatly improves frame rates and reduces stutter.',
+          },
+          {
+            filename: 'iris-1.7.0+mc1.20.1.jar',
+            name: 'Iris Shaders',
+            version: '1.7.0',
+            author: 'coderbot',
+            sizeBytes: 2450000,
+            enabled: true,
+            iconUrl: 'https://cdn.modrinth.com/data/YL57xq9U/icon.png',
+            isBom: true,
+            isCustom: false,
+            isDownloaded: true,
+            description: 'A modern shaders mod for Minecraft compatible with existing OptiFine shader packs.',
+          },
+          {
+            filename: 'appleskin-fabric-mc1.20.1-2.5.1.jar',
+            name: 'AppleSkin',
+            version: '2.5.1',
+            author: 'squeek502',
+            sizeBytes: 154000,
+            enabled: true,
+            iconUrl: 'https://cdn.modrinth.com/data/EsAfCjCV/icon.png',
+            isBom: false,
+            isCustom: true,
+            isDownloaded: true,
+            description: 'Adds various food and hunger related tooltips and HUD enhancements.',
+          },
+        ],
+        hasBom: true,
+      };
+
+    case 'list_instance_packs':
+      return {
+        shaderpacks: ['ComplementaryReimagined_r5.1.1.zip', 'BSL_v8.2.09.zip'],
+        resourcepacks: ['Faithful32x-1.20.zip', 'StayTrue-1.20.zip'],
+        activeShaderpack: 'ComplementaryReimagined_r5.1.1.zip',
+        activeResourcepacks: ['Faithful32x-1.20.zip'],
+        shadersEnabled: true,
+        locallyAddedShaderpacks: ['ComplementaryReimagined_r5.1.1.zip', 'BSL_v8.2.09.zip'],
+        locallyAddedResourcepacks: ['Faithful32x-1.20.zip', 'StayTrue-1.20.zip'],
+      };
+
+    case 'list_instance_packs_detailed':
+      return {
+        shaderpacks: [
+          {
+            filename: 'ComplementaryReimagined_r5.1.1.zip',
+            title: 'Complementary Reimagined',
+            author: 'EminGT',
+            description: 'Exceptional visual quality and performance shaderpack.',
+            iconUrl: 'https://cdn.modrinth.com/data/R2Fr3oaQ/icon.png',
+            isActive: true,
+            isLocal: true,
+          },
+          {
+            filename: 'BSL_v8.2.09.zip',
+            title: 'BSL Shaders',
+            author: 'Capt Tatsu',
+            description: 'Bright and colorful shaderpack with warm lighting.',
+            iconUrl: 'https://cdn.modrinth.com/data/m72qlz7e/icon.png',
+            isActive: false,
+            isLocal: true,
+          },
+        ],
+        resourcepacks: [
+          {
+            filename: 'Faithful32x-1.20.zip',
+            title: 'Faithful 32x',
+            author: 'Faithful Team',
+            description: 'High-resolution textures that stay true to original Minecraft.',
+            iconUrl: 'https://cdn.modrinth.com/data/1Kdd7AKh/icon.png',
+            isActive: true,
+            isLocal: true,
+          },
+          {
+            filename: 'StayTrue-1.20.zip',
+            title: 'Stay True',
+            author: 'Trxvz',
+            description: 'Subtle design tweaks to default textures without straying too far.',
+            iconUrl: 'https://cdn.modrinth.com/data/u5bxb4Pq/icon.png',
+            isActive: false,
+            isLocal: true,
+          },
+        ],
+        shadersEnabled: true,
+      };
+
+    case 'search_mods': {
+      const type = args.projectType || 'mod';
+      if (type === 'shader' || type === 'shaderpack') {
+        return [
+          {
+            id: 'complementary-reimagined',
+            projectId: 'R2Fr3oaQ',
+            title: 'Complementary Reimagined',
+            name: 'Complementary Reimagined',
+            slug: 'complementary-reimagined',
+            description: 'Top-tier shaders designed for realism and aesthetic perfection.',
+            summary: 'Top-tier shaders designed for realism and aesthetic perfection.',
+            author: 'EminGT',
+            iconUrl: 'https://cdn.modrinth.com/data/R2Fr3oaQ/icon.png',
+            downloads: 15420000,
+            downloadCount: 15420000,
+            projectUrl: 'https://modrinth.com/shader/complementary-reimagined',
+            websiteUrl: 'https://modrinth.com/shader/complementary-reimagined',
+            origin: args.origin || args.provider || 'modrinth',
+            loaders: ['iris', 'optifine'],
+          },
+        ];
+      }
+      if (type === 'resourcepack' || type === 'resource') {
+        return [
+          {
+            id: 'faithful-32x',
+            projectId: '1Kdd7AKh',
+            title: 'Faithful 32x',
+            name: 'Faithful 32x',
+            slug: 'faithful-32x',
+            description: 'The definitive high-definition vanilla texture pack.',
+            summary: 'The definitive high-definition vanilla texture pack.',
+            author: 'Faithful Team',
+            iconUrl: 'https://cdn.modrinth.com/data/1Kdd7AKh/icon.png',
+            downloads: 8750000,
+            downloadCount: 8750000,
+            projectUrl: 'https://modrinth.com/resourcepack/faithful-32x',
+            websiteUrl: 'https://modrinth.com/resourcepack/faithful-32x',
+            origin: args.origin || args.provider || 'modrinth',
+            loaders: ['minecraft'],
+          },
+        ];
+      }
+      return [
+        {
+          id: 'fabric-api',
+          projectId: 'P7dR8mSH',
+          title: 'Fabric API',
+          name: 'Fabric API',
+          slug: 'fabric-api',
+          description: 'Essential hooks and inter-mod communication library for Fabric.',
+          summary: 'Essential hooks and inter-mod communication library for Fabric.',
+          author: 'modmuss50',
+          iconUrl: 'https://cdn.modrinth.com/data/P7dR8mSH/icon.png',
+          downloads: 45000000,
+          downloadCount: 45000000,
+          projectUrl: 'https://modrinth.com/mod/fabric-api',
+          websiteUrl: 'https://modrinth.com/mod/fabric-api',
+          origin: args.origin || args.provider || 'modrinth',
+          loaders: ['fabric', 'quilt'],
+        },
+      ];
+    }
+
+    case 'list_mod_versions':
+      return [
+        {
+          id: 'ver-1',
+          name: '1.20.1-v1.0.0',
+          versionNumber: '1.0.0',
+          fileName: 'pack-1.0.0.zip',
+          downloadUrl: 'https://example.com/pack.zip',
+          fileSize: 4500000,
+        },
+      ];
+
+    case 'install_modrinth_pack':
+    case 'install_server_modrinth_mod':
+      return 'installed_pack.zip';
+
+    case 'set_server_mod_enabled':
+    case 'delete_server_mod':
+    case 'set_active_shaderpack':
+    case 'set_active_resourcepacks':
+    case 'set_server_pack_decisions':
+      return true;
+
+    case 'get_server_pack_decisions':
+      return { accepted: ['Faithful32x-1.20.zip'], rejected: [] };
+
+    case 'import_instance_pack':
+    case 'import_instance_pack_bytes':
+      return args.filename || 'imported_pack.zip';
 
     default:
       return null;

@@ -263,6 +263,7 @@ pub fn set_active_shaderpack(game_dir: String, filename: Option<String>) -> Resu
             if !dir.join("shaderpacks").join(&name).is_file() {
                 return Err(format!("Shaderpack not present in instance: {name}"));
             }
+            selection.locally_added_shaderpacks.insert(name.clone());
             selection.active_shaderpack = Some(name);
             selection.shaders_enabled = true;
         }
@@ -305,6 +306,9 @@ pub fn set_active_resourcepacks(
 ) -> Result<(), String> {
     let dir = PathBuf::from(&game_dir);
     let mut selection = PackSelection::load(&dir);
+    for name in &filenames {
+        selection.locally_added_resourcepacks.insert(name.clone());
+    }
     selection.active_resourcepacks = filenames;
     selection.save(&dir);
     Ok(())
@@ -388,6 +392,19 @@ pub async fn import_instance_pack_bytes(
     tokio::fs::write(&dest, bytes)
         .await
         .map_err(|e| e.to_string())?;
+
+    let mut selection = PackSelection::load(&dir);
+    match kind.as_str() {
+        "shader" | "shaderpack" => {
+            selection.locally_added_shaderpacks.insert(safe_filename.to_string());
+        }
+        "resource" | "resourcepack" => {
+            selection.locally_added_resourcepacks.insert(safe_filename.to_string());
+        }
+        _ => {}
+    }
+    selection.save(&dir);
+
     Ok(safe_filename.to_string())
 }
 

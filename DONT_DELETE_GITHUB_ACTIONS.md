@@ -107,6 +107,9 @@ GitHub Actions builds the following in parallel:
 | **Linux (x86_64)** | `zircon-server-linux-x86_64.tar.gz` | `.deb` package, `.AppImage` standalone |
 | **macOS (Apple Silicon & Intel)** | `zircon-server-darwin-universal.tar.gz` | `Zircon_<ver>_universal.dmg`, `Zircon.app.tar.gz` |
 
+> [!NOTE]
+> Windows installers (`.exe` / `.msi`) and `zircon-server.exe` are automatically code-signed via **Microsoft Azure Trusted Signing** (`azure/artifact-signing-action`) whenever the Azure repository secrets are detected in GitHub Actions. If absent, builds fall back gracefully to functioning unsigned binaries without breaking the pipeline. See [docs/ci-secrets-setup.md](docs/ci-secrets-setup.md) for setup details.
+
 ---
 
 ## 4. How to Release a New Version

@@ -9,6 +9,7 @@ use zircon_core::api::modrinth::ModrinthSearchHit;
 use zircon_core::model::{BillOfMaterials, ModLoaderType};
 
 use crate::error::LauncherError;
+use crate::pack_selection::PackSelection;
 use crate::servers;
 
 use super::*;
@@ -31,12 +32,17 @@ pub async fn search_mods(
     } else {
         inst_mc_ver.as_deref()
     };
-    let loader = match loader_filter.as_deref() {
-        Some("all") => None,
-        Some(custom) if !custom.trim().is_empty() => Some(custom.trim()),
-        _ => inst_loader.as_deref(),
-    };
     let p_type = project_type.as_deref().unwrap_or("mod");
+    let is_pack = matches!(p_type, "shader" | "shaderpack" | "shaders" | "resourcepack" | "resource" | "texturepack");
+    let loader = if is_pack {
+        None
+    } else {
+        match loader_filter.as_deref() {
+            Some("all") => None,
+            Some(custom) if !custom.trim().is_empty() => Some(custom.trim()),
+            _ => inst_loader.as_deref(),
+        }
+    };
     let provider = origin.as_deref().unwrap_or("modrinth");
 
     if provider.eq_ignore_ascii_case("curseforge") {
@@ -182,6 +188,7 @@ pub async fn list_mod_versions(
     project_id: String,
     origin: Option<String>,
     all_versions: Option<bool>,
+    project_type: Option<String>,
 ) -> Result<Vec<UnifiedVersionOption>, String> {
     let (inst_mc_ver, inst_loader) = resolve_mc_and_loader(&state, &instance_id);
     let mc_ver = if all_versions.unwrap_or(false) {
@@ -189,7 +196,9 @@ pub async fn list_mod_versions(
     } else {
         inst_mc_ver.as_deref()
     };
-    let loader = inst_loader.as_deref();
+    let p_type = project_type.as_deref().unwrap_or("mod");
+    let is_pack = matches!(p_type, "shader" | "shaderpack" | "shaders" | "resourcepack" | "resource" | "texturepack");
+    let loader = if is_pack { None } else { inst_loader.as_deref() };
     let provider = origin.as_deref().unwrap_or("modrinth");
 
     if provider.eq_ignore_ascii_case("curseforge") {
@@ -219,11 +228,18 @@ pub async fn list_mod_versions(
             .collect();
         Ok(mapped)
     } else {
-        let versions = state
+        let mut versions = state
             .modrinth
             .list_project_versions(&project_id, mc_ver, loader)
             .await
             .map_err(|e| e.to_string())?;
+        if versions.is_empty() && loader.is_some() {
+            if let Ok(fallback) = state.modrinth.list_project_versions(&project_id, mc_ver, None).await {
+                if !fallback.is_empty() {
+                    versions = fallback;
+                }
+            }
+        }
         let mapped = versions
             .into_iter()
             .map(|v| {
@@ -254,36 +270,58 @@ pub async fn install_modrinth_pack_inner(
     version_id: Option<&str>,
     project_type: Option<&str>,
 ) -> Result<String, String> {
-    let Some(instance) = state.offline.load(instance_id) else {
-        return Err("Instance not found".to_string());
-    };
-    let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
-        None
+    let (game_dir, mc_ver, loader) = if let Some(instance) = state.offline.load(instance_id) {
+        let loader = if instance.mod_loader.r#type.eq_ignore_ascii_case("vanilla") {
+            None
+        } else {
+            Some(instance.mod_loader.r#type)
+        };
+        (state.offline.instance_dir(&instance.id), Some(instance.minecraft_version), loader)
     } else {
-        Some(instance.mod_loader.r#type.as_str())
+        let address = instance_id.strip_prefix("server:").unwrap_or(instance_id).trim();
+        if address.is_empty() {
+            return Err("Instance not found".to_string());
+        }
+        let (host, port) = servers::parse_server_address(address);
+        let g_dir = servers::instance_game_dir(&host, port);
+        let (mc, ld) = resolve_mc_and_loader(state, instance_id);
+        (g_dir, mc, ld)
     };
-    let versions = state
-        .modrinth
-        .list_project_versions(
-            project_id,
-            Some(&instance.minecraft_version),
-            loader,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
+
+    let p_type = project_type.unwrap_or("mod");
+    let is_pack = matches!(p_type, "shader" | "shaderpack" | "shaders" | "resourcepack" | "resource" | "texturepack");
+
+    let versions = if version_id.is_some() || is_pack {
+        state
+            .modrinth
+            .list_project_versions(project_id, None, None)
+            .await
+            .map_err(|e| e.to_string())?
+    } else {
+        state
+            .modrinth
+            .list_project_versions(
+                project_id,
+                mc_ver.as_deref(),
+                loader.as_deref(),
+            )
+            .await
+            .map_err(|e| e.to_string())?
+    };
 
     let version = if let Some(vid) = version_id {
         versions.into_iter().find(|v| v.id == vid).ok_or_else(|| {
             format!(
-                "Version '{}' not found for Minecraft {}",
-                vid, instance.minecraft_version
+                "Version '{}' not found{}",
+                vid,
+                mc_ver.as_deref().map(|m| format!(" for Minecraft {}", m)).unwrap_or_default()
             )
         })?
     } else {
         versions.into_iter().next().ok_or_else(|| {
             format!(
-                "No compatible version found for Minecraft {}",
-                instance.minecraft_version
+                "No compatible version found{}",
+                mc_ver.as_deref().map(|m| format!(" for Minecraft {}", m)).unwrap_or_default()
             )
         })?
     };
@@ -292,9 +330,8 @@ pub async fn install_modrinth_pack_inner(
         .primary_file()
         .ok_or_else(|| "This project has no downloadable file".to_string())?;
 
-    let p_type = project_type.unwrap_or("mod");
     let ext = match p_type {
-        "shader" | "shaderpack" | "resourcepack" | "resource" => ".zip",
+        "shader" | "shaderpack" | "shaders" | "resourcepack" | "resource" | "texturepack" => ".zip",
         _ => ".jar",
     };
 
@@ -309,11 +346,10 @@ pub async fn install_modrinth_pack_inner(
         .and_then(|n| n.to_str())
         .ok_or_else(|| "Invalid file name".to_string())?;
 
-    let instance_dir = state.offline.instance_dir(&instance.id);
     let target_dir = match p_type {
-        "shader" | "shaderpack" => instance_dir.join("shaderpacks"),
-        "resourcepack" | "resource" | "texturepack" => instance_dir.join("resourcepacks"),
-        _ => state.offline.mods_dir(&instance),
+        "shader" | "shaderpack" | "shaders" => game_dir.join("shaderpacks"),
+        "resourcepack" | "resource" | "texturepack" => game_dir.join("resourcepacks"),
+        _ => game_dir.join("mods"),
     };
 
     tokio::fs::create_dir_all(&target_dir)
@@ -323,6 +359,21 @@ pub async fn install_modrinth_pack_inner(
     download_file(&state.http, &file.url, &dest, file.sha1())
         .await
         .map_err(err_string)?;
+
+    let mut selection = PackSelection::load(&game_dir);
+    match p_type {
+        "shader" | "shaderpack" | "shaders" => {
+            selection.locally_added_shaderpacks.insert(safe_filename.to_string());
+        }
+        "resourcepack" | "resource" | "texturepack" => {
+            selection.locally_added_resourcepacks.insert(safe_filename.to_string());
+        }
+        _ => {
+            selection.add_locally_added_mod(safe_filename);
+        }
+    }
+    selection.save(&game_dir);
+
     Ok(safe_filename.to_string())
 }
 

@@ -414,8 +414,8 @@ export const api = {
     invoke('search_mods', { instanceId: '', query, origin: 'modrinth', projectType: 'mod', allVersions: true }),
   searchModrinth: (instanceId, query, projectType = 'mod', allVersions = false) =>
     invoke('search_mods', { instanceId, query, origin: 'modrinth', projectType, allVersions }),
-  listModVersions: (instanceId, projectId, origin = 'modrinth', allVersions = false) =>
-    invoke('list_mod_versions', { instanceId, projectId, origin, allVersions }),
+  listModVersions: (instanceId, projectId, origin = 'modrinth', allVersions = false, projectType = 'mod') =>
+    invoke('list_mod_versions', { instanceId, projectId, origin, allVersions, projectType }),
   getModrinthVersions: (projectId, mcVersion, loader) =>
     invoke('list_mod_versions', { instanceId: '', projectId, origin: 'modrinth', allVersions: true }),
   listModrinthVersions: (instanceId, projectId, allVersions = false) =>

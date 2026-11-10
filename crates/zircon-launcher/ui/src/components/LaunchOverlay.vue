@@ -36,7 +36,7 @@
       <!-- Main Launch Card with Dynamic Dual-Pane Width -->
       <div
         class="relative z-10 w-full overflow-hidden rounded-3xl border border-teal-500/30 bg-[#09111c]/95 p-6 sm:p-7 shadow-[0_25px_80px_rgba(0,0,0,0.85),0_0_50px_rgba(71,210,201,0.12)] backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
-        :class="show2048 ? 'max-w-[940px]' : 'max-w-[580px]'"
+        :class="show2048 ? 'max-w-[940px]' : 'max-w-[620px]'"
       >
         <!-- Top Animated Holographic Accent Line -->
         <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-500 via-cyan-300 to-emerald-400 animate-shimmer" />
@@ -208,8 +208,8 @@
         </div>
 
         <!-- Header: Branding, Title, Minigame Toggle, Stop/Close Actions -->
-        <div class="relative z-10 flex items-start justify-between gap-4 mb-6 pb-4 border-b border-white/5">
-          <div class="flex items-center gap-3.5 min-w-0">
+        <div class="relative z-10 flex items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
+          <div class="flex items-center gap-3.5 min-w-0 flex-1">
             <!-- Server or Launcher Icon -->
             <div class="relative shrink-0 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0e2130] to-[#08121c] border border-teal-500/35 shadow-inner">
               <img
@@ -233,12 +233,12 @@
               />
             </div>
 
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
                 <img
                   :src="zirconTitle"
                   alt="Zircon"
-                  class="h-6 w-auto max-w-[130px] select-none object-contain drop-shadow-[0_0_8px_rgba(71,210,201,0.3)]"
+                  class="h-5 w-auto max-w-[110px] select-none object-contain drop-shadow-[0_0_8px_rgba(71,210,201,0.3)]"
                   draggable="false"
                 />
                 <span
@@ -254,7 +254,7 @@
                   {{ running ? $t('overlay.online') : $t('overlay.booting') }}
                 </span>
               </div>
-              <h2 id="launch-dialog-title" class="mt-1 text-lg font-extrabold tracking-tight text-white truncate">
+              <h2 id="launch-dialog-title" class="mt-0.5 text-base sm:text-lg font-extrabold tracking-tight text-white truncate">
                 {{ server?.name || (running ? $t('overlay.game_running') : $t('overlay.starting_mc')) }}
               </h2>
               <p v-if="server?.address" class="text-[11px] font-mono text-teal-400/85 truncate">
@@ -311,8 +311,9 @@
               </span>
             </button>
 
-            <!-- Character Forge Quick Access Button -->
+            <!-- Character Forge Quick Access Button (shown in header when 2048 is expanded) -->
             <button
+              v-if="show2048"
               type="button"
               class="relative inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-300 transition-all duration-200 hover:border-cyan-400/50 hover:text-cyan-200 hover:bg-cyan-500/10"
               :title="$t('overlay.character_forge_tooltip')"
@@ -940,12 +941,18 @@ watch(
     if (isOpen) {
       currentStageIndex.value = 0;
       bannerFailed.value = false;
-      show2048.value = false;
-      expandTimer = setTimeout(() => {
-        if (props.visible) {
-          show2048.value = true;
-        }
-      }, 200);
+      const p = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const isSyncOnly = p && (p.get('modal') === 'sync' || p.has('no_2048'));
+      const is2048Explicit = p && p.get('modal') === '2048';
+
+      show2048.value = is2048Explicit;
+      if (!isSyncOnly) {
+        expandTimer = setTimeout(() => {
+          if (props.visible) {
+            show2048.value = true;
+          }
+        }, 200);
+      }
       advanceStagesSequentially();
     } else {
       currentStageIndex.value = 0;

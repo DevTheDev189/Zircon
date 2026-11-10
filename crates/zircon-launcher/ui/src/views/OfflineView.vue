@@ -3358,7 +3358,8 @@ async function loadShaderVersions(hit) {
       selected.value.id,
       hit.projectId || hit.id,
       hit.origin || shaderProvider.value,
-      shaderSearchAllVersions.value
+      shaderSearchAllVersions.value,
+      'shader'
     );
     hit.versionOptions = versions;
     hit.selectedVersionId = versions[0]?.id || '';
@@ -3413,7 +3414,8 @@ async function loadResourceVersions(hit) {
       selected.value.id,
       hit.projectId || hit.id,
       hit.origin || resourceProvider.value,
-      resourceSearchAllVersions.value
+      resourceSearchAllVersions.value,
+      'resourcepack'
     );
     hit.versionOptions = versions;
     hit.selectedVersionId = versions[0]?.id || '';

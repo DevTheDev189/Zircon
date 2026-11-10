@@ -5,11 +5,18 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 
-# Cache static assets with fast revalidation during active development
-/assets/*
+# CSS and JavaScript: always revalidate immediately so updates reflect instantly
+/assets/css/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Cache images & media
+/assets/img/*
   Cache-Control: public, max-age=300, stale-while-revalidate=600
 
-# HTML pages: always revalidate immediately so deployments are instantaneous
+# HTML pages: always revalidate immediately
 /*.html
   Cache-Control: public, max-age=0, must-revalidate
 

@@ -39,7 +39,7 @@
 
       <div class="flex-1 min-h-0 overflow-y-auto pr-1">
         <!-- Local Wi-Fi / Multicast Discovered Games & Nearby Friends -->
-        <NearbyFriendsCard @join="onJoinLanServer" />
+        <NearbyFriendsCard v-if="showLan" @join="onJoinLanServer" />
 
         <div
           v-if="servers.length === 0"
@@ -769,6 +769,13 @@ const props = defineProps({
   deepLinkServer: { type: Object, default: null },
 });
 
+const showLan = computed(() => {
+  if (typeof window === 'undefined') return true;
+  const p = new URLSearchParams(window.location.search);
+  if (p.has('no_lan') || p.get('lan') === '0') return false;
+  return true;
+});
+
 async function onJoinLanServer(lanServer) {
   const hostLabel = lanServer.hostUsername
     ? `${lanServer.hostUsername}'s World`
@@ -832,7 +839,14 @@ const showConfigModal = ref(false);
 
 function openConfigModal(server) {
   configModalServer.value = server;
-  showConfigModal.value = true;
+  if (showConfigModal.value) {
+    showConfigModal.value = false;
+    nextTick(() => {
+      showConfigModal.value = true;
+    });
+  } else {
+    showConfigModal.value = true;
+  }
 }
 
 function closeConfigModal() {

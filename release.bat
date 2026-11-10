@@ -46,7 +46,7 @@ if /i "!RENDER_SHOTS!"=="y" (
 
 echo.
 echo [2/4] Committing version bump and workspace changes...
-git add .gitignore Cargo.toml Cargo.lock README.md DONT_DELETE_GITHUB_ACTIONS.md crates/ website/ scripts/ shared/ packaging/ release.bat
+git add .gitignore Cargo.toml Cargo.lock README.md DONT_DELETE_GITHUB_ACTIONS.md .github/ docs/ crates/ website/ scripts/ shared/ packaging/ release.bat
 git commit -m "Release v%VERSION%"
 
 echo.

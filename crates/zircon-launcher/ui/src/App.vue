@@ -444,6 +444,29 @@ onMounted(async () => {
   refreshMojangSkin();
   loadAccounts();
   checkOnboardingMigration();
+
+  // Support ?modal=migration for automated screenshot capture
+  if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get('modal');
+    if (m === 'migration' || m === 'app_migration') {
+      api.scanInstalledLaunchers().then((res) => {
+        onboardingScanResults.value = res;
+        showAppMigrationModal.value = true;
+      }).catch(() => {});
+    } else if (m === 'sync' || m === 'launch' || m === '2048') {
+      launchingServer.value = {
+        name: 'Emerald Survival SMP',
+        address: 'emerald.zirconmc.net',
+        modCount: 48,
+        gameDir: 'emerald-survival',
+        banner: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80'
+      };
+      statusText.value = 'Verifying cryptographic mod hashes with Modrinth & CurseForge... (36/48 verified)';
+      progress.value = 0.75;
+      launchModalActive.value = true;
+    }
+  }
   
   window.addEventListener('zircon-open-eula', () => {
     showEulaModal.value = true;
@@ -735,6 +758,13 @@ async function refreshMojangSkin() {
 
 async function checkOnboardingMigration() {
   if (!session.value) return;
+  // In mock / screenshot capture mode, only show onboarding if explicitly requested via ?modal=onboarding
+  if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('mock') && params.get('modal') !== 'onboarding') {
+      return;
+    }
+  }
   if (localStorage.getItem('zircon_migration_onboarding_shown')) return;
   localStorage.setItem('zircon_migration_onboarding_shown', 'true');
   try {
@@ -769,6 +799,29 @@ function onLoggedIn(loggedInSession) {
   refreshMojangSkin();
   loadAccounts();
   checkOnboardingMigration();
+
+  // Support ?modal=migration for automated screenshot capture
+  if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get('modal');
+    if (m === 'migration' || m === 'app_migration') {
+      api.scanInstalledLaunchers().then((res) => {
+        onboardingScanResults.value = res;
+        showAppMigrationModal.value = true;
+      }).catch(() => {});
+    } else if (m === 'sync' || m === 'launch' || m === '2048') {
+      launchingServer.value = {
+        name: 'Emerald Survival SMP',
+        address: 'emerald.zirconmc.net',
+        modCount: 48,
+        gameDir: 'emerald-survival',
+        banner: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80'
+      };
+      statusText.value = 'Verifying cryptographic mod hashes with Modrinth & CurseForge... (36/48 verified)';
+      progress.value = 0.75;
+      launchModalActive.value = true;
+    }
+  }
 }
 
 async function onLogout() {

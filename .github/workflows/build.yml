@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -60,6 +61,37 @@ jobs:
         run: |
           cargo build --release -p zircon-server
 
+      - name: Check Microsoft Azure Trusted Signing Credentials
+        id: azure-sign-check
+        shell: pwsh
+        env:
+          AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:AZURE_SIGNING_ACCOUNT_NAME) -and -not [string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_ID)) {
+            Write-Host "Microsoft Azure Trusted Signing credentials detected — code signing will be performed."
+            echo "has_azure_key=true" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "No Microsoft Azure signing credentials detected. Skipping Windows code signing."
+            echo "has_azure_key=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Sign Zircon Server Binary (Azure Trusted Signing)
+        if: steps.azure-sign-check.outputs.has_azure_key == 'true'
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ secrets.AZURE_ENDPOINT || 'https://eus.codesigning.azure.net/' }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}/target/release
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
       - name: Package Zircon Server
         shell: pwsh
         run: |
@@ -72,21 +104,6 @@ jobs:
           $hash = (Get-FileHash -Path "dist-run/zircon-server-windows-x86_64.zip" -Algorithm SHA256).Hash
           "$hash  zircon-server-windows-x86_64.zip" | Out-File -FilePath "dist-run/zircon-server-windows-x86_64.zip.sha256" -Encoding ascii
           Write-Host "Server packaged: dist-run/zircon-server-windows-x86_64.zip (SHA256: $hash)"
-
-      - name: Check Microsoft Azure Code Signing Key
-        id: azure-sign-check
-        shell: pwsh
-        env:
-          AZURE_KEY_VAULT_URI: ${{ secrets.AZURE_KEY_VAULT_URI }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-        run: |
-          if (-not [string]::IsNullOrWhiteSpace($env:AZURE_KEY_VAULT_URI) -and -not [string]::IsNullOrWhiteSpace($env:AZURE_CLIENT_ID)) {
-            Write-Host "Microsoft Azure developer key detected — code signing will be performed."
-            echo "has_azure_key=true" >> $env:GITHUB_OUTPUT
-          } else {
-            Write-Host "No Microsoft Azure signing credentials detected. Skipping Windows code signing."
-            echo "has_azure_key=false" >> $env:GITHUB_OUTPUT
-          }
 
       - name: Build Zircon Launcher (NSIS & MSI)
         working-directory: crates/zircon-launcher
@@ -103,20 +120,22 @@ jobs:
             npx --yes @tauri-apps/cli build --bundles nsis,msi --config '{"bundle":{"createUpdaterArtifacts":false}}'
           }
 
-      - name: Sign Windows Binaries with Azure (Optional)
+      - name: Sign Windows Installer Bundles (Azure Trusted Signing)
         if: steps.azure-sign-check.outputs.has_azure_key == 'true'
-        shell: pwsh
-        env:
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_KEY_VAULT_URI: ${{ secrets.AZURE_KEY_VAULT_URI }}
-          AZURE_CERT_NAME: ${{ secrets.AZURE_CERT_NAME }}
-        run: |
-          Write-Host "Executing Azure Trusted Signing on Windows bundle artifacts..."
-          # Azure signing placeholder / integration hook:
-          # dotnet tool install --global Azure.CodeSigning.Dlib
-          # or azuresigntool sign -kvu $env:AZURE_KEY_VAULT_URI -kvi $env:AZURE_CLIENT_ID -kvs $env:AZURE_CLIENT_SECRET -kvc $env:AZURE_CERT_NAME ...
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ secrets.AZURE_ENDPOINT || 'https://eus.codesigning.azure.net/' }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}/target/release/bundle
+          files-folder-recurse: true
+          files-folder-filter: exe,msi
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Stage Windows Artifacts
         shell: pwsh

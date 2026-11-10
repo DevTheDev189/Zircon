@@ -32,19 +32,26 @@ To configure in GitHub:
 
 ---
 
-## 3. Microsoft Azure Code Signing (Windows)
+## 3. Microsoft Azure Trusted Signing (Windows)
 
-The Windows job automatically checks for Azure credentials. If absent, it logs `No Microsoft Azure signing credentials detected. Skipping Windows code signing.` and produces unsigned installers (`.exe` and `.msi`).
+The Windows build job automatically checks for Azure Trusted Signing credentials. If absent, it logs `No Microsoft Azure signing credentials detected. Skipping Windows code signing.` and produces working unsigned installers (`.exe` and `.msi`).
 
-When you are ready to enable Azure code signing (via Azure Key Vault or Azure Trusted Signing), add:
+When configured, the pipeline signs both the standalone `zircon-server.exe` and the Tauri installer bundles (`Zircon_*_x64-setup.exe` and `.msi`) using Microsoft's official **`azure/artifact-signing-action`**.
 
-| Secret Name | Purpose |
-| :--- | :--- |
-| `AZURE_TENANT_ID` | Azure Active Directory Tenant ID |
-| `AZURE_CLIENT_ID` | Service Principal / App Registration Client ID |
-| `AZURE_CLIENT_SECRET` | Service Principal Client Secret |
-| `AZURE_KEY_VAULT_URI` | Azure Key Vault URI (e.g., `https://myvault.vault.azure.net/`) |
-| `AZURE_CERT_NAME` | Name of the code-signing certificate inside the Key Vault |
+### GitHub Repository Secrets
+
+| Secret Name | Required? | Description |
+| :--- | :--- | :--- |
+| `AZURE_TENANT_ID` | Required for signing | Azure Active Directory / Microsoft Entra Tenant ID |
+| `AZURE_CLIENT_ID` | Required for signing | App Registration (Service Principal) Application Client ID |
+| `AZURE_CLIENT_SECRET` | Required for signing | App Registration (Service Principal) Client Secret Value |
+| `AZURE_SIGNING_ACCOUNT_NAME` | Required for signing | Name of your Azure Trusted Signing Account |
+| `AZURE_CERT_PROFILE_NAME` | Required for signing | Name of the Certificate Profile under your signing account |
+| `AZURE_ENDPOINT` | Optional | Regional endpoint URI (defaults to `https://eus.codesigning.azure.net/`) |
+
+> [!TIP]
+> **University Student Tip ($100 Free Credits)**:
+> Students with an active `.edu` address can sign up for **Azure for Students** to receive $100 annual cloud credits with no credit card required. The **Azure Trusted Signing Basic Tier** costs ~$9.99/month, meaning your annual student credit will cover ~10 months of automated code signing at zero out-of-pocket cost. See the full setup guide in conversation or the Azure portal.
 
 ---
 

@@ -148,7 +148,12 @@ pub async fn get_server_instance_mods(
 
     for use_https in schemes {
         for base_url in candidate_base_urls(&url_host, port, use_https) {
-            if let Ok(b) = fetch_bom(&state.http, &base_url).await {
+            let bom_attempt = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                fetch_bom(&state.http, &base_url),
+            )
+            .await;
+            if let Ok(Ok(b)) = bom_attempt {
                 let _ = std::fs::create_dir_all(&game_dir);
                 if let Ok(serialized) = serde_json::to_string_pretty(&b) {
                     let _ = std::fs::write(game_dir.join("server-bom.json"), serialized);

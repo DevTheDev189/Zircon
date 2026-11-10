@@ -21,7 +21,7 @@
 
 <p align="center">
   <a href="https://zirconmc.net"><strong> Official Website: zirconmc.net</strong></a> &nbsp;|&nbsp;
-  <a href="https://zirconmc.net/downloads.html"><strong> Download Launcher &amp; Server</strong></a> &nbsp;|&nbsp;
+  <a href="https://zirconmc.net/downloads"><strong> Download Launcher &amp; Server</strong></a> &nbsp;|&nbsp;
   <a href="https://github.com/DevTheDev189/Zircon/releases"><strong> GitHub Releases</strong></a>
 </p>
 
@@ -124,16 +124,21 @@ sequenceDiagram
 
 ## 📥 Downloads & Installation
 
-Pre-built binaries and installers are hosted at [**zirconmc.net/downloads.html**](https://zirconmc.net/downloads.html) and on [**GitHub Releases**](https://github.com/DevTheDev189/Zircon/releases).
+Pre-built binaries and installers are hosted at [**zirconmc.net/downloads**](https://zirconmc.net/downloads) and on [**GitHub Releases**](https://github.com/DevTheDev189/Zircon/releases).
+
+> [!TIP]
+> **First-Time Install Notes**:
+> - **Windows**: If Microsoft Defender SmartScreen appears, click **"More info" $\rightarrow$ "Run anyway"** (as an active independent release, Windows Defender builds reputation with each version).
+> - **macOS**: Right-click Zircon $\rightarrow$ **Open**, or go to **System Settings $\rightarrow$ Privacy & Security** and click **"Open Anyway"** (or run `xattr -cr /Applications/Zircon.app` in Terminal).
 
 ### 🎮 For Players (Companion Launcher)
-1. **Download:** Grab the latest Windows installer (`.msi`) or setup executable (`.exe`) from [zirconmc.net/downloads.html#players](https://zirconmc.net/downloads.html#players).
+1. **Download:** Grab the latest Windows installer (`.msi`) or setup executable (`.exe`) from [zirconmc.net/downloads#players](https://zirconmc.net/downloads#players).
 2. **Install & Launch:** Run the installer and launch **Zircon**.
 3. **Sign In:** Sign in with your official Microsoft account (OAuth2/PKCE).
 4. **Join & Play:** Pick or add your server and click **PLAY**. Zircon automatically syncs and verifies all required mods on launch.
 
 ### 🖥️ For Server Owners (Server Manager)
-1. **Download:** Get the standalone server package (`zircon-server-windows-x86_64.zip`) from [zirconmc.net/downloads.html#server-owners](https://zirconmc.net/downloads.html#server-owners).
+1. **Download:** Get the standalone server package (`zircon-server-windows-x86_64.zip`) from [zirconmc.net/downloads#server-owners](https://zirconmc.net/downloads#server-owners).
 2. **Extract & Run:** Extract the archive and launch `zircon-server.exe`. Copy the generated admin password printed to the console on first launch.
 3. **Open Dashboard:** Navigate to [http://localhost:25564](http://localhost:25564) (or `http://<host>:25565`) and sign in.
 4. **Create Instance:** Accept the EULA, choose your Minecraft version and mod loader (Fabric, Quilt, Forge, NeoForge), add your mods, and start the server.
