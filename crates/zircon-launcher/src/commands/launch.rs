@@ -1121,23 +1121,63 @@ pub(crate) async fn run_offline_flow(
     let is_vr = crate::launch::java::is_vr_instance(&game_dir, Some(&launch_data.version_name));
     let java_args = override_heap_with_context(&instance.java_args, memory_gb, custom_jvm.as_deref(), java_major, is_vr);
 
-    let (player_name, player_uuid): (String, Option<String>) = {
-        let session = state.session.lock().await;
-        if let Some(s) = session.as_ref() {
-            (s.username.clone(), Some(s.uuid.clone()))
-        } else {
+    // --- session & entitlement check (Mojang EULA compliance) ---
+    let mut session_guard = state.session.lock().await;
+    let session = match session_guard.as_ref() {
+        Some(session) if !session.is_expired() => session.clone(),
+        Some(session) => {
+            emit_status(app, "Renewing session...");
+            match state.auth.refresh(session).await {
+                Ok(fresh) => {
+                    *session_guard = Some(fresh.clone());
+                    fresh
+                }
+                Err(err) => {
+                    if !session.access_token.trim().is_empty() && session.access_token != "0" {
+                        tracing::warn!("Session refresh failed ({err}), using cached credentials for offline launch");
+                        session.clone()
+                    } else {
+                        emit_status(app, "Session expired — please sign in again.");
+                        return Err(LauncherError::Auth(
+                            "Session expired; sign in again from the launcher.".to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+        None => {
             let accounts = state.accounts.load_accounts(None);
             if let Some(ref active_uuid) = accounts.active_uuid {
-                if let Some(profile) = accounts.accounts.iter().find(|a| &a.uuid == active_uuid) {
-                    (profile.username.clone(), Some(profile.uuid.clone()))
+                if let Some(saved) = state.accounts.load_session_for_uuid(active_uuid) {
+                    *session_guard = Some(saved.clone());
+                    saved
                 } else {
-                    ("Player".to_string(), None)
+                    emit_status(app, "Sign in required before launching.");
+                    return Err(LauncherError::Auth(
+                        "Not signed in — sign in with your Microsoft account first.".to_string(),
+                    ));
                 }
             } else {
-                ("Player".to_string(), None)
+                emit_status(app, "Sign in required before launching.");
+                return Err(LauncherError::Auth(
+                    "Not signed in — sign in with your Microsoft account first.".to_string(),
+                ));
             }
         }
     };
+    drop(session_guard);
+
+    if !state.auth.check_entitlements(&session.access_token).await {
+        return Err(LauncherError::Auth(
+            "Minecraft rejected this session — the account does not own \
+             Minecraft (Java Edition) or the session was revoked. Please sign \
+             in with an account that owns the game."
+                .to_string(),
+        ));
+    }
+
+    let player_name = session.username.clone();
+    let player_uuid = Some(session.uuid.clone());
 
     emit_status(
         app,

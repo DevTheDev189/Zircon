@@ -1,7 +1,8 @@
 <template>
   <div
     v-if="visible"
-    class="absolute inset-0 z-50 flex items-center justify-center bg-[#070b0f]/85 backdrop-blur-md p-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-[#070b0f]/80 backdrop-blur-md p-4 transition-all duration-200"
+    @click.self="onBackdropClick"
   >
     <!-- Soft cyan ambient glow behind the card -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
@@ -10,18 +11,35 @@
       ></div>
     </div>
 
-    <div class="z-card w-full max-w-[420px] text-center p-8 shadow-2xl relative border border-slate-700/60 overflow-hidden">
+    <div class="z-card w-full max-w-[440px] text-center p-7 sm:p-8 shadow-2xl relative border border-slate-700/60 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <!-- Close button (top right) -->
+      <button
+        v-if="canDismiss && !busy"
+        type="button"
+        class="absolute top-4 right-4 text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800/80 transition-colors cursor-pointer"
+        title="Close"
+        @click="emit('close')"
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+
       <img
         :src="zirconTitle"
         alt="Zircon"
         class="h-10 w-auto mx-auto mb-4 select-none drop-shadow-[0_0_18px_rgba(71,210,201,0.35)]"
         draggable="false"
       />
-      <h2 class="text-white text-lg font-bold mb-1.5 tracking-tight">{{ $t('auth.sign_in_title') }}</h2>
-      <p class="text-slate-400 text-xs mb-6 leading-relaxed">
-        {{ $t('auth.sign_in_description') }}
+      <h2 class="text-white text-lg font-bold mb-1.5 tracking-tight">
+        {{ title || $t('auth.sign_in_title') }}
+      </h2>
+      <p class="text-slate-400 text-xs mb-5 leading-relaxed">
+        {{ reason || $t('auth.sign_in_description') }}
       </p>
 
+      <!-- Primary Action: Microsoft OAuth -->
       <button
         class="z-btn w-full py-2.5 text-sm font-bold disabled:opacity-60 flex items-center justify-center gap-2.5 bg-white text-[#1f2328] shadow-lg shadow-black/30 hover:bg-gray-100 hover:shadow-xl active:translate-y-px rounded-xl transition-all cursor-pointer"
         :disabled="busy"
@@ -37,9 +55,53 @@
         <span v-else>{{ $t('auth.continue_with_microsoft') }}</span>
       </button>
 
+      <!-- Secondary Action: Continue Exploring as Guest -->
+      <button
+        v-if="canDismiss && !busy"
+        type="button"
+        class="z-btn-ghost w-full py-2 text-xs font-semibold text-slate-400 hover:text-white mt-2 rounded-xl transition-colors cursor-pointer"
+        @click="emit('close')"
+      >
+        {{ $t('auth.continue_as_guest') }}
+      </button>
+
       <p v-if="status && !manualAuthUrl" class="text-xs text-cyan-300/90 font-medium mt-4 whitespace-pre-line">
         {{ status }}
       </p>
+
+      <!-- Scope & Access Transparency Section -->
+      <div v-if="!manualAuthUrl && !isOwnershipError" class="mt-5 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-left">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5 font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-cyan-400/80"></span>
+          <span>{{ $t('auth.scope_title') }}</span>
+        </div>
+        <ul class="flex flex-col gap-1.5 text-[11px] text-slate-300">
+          <li class="flex items-start gap-2">
+            <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>{{ $t('auth.scope_license') }}</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>{{ $t('auth.scope_multiplayer') }}</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>{{ $t('auth.scope_profile') }}</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <svg class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>{{ $t('auth.scope_browser') }}</span>
+          </li>
+        </ul>
+      </div>
 
       <!-- Manual Browser Fallback Card (for Linux, minimal WMs, or when browser fails to launch) -->
       <div
@@ -193,10 +255,13 @@ function openEula() {
   window.dispatchEvent(new CustomEvent('zircon-open-eula'));
 }
 
-const emit = defineEmits(['logged-in']);
+const emit = defineEmits(['logged-in', 'close']);
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
+  title: { type: String, default: '' },
+  reason: { type: String, default: '' },
+  canDismiss: { type: Boolean, default: true },
 });
 
 const busy = ref(false);
@@ -207,7 +272,20 @@ const autoOpened = ref(true);
 const copied = ref(false);
 let unlistenAuthUrl = null;
 
+function onBackdropClick() {
+  if (props.canDismiss && !busy.value) {
+    emit('close');
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape' && props.visible && props.canDismiss && !busy.value) {
+    emit('close');
+  }
+}
+
 onMounted(async () => {
+  window.addEventListener('keydown', onKeyDown);
   try {
     unlistenAuthUrl = await onAuthManualUrl((payload) => {
       if (payload && payload.url) {
@@ -221,6 +299,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown);
   if (unlistenAuthUrl) {
     unlistenAuthUrl();
   }

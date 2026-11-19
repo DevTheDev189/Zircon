@@ -157,6 +157,21 @@
             }}
           </button>
 
+          <!-- Sign in to Sync to Mojang prompt for guests -->
+          <button
+            v-if="!session && previewUrl"
+            type="button"
+            class="w-full text-center text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold py-1 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            @click="emit('request-auth', { title: 'Sign in to Sync Skin', reason: 'Sign in with your Microsoft account to upload and wear this custom skin on official Minecraft servers.', action: () => saveAction() })"
+          >
+            <svg class="w-3 h-3 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <span>Sign in to wear on Minecraft</span>
+          </button>
+
           <!-- Edit in Paint Studio Button -->
           <button
             class="z-btn-ghost w-full py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 border border-slate-700/70 hover:border-cyan-400 hover:text-cyan-300 transition-colors"
@@ -591,6 +606,8 @@ import {
   PNG_FILTER,
   renderSkinIsometric3D,
 } from '../lib/api';
+
+const emit = defineEmits(['request-auth']);
 
 const props = defineProps({
   session: { type: Object, default: null },

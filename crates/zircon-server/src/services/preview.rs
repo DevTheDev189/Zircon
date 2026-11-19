@@ -559,6 +559,9 @@ impl WorldPreviewService {
         cmd.arg("-Xms512M");
         cmd.arg("-Djava.awt.headless=true");
         cmd.arg("-Dmixin.debug.countInjections=false");
+        if java_version >= 17 {
+            cmd.arg("-XX:-UseBASE64Intrinsics");
+        }
 
         // 2. ModLoader specific command line arguments (Forge, NeoForge, Quilt, Fabric, Vanilla)
         let loader = mod_loader

@@ -111,6 +111,100 @@
           </div>
         </div>
 
+        <!-- MAGIC PROMPT BAR (NATURAL LANGUAGE TEXT-TO-SKIN) -->
+        <div class="p-3.5 bg-gradient-to-r from-[#0d1624] via-[#09101b] to-[#0c1421] border border-cyan-500/40 rounded-2xl shadow-[0_0_24px_rgba(6,182,212,0.12)] space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+              </svg>
+              <span>Magic Prompt (Natural Language DiT)</span>
+            </label>
+            <span class="text-[11px] text-slate-400">Describe any character, clothing, theme, or style</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <input
+                v-model="promptText"
+                type="text"
+                placeholder="e.g. Cyberpunk street runner with glowing cyan visor, black tactical jacket with neon trim, and dark cargo pants"
+                class="w-full bg-[#060a10] border border-slate-700/80 focus:border-cyan-400 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition-all font-medium pr-10 shadow-inner"
+                @keydown.enter="generateBatch"
+              />
+              <button
+                v-if="promptText"
+                type="button"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 rounded transition-colors text-sm font-bold"
+                @click="promptText = ''"
+              >
+                &times;
+              </button>
+            </div>
+
+            <button
+              type="button"
+              class="z-btn-accent text-xs px-4 py-2.5 rounded-xl font-bold flex items-center gap-1.5 shadow-md hover:shadow-cyan-500/25 shrink-0"
+              :disabled="isGenerating"
+              @click="generateBatch"
+            >
+              <svg class="w-3.5 h-3.5 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <span>Generate (↵)</span>
+            </button>
+          </div>
+
+          <!-- RECURSIVE 3D INPAINTING & PART LOCKING BAR -->
+          <div v-if="refSkinDataUrl" class="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 animate-in fade-in duration-200">
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                <span>🔒 Refining Candidate #{{ refSkinCandidateIndex }}:</span>
+              </span>
+              <span class="text-[10px] text-slate-400">Locked parts preserve 100% exact pixels (0% drift)</span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button
+                v-for="part in PART_LOCK_OPTIONS"
+                :key="part.id"
+                type="button"
+                class="px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border flex items-center gap-1 cursor-pointer"
+                :class="
+                  lockedParts.includes(part.id)
+                    ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-sm'
+                    : 'bg-[#080d14] border-slate-800 text-slate-400 hover:text-slate-200'
+                "
+                @click="toggleLockPart(part.id)"
+              >
+                <span>{{ lockedParts.includes(part.id) ? '🔒' : '🔓' }}</span>
+                <span>{{ part.name }}</span>
+              </button>
+
+              <button
+                type="button"
+                class="px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border flex items-center gap-1 cursor-pointer"
+                :class="
+                  maskOverlayOnly
+                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-sm'
+                    : 'bg-[#080d14] border-slate-800 text-slate-400 hover:text-slate-200'
+                "
+                @click="maskOverlayOnly = !maskOverlayOnly"
+              >
+                <span>🧥 Outer Overlay Only</span>
+              </button>
+
+              <button
+                type="button"
+                class="px-2 py-0.5 rounded-md text-[10px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors ml-1 cursor-pointer"
+                @click="clearReferenceSkin"
+              >
+                Clear Ref
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- 1-CLICK INSPIRATION PRESETS -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
@@ -599,6 +693,19 @@
                   <span>Edit in Studio</span>
                 </button>
 
+                <button
+                  type="button"
+                  class="py-1.5 px-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-200 hover:text-white font-bold text-[11px] transition-colors flex items-center justify-center gap-1.5 w-full cursor-pointer shadow-sm"
+                  title="Use this skin as reference and lock parts to inpaint new clothing or features"
+                  @click="selectAsReference(cand)"
+                >
+                  <svg class="w-3.5 h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <span>Refine / Inpaint (🔒)</span>
+                </button>
+
                 <div class="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
@@ -881,6 +988,44 @@ const selectedVariant = ref('classic');
 const selectedSlots = ref({ ...PRESETS[0].slots });
 const palette = ref([...PRESETS[0].palette]);
 
+// Natural Language Prompt & Recursive 3D Inpainting State
+const promptText = ref('');
+const refSkinDataUrl = ref(null);
+const refSkinCandidateIndex = ref(null);
+const lockedParts = ref(['head', 'legs']);
+const maskOverlayOnly = ref(false);
+
+const PART_LOCK_OPTIONS = [
+  { id: 'head', name: 'Head' },
+  { id: 'torso', name: 'Torso' },
+  { id: 'arms', name: 'Arms' },
+  { id: 'legs', name: 'Legs' },
+];
+
+function toggleLockPart(partId) {
+  const idx = lockedParts.value.indexOf(partId);
+  if (idx >= 0) {
+    lockedParts.value.splice(idx, 1);
+  } else {
+    lockedParts.value.push(partId);
+  }
+}
+
+function selectAsReference(cand) {
+  refSkinDataUrl.value = cand.data_url;
+  refSkinCandidateIndex.value = cand.index + 1;
+  if (lockedParts.value.length === 0) {
+    lockedParts.value = ['head', 'legs'];
+  }
+}
+
+function clearReferenceSkin() {
+  refSkinDataUrl.value = null;
+  refSkinCandidateIndex.value = null;
+  lockedParts.value = [];
+  maskOverlayOnly.value = false;
+}
+
 // Inference Tuning & Random Seed State
 const isRandomSeed = ref(true);
 const currentBaseSeed = ref(generateHighEntropySeed());
@@ -1048,14 +1193,20 @@ async function generateBatch() {
     // Collect active tags from the 8 slots
     const tagsList = Object.values(selectedSlots.value).filter(Boolean);
 
-    const res = await api.generateSkinBatch({
+    const payload = {
       tags: tagsList,
       palette: palette.value,
       variant: selectedVariant.value,
       steps: odeSteps.value,
       guidance_scale: cfgScale.value,
       seed: runSeed,
-    });
+      prompt: promptText.value ? promptText.value.trim() : null,
+      ref_skin_data_url: refSkinDataUrl.value || null,
+      lock_parts: refSkinDataUrl.value && lockedParts.value.length > 0 ? lockedParts.value : null,
+      mask_overlay_only: refSkinDataUrl.value ? maskOverlayOnly.value : null,
+    };
+
+    const res = await api.generateSkinBatch(payload);
 
     generationTime.value = res.generation_time_ms;
     targetProgress.value = 100;

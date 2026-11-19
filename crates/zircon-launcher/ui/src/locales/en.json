@@ -910,7 +910,19 @@
     "minecraft_required_title": "Minecraft Java Edition Required",
     "minecraft_required_description": "This Microsoft account does not own Minecraft Java Edition. You must purchase Minecraft Java Edition to play on Zircon.",
     "buy_btn": "Buy Minecraft Java Edition",
-    "buy_minecraft_button": "Buy Minecraft Java Edition"
+    "buy_minecraft_button": "Buy Minecraft Java Edition",
+    "guest_title": "Guest Explorer",
+    "guest_subtitle": "Click to sign in with Microsoft",
+    "guest_badge": "Guest",
+    "continue_as_guest": "Continue Exploring as Guest",
+    "scope_title": "Scope & Access Transparency",
+    "scope_license": "Ensuring that you own Minecraft Java Edition",
+    "scope_multiplayer": "Authenticating with official multiplayer servers",
+    "scope_profile": "Syncing your player profile and active skin",
+    "scope_browser": "Direct OAuth via default browser (no passwords stored)",
+    "explorer_banner_title": "Explorer Mode",
+    "explorer_banner_desc": "Browse modpacks, configure instances, and create AI skins. Sign in when you are ready to play.",
+    "sign_in_to_play": "Sign in with Microsoft to launch Minecraft"
   },
   "crash_dialog": {
     "default_title": "Minecraft Crashed",

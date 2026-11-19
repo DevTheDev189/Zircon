@@ -2211,7 +2211,7 @@ import {
 } from '../lib/api';
 import { askConfirm } from '../lib/confirm';
 
-const emit = defineEmits(['launching', 'stopped', 'error']);
+const emit = defineEmits(['launching', 'stopped', 'error', 'request-auth']);
 
 const props = defineProps({
   session: { type: Object, default: null },
@@ -2834,6 +2834,14 @@ async function loadPacks() {
 
 async function playOffline() {
   if (!selected.value) return;
+  if (!props.session) {
+    emit('request-auth', {
+      title: `Sign in to Launch ${selected.value.name}`,
+      reason: 'Mojang requires an authenticated Minecraft Java Edition account to download game files and launch Minecraft.',
+      action: () => playOffline(),
+    });
+    return;
+  }
   launching.value = true;
   emit('launching', selected.value ? {
     name: selected.value.name,

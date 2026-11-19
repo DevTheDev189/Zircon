@@ -760,7 +760,7 @@ import CouchCoopModal from '../components/CouchCoopModal.vue';
 import NearbyFriendsCard from '../components/NearbyFriendsCard.vue';
 import { api, getCachedActiveSkin, onSkinUpdated } from '../lib/api';
 
-const emit = defineEmits(['launching', 'stopped', 'error']);
+const emit = defineEmits(['launching', 'stopped', 'error', 'request-auth']);
 
 const props = defineProps({
   session: { type: Object, default: null },
@@ -1092,6 +1092,14 @@ function isThisServerRunning(address) {
 }
 
 async function playServer(server) {
+  if (!props.session) {
+    emit('request-auth', {
+      title: `Sign in to Play ${server.name || 'Server'}`,
+      reason: 'Mojang requires an authenticated Minecraft Java Edition account to verify game ownership and connect to multiplayer servers.',
+      action: () => playServer(server),
+    });
+    return;
+  }
   if (launchingAddress.value) return;
   launchingAddress.value = server.address;
   emit('launching', {

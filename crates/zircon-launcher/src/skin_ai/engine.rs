@@ -10,7 +10,7 @@ use tracing::info;
 
 use crate::paths::skin_ai_model_dir;
 use super::download::{MODEL_ONNX_FILENAME, MODEL_ONNX_FP16_FILENAME, VOCAB_JSON_FILENAME};
-use super::postprocess::{encode_to_png_data_url, postprocess_skin_buffer};
+use super::postprocess::{decode_from_png_data_url, encode_to_png_data_url, postprocess_skin_buffer};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerationRequest {
@@ -20,6 +20,10 @@ pub struct GenerationRequest {
     pub steps: Option<u32>,    // default: 15
     pub guidance_scale: Option<f32>, // default: 2.0
     pub seed: Option<u64>,     // base seed
+    pub prompt: Option<String>,
+    pub ref_skin_data_url: Option<String>,
+    pub lock_parts: Option<Vec<String>>,
+    pub mask_overlay_only: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +77,102 @@ fn is_in_rects(x: u32, y: u32, rects: &[(u32, u32, u32, u32)]) -> bool {
         }
     }
     false
+}
+
+fn compute_edit_mask(req: &GenerationRequest) -> [f32; 64 * 64] {
+    let mut mask = [1.0f32; 64 * 64];
+
+    let Some(ref locked) = req.lock_parts else {
+        return mask;
+    };
+
+    if locked.is_empty() {
+        return mask;
+    }
+
+    let is_locked = |part: &str| -> bool {
+        locked.iter().any(|p| p.eq_ignore_ascii_case(part))
+    };
+
+    let mut set_rect = |x: u32, y: u32, w: u32, h: u32, val: f32| {
+        for row in y..y + h {
+            for col in x..x + w {
+                if col < 64 && row < 64 {
+                    mask[(row * 64 + col) as usize] = val;
+                }
+            }
+        }
+    };
+
+    // Head (Base + Overlay)
+    if is_locked("head") {
+        set_rect(0, 0, 64, 16, 0.0);
+    }
+
+    // Torso (Base + Overlay)
+    if is_locked("torso") || is_locked("body") {
+        set_rect(16, 16, 24, 32, 0.0);
+    }
+
+    // Right Arm (Base + Overlay)
+    if is_locked("right_arm") || is_locked("arms") {
+        set_rect(40, 16, 16, 32, 0.0);
+    }
+
+    // Left Arm (Base + Overlay)
+    if is_locked("left_arm") || is_locked("arms") {
+        set_rect(32, 48, 32, 16, 0.0);
+    }
+
+    // Right Leg (Base + Overlay)
+    if is_locked("right_leg") || is_locked("legs") {
+        set_rect(0, 16, 16, 32, 0.0);
+    }
+
+    // Left Leg (Base + Overlay)
+    if is_locked("left_leg") || is_locked("legs") {
+        set_rect(0, 48, 32, 16, 0.0);
+    }
+
+    // Overlay Only Edit: If mask_overlay_only is true, lock all base layer rects (mask = 0.0)
+    if req.mask_overlay_only.unwrap_or(false) {
+        for &(bx, by, bw, bh) in &BASE_RECTS {
+            set_rect(bx, by, bw, bh, 0.0);
+        }
+    }
+
+    mask
+}
+
+fn rgba_to_7channel(raw_rgba: &[u8; 64 * 64 * 4]) -> Vec<f32> {
+    let mut ch = vec![0.0f32; 7 * 64 * 64];
+    for y in 0..64 {
+        for x in 0..64 {
+            let p = (y * 64 + x) as usize;
+            let idx = p * 4;
+
+            let is_base = is_in_rects(x as u32, y as u32, &BASE_RECTS);
+            let is_overlay = is_in_rects(x as u32, y as u32, &OVERLAY_RECTS);
+
+            let r = raw_rgba[idx] as f32 / 127.5 - 1.0;
+            let g = raw_rgba[idx + 1] as f32 / 127.5 - 1.0;
+            let b = raw_rgba[idx + 2] as f32 / 127.5 - 1.0;
+            let a = raw_rgba[idx + 3];
+
+            if is_base {
+                ch[p] = r;
+                ch[4096 + p] = g;
+                ch[8192 + p] = b;
+            }
+            if is_overlay {
+                ch[12288 + p] = r;
+                ch[16384 + p] = g;
+                ch[20480 + p] = b;
+                ch[24576 + p] = if a > 0 { 1.0 } else { -1.0 };
+            }
+        }
+    }
+    ch
 }
 
 fn derive_variant_seeds(base_seed: u64, count: usize) -> Vec<u64> {
@@ -329,10 +429,20 @@ impl SkinAiEngine {
 
         // Fallback concept generator if model is missing
         info!("Generating concept draft variants (fallback mode)...");
+        let edit_mask = compute_edit_mask(&req);
+        let ref_rgba_opt = req.ref_skin_data_url.as_deref().and_then(|url| decode_from_png_data_url(url).ok());
         let mut variants = Vec::with_capacity(4);
         for i in 0..4 {
             let variant_seed = base_seed.wrapping_add(i as u64 * 7919);
             let mut buffer = Self::generate_concept_draft(&req, variant_seed, is_slim);
+            if let Some(ref_rgba) = &ref_rgba_opt {
+                for p in 0..4096 {
+                    if edit_mask[p] < 0.5 {
+                        let idx = p * 4;
+                        buffer[idx..idx + 4].copy_from_slice(&ref_rgba[idx..idx + 4]);
+                    }
+                }
+            }
             postprocess_skin_buffer(&mut buffer, is_slim);
             let data_url = encode_to_png_data_url(&buffer)?;
             variants.push(GeneratedVariant {
@@ -449,13 +559,26 @@ impl SkinAiEngine {
         let token_ids = resolve_tags(&req.tags, vocab_path);
         let pal_norm = parse_palette_normalized(&req.palette);
 
-        info!(
-            "SkinAiEngine: Starting Euler ODE Flow Matching batch (batch_size={}, steps={}, guidance_scale={:.2}, variant='{}', seed={})",
-            batch_size, steps, guidance_scale, req.variant, base_seed
-        );
-        info!("SkinAiEngine: Resolved tags: {:?}, normalized palette: {:?}", token_ids, pal_norm);
+        let edit_mask = compute_edit_mask(req);
+        let ref_rgba_opt = req.ref_skin_data_url.as_deref().and_then(|url| decode_from_png_data_url(url).ok());
+        let ref_7ch_opt = ref_rgba_opt.as_ref().map(|rgba| rgba_to_7channel(rgba));
 
         let session = session_guard.as_mut().unwrap();
+
+        let is_15ch_model = session.inputs().iter().any(|inp| {
+            inp.name() == "x" && match inp.dtype() {
+                ort::value::ValueType::Tensor { shape, .. } => {
+                    shape.get(1).copied() == Some(15)
+                }
+                _ => false,
+            }
+        });
+
+        info!(
+            "SkinAiEngine: Starting Euler ODE Flow Matching batch (batch_size={}, steps={}, guidance_scale={:.2}, variant='{}', seed={}, 15ch={})",
+            batch_size, steps, guidance_scale, req.variant, base_seed, is_15ch_model
+        );
+        info!("SkinAiEngine: Resolved tags: {:?}, normalized palette: {:?}", token_ids, pal_norm);
 
         // Initialize Gaussian noise x_0 of shape (4, 7, 64, 64)
         let per_variant_size = 7 * 64 * 64;
@@ -493,7 +616,8 @@ impl SkinAiEngine {
 
         // Euler ODE Integration Loop
         let dt = 1.0 / steps as f32;
-        let mut x_cat = Vec::with_capacity(total_x_size * 2);
+        let x_capacity = if is_15ch_model { 8 * 15 * 64 * 64 } else { total_x_size * 2 };
+        let mut x_cat = Vec::with_capacity(x_capacity);
         let ode_start = std::time::Instant::now();
 
         for i in 0..steps {
@@ -513,13 +637,49 @@ impl SkinAiEngine {
 
             // Combined batch size: 2 * batch_size = 8
             x_cat.clear();
-            x_cat.extend_from_slice(&x);
-            x_cat.extend_from_slice(&x);
+            if is_15ch_model {
+                let mask_slice = &edit_mask;
+                let ref_masked: Vec<f32> = if let Some(ref_7ch) = &ref_7ch_opt {
+                    let mut rm = vec![0.0f32; 7 * 4096];
+                    for c in 0..7 {
+                        let c_off = c * 4096;
+                        for p in 0..4096 {
+                            rm[c_off + p] = ref_7ch[c_off + p] * (1.0 - mask_slice[p]);
+                        }
+                    }
+                    rm
+                } else {
+                    vec![0.0f32; 7 * 4096]
+                };
+
+                // Rows 0..3 (Conditional)
+                for b in 0..batch_size {
+                    let b_off = b * per_variant_size;
+                    x_cat.extend_from_slice(&x[b_off..b_off + per_variant_size]);
+                    x_cat.extend_from_slice(&ref_masked);
+                    x_cat.extend_from_slice(mask_slice);
+                }
+                // Rows 4..7 (Unconditional)
+                for b in 0..batch_size {
+                    let b_off = b * per_variant_size;
+                    x_cat.extend_from_slice(&x[b_off..b_off + per_variant_size]);
+                    x_cat.extend(std::iter::repeat(0.0f32).take(7 * 4096));
+                    x_cat.extend_from_slice(mask_slice);
+                }
+            } else {
+                x_cat.extend_from_slice(&x);
+                x_cat.extend_from_slice(&x);
+            }
 
             let t_cat = vec![t_val; 8];
 
-            let x_tensor = ort::value::Tensor::from_array(([8, 7, 64, 64], x_cat.clone()))
-                .map_err(|e| format!("x tensor error: {e}"))?;
+            let x_tensor = if is_15ch_model {
+                ort::value::Tensor::from_array(([8, 15, 64, 64], x_cat.clone()))
+                    .map_err(|e| format!("x tensor error: {e}"))?
+            } else {
+                ort::value::Tensor::from_array(([8, 7, 64, 64], x_cat.clone()))
+                    .map_err(|e| format!("x tensor error: {e}"))?
+            };
             let t_tensor = ort::value::Tensor::from_array(([8], t_cat))
                 .map_err(|e| format!("t tensor error: {e}"))?;
 
@@ -673,6 +833,16 @@ impl SkinAiEngine {
                 }
             }
 
+            // Zero-drift preservation of locked regions from reference skin
+            if let Some(ref_rgba) = &ref_rgba_opt {
+                for p in 0..4096 {
+                    if edit_mask[p] < 0.5 {
+                        let idx = p * 4;
+                        raw_rgba[idx..idx + 4].copy_from_slice(&ref_rgba[idx..idx + 4]);
+                    }
+                }
+            }
+
             postprocess_skin_buffer(&mut raw_rgba, is_slim);
             let data_url = encode_to_png_data_url(&raw_rgba)?;
 
@@ -792,6 +962,10 @@ mod tests {
             steps: Some(1), // Just 1 step to instantly test providers and speed
             guidance_scale: Some(3.5),
             seed: Some(42),
+            prompt: None,
+            ref_skin_data_url: None,
+            lock_parts: None,
+            mask_overlay_only: None,
         };
 
         let res = SkinAiEngine::generate_batch(None, req);
@@ -810,6 +984,10 @@ mod tests {
             steps: Some(6),
             guidance_scale: Some(3.5),
             seed: Some(123),
+            prompt: None,
+            ref_skin_data_url: None,
+            lock_parts: None,
+            mask_overlay_only: None,
         };
         let res2 = SkinAiEngine::generate_batch(None, req2);
         assert!(res2.is_ok(), "Second generate_batch failed: {:?}", res2.err());

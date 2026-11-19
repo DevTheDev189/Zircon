@@ -481,6 +481,14 @@ impl MinecraftProcessManager {
         }));
         let mut launch_args: Vec<String> = crate::process::driver::sanitize_server_java_args(&self.context.java_args)
             .map_err(ProcessError::Io)?;
+        // Security hardening: proactively neutralize the Java4Shell (CVE-2026-114938)
+        // vulnerability on Java 17+ by disabling the AVX-512 Base64 accelerated intrinsic
+        if java_version >= 17 && !launch_args.iter().any(|t| {
+            t.eq_ignore_ascii_case("-XX:+UseBASE64Intrinsics")
+                || t.eq_ignore_ascii_case("-XX:-UseBASE64Intrinsics")
+        }) {
+            launch_args.push("-XX:-UseBASE64Intrinsics".to_string());
+        }
         let loader = ModLoaderType::from_id(&self.context.loader_info.r#type) /* z0 */
             .unwrap_or(ModLoaderType::Vanilla); // z0
         if loader.is_forge_like()  { // z0

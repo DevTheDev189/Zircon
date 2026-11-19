@@ -367,6 +367,41 @@ struct AdoptiumBinary {
 #[derive(serde::Deserialize)]
 struct AdoptiumRelease {
     binary: AdoptiumBinary,
+    #[serde(default)]
+    release_name: Option<String>,
+}
+
+/// Metadata tracked for cached Adoptium runtimes to support automated security updates.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct JdkMetadata {
+    pub major: i32,
+    pub release_name: String,
+    pub checksum: String,
+    pub download_url: String,
+    pub last_checked_epoch_secs: u64,
+    #[serde(default)]
+    pub update_pending: bool,
+}
+
+pub fn jdk_metadata_path(cache_dir: &Path, major: i32) -> PathBuf {
+    cache_dir.join(format!("jdk-{major}.metadata.json"))
+}
+
+pub fn load_jdk_metadata(cache_dir: &Path, major: i32) -> Option<JdkMetadata> {
+    let path = jdk_metadata_path(cache_dir, major);
+    let bytes = std::fs::read(path).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+pub fn save_jdk_metadata(cache_dir: &Path, meta: &JdkMetadata) -> Result<(), LauncherError> {
+    let path = jdk_metadata_path(cache_dir, meta.major);
+    let json = serde_json::to_string_pretty(meta)
+        .map_err(|e| LauncherError::InvalidInput(e.to_string()))?;
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(path, json)?;
+    Ok(())
 }
 
 impl JavaRuntimeResolver {
@@ -377,14 +412,14 @@ impl JavaRuntimeResolver {
         }
     }
 
-    /// Queries the Adoptium v3 assets API for the verified download URL and
-    /// SHA-256 checksum of the latest Temurin JDK for `major`.
+    /// Queries the Adoptium v3 assets API for the verified download URL,
+    /// SHA-256 checksum, and release name of the latest Temurin JDK for `major`.
     ///
     /// The metadata request itself is subject to the SSRF guard: only the
     /// allowlisted `api.adoptium.net` host may be queried, so a corrupted
     /// configuration can never redirect the probe at an internal host. The
     /// returned checksum is what later gates the actual archive download.
-    async fn fetch_adoptium_release(&self, major: i32) -> Result<(String, String), LauncherError> {
+    async fn fetch_adoptium_release(&self, major: i32) -> Result<(String, String, String), LauncherError> {
         let api_url = adoptium_metadata_url(major);
 
         if !zircon_core::security::ssrf::is_safe_cdn_url(&api_url) {
@@ -408,7 +443,73 @@ impl JavaRuntimeResolver {
             ))
         })?;
 
-        Ok((first.binary.package.link, first.binary.package.checksum))
+        let release_name = first
+            .release_name
+            .unwrap_or_else(|| format!("jdk-{major}"));
+        Ok((
+            first.binary.package.link,
+            first.binary.package.checksum,
+            release_name,
+        ))
+    }
+
+    /// Checks Adoptium for a newer security or point release of `major`.
+    ///
+    /// Throttled to once every 24 hours per major version unless `force` is true.
+    /// If an update is detected, `update_pending` is flagged in the JDK's metadata
+    /// so that the next launch requiring this major version automatically refreshes it.
+    pub async fn check_and_mark_jdk_update(
+        &self,
+        major: i32,
+        force: bool,
+    ) -> Result<bool, LauncherError> {
+        let jdk_dir = self.cache_dir.join(format!("jdk-{major}"));
+        if !jdk_dir.is_dir() {
+            return Ok(false);
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let current_meta = load_jdk_metadata(&self.cache_dir, major);
+        if let Some(meta) = &current_meta {
+            if !force && !meta.update_pending && now.saturating_sub(meta.last_checked_epoch_secs) < 86_400 {
+                return Ok(false);
+            }
+        }
+
+        match self.fetch_adoptium_release(major).await {
+            Ok((download_url, checksum, release_name)) => {
+                let has_update = match &current_meta {
+                    Some(m) => !m.checksum.eq_ignore_ascii_case(&checksum),
+                    None => true, // unverified legacy installation
+                };
+                let new_meta = JdkMetadata {
+                    major,
+                    release_name,
+                    checksum,
+                    download_url,
+                    last_checked_epoch_secs: now,
+                    update_pending: has_update,
+                };
+                if let Err(e) = save_jdk_metadata(&self.cache_dir, &new_meta) {
+                    tracing::warn!("Failed to save JDK metadata for Java {major}: {e}");
+                }
+                if has_update {
+                    tracing::info!(
+                        "Java {major} has a newer security release available ({}) - flagged for auto-update on next launch",
+                        new_meta.release_name
+                    );
+                }
+                Ok(has_update)
+            }
+            Err(e) => {
+                tracing::warn!("Could not check Adoptium for Java {major} updates: {e}");
+                Ok(false)
+            }
+        }
     }
 
     /// Returns a Java home whose major version is `>= required_major`.
@@ -476,6 +577,11 @@ impl JavaRuntimeResolver {
     }
 
     /// Returns a Java home matching `requirement`, downloading from Adoptium if necessary.
+    ///
+    /// If an existing cached runtime is present but flagged as having a pending security update,
+    /// an automated update is attempted. If the update fails (e.g. offline play or network drop),
+    /// the resolver logs a warning and cleanly falls back to the cached runtime to prevent
+    /// disruption.
     pub async fn resolve_with_requirement_progress(
         &self,
         requirement: &JavaRequirement,
@@ -495,11 +601,47 @@ impl JavaRuntimeResolver {
         }
 
         let jdk_dir = self.cache_dir.join(format!("jdk-{pref}"));
-        if let Some(home) = find_java_home_in(&jdk_dir) {
-            tracing::info!("Using cached Java runtime at {}", home.display());
-            return Ok(home);
+        let meta = load_jdk_metadata(&self.cache_dir, pref);
+        let is_cached = find_java_home_in(&jdk_dir).is_some();
+
+        if is_cached {
+            let update_needed = meta.as_ref().map_or(true, |m| m.update_pending);
+            if update_needed {
+                tracing::info!("Java {pref} has a pending security update or missing metadata. Attempting update...");
+                if let Some(l) = listener {
+                    l.on_status(&format!("Updating Java {pref} to latest security release..."));
+                }
+                match self.download_and_extract_jdk(pref, listener).await {
+                    Ok(new_home) => {
+                        tracing::info!("Successfully updated Java {pref} at {}", new_home.display());
+                        return Ok(new_home);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to update Java {pref} ({e}). Falling back to existing cached runtime.");
+                    }
+                }
+            }
+
+            if let Some(home) = find_java_home_in(&jdk_dir) {
+                tracing::info!("Using cached Java runtime at {}", home.display());
+                return Ok(home);
+            }
         }
 
+        self.download_and_extract_jdk(pref, listener).await
+    }
+
+    /// Downloads, verifies, and cleanly installs the latest Adoptium Temurin release for `major`.
+    ///
+    /// If an older version already exists at `cache_dir/jdk-{major}`, it extracts to a temporary
+    /// directory first, verifies integrity, swaps the directories atomically, and purges the
+    /// obsolete runtime to save disk space.
+    pub async fn download_and_extract_jdk(
+        &self,
+        major: i32,
+        listener: Option<&dyn ProgressListener>,
+    ) -> Result<PathBuf, LauncherError> {
+        let pref = major;
         if let Some(l) = listener {
             l.on_status(&format!("Fetching Java {pref} release from Adoptium..."));
         }
@@ -507,19 +649,15 @@ impl JavaRuntimeResolver {
             "Downloading Java {} runtime from Adoptium (this can take a few minutes)...",
             pref
         );
-        // Adoptium serves .zip on Windows and .tar.gz on Linux/macOS.
+
         let archive_ext = if cfg!(target_os = "windows") {
             "zip"
         } else {
             "tar.gz"
         };
-        let archive = self
-            .cache_dir
-            .join(format!("jdk-{pref}.{archive_ext}"));
+        let archive = self.cache_dir.join(format!("jdk-{pref}.{archive_ext}"));
 
-        // Resolve the canonical download URL and its SHA-256 from Adoptium's
-        // metadata API *before* fetching anything.
-        let (download_url, expected_sha256) = self.fetch_adoptium_release(pref).await?;
+        let (download_url, expected_sha256, release_name) = self.fetch_adoptium_release(pref).await?;
         if !zircon_core::security::ssrf::is_safe_cdn_url(&download_url) {
             return Err(LauncherError::InvalidInput(
                 "Adoptium package download URL rejected by SSRF guard".into(),
@@ -527,18 +665,14 @@ impl JavaRuntimeResolver {
         }
 
         if let Some(l) = listener {
-            l.on_status(&format!("Downloading Java {pref} from Adoptium..."));
+            l.on_status(&format!("Downloading Java {pref} ({release_name})..."));
         }
-        tracing::info!("Downloading Java {pref} from {download_url}...");
+        tracing::info!("Downloading Java {pref} ({release_name}) from {download_url}...");
         self.download(&download_url, &archive).await?;
 
         if let Some(l) = listener {
             l.on_status(&format!("Verifying Java {pref} archive checksum..."));
         }
-        // Cryptographic integrity check: the archive must match the SHA-256
-        // published by Adoptium's metadata API. A poisoned or corrupted
-        // download is deleted and the launch aborts before anything is
-        // extracted or executed.
         if let Err(e) = verify_sha256(&archive, &expected_sha256).await {
             let _ = tokio::fs::remove_file(&archive).await;
             return Err(e);
@@ -548,13 +682,59 @@ impl JavaRuntimeResolver {
         if let Some(l) = listener {
             l.on_status(&format!("Extracting Java {pref} runtime..."));
         }
-        self.extract(&archive, &jdk_dir)?;
+
+        let jdk_dir = self.cache_dir.join(format!("jdk-{pref}"));
+        let tmp_dir = self.cache_dir.join(format!("jdk-{pref}.tmp"));
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+
+        self.extract(&archive, &tmp_dir)?;
+
+        if find_java_home_in(&tmp_dir).is_none() {
+            let _ = std::fs::remove_dir_all(&tmp_dir);
+            return Err(LauncherError::Process(format!(
+                "Java runtime downloaded but java executable not found under {}",
+                tmp_dir.display()
+            )));
+        }
+
+        // Atomic directory swap: replace old runtime safely and purge outdated runtime to save space
+        if jdk_dir.exists() {
+            let old_dir = self.cache_dir.join(format!("jdk-{pref}.old"));
+            let _ = std::fs::remove_dir_all(&old_dir);
+            if let Err(e) = std::fs::rename(&jdk_dir, &old_dir) {
+                tracing::warn!("Failed to rename old jdk dir ({e}); attempting direct remove");
+                let _ = std::fs::remove_dir_all(&jdk_dir);
+            } else {
+                let _ = std::fs::remove_dir_all(&old_dir);
+            }
+        }
+
+        if let Err(e) = std::fs::rename(&tmp_dir, &jdk_dir) {
+            return Err(LauncherError::Process(format!(
+                "Failed to finalize Java runtime installation: {e}"
+            )));
+        }
+
+        // Record verified metadata
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let meta = JdkMetadata {
+            major: pref,
+            release_name,
+            checksum: expected_sha256,
+            download_url,
+            last_checked_epoch_secs: now,
+            update_pending: false,
+        };
+        let _ = save_jdk_metadata(&self.cache_dir, &meta);
 
         if let Some(home) = find_java_home_in(&jdk_dir) {
             return Ok(home);
         }
         Err(LauncherError::Process(format!(
-            "Java runtime downloaded but java executable not found under {}",
+            "Java runtime finalized but java executable not found under {}",
             jdk_dir.display()
         )))
     }
@@ -623,6 +803,19 @@ impl JavaRuntimeResolver {
         let mut tar = tar::Archive::new(decoder);
         tar.unpack(target_dir)?;
         Ok(())
+    }
+}
+
+/// Scans the launcher cache directory and flags any installed JDK runtimes that have
+/// pending security or patch updates available from Eclipse Adoptium.
+pub async fn check_and_mark_all_cached_jdk_updates() {
+    let cache_dir = paths::launcher_dir();
+    let resolver = JavaRuntimeResolver::new(cache_dir.clone());
+    for major in [8, 16, 17, 21, 25] {
+        let jdk_dir = cache_dir.join(format!("jdk-{major}"));
+        if jdk_dir.is_dir() {
+            let _ = resolver.check_and_mark_jdk_update(major, false).await;
+        }
     }
 }
 
@@ -1174,5 +1367,27 @@ mod tests {
 
         let release_8 = "JAVA_VERSION=\"1.8.0_392\"\n";
         assert_eq!(parse_major_from_release_file(release_8), Some(8));
+    }
+
+    #[test]
+    fn test_jdk_metadata_roundtrip() {
+        let temp = std::env::temp_dir().join(format!("zircon-jdk-meta-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let meta = JdkMetadata {
+            major: 21,
+            release_name: "jdk-21.0.13+1".into(),
+            checksum: "abcdef1234567890".into(),
+            download_url: "https://example.com/jdk.zip".into(),
+            last_checked_epoch_secs: 1731974400,
+            update_pending: true,
+        };
+
+        assert!(save_jdk_metadata(&temp, &meta).is_ok());
+        let loaded = load_jdk_metadata(&temp, 21).expect("metadata must load");
+        assert_eq!(loaded, meta);
+
+        let _ = std::fs::remove_dir_all(&temp);
     }
 }

@@ -800,10 +800,125 @@ pub fn java_bin() -> String {
     java_bin_for_version(21)
 }
 
+/// Metadata tracked for cached server runtimes to support automated security updates.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct ServerJdkMetadata {
+    pub major: u8,
+    pub release_name: String,
+    pub checksum: String,
+    pub download_url: String,
+    pub last_checked_epoch_secs: u64,
+    #[serde(default)]
+    pub update_pending: bool,
+}
+
+pub fn server_jdk_metadata_path(major: u8) -> PathBuf {
+    PathBuf::from("server-data").join("runtimes").join(format!("jdk-{major}.metadata.json"))
+}
+
+pub fn load_server_jdk_metadata(major: u8) -> Option<ServerJdkMetadata> {
+    let path = server_jdk_metadata_path(major);
+    let bytes = std::fs::read(path).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+pub fn save_server_jdk_metadata(meta: &ServerJdkMetadata) -> Result<(), InstallError> {
+    let path = server_jdk_metadata_path(meta.major);
+    let json = serde_json::to_string_pretty(meta)
+        .map_err(|e| InstallError::Config(e.to_string()))?;
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(path, json)?;
+    Ok(())
+}
+
+/// Checks Adoptium for a newer security or point release of server Java `major`.
+///
+/// Throttled to once every 24 hours per major version unless `force` is true.
+/// If an update is detected, `update_pending` is flagged in metadata so that the
+/// next server launch using this Java version automatically refreshes it.
+pub async fn check_and_mark_server_jdk_update(major: u8, force: bool) -> Result<bool, InstallError> {
+    let candidate_dir = PathBuf::from("server-data").join("runtimes").join(format!("jdk-{major}"));
+    if !candidate_dir.is_dir() {
+        return Ok(false);
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let current_meta = load_server_jdk_metadata(major);
+    if let Some(meta) = &current_meta {
+        if !force && !meta.update_pending && now.saturating_sub(meta.last_checked_epoch_secs) < 86_400 {
+            return Ok(false);
+        }
+    }
+
+    match query_adoptium_release(major).await {
+        Ok((download_url, checksum, release_name)) => {
+            let has_update = match &current_meta {
+                Some(m) => !m.checksum.eq_ignore_ascii_case(&checksum),
+                None => true,
+            };
+            let new_meta = ServerJdkMetadata {
+                major,
+                release_name,
+                checksum,
+                download_url,
+                last_checked_epoch_secs: now,
+                update_pending: has_update,
+            };
+            let _ = save_server_jdk_metadata(&new_meta);
+            if has_update {
+                tracing::info!(
+                    "Server Java {major} has a newer security release available ({}) - flagged for auto-update on next start",
+                    new_meta.release_name
+                );
+            }
+            Ok(has_update)
+        }
+        Err(e) => {
+            tracing::warn!("Could not check Adoptium for server Java {major} updates: {e}");
+            Ok(false)
+        }
+    }
+}
+
+/// Scans the server runtimes directory and flags any installed JDK runtimes that have
+/// pending security or patch updates available from Eclipse Adoptium.
+pub async fn check_and_mark_all_cached_jdk_updates() {
+    for major in [8, 16, 17, 21, 25] {
+        let _ = check_and_mark_server_jdk_update(major, false).await;
+    }
+}
+
 /// Ensures a Java runtime for `target_major` is present on the system.
+/// If an existing runtime has a pending security update, an update is attempted.
 /// If no local JDK or system Java is found, it automatically provisions the
 /// official Eclipse Adoptium Temurin JDK into `server-data/runtimes/jdk-{target_major}`.
 pub async fn ensure_java_installed(target_major: u8) -> Result<String, InstallError> {
+    let runtimes_dir = PathBuf::from("server-data").join("runtimes").join(format!("jdk-{target_major}"));
+    let meta = load_server_jdk_metadata(target_major);
+
+    // If an update is pending or metadata is missing for an existing managed runtime:
+    if runtimes_dir.is_dir() {
+        let update_needed = meta.as_ref().map_or(true, |m| m.update_pending);
+        if update_needed {
+            tracing::info!("Server Java {target_major} has a pending security update or missing metadata. Attempting update...");
+            match download_adoptium_jdk(target_major, &runtimes_dir).await {
+                Ok(java_path) => {
+                    tracing::info!("Successfully updated server Java {target_major} at {java_path}");
+                    return Ok(java_path);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to auto-update Java {target_major} from Adoptium ({e}). Falling back to existing runtime.");
+                }
+            }
+        }
+    }
+
     let existing = java_bin_for_version(target_major);
     let exe = if is_windows() { "java.exe" } else { "java" };
 
@@ -819,7 +934,6 @@ pub async fn ensure_java_installed(target_major: u8) -> Result<String, InstallEr
 
     // Auto-provision from Adoptium Temurin API
     tracing::info!("Java {target_major} not found locally. Auto-downloading Temurin JDK from Eclipse Adoptium...");
-    let runtimes_dir = PathBuf::from("server-data").join("runtimes").join(format!("jdk-{target_major}"));
     let _ = fs::create_dir_all(&runtimes_dir);
 
     match download_adoptium_jdk(target_major, &runtimes_dir).await {
@@ -853,9 +967,11 @@ struct AdoptiumBinary {
 #[derive(serde::Deserialize)]
 struct AdoptiumRelease {
     binary: AdoptiumBinary,
+    #[serde(default)]
+    release_name: Option<String>,
 }
 
-async fn download_adoptium_jdk(major: u8, target_dir: &Path) -> Result<String, InstallError> {
+pub async fn query_adoptium_release(major: u8) -> Result<(String, String, String), InstallError> {
     let os = if is_windows() {
         "windows"
     } else if cfg!(target_os = "macos") {
@@ -898,6 +1014,8 @@ async fn download_adoptium_jdk(major: u8, target_dir: &Path) -> Result<String, I
 
     let download_url = first.binary.package.link;
     let expected_checksum = first.binary.package.checksum.trim().to_string();
+    let release_name = first.release_name.unwrap_or_else(|| format!("jdk-{major}"));
+
     if !ssrf::is_safe_cdn_url(&download_url) {
         return Err(InstallError::Http(format!(
             "Rejected Adoptium JDK download URL (host is not an allowed CDN): {download_url}"
@@ -909,8 +1027,14 @@ async fn download_adoptium_jdk(major: u8, target_dir: &Path) -> Result<String, I
         ));
     }
 
+    Ok((download_url, expected_checksum, release_name))
+}
+
+async fn download_adoptium_jdk(major: u8, target_dir: &Path) -> Result<String, InstallError> {
+    let (download_url, expected_checksum, release_name) = query_adoptium_release(major).await?;
+
     tracing::info!(
-        "Downloading Java {major} runtime from {download_url} into {}...",
+        "Downloading Java {major} runtime ({release_name}) from {download_url} into {}...",
         target_dir.display()
     );
 
@@ -953,11 +1077,15 @@ async fn download_adoptium_jdk(major: u8, target_dir: &Path) -> Result<String, I
     }
 
     let exe = if is_windows() { "java.exe" } else { "java" };
+    let parent = target_dir.parent().unwrap_or_else(|| Path::new("."));
+    let tmp_dir = parent.join(format!("jdk-{major}.tmp"));
+    let _ = fs::remove_dir_all(&tmp_dir);
+    let _ = fs::create_dir_all(&tmp_dir);
 
     if is_windows() || download_url.ends_with(".zip") {
         let cursor = std::io::Cursor::new(bytes);
         let guard = zircon_core::archive::limits::ArchiveGuard::for_server_import();
-        zircon_core::archive::zip::extract_zip(cursor, target_dir, &guard)
+        zircon_core::archive::zip::extract_zip(cursor, &tmp_dir, &guard)
             .map_err(|e| InstallError::Config(format!("Failed to extract JDK zip archive: {e}")))?;
     } else {
         let cursor = std::io::Cursor::new(bytes);
@@ -965,9 +1093,50 @@ async fn download_adoptium_jdk(major: u8, target_dir: &Path) -> Result<String, I
         let mut archive = tar::Archive::new(decoder);
         archive.set_preserve_permissions(false);
         archive
-            .unpack(target_dir)
+            .unpack(&tmp_dir)
             .map_err(|e| InstallError::Config(format!("Failed to unpack JDK tar.gz archive: {e}")))?;
     }
+
+    let _cand = find_java_exe_in_tree(&tmp_dir, exe).ok_or_else(|| {
+        let _ = fs::remove_dir_all(&tmp_dir);
+        InstallError::Config(format!(
+            "JDK extracted into {} but {exe} was not found",
+            tmp_dir.display()
+        ))
+    })?;
+
+    // Atomic swap: replace old runtime and purge outdated files to save disk space
+    if target_dir.exists() {
+        let old_dir = parent.join(format!("jdk-{major}.old"));
+        let _ = fs::remove_dir_all(&old_dir);
+        if let Err(e) = fs::rename(target_dir, &old_dir) {
+            tracing::warn!("Failed to rename old server jdk dir ({e}); attempting direct remove");
+            let _ = fs::remove_dir_all(target_dir);
+        } else {
+            let _ = fs::remove_dir_all(&old_dir);
+        }
+    }
+
+    if let Err(e) = fs::rename(&tmp_dir, target_dir) {
+        return Err(InstallError::Config(format!(
+            "Failed to finalize Java runtime installation: {e}"
+        )));
+    }
+
+    // Save metadata
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let meta = ServerJdkMetadata {
+        major,
+        release_name,
+        checksum: expected_checksum,
+        download_url,
+        last_checked_epoch_secs: now,
+        update_pending: false,
+    };
+    let _ = save_server_jdk_metadata(&meta);
 
     if let Some(cand) = find_java_exe_in_tree(target_dir, exe) {
         #[cfg(unix)]
@@ -1282,5 +1451,21 @@ mod tests {
         assert!(find_server_args_file(&dir, "49.0.0").is_some());
         assert!(find_server_args_file(&dir, "50.0.0").is_none());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_server_jdk_metadata_serialization() {
+        let meta = ServerJdkMetadata {
+            major: 21,
+            release_name: "jdk-21.0.13+1".into(),
+            checksum: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90".into(),
+            download_url: "https://example.com/jdk.zip".into(),
+            last_checked_epoch_secs: 1731974400,
+            update_pending: true,
+        };
+
+        let json = serde_json::to_string(&meta).unwrap();
+        let deserialized: ServerJdkMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(meta, deserialized);
     }
 }

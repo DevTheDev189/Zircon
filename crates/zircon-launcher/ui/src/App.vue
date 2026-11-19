@@ -1,7 +1,14 @@
 <template>
   <div class="relative h-full flex flex-col bg-bg text-text">
-    <!-- Microsoft login overlay (visible only when signed out) -->
-    <LoginOverlay :visible="!authChecking && !session" @logged-in="onLoggedIn" />
+    <!-- Contextual Microsoft sign-in modal (deferred authentication) -->
+    <LoginOverlay
+      :visible="showLoginModal"
+      :title="loginModalTitle"
+      :reason="loginModalReason"
+      :can-dismiss="true"
+      @close="onLoginModalClose"
+      @logged-in="onLoggedIn"
+    />
     <!-- First-Login Onboarding Instance Migration Welcome Dialog -->
     <OnboardingWelcomeModal
       :open="showOnboardingWelcomeModal"
@@ -107,23 +114,40 @@
         <div class="px-3 pb-4 relative user-account-switcher-container">
           <div
             class="z-card flex items-center gap-2.5 p-2.5 transition-all hover:border-accent/40 cursor-pointer"
-            @click="session ? (showAccountSwitcher = !showAccountSwitcher) : addAccount()"
-            :title="session ? 'Account Switcher' : 'Sign in / Add Account'"
+            @click="session ? (showAccountSwitcher = !showAccountSwitcher) : triggerLoginModal()"
+            :title="session ? 'Account Switcher' : 'Sign in with Microsoft'"
           >
+            <!-- Authenticated Avatar -->
             <img
-              v-if="avatarUrl"
+              v-if="session && avatarUrl"
               :src="avatarUrl"
               class="w-8 h-8 rounded-lg image-render-pixel border border-slate-700/80 ring-1 ring-accent/30"
               alt="avatar"
             />
-            <div v-else class="w-8 h-8 rounded-lg bg-[#1a232f] border border-slate-700"></div>
+            <!-- Guest Clean Vector Avatar -->
+            <div
+              v-else
+              class="w-8 h-8 rounded-lg bg-[#1a232f] border border-slate-700/80 flex items-center justify-center text-slate-400 shrink-0"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
             <div class="flex-1 min-w-0">
-              <div class="text-xs font-bold text-white truncate">
-                {{ session?.username || 'Not signed in' }}
+              <div class="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                <span class="truncate">{{ session?.username || $t('auth.guest_title') }}</span>
+                <span
+                  v-if="!session"
+                  class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold tracking-wider uppercase bg-accent/15 text-accent-bright border border-accent/30 shrink-0"
+                >
+                  {{ $t('auth.guest_badge') }}
+                </span>
               </div>
-              <div class="text-[10px] text-accent font-mono flex items-center gap-1">
-                <span>Microsoft</span>
-                <span v-if="accounts.length > 1" class="text-slate-400">({{ accounts.length }})</span>
+              <div class="text-[10px] text-accent font-mono flex items-center gap-1 truncate">
+                <span v-if="session">Microsoft</span>
+                <span v-else class="text-slate-400 hover:text-cyan-300 transition-colors">{{ $t('auth.guest_subtitle') }}</span>
+                <span v-if="session && accounts.length > 1" class="text-slate-400">({{ accounts.length }})</span>
               </div>
             </div>
             <svg
@@ -201,6 +225,46 @@
         <!-- Animated Background & Wallpaper Engine Layer -->
         <ZirconBackground :game-running="Boolean(gameStatus?.running)" />
 
+        <!-- Non-intrusive Explorer Mode Welcome Banner -->
+        <div
+          v-if="!session && !explorerBannerDismissed && !authChecking"
+          class="relative z-20 mx-5 mt-4 px-4 py-2.5 rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-between gap-3 shadow-lg shadow-black/20 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-6 h-6 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center text-accent-bright shrink-0">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </div>
+            <div class="text-xs text-slate-200 truncate">
+              <span class="font-bold text-accent-bright mr-1.5">{{ $t('auth.explorer_banner_title') }}:</span>
+              <span class="text-slate-300">{{ $t('auth.explorer_banner_desc') }}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              class="z-btn-accent text-xs font-bold px-3 py-1 rounded-xl shadow-sm cursor-pointer"
+              @click="triggerLoginModal()"
+            >
+              {{ $t('auth.sign_in_title') }}
+            </button>
+            <button
+              type="button"
+              class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              title="Dismiss"
+              @click="dismissExplorerBanner"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <div class="relative z-10 flex-1 min-h-0 overflow-hidden">
           <KeepAlive>
             <ServersView
@@ -212,6 +276,7 @@
               @launching="onLaunching"
               @stopped="onStopped"
               @error="onLaunchError"
+              @request-auth="onRequestAuth"
             />
             <OfflineView
               v-else-if="view === 'offline'"
@@ -220,6 +285,7 @@
               @launching="onLaunching"
               @stopped="onStopped"
               @error="onLaunchError"
+              @request-auth="onRequestAuth"
             />
             <MissionControlView
               v-else-if="view === 'mission_control'"
@@ -227,7 +293,11 @@
               :session="session"
               @stopped="onStopped"
             />
-            <SkinsView v-else-if="view === 'skins'" :session="session" />
+            <SkinsView
+              v-else-if="view === 'skins'"
+              :session="session"
+              @request-auth="onRequestAuth"
+            />
             <SettingsView v-else-if="view === 'settings'" />
           </KeepAlive>
         </div>
@@ -401,6 +471,38 @@ const showAppMigrationModal = ref(false);
 const onboardingScanResults = ref([]);
 const showEulaModal = ref(false);
 
+// Deferred authentication & explorer mode state
+const showLoginModal = ref(false);
+const loginModalTitle = ref('');
+const loginModalReason = ref('');
+let pendingPostLoginAction = null;
+const explorerBannerDismissed = ref(
+  typeof localStorage !== 'undefined' ? localStorage.getItem('zircon_explorer_banner_dismissed') === 'true' : false
+);
+
+function dismissExplorerBanner() {
+  explorerBannerDismissed.value = true;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('zircon_explorer_banner_dismissed', 'true');
+  }
+}
+
+function triggerLoginModal(title = '', reason = '', action = null) {
+  loginModalTitle.value = title;
+  loginModalReason.value = reason;
+  pendingPostLoginAction = action;
+  showLoginModal.value = true;
+}
+
+function onLoginModalClose() {
+  showLoginModal.value = false;
+  pendingPostLoginAction = null;
+}
+
+function onRequestAuth(payload) {
+  triggerLoginModal(payload?.title, payload?.reason, payload?.action);
+}
+
 let unlisten = [];
 
 onMounted(async () => {
@@ -573,6 +675,12 @@ onMounted(async () => {
   window.addEventListener('accounts-updated', onAccountsUpdated);
   unlisten.push(() => window.removeEventListener('accounts-updated', onAccountsUpdated));
 
+  const onRequestAuthEvent = (e) => {
+    onRequestAuth(e.detail);
+  };
+  window.addEventListener('zircon-request-auth', onRequestAuthEvent);
+  unlisten.push(() => window.removeEventListener('zircon-request-auth', onRequestAuthEvent));
+
   api.getSettings().then((s) => {
     if (s) {
       applyTheme({
@@ -701,25 +809,9 @@ async function switchAccount(uuid) {
   }
 }
 
-async function addAccount() {
+function addAccount() {
   showAccountSwitcher.value = false;
-  try {
-    const newSession = await api.loginMicrosoft();
-    session.value = newSession;
-    await refreshAvatar();
-    await refreshMojangSkin();
-    await loadAccounts();
-    statusText.value = `Added ${newSession.username}.`;
-  } catch (err) {
-    console.error('Login error:', err);
-    const msg = String(err).toLowerCase();
-    if (msg.includes('does not own minecraft') || (msg.includes('404') && (msg.includes('profile') || msg.includes('minecraft')))) {
-      statusText.value = 'Account does not own Minecraft Java Edition. Purchase required.';
-      api.openBrowserUrl('https://www.minecraft.net/store/minecraft-java-bedrock-edition-pc').catch(() => {});
-    } else {
-      statusText.value = `Login failed: ${err}`;
-    }
-  }
+  triggerLoginModal('Add Microsoft Account', 'Sign in with another Microsoft account to switch profiles seamlessly.');
 }
 
 async function removeAccount(uuid) {
@@ -795,10 +887,22 @@ function onAppInstancesMigrated() {
 function onLoggedIn(loggedInSession) {
   session.value = loggedInSession;
   statusText.value = 'Signed in.';
+  showLoginModal.value = false;
   refreshAvatar();
   refreshMojangSkin();
   loadAccounts();
   checkOnboardingMigration();
+
+  // Seamless action resumption: execute any action that was pending before the login gate
+  if (typeof pendingPostLoginAction === 'function') {
+    const act = pendingPostLoginAction;
+    pendingPostLoginAction = null;
+    try {
+      act();
+    } catch (err) {
+      console.error('Failed to execute pending post-login action:', err);
+    }
+  }
 
   // Support ?modal=migration for automated screenshot capture
   if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {

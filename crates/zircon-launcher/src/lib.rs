@@ -150,6 +150,10 @@ pub fn run() {
             use tauri::Manager;
             let state = app.state::<commands::LauncherState>();
             state.telemetry.start(app.handle().clone());
+            // Asynchronously audit installed JDKs on boot for available security patches
+            tauri::async_runtime::spawn(async move {
+                crate::launch::java::check_and_mark_all_cached_jdk_updates().await;
+            });
             let lan_slot = state.lan_discovery.clone();
             tauri::async_runtime::spawn(async move {
                 *lan_slot.lock().await = Some(lan_engine);

@@ -339,6 +339,9 @@ impl WarmSessionManager {
         cmd.arg("-Xms512M");
         cmd.arg("-Djava.awt.headless=true");
         cmd.arg("-Dmixin.debug.countInjections=false");
+        if java_version >= 17 {
+            cmd.arg("-XX:-UseBASE64Intrinsics");
+        }
 
         let loader = mod_loader
             .as_ref()

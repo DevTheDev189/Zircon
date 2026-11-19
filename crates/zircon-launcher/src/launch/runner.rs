@@ -675,6 +675,16 @@ fn append_jvm_memory_args(
         let gc_flags = crate::launch::java::select_optimal_gc(java_major, memory_gb, is_vr);
         tokens.extend(gc_flags);
     }
+    // Security hardening: proactively neutralize the Java4Shell (CVE-2026-114938)
+    // vulnerability on Java 17+ by disabling the AVX-512 Base64 accelerated intrinsic
+    if java_major.is_none() || java_major.is_some_and(|m| m >= 17) {
+        if !tokens.iter().any(|t| {
+            t.eq_ignore_ascii_case("-XX:+UseBASE64Intrinsics")
+                || t.eq_ignore_ascii_case("-XX:-UseBASE64Intrinsics")
+        }) {
+            tokens.push("-XX:-UseBASE64Intrinsics".to_string());
+        }
+    }
     command.extend(tokens);
     Ok(())
 }

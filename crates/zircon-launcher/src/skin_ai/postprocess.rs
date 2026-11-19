@@ -101,3 +101,25 @@ pub fn encode_to_png_data_url(raw_rgba: &[u8; 64 * 64 * 4]) -> Result<String, St
     let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
     Ok(format!("data:image/png;base64,{b64}"))
 }
+
+/// Decodes a PNG Data URL or base64 string into raw 64x64 RGBA bytes.
+pub fn decode_from_png_data_url(data_url: &str) -> Result<[u8; 64 * 64 * 4], String> {
+    use base64::Engine as _;
+    let base64_str = if let Some(idx) = data_url.find(',') {
+        &data_url[idx + 1..]
+    } else {
+        data_url
+    };
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_str.trim())
+        .map_err(|e| format!("Failed to decode base64: {e}"))?;
+    let img = image::load_from_memory(&bytes)
+        .map_err(|e| format!("Failed to parse image from PNG: {e}"))?
+        .to_rgba8();
+    if img.width() != 64 || img.height() != 64 {
+        return Err(format!("Invalid skin dimensions: {}x{} (expected 64x64)", img.width(), img.height()));
+    }
+    let mut buf = [0u8; 64 * 64 * 4];
+    buf.copy_from_slice(img.as_raw());
+    Ok(buf)
+}

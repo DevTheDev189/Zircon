@@ -81,6 +81,14 @@ impl ProcessDriver for NativeDriver {
         }));
 
         let mut args: Vec<String> = sanitize_server_java_args(&opts.memory_args)?;
+        // Security hardening: proactively neutralize the Java4Shell (CVE-2026-114938)
+        // vulnerability on Java 17+ by disabling the AVX-512 Base64 accelerated intrinsic
+        if opts.java_version >= 17 && !args.iter().any(|t| {
+            t.eq_ignore_ascii_case("-XX:+UseBASE64Intrinsics")
+                || t.eq_ignore_ascii_case("-XX:-UseBASE64Intrinsics")
+        }) {
+            args.push("-XX:-UseBASE64Intrinsics".to_string());
+        }
 
         // Determine JAR target
         let quilt_jar = opts.server_dir.join("quilt-server-launch.jar");

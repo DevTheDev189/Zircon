@@ -159,6 +159,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let idle_shutdown = IdleShutdownService::new(instances.clone());
     let idle_shutdown_handle = idle_shutdown.start();
 
+    // Asynchronously audit installed server JDKs on boot for available security patches
+    tokio::spawn(async {
+        zircon_server::installer::check_and_mark_all_cached_jdk_updates().await;
+    });
+
     let tickets = Arc::new(JoinTicketManager::new());
 
     // Auth hardening: server-side session revocation + a global cap on failed
